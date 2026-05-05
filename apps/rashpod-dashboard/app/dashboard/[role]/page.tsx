@@ -1,83 +1,87 @@
 "use client";
 
-import Link from "next/link";
 import { use, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "../../auth/auth-provider";
+import DashboardLayout from "../dashboard-layout";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3002";
+const VALID_ROLES = new Set(["designer", "customer", "production", "corporate", "moderator", "finance", "support", "admin", "super-admin"]);
+
+function StatCard({ label, value }: { label: string; value: number }) {
+  return (
+    <div style={{ background: "white", border: "1px solid #E8EAFB", borderRadius: 16, padding: "16px 20px", boxShadow: "0 1px 4px rgba(120,138,224,0.06)" }}>
+      <div style={{ color: "#6B7280", fontSize: 12, fontWeight: 500, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6 }}>{label}</div>
+      <div style={{ fontSize: 32, fontWeight: 700, color: "#1A1D2E" }}>{value.toLocaleString()}</div>
+    </div>
+  );
+}
+
+function SkeletonStat() {
+  return (
+    <div style={{ background: "white", border: "1px solid #E8EAFB", borderRadius: 16, padding: "16px 20px" }}>
+      <div style={{ height: 12, borderRadius: 6, background: "#F0F2FA", marginBottom: 10, width: "60%" }} />
+      <div style={{ height: 32, borderRadius: 8, background: "#F0F2FA", width: "40%" }} />
+    </div>
+  );
+}
 
 export default function RoleDashboardPage({ params }: { params: Promise<{ role: string }> }) {
   const { role } = use(params);
   const router = useRouter();
-  const { token, isReady, clearSession } = useAuth();
+  const { token, isReady } = useAuth();
   const [data, setData] = useState<Record<string, number> | null>(null);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
   useEffect(() => {
     if (!isReady) return;
-    if (!token) {
-      router.push("/auth/login");
-      return;
-    }
+    if (!token) { router.push(`/auth/login?next=/dashboard/${role}`); return; }
+    if (!VALID_ROLES.has(role)) { router.push("/auth/login"); return; }
+
     const load = async () => {
-      const res = await fetch(`${API_URL}/dashboard/${role}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (res.status === 401 || res.status === 403) {
-        clearSession();
-        router.push("/auth/login");
-        return;
+      setLoading(true);
+      setError("");
+      try {
+        const res = await fetch(`${API_URL}/dashboard/${role}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (res.status === 401 || res.status === 403) { router.push(`/auth/login?next=/dashboard/${role}`); return; }
+        if (!res.ok) throw new Error(`Failed to load dashboard (${res.status})`);
+        setData(await res.json());
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Something went wrong.");
+      } finally {
+        setLoading(false);
       }
-      if (!res.ok) {
-        setError(`Failed to load dashboard (${res.status})`);
-        return;
-      }
-      setData(await res.json());
     };
     void load();
   }, [role, token, isReady]);
 
-  const links: Record<string, Array<{ href: string; label: string }>> = {
-    designer: [{ href: "/dashboard/designer/listings", label: "Manage Listings" }],
-    customer: [
-      { href: "/dashboard/customer/shop", label: "Browse Shop" },
-      { href: "/dashboard/customer/orders", label: "My Orders" },
-    ],
-    production: [{ href: "/dashboard/production/jobs", label: "Production Queue" }],
-    corporate: [{ href: "/dashboard/corporate/requests", label: "Corporate Requests" }],
-    moderator: [{ href: "/dashboard/moderator/designs", label: "Moderation Queue" }],
-    admin: [
-      { href: "/dashboard/admin/orders", label: "Orders" },
-      { href: "/dashboard/admin/delivery-settings", label: "Delivery Settings" },
-      { href: "/dashboard/admin/corporate", label: "Corporate" },
-      { href: "/dashboard/admin/worker-jobs", label: "Worker Jobs" },
-    ],
-  };
-
   return (
-    <main style={{ padding: 24, maxWidth: 980 }}>
-      <h1 style={{ textTransform: "capitalize", marginBottom: 6 }}>{role} dashboard</h1>
-      {error ? <p style={{ color: "#B42318" }}>{error}</p> : null}
-      {data ? (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(180px,1fr))", gap: 12, marginTop: 12 }}>
-          {Object.entries(data).map(([k, v]) => (
-            <div key={k} style={{ background: "white", border: "1px solid #E5E7EB", borderRadius: 16, padding: 14 }}>
-              <div style={{ color: "#6B7280", fontSize: 13 }}>{k}</div>
-              <div style={{ fontSize: 28, fontWeight: 700 }}>{v}</div>
-            </div>
-          ))}
+    <DashboardLayout role={role}>
+      <h1 style={{ margin: "0 0 20px", fontSize: 22, color: "#1A1D2E", textTransform: "capitalize" }}>
+        {role.replace("-", " ")} overview
+      </h1>
+
+      {error && (
+        <div role="alert" style={{ background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 12, padding: 16, marginBottom: 20, color: "#B42318", fontSize: 14 }}>
+          {error}
+          <button onClick={() => window.location.reload()} style={{ marginLeft: 12, background: "none", border: "none", color: "#788AE0", cursor: "pointer", fontWeight: 500, padding: 0 }}>
+            Retry
+          </button>
         </div>
-      ) : (
-        <p>Loading...</p>
       )}
-      <div style={{ marginTop: 18, display: "flex", gap: 10, flexWrap: "wrap" }}>
-        {(links[role] || []).map((l) => (
-          <Link key={l.href} href={l.href} style={{ padding: "10px 14px", background: "#788AE0", color: "white", borderRadius: 999, textDecoration: "none" }}>
-            {l.label}
-          </Link>
-        ))}
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 12 }}>
+        {loading
+          ? Array.from({ length: 4 }).map((_, i) => <SkeletonStat key={i} />)
+          : data && Object.keys(data).length > 0
+          ? Object.entries(data).map(([k, v]) => <StatCard key={k} label={k} value={v} />)
+          : !error && (
+              <p style={{ color: "#9CA3AF", fontSize: 14, gridColumn: "1/-1" }}>No data available yet.</p>
+            )}
       </div>
-    </main>
+    </DashboardLayout>
   );
 }

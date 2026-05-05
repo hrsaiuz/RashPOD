@@ -9,8 +9,8 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3002";
 export default function LoginPage() {
   const router = useRouter();
   const { setSession } = useAuth();
-  const [email, setEmail] = useState("admin@rashpod.local");
-  const [password, setPassword] = useState("ChangeMe123!");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -31,8 +31,27 @@ export default function LoginPage() {
         headers: { Authorization: `Bearer ${accessToken}` },
       });
       const me = meRes.ok ? await meRes.json() : null;
-      setSession(accessToken, me);
-      router.push("/dashboard/admin/worker-jobs");
+      await setSession(accessToken, me);
+
+      const nextParam = new URLSearchParams(window.location.search).get("next");
+      if (nextParam && nextParam.startsWith("/dashboard")) {
+        router.push(nextParam);
+        return;
+      }
+      const roleRoutes: Record<string, string> = {
+        SUPER_ADMIN: "/dashboard/super-admin",
+        ADMIN: "/dashboard/admin/worker-jobs",
+        OPERATIONS_MANAGER: "/dashboard/admin/worker-jobs",
+        MODERATOR: "/dashboard/moderator",
+        PRODUCTION_STAFF: "/dashboard/production",
+        FINANCE_STAFF: "/dashboard/finance",
+        SUPPORT_STAFF: "/dashboard/support",
+        DESIGNER: "/dashboard/designer",
+        CUSTOMER: "/dashboard/customer",
+        CORPORATE_CLIENT: "/dashboard/corporate",
+      };
+      const dest = (me?.role && roleRoutes[me.role as string]) || "/dashboard";
+      router.push(dest);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unknown login error");
     } finally {

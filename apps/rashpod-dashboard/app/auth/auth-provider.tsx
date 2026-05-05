@@ -13,22 +13,9 @@ type AuthState = {
   token: string;
   user: SessionUser | null;
   isReady: boolean;
-  setSession: (token: string, user?: SessionUser | null) => void;
-  clearSession: () => void;
+  setSession: (token: string, user?: SessionUser | null) => Promise<void>;
+  clearSession: () => Promise<void>;
 };
-
-const TOKEN_KEY = "rashpod_dashboard_token";
-const USER_KEY = "rashpod_dashboard_user";
-const TOKEN_COOKIE = "rashpod_dashboard_token";
-
-function writeTokenCookie(token: string) {
-  const maxAge = 60 * 60 * 24 * 7;
-  document.cookie = `${TOKEN_COOKIE}=${encodeURIComponent(token)}; Path=/; Max-Age=${maxAge}; SameSite=Lax`;
-}
-
-function clearTokenCookie() {
-  document.cookie = `${TOKEN_COOKIE}=; Path=/; Max-Age=0; SameSite=Lax`;
-}
 
 const AuthContext = createContext<AuthState | null>(null);
 
@@ -38,32 +25,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isReady, setIsReady] = useState(false);
 
   useEffect(() => {
-    const savedToken = window.localStorage.getItem(TOKEN_KEY) || "";
-    const savedUserRaw = window.localStorage.getItem(USER_KEY);
-    const savedUser = savedUserRaw ? (JSON.parse(savedUserRaw) as SessionUser) : null;
-    setToken(savedToken);
-    setUser(savedUser);
-    if (savedToken) writeTokenCookie(savedToken);
-    setIsReady(true);
+    // Restore token + user by reading the httpOnly cookie via a server-side API route
+    fetch("/api/auth/me")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (d?.token) {
+          setToken(d.token as string);
+          if (d.user) setUser(d.user as SessionUser);
+        }
+      })
+      .catch(() => null)
+      .finally(() => setIsReady(true));
   }, []);
 
-  const setSession = (nextToken: string, nextUser?: SessionUser | null) => {
+  const setSession = async (nextToken: string, nextUser?: SessionUser | null) => {
+    await fetch("/api/auth/set-cookie", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token: nextToken }),
+    });
     setToken(nextToken);
-    if (nextUser !== undefined) setUser(nextUser);
-    window.localStorage.setItem(TOKEN_KEY, nextToken);
-    writeTokenCookie(nextToken);
-    if (nextUser !== undefined) {
-      if (nextUser) window.localStorage.setItem(USER_KEY, JSON.stringify(nextUser));
-      else window.localStorage.removeItem(USER_KEY);
-    }
+    if (nextUser !== undefined) setUser(nextUser ?? null);
   };
 
-  const clearSession = () => {
+  const clearSession = async () => {
+    await fetch("/api/auth/clear-cookie", { method: "POST" });
     setToken("");
     setUser(null);
-    window.localStorage.removeItem(TOKEN_KEY);
-    window.localStorage.removeItem(USER_KEY);
-    clearTokenCookie();
   };
 
   const value = useMemo<AuthState>(

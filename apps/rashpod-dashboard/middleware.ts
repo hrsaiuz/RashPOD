@@ -1,26 +1,38 @@
 import { NextRequest, NextResponse } from "next/server";
 import { jwtVerify } from "jose";
 
-const ADMIN_PREFIX = "/dashboard/admin";
 const DASHBOARD_PREFIX = "/dashboard";
 const LOGIN_PATH = "/auth/login";
 const TOKEN_COOKIE = "rashpod_dashboard_token";
-const ALLOWED_ADMIN_ROLES = new Set(["ADMIN", "SUPER_ADMIN", "OPERATIONS_MANAGER"]);
 
-function hasToken(req: NextRequest) {
-  const fromCookie = req.cookies.get(TOKEN_COOKIE)?.value;
-  return Boolean(fromCookie);
-}
+const ROLE_PATHS: Record<string, string[]> = {
+  SUPER_ADMIN:        ["/dashboard"],
+  ADMIN:              ["/dashboard/admin", "/dashboard/moderator", "/dashboard/production", "/dashboard/finance", "/dashboard/support"],
+  OPERATIONS_MANAGER: ["/dashboard/admin", "/dashboard/production"],
+  MODERATOR:          ["/dashboard/moderator"],
+  PRODUCTION_STAFF:   ["/dashboard/production"],
+  FINANCE_STAFF:      ["/dashboard/finance"],
+  SUPPORT_STAFF:      ["/dashboard/support"],
+  DESIGNER:           ["/dashboard/designer"],
+  CUSTOMER:           ["/dashboard/customer"],
+  CORPORATE_CLIENT:   ["/dashboard/corporate"],
+};
 
-async function isAllowedAdminToken(token: string) {
-  const secret = process.env.JWT_SECRET || "rashpod-dev-secret";
+async function verifyToken(token: string): Promise<string | null> {
+  const secret = process.env.JWT_SECRET;
+  if (!secret) return null;
   try {
     const { payload } = await jwtVerify(token, new TextEncoder().encode(secret));
-    const role = typeof payload.role === "string" ? payload.role : "";
-    return ALLOWED_ADMIN_ROLES.has(role);
+    return typeof payload.role === "string" ? payload.role : null;
   } catch {
-    return false;
+    return null;
   }
+}
+
+function isAllowed(role: string, pathname: string): boolean {
+  if (role === "SUPER_ADMIN") return true;
+  const allowed = ROLE_PATHS[role] ?? [];
+  return allowed.some((prefix) => pathname.startsWith(prefix));
 }
 
 export async function middleware(req: NextRequest) {
@@ -28,17 +40,16 @@ export async function middleware(req: NextRequest) {
   if (!pathname.startsWith(DASHBOARD_PREFIX)) return NextResponse.next();
 
   const token = req.cookies.get(TOKEN_COOKIE)?.value || "";
-  if (!hasToken(req)) {
+
+  if (!token) {
     const url = req.nextUrl.clone();
     url.pathname = LOGIN_PATH;
     url.searchParams.set("next", pathname);
     return NextResponse.redirect(url);
   }
 
-  if (!pathname.startsWith(ADMIN_PREFIX)) return NextResponse.next();
-
-  const allowed = await isAllowedAdminToken(token);
-  if (!allowed) {
+  const role = await verifyToken(token);
+  if (!role || !isAllowed(role, pathname)) {
     const url = req.nextUrl.clone();
     url.pathname = LOGIN_PATH;
     url.searchParams.set("next", pathname);
