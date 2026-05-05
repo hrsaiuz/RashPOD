@@ -1,0 +1,59 @@
+{
+  "home": {
+    "hero": {
+      "title": "Upload your designs. Sell products. Earn royalties.",
+      "subtitle": "Join Uzbekistan's first print-on-demand platform for designers",
+      "cta": "Start selling"
+    },
+    "howItWorks": {
+      "designers": "For Designers",
+      "customers": "For Customers"
+    },
+    "featuredProducts": "Featured Products",
+    "featuredDesigners": "Featured Designers",
+    "viewAll": "View all",
+    "loading": "Loading...",
+    "error": "Failed to load",
+    "retry": "Retry",
+    "noProducts": "No products available yet",
+    "noDesigners": "No designers yet"
+  },
+  "shop": {
+    "title": "Shop",
+    "filters": "Filters",
+    "clearFilters": "Clear filters",
+    "category": "Category",
+    "priceRange": "Price Range",
+    "designer": "Designer",
+    "hasFilm": "Film Available",
+    "sort": "Sort by",
+    "newest": "Newest",
+    "popular": "Most Popular",
+    "priceAsc": "Price: Low to High",
+    "priceDesc": "Price: High to Low"
+  },
+  "product": {
+    "addToCart": "Add to cart",
+    "description": "Description",
+    "shipping": "Shipping",
+    "reviews": "Reviews",
+    "designer": "Designer",
+    "relatedProducts": "Related products"
+  },
+  "film": {
+    "title": "Film Catalog",
+    "subtitle": "License high-quality designs for DTF/UV-DTF printing",
+    "licenseFilm": "License this film",
+    "notAvailable": "Not yet available for licensing",
+    "perLicense": "per license"
+  },
+  "designers": {
+    "title": "Designers",
+    "subtitle": "Meet talented designers from across Uzbekistan"
+  },
+  "about": {
+    "title": "About RashPOD",
+    "mission": "Our Mission",
+    "values": "Our Values"
+  }
+}

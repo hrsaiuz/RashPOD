@@ -8,13 +8,14 @@
     "start": "next start -p 3000"
   },
   "dependencies": {
+    "@rashpod/ui": "*",
     "autoprefixer": "^10.5.0",
     "clsx": "^2.1.1",
     "framer-motion": "^12.38.0",
     "lucide-react": "^1.14.0",
     "next": "15.3.1",
+    "next-intl": "^4.11.0",
     "postcss": "^8.5.14",
-    "@rashpod/ui": "*",
     "react": "19.1.0",
     "react-dom": "19.1.0",
     "recharts": "^3.8.1",
