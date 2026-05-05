@@ -1,0 +1,168 @@
+substitutions:
+  _REGION: us-central1
+  _REPO: rashpod
+  _PROJECT: rashpod-production
+
+steps:
+  # ── Build images ──────────────────────────────────────────────────────────────
+  - id: build-api
+    name: gcr.io/cloud-builders/docker
+    args:
+      - build
+      - -f
+      - apps/rashpod-api/Dockerfile
+      - -t
+      - ${_REGION}-docker.pkg.dev/${_PROJECT}/${_REPO}/rashpod-api:$COMMIT_SHA
+      - -t
+      - ${_REGION}-docker.pkg.dev/${_PROJECT}/${_REPO}/rashpod-api:latest
+      - .
+    waitFor: ['-']
+
+  - id: build-web
+    name: gcr.io/cloud-builders/docker
+    args:
+      - build
+      - -f
+      - apps/rashpod-web/Dockerfile
+      - -t
+      - ${_REGION}-docker.pkg.dev/${_PROJECT}/${_REPO}/rashpod-web:$COMMIT_SHA
+      - -t
+      - ${_REGION}-docker.pkg.dev/${_PROJECT}/${_REPO}/rashpod-web:latest
+      - .
+    waitFor: ['-']
+
+  - id: build-dashboard
+    name: gcr.io/cloud-builders/docker
+    args:
+      - build
+      - -f
+      - apps/rashpod-dashboard/Dockerfile
+      - -t
+      - ${_REGION}-docker.pkg.dev/${_PROJECT}/${_REPO}/rashpod-dashboard:$COMMIT_SHA
+      - -t
+      - ${_REGION}-docker.pkg.dev/${_PROJECT}/${_REPO}/rashpod-dashboard:latest
+      - .
+    waitFor: ['-']
+
+  - id: build-worker
+    name: gcr.io/cloud-builders/docker
+    args:
+      - build
+      - -f
+      - apps/rashpod-worker/Dockerfile
+      - -t
+      - ${_REGION}-docker.pkg.dev/${_PROJECT}/${_REPO}/rashpod-worker:$COMMIT_SHA
+      - -t
+      - ${_REGION}-docker.pkg.dev/${_PROJECT}/${_REPO}/rashpod-worker:latest
+      - .
+    waitFor: ['-']
+
+  # ── Push images ───────────────────────────────────────────────────────────────
+  - id: push-api
+    name: gcr.io/cloud-builders/docker
+    args: [push, '--all-tags', '${_REGION}-docker.pkg.dev/${_PROJECT}/${_REPO}/rashpod-api']
+    waitFor: [build-api]
+
+  - id: push-web
+    name: gcr.io/cloud-builders/docker
+    args: [push, '--all-tags', '${_REGION}-docker.pkg.dev/${_PROJECT}/${_REPO}/rashpod-web']
+    waitFor: [build-web]
+
+  - id: push-dashboard
+    name: gcr.io/cloud-builders/docker
+    args: [push, '--all-tags', '${_REGION}-docker.pkg.dev/${_PROJECT}/${_REPO}/rashpod-dashboard']
+    waitFor: [build-dashboard]
+
+  - id: push-worker
+    name: gcr.io/cloud-builders/docker
+    args: [push, '--all-tags', '${_REGION}-docker.pkg.dev/${_PROJECT}/${_REPO}/rashpod-worker']
+    waitFor: [build-worker]
+
+  # ── Deploy to Cloud Run ───────────────────────────────────────────────────────
+  - id: deploy-api
+    name: gcr.io/google.com/cloudsdktool/cloud-sdk
+    entrypoint: gcloud
+    args:
+      - run
+      - deploy
+      - rashpod-api
+      - --image=${_REGION}-docker.pkg.dev/${_PROJECT}/${_REPO}/rashpod-api:$COMMIT_SHA
+      - --region=${_REGION}
+      - --platform=managed
+      - --allow-unauthenticated
+      - --port=8080
+      - --memory=512Mi
+      - --cpu=1
+      - --min-instances=0
+      - --max-instances=5
+      - --set-secrets=DATABASE_URL=DATABASE_URL:latest,JWT_SECRET=JWT_SECRET:latest,ZEPTO_SMTP_PASSWORD=ZEPTO_SMTP_PASSWORD:latest,OPENAI_API_KEY=OPENAI_API_KEY:latest,CLICK_SECRET_KEY=CLICK_SECRET_KEY:latest
+      - --set-env-vars=NODE_ENV=production,ZEPTO_SMTP_HOST=smtp.zeptomail.com,ZEPTO_SMTP_PORT=587,ZEPTO_SMTP_FROM=rashpod.uz,ZEPTO_SMTP_USERNAME=emailapikey,JWT_EXPIRES_IN=7d
+    waitFor: [push-api]
+
+  - id: deploy-worker
+    name: gcr.io/google.com/cloudsdktool/cloud-sdk
+    entrypoint: gcloud
+    args:
+      - run
+      - deploy
+      - rashpod-worker
+      - --image=${_REGION}-docker.pkg.dev/${_PROJECT}/${_REPO}/rashpod-worker:$COMMIT_SHA
+      - --region=${_REGION}
+      - --platform=managed
+      - --no-allow-unauthenticated
+      - --port=8080
+      - --memory=1Gi
+      - --cpu=1
+      - --min-instances=0
+      - --max-instances=3
+      - --set-secrets=DATABASE_URL=DATABASE_URL:latest,GCS_BUCKET_NAME=GCS_BUCKET_NAME:latest
+      - --set-env-vars=NODE_ENV=production
+    waitFor: [push-worker]
+
+  - id: deploy-web
+    name: gcr.io/google.com/cloudsdktool/cloud-sdk
+    entrypoint: gcloud
+    args:
+      - run
+      - deploy
+      - rashpod-web
+      - --image=${_REGION}-docker.pkg.dev/${_PROJECT}/${_REPO}/rashpod-web:$COMMIT_SHA
+      - --region=${_REGION}
+      - --platform=managed
+      - --allow-unauthenticated
+      - --port=8080
+      - --memory=512Mi
+      - --cpu=1
+      - --min-instances=0
+      - --max-instances=10
+      - --set-env-vars=NODE_ENV=production
+    waitFor: [push-web]
+
+  - id: deploy-dashboard
+    name: gcr.io/google.com/cloudsdktool/cloud-sdk
+    entrypoint: gcloud
+    args:
+      - run
+      - deploy
+      - rashpod-dashboard
+      - --image=${_REGION}-docker.pkg.dev/${_PROJECT}/${_REPO}/rashpod-dashboard:$COMMIT_SHA
+      - --region=${_REGION}
+      - --platform=managed
+      - --allow-unauthenticated
+      - --port=8080
+      - --memory=512Mi
+      - --cpu=1
+      - --min-instances=0
+      - --max-instances=5
+      - --set-env-vars=NODE_ENV=production
+    waitFor: [push-dashboard]
+
+images:
+  - ${_REGION}-docker.pkg.dev/${_PROJECT}/${_REPO}/rashpod-api:$COMMIT_SHA
+  - ${_REGION}-docker.pkg.dev/${_PROJECT}/${_REPO}/rashpod-web:$COMMIT_SHA
+  - ${_REGION}-docker.pkg.dev/${_PROJECT}/${_REPO}/rashpod-dashboard:$COMMIT_SHA
+  - ${_REGION}-docker.pkg.dev/${_PROJECT}/${_REPO}/rashpod-worker:$COMMIT_SHA
+
+options:
+  machineType: E2_HIGHCPU_8
+  logging: CLOUD_LOGGING_ONLY
