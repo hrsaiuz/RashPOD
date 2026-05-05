@@ -21,7 +21,9 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY tsconfig.base.json ./
 COPY packages/ ./packages/
 COPY apps/rashpod-worker/ ./apps/rashpod-worker/
+COPY apps/rashpod-api/prisma ./apps/rashpod-api/prisma
 
+RUN npx prisma generate --schema=apps/rashpod-api/prisma/schema.prisma
 RUN cd apps/rashpod-worker && npx tsc -p tsconfig.json
 
 # ── Stage 3: production runner ─────────────────────────────────────────────────
