@@ -5,7 +5,7 @@ import { use } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { Button, ProductCard } from "@rashpod/ui";
-import { Star, CheckCircle, ChevronLeft, ChevronRight, Share2, Heart } from "lucide-react";
+import { Star, CheckCircle, ChevronLeft, ChevronRight, Share2, Heart, Package } from "lucide-react";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3002";
 
