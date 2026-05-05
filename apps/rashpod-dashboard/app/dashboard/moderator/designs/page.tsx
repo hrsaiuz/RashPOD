@@ -3,17 +3,16 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "../../../auth/auth-provider";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3002";
 type Design = { id: string; title: string; status: string };
 
 export default function ModeratorDesignsPage() {
-  const { token } = useAuth();
+  const { user } = useAuth();
   const [items, setItems] = useState<Design[]>([]);
   const [error, setError] = useState("");
 
   const load = async () => {
-    if (!token) return;
-    const res = await fetch(`${API_URL}/moderation/designs`, { headers: { Authorization: `Bearer ${token}` } });
+    if (!user) return;
+    const res = await fetch(`/api/proxy/moderation/designs`);
     if (!res.ok) {
       setError(`Failed to load queue (${res.status})`);
       return;
@@ -23,13 +22,13 @@ export default function ModeratorDesignsPage() {
 
   useEffect(() => {
     void load();
-  }, [token]);
+  }, [user]);
 
   const decide = async (id: string, action: "approve" | "reject" | "request-changes") => {
-    if (!token) return;
-    await fetch(`${API_URL}/moderation/designs/${id}/${action}`, {
+    if (!user) return;
+    await fetch(`/api/proxy/moderation/designs/${id}/${action}`, {
       method: "POST",
-      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ reason: action !== "approve" ? "Moderator action" : undefined }),
     });
     await load();

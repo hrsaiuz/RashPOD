@@ -5,14 +5,12 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "../../../auth/auth-provider";
 import DashboardLayout from "../../dashboard-layout";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3002";
-
 type Design = { id: string; title: string };
 type Listing = { id: string; title: string; status: string; slug: string; price: string };
 
 export default function DesignerListingsPage() {
   const router = useRouter();
-  const { token, isReady } = useAuth();
+  const { user, isLoading } = useAuth();
   const [designs, setDesigns] = useState<Design[]>([]);
   const [listings, setListings] = useState<Listing[]>([]);
   const [form, setForm] = useState({ designAssetId: "", title: "", description: "", price: "0", type: "PRODUCT" });
@@ -20,30 +18,28 @@ export default function DesignerListingsPage() {
   const [submitting, setSubmitting] = useState(false);
 
   const load = async () => {
-    if (!token) return;
     const [dRes, lRes] = await Promise.all([
-      fetch(`${API_URL}/designs`, { headers: { Authorization: `Bearer ${token}` } }),
-      fetch(`${API_URL}/listings`, { headers: { Authorization: `Bearer ${token}` } }),
+      fetch(`/api/proxy/designs`),
+      fetch(`/api/proxy/listings`),
     ]);
     if (dRes.ok) setDesigns(await dRes.json() as Design[]);
     if (lRes.ok) setListings(await lRes.json() as Listing[]);
   };
 
   useEffect(() => {
-    if (!isReady) return;
-    if (!token) { router.push("/auth/login?next=/dashboard/designer/listings"); return; }
+    if (isLoading || !user) return;
     void load();
-  }, [token, isReady]);
+  }, [user, isLoading, router]);
 
   const onCreate = async (e: FormEvent) => {
     e.preventDefault();
-    if (!token) return;
+    if (!user) return;
     setError("");
     setSubmitting(true);
     try {
-      const res = await fetch(`${API_URL}/listings`, {
+      const res = await fetch(`/api/proxy/listings`, {
         method: "POST",
-        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...form, price: Number(form.price) }),
       });
       if (!res.ok) throw new Error(`Create failed (${res.status})`);

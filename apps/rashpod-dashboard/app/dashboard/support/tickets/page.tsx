@@ -5,8 +5,6 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "../../../auth/auth-provider";
 import DashboardLayout from "../../dashboard-layout";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3002";
-
 interface Ticket {
   id: string;
   subject: string;
@@ -35,21 +33,18 @@ const STATUS_STYLE: Record<string, { bg: string; color: string }> = {
 
 export default function SupportTicketsPage() {
   const router = useRouter();
-  const { token, isReady } = useAuth();
+  const { user, isLoading } = useAuth();
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [filter, setFilter] = useState<"all" | "open" | "in_progress" | "resolved">("all");
 
   useEffect(() => {
-    if (!isReady) return;
-    if (!token) { router.push("/auth/login?next=/dashboard/support/tickets"); return; }
+    if (isLoading || !user) return;
 
     const load = async () => {
       try {
-        const res = await fetch(`${API_URL}/support/tickets`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+        const res = await fetch(`/api/proxy/support/tickets`);
         if (res.status === 401 || res.status === 403) { router.push("/auth/login"); return; }
         if (!res.ok) throw new Error(`Server error (${res.status})`);
         setTickets(await res.json());
@@ -60,7 +55,7 @@ export default function SupportTicketsPage() {
       }
     };
     void load();
-  }, [token, isReady]);
+  }, [user, isLoading, router]);
 
   const filtered = filter === "all" ? tickets : tickets.filter((t) => t.status === filter);
 

@@ -4,11 +4,9 @@ import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "../../../auth/auth-provider";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3002";
-
 export default function AdminAiAssistPage() {
   const router = useRouter();
-  const { token, user, clearSession } = useAuth();
+  const { user, clearSession } = useAuth();
   const [prompt, setPrompt] = useState("Blue oversized hoodie with abstract ink print");
   const [result, setResult] = useState<any>(null);
   const [error, setError] = useState("");
@@ -19,11 +17,10 @@ export default function AdminAiAssistPage() {
     setLoading(true);
     setError("");
     try {
-      const res = await fetch(`${API_URL}/ai/listing-copy`, {
+      const res = await fetch(`/api/proxy/ai/listing-copy`, {
         method: "POST",
         headers: {
           "content-type": "application/json",
-          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({ titleHint: prompt }),
       });

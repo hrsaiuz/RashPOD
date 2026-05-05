@@ -3,29 +3,28 @@
 import { FormEvent, useEffect, useState } from "react";
 import { useAuth } from "../../../auth/auth-provider";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3002";
 type CorporateRequest = { id: string; title: string; status: string; quantity: number; budget: string | null };
 
 export default function CorporateRequestsPage() {
-  const { token } = useAuth();
+  const { user } = useAuth();
   const [requests, setRequests] = useState<CorporateRequest[]>([]);
   const [form, setForm] = useState({ title: "", details: "", quantity: "100", budget: "0" });
 
   const load = async () => {
-    if (!token) return;
-    const res = await fetch(`${API_URL}/corporate/requests`, { headers: { Authorization: `Bearer ${token}` } });
+    if (!user) return;
+    const res = await fetch(`/api/proxy/corporate/requests`);
     if (res.ok) setRequests(await res.json());
   };
   useEffect(() => {
     void load();
-  }, [token]);
+  }, [user]);
 
   const create = async (e: FormEvent) => {
     e.preventDefault();
-    if (!token) return;
-    await fetch(`${API_URL}/corporate/requests`, {
+    if (!user) return;
+    await fetch(`/api/proxy/corporate/requests`, {
       method: "POST",
-      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         title: form.title,
         details: form.details,

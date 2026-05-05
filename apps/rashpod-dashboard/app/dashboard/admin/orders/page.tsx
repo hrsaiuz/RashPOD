@@ -3,38 +3,37 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "../../../auth/auth-provider";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3002";
 type AdminOrder = { id: string; status: string; total: string; customer: { email: string } };
 
 export default function AdminOrdersPage() {
-  const { token } = useAuth();
+  const { user } = useAuth();
   const [orders, setOrders] = useState<AdminOrder[]>([]);
 
   const load = async () => {
-    if (!token) return;
-    const res = await fetch(`${API_URL}/admin/orders`, { headers: { Authorization: `Bearer ${token}` } });
+    if (!user) return;
+    const res = await fetch(`/api/proxy/admin/orders`);
     if (res.ok) setOrders(await res.json());
   };
 
   useEffect(() => {
     void load();
-  }, [token]);
+  }, [user]);
 
   const markPaid = async (id: string) => {
-    if (!token) return;
-    await fetch(`${API_URL}/admin/orders/${id}/mark-paid`, {
+    if (!user) return;
+    await fetch(`/api/proxy/admin/orders/${id}/mark-paid`, {
       method: "POST",
-      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ providerRef: `manual-${Date.now()}` }),
     });
     await load();
   };
 
   const createShipment = async (id: string) => {
-    if (!token) return;
-    await fetch(`${API_URL}/delivery/create-shipment`, {
+    if (!user) return;
+    await fetch(`/api/proxy/delivery/create-shipment`, {
       method: "POST",
-      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ orderId: id }),
     });
     await load();

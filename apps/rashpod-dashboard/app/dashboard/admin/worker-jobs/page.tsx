@@ -16,8 +16,6 @@ type WorkerJob = {
   updatedAt: string;
 };
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3002";
-
 const STATUS_STYLE: Record<string, { bg: string; color: string }> = {
   PENDING: { bg: "#FEF3C7", color: "#92400E" },
   PROCESSING: { bg: "#DBEAFE", color: "#1E40AF" },
@@ -27,7 +25,7 @@ const STATUS_STYLE: Record<string, { bg: string; color: string }> = {
 
 export default function AdminWorkerJobsPage() {
   const router = useRouter();
-  const { token, isReady, user, clearSession } = useAuth();
+  const { user, isLoading, clearSession } = useAuth();
   const [jobs, setJobs] = useState<WorkerJob[]>([]);
   const [status, setStatus] = useState<string>("");
   const [type, setType] = useState<string>("");
@@ -42,9 +40,7 @@ export default function AdminWorkerJobsPage() {
       const params = new URLSearchParams();
       if (status) params.set("status", status);
       if (type) params.set("type", type);
-      const res = await fetch(`${API_URL}/admin/worker-jobs?${params.toString()}`, {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-      });
+      const res = await fetch(`/api/proxy/admin/worker-jobs?${params.toString()}`);
       if (res.status === 401 || res.status === 403) { clearSession(); router.push("/auth/login"); return; }
       if (!res.ok) throw new Error(`Failed to load jobs (${res.status})`);
       setJobs(await res.json() as WorkerJob[]);
@@ -56,10 +52,9 @@ export default function AdminWorkerJobsPage() {
   };
 
   const retry = async (id: string) => {
-    if (!token) { setError("Session expired."); return; }
-    const res = await fetch(`${API_URL}/admin/worker-jobs/${id}/retry`, {
+    if (!user) { setError("Session expired."); return; }
+    const res = await fetch(`/api/proxy/admin/worker-jobs/${id}/retry`, {
       method: "POST",
-      headers: { Authorization: `Bearer ${token}` },
     });
     if (res.status === 401 || res.status === 403) { clearSession(); router.push("/auth/login"); return; }
     if (!res.ok) { setError(`Retry failed (${res.status})`); return; }
@@ -67,10 +62,9 @@ export default function AdminWorkerJobsPage() {
   };
 
   useEffect(() => {
-    if (!isReady) return;
-    if (!token) { router.push("/auth/login"); return; }
+    if (isLoading || !user) return;
     void load();
-  }, [isReady, token]);
+  }, [user, isLoading, router]);
 
   return (
     <DashboardLayout role="admin">

@@ -1,11 +1,11 @@
 "use client";
 
-import { FormEvent, useState, useEffect } from "react";
+import { FormEvent, useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3002";
 
-export default function RegisterPage() {
+function RegisterForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [email, setEmail] = useState("");
@@ -137,5 +137,13 @@ export default function RegisterPage() {
         </a>
       </p>
     </main>
+  );
+}
+
+export default function RegisterPage() {
+  return (
+    <Suspense fallback={<div style={{ maxWidth: 440, margin: "48px auto", padding: 24, textAlign: "center" }}>Loading...</div>}>
+      <RegisterForm />
+    </Suspense>
   );
 }

@@ -3,8 +3,6 @@
 import { FormEvent, useEffect, useState } from "react";
 import { useAuth } from "../../../auth/auth-provider";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3002";
-
 type DeliverySetting = {
   id: string;
   providerType: string;
@@ -17,7 +15,7 @@ type DeliverySetting = {
 };
 
 export default function AdminDeliverySettingsPage() {
-  const { token } = useAuth();
+  const { user } = useAuth();
   const [items, setItems] = useState<DeliverySetting[]>([]);
   const [message, setMessage] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -40,8 +38,8 @@ export default function AdminDeliverySettingsPage() {
   });
 
   const load = async () => {
-    if (!token) return;
-    const res = await fetch(`${API_URL}/admin/delivery-settings`, { headers: { Authorization: `Bearer ${token}` } });
+    if (!user) return;
+    const res = await fetch(`/api/proxy/admin/delivery-settings`);
     if (!res.ok) {
       setMessage(`Failed to load settings (${res.status})`);
       return;
@@ -51,14 +49,14 @@ export default function AdminDeliverySettingsPage() {
 
   useEffect(() => {
     void load();
-  }, [token]);
+  }, [user]);
 
   const addSetting = async (e: FormEvent) => {
     e.preventDefault();
-    if (!token) return;
-    const res = await fetch(`${API_URL}/admin/delivery-settings`, {
+    if (!user) return;
+    const res = await fetch(`/api/proxy/admin/delivery-settings`, {
       method: "POST",
-      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         providerType: form.providerType,
         displayName: form.displayName,
@@ -78,10 +76,10 @@ export default function AdminDeliverySettingsPage() {
   };
 
   const toggleActive = async (id: string, isActive: boolean) => {
-    if (!token) return;
-    const res = await fetch(`${API_URL}/delivery/admin/providers/${id}`, {
+    if (!user) return;
+    const res = await fetch(`/api/proxy/delivery/admin/providers/${id}`, {
       method: "PATCH",
-      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ isActive: !isActive }),
     });
     if (!res.ok) {
@@ -105,10 +103,10 @@ export default function AdminDeliverySettingsPage() {
   };
 
   const saveEdit = async () => {
-    if (!token || !editingId) return;
-    const res = await fetch(`${API_URL}/admin/delivery-settings/${editingId}`, {
+    if (!user || !editingId) return;
+    const res = await fetch(`/api/proxy/admin/delivery-settings/${editingId}`, {
       method: "PATCH",
-      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         providerType: editForm.providerType,
         displayName: editForm.displayName,

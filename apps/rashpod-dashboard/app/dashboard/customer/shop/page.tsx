@@ -7,15 +7,15 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3002";
 type ShopListing = { id: string; title: string; type: string; price: string; slug: string };
 
 export default function CustomerShopPage() {
-  const { token } = useAuth();
+  const { user } = useAuth();
   const [listings, setListings] = useState<ShopListing[]>([]);
   const [cartCount, setCartCount] = useState(0);
 
   const load = async () => {
     const sRes = await fetch(`${API_URL}/shop/listings`);
     if (sRes.ok) setListings(await sRes.json());
-    if (token) {
-      const cRes = await fetch(`${API_URL}/cart`, { headers: { Authorization: `Bearer ${token}` } });
+    if (user) {
+      const cRes = await fetch(`/api/proxy/cart`);
       if (cRes.ok) {
         const cart = await cRes.json();
         setCartCount(cart.items?.length || 0);
@@ -25,13 +25,13 @@ export default function CustomerShopPage() {
 
   useEffect(() => {
     void load();
-  }, [token]);
+  }, [user]);
 
   const add = async (listingId: string) => {
-    if (!token) return;
-    await fetch(`${API_URL}/cart`, {
+    if (!user) return;
+    await fetch(`/api/proxy/cart`, {
       method: "POST",
-      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ listingId, quantity: 1 }),
     });
     await load();

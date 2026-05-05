@@ -5,8 +5,6 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "../../../auth/auth-provider";
 import DashboardLayout from "../../dashboard-layout";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3002";
-
 interface PaymentRow {
   id: string;
   orderId: string;
@@ -30,20 +28,17 @@ const STATUS_STYLE: Record<string, { bg: string; color: string }> = {
 
 export default function FinancePaymentsPage() {
   const router = useRouter();
-  const { token, isReady } = useAuth();
+  const { user, isLoading } = useAuth();
   const [rows, setRows] = useState<PaymentRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
   useEffect(() => {
-    if (!isReady) return;
-    if (!token) { router.push("/auth/login?next=/dashboard/finance/payments"); return; }
+    if (isLoading || !user) return;
 
     const load = async () => {
       try {
-        const res = await fetch(`${API_URL}/payments`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+        const res = await fetch(`/api/proxy/payments`);
         if (res.status === 401 || res.status === 403) { router.push("/auth/login"); return; }
         if (!res.ok) throw new Error(`Server error (${res.status})`);
         setRows(await res.json());
@@ -54,7 +49,7 @@ export default function FinancePaymentsPage() {
       }
     };
     void load();
-  }, [token, isReady]);
+  }, [user, isLoading, router]);
 
   return (
     <DashboardLayout role="finance">

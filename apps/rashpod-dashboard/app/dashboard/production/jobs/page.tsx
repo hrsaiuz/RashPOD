@@ -4,8 +4,6 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "../../../auth/auth-provider";
 import DashboardLayout from "../../dashboard-layout";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3002";
 type Job = { id: string; status: string; queueType: string; order: { id: string } };
 
 const STATUSES = ["ORDERED", "FILE_CHECK", "READY_FOR_PRINT", "PRINTING", "QC", "PACKING", "READY_FOR_PICKUP", "DELIVERED"];
@@ -30,17 +28,16 @@ function Skeleton() {
 
 export default function ProductionJobsPage() {
   const router = useRouter();
-  const { token, isReady } = useAuth();
+  const { user, isLoading } = useAuth();
   const [jobs, setJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [updating, setUpdating] = useState<string | null>(null);
 
   const load = async () => {
-    if (!token) return;
     setError("");
     try {
-      const res = await fetch(`${API_URL}/production/jobs`, { headers: { Authorization: `Bearer ${token}` } });
+      const res = await fetch(`/api/proxy/production/jobs`);
       if (res.status === 401 || res.status === 403) { router.push("/auth/login"); return; }
       if (!res.ok) throw new Error(`Server error (${res.status})`);
       setJobs(await res.json());
@@ -52,18 +49,17 @@ export default function ProductionJobsPage() {
   };
 
   useEffect(() => {
-    if (!isReady) return;
-    if (!token) { router.push("/auth/login?next=/dashboard/production/jobs"); return; }
+    if (isLoading || !user) return;
     void load();
-  }, [token, isReady]);
+  }, [user, isLoading, router]);
 
   const update = async (id: string, status: string) => {
-    if (!token) return;
+    if (!user) return;
     setUpdating(id);
     try {
-      const res = await fetch(`${API_URL}/production/jobs/${id}/status`, {
+      const res = await fetch(`/api/proxy/production/jobs/${id}/status`, {
         method: "PATCH",
-        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status }),
       });
       if (!res.ok) throw new Error("Update failed");

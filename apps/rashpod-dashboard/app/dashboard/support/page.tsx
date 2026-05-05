@@ -8,18 +8,16 @@ import Link from "next/link";
 
 export default function SupportPage() {
   const router = useRouter();
-  const { token, isReady } = useAuth();
+  const { user, isLoading } = useAuth();
   const [stats, setStats] = useState<{ open: number; inProgress: number; resolved: number } | null>(null);
-  const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3002";
 
   useEffect(() => {
-    if (!isReady) return;
-    if (!token) { router.push("/auth/login?next=/dashboard/support"); return; }
-    fetch(`${API_URL}/support/stats`, { headers: { Authorization: `Bearer ${token}` } })
+    if (isLoading || !user) return;
+    fetch(`/api/proxy/support/stats`)
       .then((r) => r.ok ? r.json() : null)
       .then((d) => d && setStats(d))
       .catch(() => null);
-  }, [token, isReady]);
+  }, [user, isLoading, router]);
 
   return (
     <DashboardLayout role="support">

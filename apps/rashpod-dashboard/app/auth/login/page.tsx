@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useState, useEffect } from "react";
+import { FormEvent, useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "../auth-provider";
 
@@ -39,7 +39,7 @@ function normalizeRole(roleValue: string | string[]): string {
   return roleValue;
 }
 
-export default function LoginPage() {
+function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { login } = useAuth();
@@ -134,5 +134,13 @@ export default function LoginPage() {
         </a>
       </p>
     </main>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<div style={{ maxWidth: 440, margin: "48px auto", padding: 24, textAlign: "center" }}>Loading...</div>}>
+      <LoginForm />
+    </Suspense>
   );
 }

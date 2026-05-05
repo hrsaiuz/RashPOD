@@ -5,8 +5,6 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "../../../auth/auth-provider";
 import DashboardLayout from "../../dashboard-layout";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3002";
-
 interface RoyaltyRow {
   id: string;
   designerName: string;
@@ -23,20 +21,17 @@ function Skeleton({ w = "100%", h = 14 }: { w?: string | number; h?: number }) {
 
 export default function FinanceRoyaltiesPage() {
   const router = useRouter();
-  const { token, isReady } = useAuth();
+  const { user, isLoading } = useAuth();
   const [rows, setRows] = useState<RoyaltyRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
   useEffect(() => {
-    if (!isReady) return;
-    if (!token) { router.push("/auth/login?next=/dashboard/finance/royalties"); return; }
+    if (isLoading || !user) return;
 
     const load = async () => {
       try {
-        const res = await fetch(`${API_URL}/royalties/pending`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+        const res = await fetch(`/api/proxy/royalties/pending`);
         if (res.status === 401 || res.status === 403) { router.push("/auth/login"); return; }
         if (!res.ok) throw new Error(`Server error (${res.status})`);
         setRows(await res.json());
@@ -47,7 +42,7 @@ export default function FinanceRoyaltiesPage() {
       }
     };
     void load();
-  }, [token, isReady]);
+  }, [user, isLoading, router]);
 
   return (
     <DashboardLayout role="finance">

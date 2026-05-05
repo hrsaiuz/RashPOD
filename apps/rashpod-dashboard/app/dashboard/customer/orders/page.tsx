@@ -9,7 +9,7 @@ type CartItem = { id: string; listing: { title: string }; quantity: number };
 type DeliveryOption = { id: string; providerType: string; displayName: string; zone: string };
 
 export default function CustomerOrdersPage() {
-  const { token } = useAuth();
+  const { user } = useAuth();
   const [orders, setOrders] = useState<Order[]>([]);
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [deliveryOptions, setDeliveryOptions] = useState<DeliveryOption[]>([]);
@@ -18,11 +18,11 @@ export default function CustomerOrdersPage() {
   const [message, setMessage] = useState("");
 
   const load = async () => {
-    if (!token) return;
+    if (!user) return;
     const [oRes, cRes, dRes] = await Promise.all([
-      fetch(`${API_URL}/orders`, { headers: { Authorization: `Bearer ${token}` } }),
-      fetch(`${API_URL}/cart`, { headers: { Authorization: `Bearer ${token}` } }),
-      fetch(`${API_URL}/delivery/options`, { headers: { Authorization: `Bearer ${token}` } }),
+      fetch(`/api/proxy/orders`),
+      fetch(`/api/proxy/cart`),
+      fetch(`/api/proxy/delivery/options`),
     ]);
     if (oRes.ok) setOrders(await oRes.json());
     if (cRes.ok) {
@@ -41,13 +41,13 @@ export default function CustomerOrdersPage() {
 
   useEffect(() => {
     void load();
-  }, [token]);
+  }, [user]);
 
   const checkout = async () => {
-    if (!token) return;
-    const res = await fetch(`${API_URL}/orders`, {
+    if (!user) return;
+    const res = await fetch(`/api/proxy/orders`, {
       method: "POST",
-      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ deliveryType, deliveryZone }),
     });
     if (!res.ok) {
@@ -56,9 +56,9 @@ export default function CustomerOrdersPage() {
       return;
     }
     const order = await res.json();
-    const payRes = await fetch(`${API_URL}/payments/click/create`, {
+    const payRes = await fetch(`/api/proxy/payments/click/create`, {
       method: "POST",
-      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ orderId: order.id }),
     });
     setMessage(payRes.ok ? `Order created with payment ${String((await payRes.json()).paymentId)}` : "Order created, payment init failed");

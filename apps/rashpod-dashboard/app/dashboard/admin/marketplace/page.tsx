@@ -4,11 +4,9 @@ import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "../../../auth/auth-provider";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3002";
-
 export default function AdminMarketplacePage() {
   const router = useRouter();
-  const { token, user, clearSession } = useAuth();
+  const { user, clearSession } = useAuth();
   const [type, setType] = useState<"" | "PRODUCT" | "FILM">("");
   const [data, setData] = useState<any>(null);
   const [error, setError] = useState("");
@@ -21,9 +19,7 @@ export default function AdminMarketplacePage() {
     try {
       const params = new URLSearchParams();
       if (type) params.set("type", type);
-      const res = await fetch(`${API_URL}/admin/marketplace/export?${params.toString()}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = await fetch(`/api/proxy/admin/marketplace/export?${params.toString()}`);
       if (res.status === 401 || res.status === 403) {
         clearSession();
         router.push("/auth/login");

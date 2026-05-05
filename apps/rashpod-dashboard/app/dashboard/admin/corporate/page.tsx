@@ -3,55 +3,50 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "../../../auth/auth-provider";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3002";
 type Req = { id: string; title: string; status: string };
 type Bid = { id: string; designerId: string; proposal: string; status: string; designFee: string };
 
 export default function AdminCorporatePage() {
-  const { token } = useAuth();
+  const { user } = useAuth();
   const [requests, setRequests] = useState<Req[]>([]);
   const [selectedReq, setSelectedReq] = useState("");
   const [bids, setBids] = useState<Bid[]>([]);
   const [selectedBid, setSelectedBid] = useState("");
 
   const loadRequests = async () => {
-    if (!token) return;
-    const res = await fetch(`${API_URL}/corporate/requests`, { headers: { Authorization: `Bearer ${token}` } });
+    if (!user) return;
+    const res = await fetch(`/api/proxy/corporate/requests`);
     if (res.ok) setRequests(await res.json());
   };
   const loadBids = async (requestId: string) => {
-    if (!token || !requestId) return;
-    const res = await fetch(`${API_URL}/corporate/requests/${requestId}/bids`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
+    if (!user || !requestId) return;
+    const res = await fetch(`/api/proxy/corporate/requests/${requestId}/bids`);
     if (res.ok) setBids(await res.json());
   };
 
   useEffect(() => {
     void loadRequests();
-  }, [token]);
+  }, [user]);
 
   const selectBid = async (bidId: string) => {
-    if (!token) return;
-    await fetch(`${API_URL}/admin/corporate/bids/${bidId}/select`, {
+    if (!user) return;
+    await fetch(`/api/proxy/admin/corporate/bids/${bidId}/select`, {
       method: "POST",
-      headers: { Authorization: `Bearer ${token}` },
     });
     await loadBids(selectedReq);
   };
 
   const createOffer = async () => {
-    if (!token || !selectedReq || !selectedBid) return;
-    const res = await fetch(`${API_URL}/admin/commercial-offers/${selectedReq}`, {
+    if (!user || !selectedReq || !selectedBid) return;
+    const res = await fetch(`/api/proxy/admin/commercial-offers/${selectedReq}`, {
       method: "POST",
-      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ selectedBidId: selectedBid, subtotal: 1000000, discount: 0, terms: "Standard terms" }),
     });
     if (!res.ok) return;
     const offer = await res.json();
-    await fetch(`${API_URL}/admin/commercial-offers/${offer.id}/send`, {
+    await fetch(`/api/proxy/admin/commercial-offers/${offer.id}/send`, {
       method: "POST",
-      headers: { Authorization: `Bearer ${token}` },
     });
     await loadRequests();
   };
