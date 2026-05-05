@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 
+import "./globals.css";
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 
 export const metadata: Metadata = {
@@ -17,7 +18,7 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en" className={inter.variable}>
-      <body style={{ margin: 0, background: "#F0F2FA", color: "#1A1D2E", fontFamily: "var(--font-inter), system-ui, sans-serif" }}>
+      <body className="font-rash antialiased min-h-screen">
         <header style={{ background: "white", borderBottom: "1px solid #E8EAFB", padding: "0 24px", height: 60, display: "flex", alignItems: "center", gap: 24, position: "sticky", top: 0, zIndex: 50 }}>
           <a href="/" style={{ fontWeight: 700, fontSize: 18, color: "#788AE0", textDecoration: "none", letterSpacing: -0.5 }}>RashPOD</a>
           <nav style={{ display: "flex", gap: 20, marginLeft: "auto", alignItems: "center" }}>

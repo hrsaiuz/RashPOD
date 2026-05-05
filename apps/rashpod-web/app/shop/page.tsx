@@ -2,19 +2,12 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { CategoryTile, ProductCard } from "@rashpod/ui";
+import { motion, AnimatePresence } from "framer-motion";
+import { Search, Filter } from "lucide-react";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3002";
-type Listing = { id: string; slug: string; title: string; type: string; price: string };
-
-function SkeletonCard() {
-  return (
-    <div style={{ background: "white", border: "1px solid #E8EAFB", borderRadius: 16, padding: 12, animation: "pulse 1.5s ease-in-out infinite" }}>
-      <div style={{ height: 140, borderRadius: 10, background: "#F0F2FA", marginBottom: 10 }} />
-      <div style={{ height: 14, borderRadius: 6, background: "#F0F2FA", marginBottom: 6, width: "70%" }} />
-      <div style={{ height: 12, borderRadius: 6, background: "#F0F2FA", width: "45%" }} />
-    </div>
-  );
-}
+type Listing = { id: string; slug: string; title: string; type: string; price: string; imageUrl?: string };
 
 export default function ShopPage() {
   const [items, setItems] = useState<Listing[]>([]);
@@ -48,68 +41,111 @@ export default function ShopPage() {
   };
 
   return (
-    <main style={{ maxWidth: 1120, margin: "0 auto", padding: "32px 16px" }}>
-      <h1 style={{ margin: "0 0 20px", color: "#1A1D2E" }}>RashPOD Shop</h1>
+    <main className="max-w-[1280px] mx-auto px-6 py-10">
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-12">
+        <div>
+          <h1 className="text-4xl font-bold text-brand-ink mb-2">RashPOD Shop</h1>
+          <p className="text-brand-muted">Discover unique designs and high-quality prints.</p>
+        </div>
 
-      <form onSubmit={onSearch} style={{ display: "flex", gap: 8, marginBottom: 20, flexWrap: "wrap" }}>
-        <input
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          placeholder="Search listings…"
-          aria-label="Search listings"
-          style={{ flex: "1 1 200px", padding: "10px 14px", borderRadius: 12, border: "1px solid #D1D5DB", fontSize: 14, minWidth: 0 }}
-        />
-        <select
-          value={sort}
-          onChange={(e) => { setSort(e.target.value); void load(q, e.target.value); }}
-          aria-label="Sort by"
-          style={{ padding: "10px 12px", borderRadius: 12, border: "1px solid #D1D5DB", fontSize: 14, background: "white" }}
-        >
-          <option value="newest">Newest</option>
-          <option value="popular">Popular</option>
-          <option value="price_asc">Price: low → high</option>
-          <option value="price_desc">Price: high → low</option>
-        </select>
-        <button type="submit" style={{ background: "#788AE0", color: "white", border: "none", borderRadius: 999, padding: "10px 20px", fontWeight: 500, fontSize: 14, cursor: "pointer", whiteSpace: "nowrap" }}>
-          Search
-        </button>
-        <Link href="/checkout" style={{ marginLeft: "auto", alignSelf: "center", color: "#788AE0", fontWeight: 500, fontSize: 14, textDecoration: "none", whiteSpace: "nowrap" }}>
-          🛒 Cart
-        </Link>
-      </form>
-
-      {error && (
-        <div role="alert" style={{ background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 12, padding: 16, marginBottom: 20, color: "#B42318", fontSize: 14 }}>
-          {error}{" "}
-          <button onClick={() => void load(q)} style={{ background: "none", border: "none", color: "#788AE0", cursor: "pointer", fontWeight: 500, padding: 0 }}>
-            Retry
+        <form onSubmit={onSearch} className="flex gap-3">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-brand-muted" />
+            <input
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="Search listings…"
+              className="pl-9 pr-4 py-3 rounded-xl border border-surface-border bg-white text-sm focus:outline-none focus:ring-4 focus:ring-focus w-full md:w-[240px] transition-all"
+            />
+          </div>
+          <div className="relative hidden md:block">
+            <Filter className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-brand-muted" />
+            <select
+              value={sort}
+              onChange={(e) => { setSort(e.target.value); void load(q, e.target.value); }}
+              className="pl-9 pr-8 py-3 rounded-xl border border-surface-border bg-white text-sm focus:outline-none focus:ring-4 focus:ring-focus appearance-none cursor-pointer"
+            >
+              <option value="newest">Newest</option>
+              <option value="popular">Popular</option>
+              <option value="price_asc">Price: low → high</option>
+              <option value="price_desc">Price: high → low</option>
+            </select>
+          </div>
+          <button type="submit" className="bg-brand-blue text-white px-6 py-3 rounded-xl font-semibold shadow-sm hover:bg-brand-blue-second transition-colors">
+            Search
           </button>
+        </form>
+      </div>
+
+      {/* Categories Grid */}
+      {!q && !loading && (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-16">
+          <CategoryTile category="clothes" title="t-shirt" variant="blue" />
+          <CategoryTile category="prints" title="postal card" variant="peach" />
+          <CategoryTile category="ceramics" title="mug" variant="blue" />
         </div>
       )}
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 12 }}>
-        {loading
-          ? Array.from({ length: 8 }).map((_, i) => <SkeletonCard key={i} />)
-          : items.length === 0 && !error
-          ? null
-          : items.map((l) => (
-              <Link key={l.id} href={`/product/${l.slug}`} style={{ textDecoration: "none" }}>
-                <div style={{ background: "white", border: "1px solid #E8EAFB", borderRadius: 16, padding: 12, boxShadow: "0 1px 4px rgba(120,138,224,0.06)", transition: "box-shadow 0.15s", cursor: "pointer" }}>
-                  <div style={{ height: 140, borderRadius: 10, background: "#F0F2FA", marginBottom: 10 }} />
-                  <h3 style={{ margin: "0 0 4px", fontSize: 14, color: "#1A1D2E", fontWeight: 600 }}>{l.title}</h3>
-                  <p style={{ margin: 0, fontSize: 12, color: "#6B7280" }}>{l.type} · {l.price}</p>
-                </div>
-              </Link>
-            ))}
-      </div>
+      {error && (
+        <div className="bg-semantic-danger-bg border border-[#FECACA] rounded-xl p-4 mb-8 text-semantic-danger text-sm flex justify-between items-center">
+          {error}
+          <button onClick={() => void load(q)} className="font-semibold underline">Retry</button>
+        </div>
+      )}
+
+      <motion.div layout className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+        <AnimatePresence mode="popLayout">
+          {loading ? (
+            Array.from({ length: 8 }).map((_, i) => (
+              <motion.div
+                key={`skeleton-${i}`}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="bg-white border border-surface-border-soft rounded-[28px] p-[18px] animate-pulse"
+              >
+                <div className="w-full h-[220px] bg-brand-bg rounded-[22px] mb-4" />
+                <div className="h-4 bg-brand-bg rounded-full w-3/4 mb-2" />
+                <div className="h-3 bg-brand-bg rounded-full w-1/2" />
+              </motion.div>
+            ))
+          ) : items.length === 0 && !error ? (
+            null
+          ) : (
+            items.map((l) => (
+              <motion.div
+                key={l.id}
+                layout
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.9 }}
+                transition={{ duration: 0.2 }}
+              >
+                <Link href={`/product/${l.slug}`}>
+                  <ProductCard
+                    title={l.title}
+                    description={l.type}
+                    price={`${l.price} UZS`}
+                    imageUrl={l.imageUrl}
+                  />
+                </Link>
+              </motion.div>
+            ))
+          )}
+        </AnimatePresence>
+      </motion.div>
 
       {!loading && !error && items.length === 0 && (
-        <div style={{ textAlign: "center", padding: "64px 0" }}>
-          <div style={{ fontSize: 40, marginBottom: 12 }}>🎨</div>
-          <p style={{ color: "#6B7280", fontSize: 15 }}>No listings found{q ? ` for "${q}"` : ""}.</p>
+        <div className="text-center py-20">
+          <div className="text-6xl mb-4">🎨</div>
+          <h2 className="text-xl font-semibold text-brand-ink mb-2">No listings found</h2>
+          <p className="text-brand-muted mb-6">We couldn't find any items matching your search.</p>
           {q && (
-            <button onClick={() => { setQ(""); void load(""); }} style={{ marginTop: 8, background: "none", border: "none", color: "#788AE0", cursor: "pointer", fontWeight: 500 }}>
-              Clear search
+            <button
+              onClick={() => { setQ(""); void load(""); }}
+              className="text-brand-blue font-semibold hover:underline"
+            >
+              Clear search filters
             </button>
           )}
         </div>
