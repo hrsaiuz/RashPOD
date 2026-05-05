@@ -10,53 +10,51 @@ type SessionUser = {
 };
 
 type AuthState = {
-  token: string;
   user: SessionUser | null;
-  isReady: boolean;
-  setSession: (token: string, user?: SessionUser | null) => Promise<void>;
+  isLoading: boolean;
   clearSession: () => Promise<void>;
+  login: (email: string, password: string) => Promise<{ role: string }>;
 };
 
 const AuthContext = createContext<AuthState | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [token, setToken] = useState("");
   const [user, setUser] = useState<SessionUser | null>(null);
-  const [isReady, setIsReady] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Restore token + user by reading the httpOnly cookie via a server-side API route
     fetch("/api/auth/me")
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => {
-        if (d?.token) {
-          setToken(d.token as string);
-          if (d.user) setUser(d.user as SessionUser);
-        }
+        if (d?.user) setUser(d.user as SessionUser);
       })
       .catch(() => null)
-      .finally(() => setIsReady(true));
+      .finally(() => setIsLoading(false));
   }, []);
 
-  const setSession = async (nextToken: string, nextUser?: SessionUser | null) => {
-    await fetch("/api/auth/set-cookie", {
+  const login = async (email: string, password: string): Promise<{ role: string }> => {
+    const res = await fetch("/api/auth/login", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ token: nextToken }),
+      body: JSON.stringify({ email, password }),
     });
-    setToken(nextToken);
-    if (nextUser !== undefined) setUser(nextUser ?? null);
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      throw new Error(body?.error || "Login failed");
+    }
+    const data = await res.json();
+    setUser(data.user);
+    return { role: data.role || "CUSTOMER" };
   };
 
   const clearSession = async () => {
-    await fetch("/api/auth/clear-cookie", { method: "POST" });
-    setToken("");
+    await fetch("/api/auth/logout", { method: "POST" });
     setUser(null);
   };
 
   const value = useMemo<AuthState>(
-    () => ({ token, user, isReady, setSession, clearSession }),
-    [token, user, isReady],
+    () => ({ user, isLoading, clearSession, login }),
+    [user, isLoading],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
@@ -67,3 +65,6 @@ export function useAuth() {
   if (!ctx) throw new Error("useAuth must be used inside AuthProvider");
   return ctx;
 }
+
+// Legacy compatibility
+export { useAuth as default };

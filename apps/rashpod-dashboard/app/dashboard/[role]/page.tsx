@@ -2,10 +2,10 @@
 
 import { use, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { notFound } from "next/navigation";
 import { useAuth } from "../../auth/auth-provider";
 import DashboardLayout from "../dashboard-layout";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3002";
 const VALID_ROLES = new Set(["designer", "customer", "production", "corporate", "moderator", "finance", "support", "admin", "super-admin"]);
 
 function StatCard({ label, value }: { label: string; value: number }) {
@@ -29,24 +29,31 @@ function SkeletonStat() {
 export default function RoleDashboardPage({ params }: { params: Promise<{ role: string }> }) {
   const { role } = use(params);
   const router = useRouter();
-  const { token, isReady } = useAuth();
+  const { user, isLoading: authLoading } = useAuth();
   const [data, setData] = useState<Record<string, number> | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
+  if (!VALID_ROLES.has(role)) {
+    notFound();
+  }
+
   useEffect(() => {
-    if (!isReady) return;
-    if (!token) { router.push(`/auth/login?next=/dashboard/${role}`); return; }
-    if (!VALID_ROLES.has(role)) { router.push("/auth/login"); return; }
+    if (authLoading) return;
+    if (!user) {
+      router.push(`/auth/login?next=/dashboard/${role}`);
+      return;
+    }
 
     const load = async () => {
       setLoading(true);
       setError("");
       try {
-        const res = await fetch(`${API_URL}/dashboard/${role}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        if (res.status === 401 || res.status === 403) { router.push(`/auth/login?next=/dashboard/${role}`); return; }
+        const res = await fetch(`/api/proxy/dashboard/${role}`);
+        if (res.status === 401 || res.status === 403) {
+          router.push(`/auth/login?next=/dashboard/${role}`);
+          return;
+        }
         if (!res.ok) throw new Error(`Failed to load dashboard (${res.status})`);
         setData(await res.json());
       } catch (err) {
@@ -56,7 +63,7 @@ export default function RoleDashboardPage({ params }: { params: Promise<{ role: 
       }
     };
     void load();
-  }, [role, token, isReady]);
+  }, [role, user, authLoading, router]);
 
   return (
     <DashboardLayout role={role}>

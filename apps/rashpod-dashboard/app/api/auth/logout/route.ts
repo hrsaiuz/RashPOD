@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-const TOKEN_COOKIE = "rashpod_dashboard_token";
+const TOKEN_COOKIE = "rashpod_jwt";
 
 export async function POST() {
   const res = NextResponse.json({ ok: true });

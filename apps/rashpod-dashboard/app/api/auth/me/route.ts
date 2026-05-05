@@ -2,7 +2,8 @@ import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import * as jose from "jose";
 
-const COOKIE = "rashpod_dashboard_token";
+const API_URL = process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || "http://localhost:3002";
+const COOKIE = "rashpod_jwt";
 const JWT_SECRET = process.env.JWT_SECRET || "change-me-in-production";
 
 export async function GET() {
@@ -11,17 +12,14 @@ export async function GET() {
   if (!token) return NextResponse.json({ error: "unauthenticated" }, { status: 401 });
 
   try {
-    const secret = new TextEncoder().encode(JWT_SECRET);
-    const { payload } = await jose.jwtVerify(token, secret);
-    return NextResponse.json({
-      token,
-      user: {
-        id: payload.sub as string,
-        email: payload.email as string,
-        role: payload.role as string,
-        displayName: payload.displayName as string | undefined,
-      },
+    const meRes = await fetch(`${API_URL}/auth/me`, {
+      headers: { Authorization: `Bearer ${token}` },
     });
+    if (!meRes.ok) {
+      return NextResponse.json({ error: "unauthenticated" }, { status: 401 });
+    }
+    const user = await meRes.json();
+    return NextResponse.json({ user });
   } catch {
     return NextResponse.json({ error: "invalid_token" }, { status: 401 });
   }

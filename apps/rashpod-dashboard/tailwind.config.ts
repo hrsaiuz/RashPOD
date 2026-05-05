@@ -1,5 +1,5 @@
 import type { Config } from "tailwindcss";
-import sharedConfig from "../../packages/ui/tailwind.config";
+import tailwindPreset from "@rashpod/ui/tailwind-preset";
 
 const config: Config = {
   content: [
@@ -7,7 +7,7 @@ const config: Config = {
     "./app/**/*.{js,ts,jsx,tsx,mdx}",
     "../../packages/ui/src/**/*.{js,ts,jsx,tsx,mdx}",
   ],
-  presets: [sharedConfig],
+  presets: [tailwindPreset],
 };
 
 export default config;
