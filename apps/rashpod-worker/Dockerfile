@@ -14,8 +14,9 @@ RUN npm ci --workspace=@rashpod/worker --include-workspace-root
 FROM node:20-alpine AS builder
 WORKDIR /app
 
+RUN apk add --no-cache vips-dev
+
 COPY --from=deps /app/node_modules ./node_modules
-COPY --from=deps /app/apps/rashpod-worker/node_modules ./apps/rashpod-worker/node_modules
 
 COPY tsconfig.base.json ./
 COPY packages/ ./packages/
@@ -33,7 +34,6 @@ ENV NODE_ENV=production
 ENV PORT=8080
 
 COPY --from=builder /app/node_modules /app/node_modules
-COPY --from=builder /app/apps/rashpod-worker/node_modules ./node_modules
 COPY --from=builder /app/apps/rashpod-worker/dist ./dist
 
 EXPOSE 8080

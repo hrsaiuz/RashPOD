@@ -13,7 +13,6 @@ FROM node:20-alpine AS builder
 WORKDIR /app
 
 COPY --from=deps /app/node_modules ./node_modules
-COPY --from=deps /app/apps/rashpod-dashboard/node_modules ./apps/rashpod-dashboard/node_modules
 
 COPY packages/ ./packages/
 COPY apps/rashpod-dashboard/ ./apps/rashpod-dashboard/

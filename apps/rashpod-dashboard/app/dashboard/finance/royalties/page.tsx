@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "../../../auth/auth-provider";
-import DashboardLayout from "../dashboard-layout";
+import DashboardLayout from "../../dashboard-layout";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3002";
 
