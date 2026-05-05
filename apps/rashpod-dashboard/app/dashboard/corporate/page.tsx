@@ -5,36 +5,36 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "../../auth/auth-provider";
 import DashboardLayout from "../dashboard-layout";
 import { KpiTile, DataTable, DataTableColumn, EmptyState, ErrorState, Skeleton, Card, Button } from "@rashpod/ui";
-import { Factory, Clock, TruckIcon, Activity } from "lucide-react";
+import { FileText, MessageSquare, Briefcase, CheckCircle } from "lucide-react";
 import Link from "next/link";
 
-interface ProductionKpis {
-  queueLength: number;
-  inProgress: number;
-  shippedToday: number;
-  avgCycle: number;
+interface CorporateKpis {
+  activeRequests: number;
+  bidsReceived: number;
+  ongoingOffers: number;
+  closedDeals: number;
 }
 
-interface ProductionJob {
+interface CorporateRequest {
   id: string;
-  orderNumber: string;
-  productType: string;
+  title: string;
   status: string;
-  assignedTo: string;
+  bids: number;
+  createdAt: string;
 }
 
-export default function ProductionOverview() {
+export default function CorporateOverview() {
   const router = useRouter();
   const { user, isLoading: authLoading } = useAuth();
-  const [kpis, setKpis] = useState<ProductionKpis | null>(null);
-  const [activeJobs, setActiveJobs] = useState<ProductionJob[]>([]);
+  const [kpis, setKpis] = useState<CorporateKpis | null>(null);
+  const [recentRequests, setRecentRequests] = useState<CorporateRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
   useEffect(() => {
     if (authLoading) return;
     if (!user) {
-      router.push("/auth/login?next=/dashboard/production");
+      router.push("/auth/login?next=/dashboard/corporate");
       return;
     }
 
@@ -43,18 +43,18 @@ export default function ProductionOverview() {
       setError("");
       try {
         // TODO: Replace with actual endpoints
-        // const kpiRes = await fetch("/api/proxy/production/kpis");
-        // const jobsRes = await fetch("/api/proxy/production/jobs?status=in_progress&limit=5");
+        // const kpiRes = await fetch("/api/proxy/corporate/kpis");
+        // const requestsRes = await fetch("/api/proxy/corporate/requests?limit=5");
         
         setKpis({
-          queueLength: 15,
-          inProgress: 8,
-          shippedToday: 12,
-          avgCycle: 18.5,
+          activeRequests: 5,
+          bidsReceived: 12,
+          ongoingOffers: 3,
+          closedDeals: 8,
         });
-        setActiveJobs([
-          { id: "1", orderNumber: "ORD-001", productType: "T-Shirt", status: "printing", assignedTo: "Station A" },
-          { id: "2", orderNumber: "ORD-002", productType: "Poster", status: "quality_check", assignedTo: "Station B" },
+        setRecentRequests([
+          { id: "1", title: "Custom T-shirts for Q1 event", status: "open", bids: 4, createdAt: "2025-01-10" },
+          { id: "2", title: "Company swag pack", status: "in_progress", bids: 2, createdAt: "2025-01-15" },
         ]);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to load data");
@@ -65,9 +65,8 @@ export default function ProductionOverview() {
     void load();
   }, [user, authLoading, router]);
 
-  const jobColumns: DataTableColumn<ProductionJob>[] = [
-    { key: "orderNumber", header: "Order #", sortable: true },
-    { key: "productType", header: "Product" },
+  const requestColumns: DataTableColumn<CorporateRequest>[] = [
+    { key: "title", header: "Request", sortable: true },
     { 
       key: "status", 
       header: "Status",
@@ -77,12 +76,17 @@ export default function ProductionOverview() {
         </span>
       ),
     },
-    { key: "assignedTo", header: "Station" },
+    { key: "bids", header: "Bids" },
+    { 
+      key: "createdAt", 
+      header: "Created",
+      render: (val) => new Date(val).toLocaleDateString(),
+    },
     {
       key: "id",
       header: "Actions",
       render: (_, row) => (
-        <Link href={`/dashboard/production/jobs/${row.id}`} className="text-brand-blue hover:underline text-sm">
+        <Link href={`/dashboard/corporate/requests/${row.id}`} className="text-brand-blue hover:underline text-sm">
           View
         </Link>
       ),
@@ -90,11 +94,11 @@ export default function ProductionOverview() {
   ];
 
   return (
-    <DashboardLayout role="production">
+    <DashboardLayout role="corporate">
       <div className="space-y-8">
         <div>
-          <h1 className="text-3xl font-bold text-brand-ink mb-2">Production Dashboard</h1>
-          <p className="text-brand-muted">Monitor the production queue and active jobs.</p>
+          <h1 className="text-3xl font-bold text-brand-ink mb-2">Corporate Dashboard</h1>
+          <p className="text-brand-muted">Manage your bulk orders and custom requests.</p>
         </div>
 
         {error && (
@@ -121,30 +125,35 @@ export default function ProductionOverview() {
                 </>
               ) : kpis ? (
                 <>
-                  <KpiTile label="Queue Length" value={kpis.queueLength} icon={<Factory size={24} />} />
-                  <KpiTile label="In Progress" value={kpis.inProgress} icon={<Activity size={24} />} />
-                  <KpiTile label="Shipped Today" value={kpis.shippedToday} icon={<TruckIcon size={24} />} />
-                  <KpiTile label="Avg Cycle (hrs)" value={kpis.avgCycle} icon={<Clock size={24} />} />
+                  <KpiTile label="Active Requests" value={kpis.activeRequests} icon={<FileText size={24} />} />
+                  <KpiTile label="Bids Received" value={kpis.bidsReceived} icon={<MessageSquare size={24} />} />
+                  <KpiTile label="Ongoing Offers" value={kpis.ongoingOffers} icon={<Briefcase size={24} />} />
+                  <KpiTile label="Closed Deals" value={kpis.closedDeals} icon={<CheckCircle size={24} />} />
                 </>
               ) : null}
             </div>
 
             <Card>
               <div className="flex items-center justify-between mb-6">
-                <h2 className="text-xl font-semibold text-brand-ink">Active Jobs</h2>
-                <Link href="/dashboard/production/jobs">
+                <h2 className="text-xl font-semibold text-brand-ink">Recent Requests</h2>
+                <Link href="/dashboard/corporate/requests">
                   <Button variant="ghost" size="sm">View All</Button>
                 </Link>
               </div>
               <DataTable
-                columns={jobColumns}
-                rows={activeJobs}
+                columns={requestColumns}
+                rows={recentRequests}
                 loading={loading}
                 mobileMode="cards"
                 emptyState={
                   <EmptyState
-                    title="No active jobs"
-                    description="Production queue is empty."
+                    title="No requests yet"
+                    description="Create a custom request to get started."
+                    action={
+                      <Link href="/dashboard/corporate/requests/new">
+                        <Button variant="primary">New Request</Button>
+                      </Link>
+                    }
                   />
                 }
               />
@@ -155,4 +164,3 @@ export default function ProductionOverview() {
     </DashboardLayout>
   );
 }
-

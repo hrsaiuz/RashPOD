@@ -4,42 +4,165 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "../../auth/auth-provider";
 import DashboardLayout from "../dashboard-layout";
+import { KpiTile, DataTable, DataTableColumn, EmptyState, ErrorState, Skeleton, Card, Button } from "@rashpod/ui";
+import { Ticket, AlertTriangle, Clock, CheckCircle } from "lucide-react";
 import Link from "next/link";
 
-export default function SupportPage() {
+interface SupportKpis {
+  openTickets: number;
+  slaBreaches: number;
+  avgResponse: number;
+  resolvedToday: number;
+}
+
+interface TicketEntry {
+  id: string;
+  subject: string;
+  customer: string;
+  status: string;
+  priority: string;
+  createdAt: string;
+}
+
+export default function SupportOverview() {
   const router = useRouter();
-  const { user, isLoading } = useAuth();
-  const [stats, setStats] = useState<{ open: number; inProgress: number; resolved: number } | null>(null);
+  const { user, isLoading: authLoading } = useAuth();
+  const [kpis, setKpis] = useState<SupportKpis | null>(null);
+  const [recentTickets, setRecentTickets] = useState<TicketEntry[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
   useEffect(() => {
-    if (isLoading || !user) return;
-    fetch(`/api/proxy/support/stats`)
-      .then((r) => r.ok ? r.json() : null)
-      .then((d) => d && setStats(d))
-      .catch(() => null);
-  }, [user, isLoading, router]);
+    if (authLoading) return;
+    if (!user) {
+      router.push("/auth/login?next=/dashboard/support");
+      return;
+    }
+
+    const load = async () => {
+      setLoading(true);
+      setError("");
+      try {
+        // TODO: Replace with actual endpoints
+        // const kpiRes = await fetch("/api/proxy/support/kpis");
+        // const ticketsRes = await fetch("/api/proxy/support/tickets?limit=5");
+        
+        setKpis({
+          openTickets: 18,
+          slaBreaches: 2,
+          avgResponse: 1.2,
+          resolvedToday: 14,
+        });
+        setRecentTickets([
+          { id: "1", subject: "Order not received", customer: "john@example.com", status: "open", priority: "high", createdAt: "2025-01-20T10:30:00" },
+          { id: "2", subject: "Design approval question", customer: "jane@example.com", status: "in_progress", priority: "medium", createdAt: "2025-01-20T09:15:00" },
+        ]);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to load data");
+      } finally {
+        setLoading(false);
+      }
+    };
+    void load();
+  }, [user, authLoading, router]);
+
+  const ticketColumns: DataTableColumn<TicketEntry>[] = [
+    { key: "subject", header: "Subject", sortable: true },
+    { key: "customer", header: "Customer" },
+    { 
+      key: "status", 
+      header: "Status",
+      render: (val) => (
+        <span className="px-3 py-1 rounded-full text-xs font-medium bg-brand-blueLight text-brand-blue">
+          {val}
+        </span>
+      ),
+    },
+    { 
+      key: "priority", 
+      header: "Priority",
+      render: (val) => (
+        <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+          val === 'high' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'
+        }`}>
+          {val}
+        </span>
+      ),
+    },
+    {
+      key: "id",
+      header: "Actions",
+      render: (_, row) => (
+        <Link href={`/dashboard/support/tickets/${row.id}`} className="text-brand-blue hover:underline text-sm">
+          View
+        </Link>
+      ),
+    },
+  ];
 
   return (
     <DashboardLayout role="support">
-      <h1 style={{ margin: "0 0 20px", fontSize: 22, color: "#1A1D2E" }}>Support Overview</h1>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: 12, marginBottom: 24 }}>
-        {[
-          { label: "Open", key: "open", color: "#EEF0FB" },
-          { label: "In Progress", key: "inProgress", color: "#FEF3C7" },
-          { label: "Resolved", key: "resolved", color: "#D1FAE5" },
-        ].map(({ label, key, color }) => (
-          <div key={key} style={{ background: "white", border: "1px solid #E8EAFB", borderRadius: 16, padding: "16px 20px" }}>
-            <div style={{ width: 10, height: 10, borderRadius: "50%", background: color, display: "inline-block", marginBottom: 8 }} />
-            <div style={{ color: "#6B7280", fontSize: 12, fontWeight: 500, marginBottom: 6 }}>{label}</div>
-            <div style={{ fontSize: 30, fontWeight: 700, color: "#1A1D2E" }}>
-              {stats ? (stats as Record<string, number>)[key] ?? 0 : "—"}
+      <div className="space-y-8">
+        <div>
+          <h1 className="text-3xl font-bold text-brand-ink mb-2">Support Dashboard</h1>
+          <p className="text-brand-muted">Manage customer tickets and support requests.</p>
+        </div>
+
+        {error && (
+          <ErrorState
+            title="Failed to load dashboard"
+            description={error}
+            retry={
+              <Button onClick={() => window.location.reload()} variant="primary">
+                Retry
+              </Button>
+            }
+          />
+        )}
+
+        {!error && (
+          <>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              {loading ? (
+                <>
+                  <Skeleton className="h-32" />
+                  <Skeleton className="h-32" />
+                  <Skeleton className="h-32" />
+                  <Skeleton className="h-32" />
+                </>
+              ) : kpis ? (
+                <>
+                  <KpiTile label="Open Tickets" value={kpis.openTickets} icon={<Ticket size={24} />} />
+                  <KpiTile label="SLA Breaches" value={kpis.slaBreaches} icon={<AlertTriangle size={24} />} />
+                  <KpiTile label="Avg Response (hrs)" value={kpis.avgResponse} icon={<Clock size={24} />} />
+                  <KpiTile label="Resolved Today" value={kpis.resolvedToday} icon={<CheckCircle size={24} />} />
+                </>
+              ) : null}
             </div>
-          </div>
-        ))}
+
+            <Card>
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-xl font-semibold text-brand-ink">Recent Tickets</h2>
+                <Link href="/dashboard/support/tickets">
+                  <Button variant="ghost" size="sm">View All</Button>
+                </Link>
+              </div>
+              <DataTable
+                columns={ticketColumns}
+                rows={recentTickets}
+                loading={loading}
+                mobileMode="cards"
+                emptyState={
+                  <EmptyState
+                    title="No recent tickets"
+                    description="Support tickets will appear here."
+                  />
+                }
+              />
+            </Card>
+          </>
+        )}
       </div>
-      <Link href="/dashboard/support/tickets" style={{ display: "inline-block", padding: "10px 20px", background: "#788AE0", color: "white", borderRadius: 999, textDecoration: "none", fontWeight: 600, fontSize: 14 }}>
-        View Tickets →
-      </Link>
     </DashboardLayout>
   );
 }

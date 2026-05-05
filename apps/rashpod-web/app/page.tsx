@@ -286,16 +286,19 @@ export default function HomePage() {
         {productsError && (
           <ErrorState
             title="Failed to load products"
-            message="We couldn't load featured products. Please try again."
-            actionLabel="Retry"
-            onAction={retryProducts}
+            description="We couldn't load featured products. Please try again."
+            retry={
+              <Button variant="primaryBlue" size="md" onClick={retryProducts}>
+                Retry
+              </Button>
+            }
           />
         )}
 
         {!productsLoading && !productsError && products.length === 0 && (
           <EmptyState
             title="No products yet"
-            message="Check back soon for featured products from our designers."
+            description="Check back soon for featured products from our designers."
           />
         )}
 
@@ -371,16 +374,19 @@ export default function HomePage() {
         {designersError && (
           <ErrorState
             title="Failed to load designers"
-            message="We couldn't load featured designers. Please try again."
-            actionLabel="Retry"
-            onAction={retryDesigners}
+            description="We couldn't load featured designers. Please try again."
+            retry={
+              <Button variant="primaryBlue" size="md" onClick={retryDesigners}>
+                Retry
+              </Button>
+            }
           />
         )}
 
         {!designersLoading && !designersError && designers.length === 0 && (
           <EmptyState
             title="No designers yet"
-            message="Check back soon for featured designers."
+            description="Check back soon for featured designers."
           />
         )}
 
@@ -481,10 +487,10 @@ export default function HomePage() {
           className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6"
         >
           {/* TODO: Replace with real KPIs from API */}
-          <KpiTile label="Designers onboarded" value="120+" variant="blue" />
-          <KpiTile label="Designs sold" value="3,500+" variant="peach" />
-          <KpiTile label="Cities served" value="15+" variant="blue" />
-          <KpiTile label="On-time delivery" value="98%" variant="peach" />
+          <KpiTile label="Designers onboarded" value="120+" />
+          <KpiTile label="Designs sold" value="3,500+" />
+          <KpiTile label="Cities served" value="15+" />
+          <KpiTile label="On-time delivery" value="98%" />
         </motion.div>
       </section>
 
