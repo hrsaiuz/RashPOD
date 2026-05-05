@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { cn } from "../lib/utils";
-import { Globe, Facebook, Instagram, Twitter } from "lucide-react";
+import { Globe, Mail, ExternalLink } from "lucide-react";
 
 export interface PublicFooterLink {
   href: string;
@@ -127,14 +127,11 @@ export const PublicFooter: React.FC<PublicFooterProps> = ({
             <button className="p-2 rounded-lg hover:bg-surface-borderSoft transition-colors" aria-label="Language">
               <Globe size={18} className="text-brand-muted" />
             </button>
-            <a href="https://facebook.com" target="_blank" rel="noopener noreferrer" aria-label="Facebook">
-              <Facebook size={18} className="text-brand-muted hover:text-brand-blue transition-colors" />
+            <a href="mailto:hello@rashpod.com" aria-label="Email">
+              <Mail size={18} className="text-brand-muted hover:text-brand-blue transition-colors" />
             </a>
-            <a href="https://instagram.com" target="_blank" rel="noopener noreferrer" aria-label="Instagram">
-              <Instagram size={18} className="text-brand-muted hover:text-brand-blue transition-colors" />
-            </a>
-            <a href="https://twitter.com" target="_blank" rel="noopener noreferrer" aria-label="Twitter">
-              <Twitter size={18} className="text-brand-muted hover:text-brand-blue transition-colors" />
+            <a href="https://rashpod.com" target="_blank" rel="noopener noreferrer" aria-label="Website">
+              <ExternalLink size={18} className="text-brand-muted hover:text-brand-blue transition-colors" />
             </a>
           </div>
         </div>

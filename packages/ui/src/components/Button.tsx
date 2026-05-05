@@ -5,10 +5,11 @@ import { motion, HTMLMotionProps } from "framer-motion";
 import { cn } from "../lib/utils";
 import { Loader2 } from "lucide-react";
 
-export interface ButtonProps extends Omit<HTMLMotionProps<"button">, "ref"> {
+export interface ButtonProps extends Omit<HTMLMotionProps<"button">, "ref" | "children"> {
   variant?: "primaryBlue" | "primaryPeach" | "secondary" | "ghost" | "danger";
   size?: "sm" | "md" | "lg";
   loading?: boolean;
+  children?: React.ReactNode;
 }
 
 export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
