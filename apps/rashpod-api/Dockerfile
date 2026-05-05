@@ -33,4 +33,4 @@ COPY --from=builder /app/apps/rashpod-api/prisma ./prisma
 
 EXPOSE 8080
 
-CMD ["node", "dist/main"]
+CMD ["node", "dist/src/main.js"]
