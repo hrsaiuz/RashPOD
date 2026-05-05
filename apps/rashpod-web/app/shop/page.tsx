@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import {
@@ -38,7 +38,7 @@ interface PaginationMeta {
   totalPages: number;
 }
 
-export default function ShopPage() {
+function ShopContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const apiBase = getApiBase();
@@ -269,7 +269,7 @@ export default function ShopPage() {
         {/* Mobile filter button */}
         <div className="lg:hidden flex items-center justify-between gap-4 mb-4">
           <Button
-            variant="outline"
+            variant="secondary"
             size="md"
             onClick={() => setMobileFiltersOpen(true)}
             className="flex items-center gap-2"
@@ -370,7 +370,7 @@ export default function ShopPage() {
               {meta && meta.totalPages > 1 && (
                 <div className="flex items-center justify-center gap-2 mt-12">
                   <Button
-                    variant="outline"
+                    variant="secondary"
                     size="sm"
                     onClick={() => setPage(page - 1)}
                     disabled={page === 1}
@@ -401,7 +401,7 @@ export default function ShopPage() {
                   </div>
 
                   <Button
-                    variant="outline"
+                    variant="secondary"
                     size="sm"
                     onClick={() => setPage(page + 1)}
                     disabled={page === meta.totalPages}
@@ -436,6 +436,14 @@ export default function ShopPage() {
         </div>
       </Drawer>
     </div>
+  );
+}
+
+export default function ShopPage() {
+  return (
+    <Suspense fallback={<div className="max-w-[1280px] mx-auto px-6 py-10"><Skeleton className="h-96 w-full" /></div>}>
+      <ShopContent />
+    </Suspense>
   );
 }
 

@@ -9,7 +9,6 @@ import {
   Card,
   Select,
   FormField,
-  Badge,
   Skeleton,
   ErrorState,
   Breadcrumbs,
@@ -261,9 +260,9 @@ export default function ProductPage({ params }: { params: Promise<{ slug: string
               by <span className="font-medium">{product.designer.displayName}</span>
             </Link>
             {product.royaltyRate && (
-              <Badge variant="peach">
+              <span className="inline-flex items-center justify-center h-7 px-3 text-xs rounded-full font-medium bg-[#FFF1E8] text-[#C85F35]">
                 {product.royaltyRate}% royalty to designer
-              </Badge>
+              </span>
             )}
           </div>
 
@@ -437,7 +436,7 @@ export default function ProductPage({ params }: { params: Promise<{ slug: string
                   </h3>
                   <p className="text-sm text-brand-muted">@{product.designer.handle}</p>
                 </div>
-                <Button variant="outline" size="sm">
+                <Button variant="secondary" size="sm">
                   View profile
                 </Button>
               </div>
