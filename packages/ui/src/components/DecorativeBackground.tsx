@@ -14,8 +14,16 @@ const COLORS = ["#788AE0", "#A3AFE5", "#CFD6FA", "#F39E7C", "#EBB7A2", "#FFD6C6"
 
 export function DecorativeBackground() {
   const [shapes, setShapes] = React.useState<{ path: string, color: string, x: number, y: number, size: number, delay: number }[]>([]);
+  const [prefersReducedMotion, setPrefersReducedMotion] = React.useState(false);
 
   React.useEffect(() => {
+    // Check for reduced motion preference
+    const mediaQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
+    setPrefersReducedMotion(mediaQuery.matches);
+
+    const handleChange = () => setPrefersReducedMotion(mediaQuery.matches);
+    mediaQuery.addEventListener("change", handleChange);
+
     // Generate random shapes on client to avoid hydration mismatch
     const generated = Array.from({ length: 15 }).map(() => ({
       path: MOCK_ASSETS[Math.floor(Math.random() * MOCK_ASSETS.length)],
@@ -26,6 +34,8 @@ export function DecorativeBackground() {
       delay: Math.random() * 5,
     }));
     setShapes(generated);
+
+    return () => mediaQuery.removeEventListener("change", handleChange);
   }, []);
 
   return (
@@ -40,16 +50,24 @@ export function DecorativeBackground() {
             width: shape.size,
             height: shape.size,
           }}
-          animate={{
-            y: [0, -30, 0],
-            rotate: [0, 10, -10, 0],
-          }}
-          transition={{
-            duration: 10 + Math.random() * 10,
-            repeat: Infinity,
-            ease: "easeInOut",
-            delay: shape.delay,
-          }}
+          animate={
+            prefersReducedMotion
+              ? {}
+              : {
+                  y: [0, -30, 0],
+                  rotate: [0, 10, -10, 0],
+                }
+          }
+          transition={
+            prefersReducedMotion
+              ? {}
+              : {
+                  duration: 10 + Math.random() * 10,
+                  repeat: Infinity,
+                  ease: "easeInOut",
+                  delay: shape.delay,
+                }
+          }
         >
           <svg viewBox="0 0 100 100" width="100%" height="100%" fill={shape.color}>
             <path d={shape.path} />

@@ -5,7 +5,7 @@ async function getProductSlugs(): Promise<string[]> {
   try {
     const apiBase = getApiBase();
     const res = await fetch(`${apiBase}/shop/listings?limit=1000`, {
-      cache: "no-store",
+      next: { revalidate: 3600 },
     });
 
     if (!res.ok) return [];
@@ -23,7 +23,7 @@ async function getDesignerHandles(): Promise<string[]> {
   try {
     const apiBase = getApiBase();
     const res = await fetch(`${apiBase}/shop/designers?limit=1000`, {
-      cache: "no-store",
+      next: { revalidate: 3600 },
     });
 
     if (!res.ok) return [];
@@ -41,7 +41,7 @@ async function getFilmSlugs(): Promise<string[]> {
   try {
     const apiBase = getApiBase();
     const res = await fetch(`${apiBase}/shop/films?limit=1000`, {
-      cache: "no-store",
+      next: { revalidate: 3600 },
     });
 
     if (!res.ok) return [];
