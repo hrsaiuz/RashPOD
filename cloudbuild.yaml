@@ -4,6 +4,13 @@ substitutions:
   _PROJECT: rashpod-production
 
 steps:
+  # ── Configure Docker auth for Artifact Registry ──────────────────────────────
+  - id: docker-auth
+    name: gcr.io/google.com/cloudsdktool/cloud-sdk
+    entrypoint: gcloud
+    args: ['auth', 'configure-docker', '${_REGION}-docker.pkg.dev']
+    waitFor: ['-']
+
   # ── Build images ──────────────────────────────────────────────────────────────
   - id: build-api
     name: gcr.io/cloud-builders/docker
@@ -61,22 +68,22 @@ steps:
   - id: push-api
     name: gcr.io/cloud-builders/docker
     args: [push, '--all-tags', '${_REGION}-docker.pkg.dev/${_PROJECT}/${_REPO}/rashpod-api']
-    waitFor: [build-api]
+    waitFor: [docker-auth, build-api]
 
   - id: push-web
     name: gcr.io/cloud-builders/docker
     args: [push, '--all-tags', '${_REGION}-docker.pkg.dev/${_PROJECT}/${_REPO}/rashpod-web']
-    waitFor: [build-web]
+    waitFor: [docker-auth, build-web]
 
   - id: push-dashboard
     name: gcr.io/cloud-builders/docker
     args: [push, '--all-tags', '${_REGION}-docker.pkg.dev/${_PROJECT}/${_REPO}/rashpod-dashboard']
-    waitFor: [build-dashboard]
+    waitFor: [docker-auth, build-dashboard]
 
   - id: push-worker
     name: gcr.io/cloud-builders/docker
     args: [push, '--all-tags', '${_REGION}-docker.pkg.dev/${_PROJECT}/${_REPO}/rashpod-worker']
-    waitFor: [build-worker]
+    waitFor: [docker-auth, build-worker]
 
   # ── Deploy to Cloud Run ───────────────────────────────────────────────────────
   - id: deploy-api
