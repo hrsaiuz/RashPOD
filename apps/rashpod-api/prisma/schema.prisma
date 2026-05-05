@@ -1,0 +1,563 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  SUPER_ADMIN
+  ADMIN
+  OPERATIONS_MANAGER
+  MODERATOR
+  PRODUCTION_STAFF
+  FINANCE_STAFF
+  SUPPORT_STAFF
+  DESIGNER
+  CUSTOMER
+  CORPORATE_CLIENT
+}
+
+enum DesignStatus {
+  DRAFT
+  SUBMITTED
+  NEEDS_FIX
+  APPROVED
+  REJECTED
+  SUSPENDED
+  READY_FOR_MOCKUP
+  READY_TO_PUBLISH
+  PUBLISHED
+}
+
+enum ModerationDecision {
+  APPROVE
+  REJECT
+  REQUEST_CHANGES
+  SUSPEND
+}
+
+enum GeneratedAssetStatus {
+  PENDING
+  PROCESSING
+  READY
+  FAILED
+}
+
+enum WorkerJobStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+enum ListingType {
+  PRODUCT
+  FILM
+}
+
+enum ListingStatus {
+  DRAFT
+  READY_FOR_REVIEW
+  PUBLISHED
+  ARCHIVED
+  REJECTED
+  SUSPENDED
+}
+
+enum OrderStatus {
+  PENDING_PAYMENT
+  PAID
+  IN_PRODUCTION
+  READY_FOR_PICKUP
+  SHIPPED
+  DELIVERED
+  CANCELLED
+  REFUNDED
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  FAILED
+  CANCELLED
+  REFUNDED
+  PARTIALLY_REFUNDED
+}
+
+enum ProductionJobStatus {
+  ORDERED
+  FILE_CHECK
+  READY_FOR_PRINT
+  PRINTING
+  QC
+  PACKING
+  READY_FOR_PICKUP
+  DELIVERED
+}
+
+enum CorporateRequestStatus {
+  OPEN
+  IN_REVIEW
+  BIDDING
+  OFFER_PENDING
+  ACCEPTED
+  REJECTED
+}
+
+enum DesignerBidStatus {
+  SUBMITTED
+  SHORTLISTED
+  SELECTED
+  REJECTED
+}
+
+enum CommercialOfferStatus {
+  DRAFT
+  SENT
+  ACCEPTED
+  REJECTED
+}
+
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String
+  displayName  String
+  role         UserRole
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  designAssets DesignAsset[]
+  auditLogs    AuditLog[]
+  moderationCases DesignModerationCase[] @relation("ReviewerCases")
+  listings     CommerceListing[] @relation("ListingDesigner")
+  orders       Order[] @relation("CustomerOrders")
+  corporateRequests CorporateRequest[] @relation("CorporateClientRequests")
+  designerBids DesignerBid[] @relation("BidDesigner")
+}
+
+model DesignAsset {
+  id          String       @id @default(uuid())
+  designerId  String
+  title       String
+  description String?
+  status      DesignStatus @default(DRAFT)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  designer         User              @relation(fields: [designerId], references: [id])
+  versions         DesignVersion[]
+  commercialRights CommercialRights?
+  moderationCases  DesignModerationCase[]
+  placements       MockupPlacement[]
+  listings         CommerceListing[]
+}
+
+model DesignVersion {
+  id            String   @id @default(uuid())
+  designAssetId String
+  fileKey       String
+  widthPx       Int?
+  heightPx      Int?
+  dpi           Int?
+  hasTransparency Boolean?
+  createdAt     DateTime @default(now())
+
+  designAsset DesignAsset @relation(fields: [designAssetId], references: [id])
+  moderationCases DesignModerationCase[]
+  placements      MockupPlacement[]
+}
+
+model DesignModerationCase {
+  id              String             @id @default(uuid())
+  designAssetId   String
+  designVersionId String?
+  reviewerId      String?
+  decision        ModerationDecision
+  reason          String?
+  createdAt       DateTime           @default(now())
+
+  designAsset   DesignAsset   @relation(fields: [designAssetId], references: [id])
+  designVersion DesignVersion? @relation(fields: [designVersionId], references: [id])
+  reviewer      User?         @relation("ReviewerCases", fields: [reviewerId], references: [id])
+}
+
+model FileAsset {
+  id           String   @id @default(uuid())
+  ownerId      String
+  bucket       String
+  objectKey    String   @unique
+  mimeType     String
+  sizeBytes    Int
+  isPublic     Boolean  @default(false)
+  uploadStatus String
+  checksum     String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model CommercialRights {
+  id                         String    @id @default(uuid())
+  designAssetId              String    @unique
+  allowProductSales          Boolean   @default(false)
+  allowMarketplacePublishing Boolean   @default(false)
+  allowFilmSales             Boolean   @default(false)
+  allowCorporateBidding      Boolean   @default(false)
+  filmConsentGrantedAt       DateTime?
+  filmConsentRevokedAt       DateTime?
+  filmConsentVersionId       String?
+  filmRoyaltyRate            Float?
+  updatedAt                  DateTime  @updatedAt
+
+  designAsset DesignAsset @relation(fields: [designAssetId], references: [id])
+}
+
+model ProductType {
+  id                     String   @id @default(uuid())
+  name                   String
+  slug                   String   @unique
+  category               String
+  isActive               Boolean  @default(true)
+  availableForDesigners  Boolean  @default(true)
+  availableInShop        Boolean  @default(true)
+  availableForCorporate  Boolean  @default(true)
+  availableForMarketplace Boolean @default(false)
+  requiresMockup         Boolean  @default(true)
+  supportsFilmSale       Boolean  @default(false)
+  productionMethod       String
+  baseCost               Decimal? @db.Decimal(10, 2)
+  defaultMargin          Decimal? @db.Decimal(10, 2)
+  metadataJson           Json?
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+
+  baseProducts           BaseProduct[]
+}
+
+model RoyaltyRule {
+  id          String   @id @default(uuid())
+  scope       String
+  basis       String
+  value       Decimal  @db.Decimal(10, 4)
+  isActive    Boolean  @default(true)
+  effectiveAt DateTime
+  metadataJson Json?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model BaseProduct {
+  id              String   @id @default(uuid())
+  productTypeId   String
+  name            String
+  skuPrefix       String
+  isActive        Boolean  @default(true)
+  baseCost        Decimal? @db.Decimal(10, 2)
+  defaultPrice    Decimal? @db.Decimal(10, 2)
+  availableColors Json?
+  availableSizes  Json?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  productType     ProductType      @relation(fields: [productTypeId], references: [id])
+  mockupTemplates MockupTemplate[]
+}
+
+model MockupTemplate {
+  id               String   @id @default(uuid())
+  baseProductId    String
+  name             String
+  baseImageKey     String
+  lifestyleImageKey String?
+  closeupImageKey  String?
+  isActive         Boolean  @default(true)
+  sortOrder        Int      @default(0)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  baseProduct BaseProduct @relation(fields: [baseProductId], references: [id])
+  printAreas  PrintArea[]
+  placements  MockupPlacement[]
+}
+
+model PrintArea {
+  id               String   @id @default(uuid())
+  mockupTemplateId String
+  name             String
+  x                Int
+  y                Int
+  width            Int
+  height           Int
+  safeX            Int
+  safeY            Int
+  safeWidth        Int
+  safeHeight       Int
+  allowMove        Boolean  @default(true)
+  allowResize      Boolean  @default(true)
+  allowRotate      Boolean  @default(false)
+  minScale         Float    @default(0.1)
+  maxScale         Float    @default(2)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  mockupTemplate MockupTemplate @relation(fields: [mockupTemplateId], references: [id])
+  placements     MockupPlacement[]
+}
+
+model FilmSaleSettings {
+  id                        String   @id @default(uuid())
+  enableFilmSalesGlobally   Boolean  @default(false)
+  enableDTF                 Boolean  @default(true)
+  enableUvDtf               Boolean  @default(true)
+  defaultRoyaltyBasis       String
+  defaultRoyaltyValue       Decimal  @db.Decimal(10, 4)
+  minimumOrderPrice         Decimal? @db.Decimal(10, 2)
+  rushOrderFee              Decimal? @db.Decimal(10, 2)
+  revocationPolicy          String?
+  updatedAt                 DateTime @updatedAt
+}
+
+model DeliverySetting {
+  id                    String   @id @default(uuid())
+  providerType          String
+  displayName           String
+  isActive              Boolean  @default(true)
+  zone                  String
+  price                 Decimal? @db.Decimal(10, 2)
+  freeDeliveryThreshold Decimal? @db.Decimal(10, 2)
+  etaText               String?
+  metadataJson          Json?
+  updatedAt             DateTime @updatedAt
+}
+
+model MockupPlacement {
+  id               String   @id @default(uuid())
+  designAssetId    String
+  designVersionId  String
+  mockupTemplateId String
+  printAreaId      String
+  x                Int
+  y                Int
+  scale            Float
+  rotation         Float    @default(0)
+  width            Int
+  height           Int
+  approvedByDesigner Boolean @default(false)
+  approvedAt       DateTime?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  designAsset    DesignAsset    @relation(fields: [designAssetId], references: [id])
+  designVersion  DesignVersion  @relation(fields: [designVersionId], references: [id])
+  mockupTemplate MockupTemplate @relation(fields: [mockupTemplateId], references: [id])
+  printArea      PrintArea      @relation(fields: [printAreaId], references: [id])
+  generatedAssets GeneratedAsset[]
+}
+
+model GeneratedAsset {
+  id                String               @id @default(uuid())
+  sourcePlacementId String
+  type              String
+  status            GeneratedAssetStatus @default(PENDING)
+  fileKey           String?
+  widthPx           Int?
+  heightPx          Int?
+  errorMessage      String?
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
+
+  sourcePlacement MockupPlacement @relation(fields: [sourcePlacementId], references: [id])
+}
+
+model CommerceListing {
+  id             String       @id @default(uuid())
+  type           ListingType
+  status         ListingStatus @default(DRAFT)
+  designerId     String
+  designAssetId  String
+  title          String
+  description    String?
+  slug           String       @unique
+  price          Decimal      @db.Decimal(10, 2)
+  currency       String       @default("UZS")
+  imagesJson     Json?
+  metadataJson   Json?
+  publishedAt    DateTime?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  designer    User       @relation("ListingDesigner", fields: [designerId], references: [id])
+  designAsset DesignAsset @relation(fields: [designAssetId], references: [id])
+  cartItems   CartItem[]
+  orderItems  OrderItem[]
+}
+
+model Cart {
+  id         String   @id @default(uuid())
+  customerId String   @unique
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  items      CartItem[]
+}
+
+model CartItem {
+  id         String   @id @default(uuid())
+  cartId     String
+  listingId  String
+  quantity   Int
+  unitPrice  Decimal  @db.Decimal(10, 2)
+  metadataJson Json?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  cart       Cart            @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  listing    CommerceListing @relation(fields: [listingId], references: [id])
+}
+
+model Order {
+  id            String      @id @default(uuid())
+  customerId    String
+  status        OrderStatus @default(PENDING_PAYMENT)
+  subtotal      Decimal     @db.Decimal(10, 2)
+  deliveryFee   Decimal     @db.Decimal(10, 2)
+  total         Decimal     @db.Decimal(10, 2)
+  currency      String      @default("UZS")
+  deliveryType  String?
+  deliveryZone  String?
+  notes         String?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  customer      User                 @relation("CustomerOrders", fields: [customerId], references: [id])
+  items         OrderItem[]
+  payments      PaymentTransaction[]
+  productionJobs ProductionJob[]
+}
+
+model OrderItem {
+  id          String   @id @default(uuid())
+  orderId     String
+  listingId   String
+  quantity    Int
+  unitPrice   Decimal  @db.Decimal(10, 2)
+  totalPrice  Decimal  @db.Decimal(10, 2)
+  metadataJson Json?
+  createdAt   DateTime @default(now())
+
+  order       Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  listing     CommerceListing @relation(fields: [listingId], references: [id])
+}
+
+model PaymentTransaction {
+  id               String        @id @default(uuid())
+  orderId           String
+  provider          String
+  providerRef       String?
+  amount            Decimal       @db.Decimal(10, 2)
+  currency          String        @default("UZS")
+  status            PaymentStatus @default(PENDING)
+  rawPayloadJson    Json?
+  idempotencyKey    String?
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  order             Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+}
+
+model ProductionJob {
+  id           String              @id @default(uuid())
+  orderId      String
+  orderItemId  String?
+  status       ProductionJobStatus @default(ORDERED)
+  queueType    String
+  notes        String?
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
+
+  order        Order      @relation(fields: [orderId], references: [id], onDelete: Cascade)
+}
+
+model CorporateRequest {
+  id            String               @id @default(uuid())
+  corporateUserId String
+  title         String
+  details       String?
+  quantity      Int
+  budget        Decimal?             @db.Decimal(10, 2)
+  deadline      DateTime?
+  status        CorporateRequestStatus @default(OPEN)
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
+
+  corporateUser User         @relation("CorporateClientRequests", fields: [corporateUserId], references: [id])
+  bids          DesignerBid[]
+  offers        CommercialOffer[]
+}
+
+model DesignerBid {
+  id            String          @id @default(uuid())
+  corporateRequestId String
+  designerId    String
+  proposal      String
+  designFee     Decimal         @db.Decimal(10, 2)
+  timelineDays  Int
+  status        DesignerBidStatus @default(SUBMITTED)
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  corporateRequest CorporateRequest @relation(fields: [corporateRequestId], references: [id], onDelete: Cascade)
+  designer         User             @relation("BidDesigner", fields: [designerId], references: [id])
+  selectedInOffers CommercialOffer[]
+}
+
+model CommercialOffer {
+  id            String              @id @default(uuid())
+  corporateRequestId String
+  selectedBidId String?
+  offerNumber   String              @unique
+  status        CommercialOfferStatus @default(DRAFT)
+  subtotal      Decimal             @db.Decimal(10, 2)
+  discount      Decimal             @db.Decimal(10, 2) @default(0)
+  total         Decimal             @db.Decimal(10, 2)
+  terms         String?
+  sentAt        DateTime?
+  acceptedAt    DateTime?
+  rejectedAt    DateTime?
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+
+  corporateRequest CorporateRequest @relation(fields: [corporateRequestId], references: [id], onDelete: Cascade)
+  selectedBid      DesignerBid?     @relation(fields: [selectedBidId], references: [id])
+}
+
+model WorkerJob {
+  id          String          @id @default(uuid())
+  type        String
+  status      WorkerJobStatus @default(PENDING)
+  payloadJson Json
+  attempts    Int             @default(0)
+  maxAttempts Int             @default(3)
+  errorMessage String?
+  nextRunAt   DateTime        @default(now())
+  lastErrorAt DateTime?
+  claimedAt   DateTime?
+  completedAt DateTime?
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+}
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  actorId    String?
+  action     String
+  entityType String
+  entityId   String
+  detailsJson Json?
+  createdAt  DateTime @default(now())
+
+  actor User? @relation(fields: [actorId], references: [id])
+}

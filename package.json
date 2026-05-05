@@ -1,0 +1,17 @@
+{
+  "name": "rashpod",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:api": "npm run start:dev -w @rashpod/api",
+    "dev:web": "npm run dev -w @rashpod/web",
+    "dev:dashboard": "npm run dev -w @rashpod/dashboard",
+    "dev:worker": "npm run dev -w @rashpod/worker",
+    "build": "npm run build -ws",
+    "test": "npm run test -ws"
+  }
+}
