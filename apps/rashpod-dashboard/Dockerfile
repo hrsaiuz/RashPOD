@@ -14,6 +14,7 @@ WORKDIR /app
 
 COPY --from=deps /app/node_modules ./node_modules
 
+COPY tsconfig.base.json ./
 COPY packages/ ./packages/
 COPY apps/rashpod-dashboard/ ./apps/rashpod-dashboard/
 
@@ -32,7 +33,6 @@ RUN addgroup --system --gid 1001 nodejs && adduser --system --uid 1001 nextjs
 
 COPY --from=builder /app/apps/rashpod-dashboard/.next/standalone ./
 COPY --from=builder /app/apps/rashpod-dashboard/.next/static ./apps/rashpod-dashboard/.next/static
-COPY --from=builder /app/apps/rashpod-dashboard/public ./apps/rashpod-dashboard/public 2>/dev/null || true
 
 USER nextjs
 
