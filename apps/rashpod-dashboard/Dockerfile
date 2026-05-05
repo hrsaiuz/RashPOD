@@ -16,6 +16,7 @@ COPY --from=deps /app/node_modules ./node_modules
 
 COPY package*.json ./
 COPY tsconfig.base.json ./
+COPY rashpod-ui-tokens.ts ./
 COPY packages/ ./packages/
 COPY apps/rashpod-dashboard/ ./apps/rashpod-dashboard/
 
