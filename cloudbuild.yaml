@@ -2,6 +2,9 @@ substitutions:
   _REGION: us-central1
   _REPO: rashpod
   _PROJECT: rashpod-production
+  _API_URL: https://rashpod-api-6533fe6ega-uc.a.run.app
+  _WEB_URL: https://rashpod-web-6533fe6ega-uc.a.run.app
+  _DASHBOARD_URL: https://rashpod-dashboard-6533fe6ega-uc.a.run.app
 
 steps:
   # ── Mint Artifact Registry access token ──────────────────────────────────────
@@ -33,6 +36,12 @@ steps:
       - build
       - -f
       - apps/rashpod-web/Dockerfile
+      - --build-arg
+      - NEXT_PUBLIC_API_URL=${_API_URL}
+      - --build-arg
+      - NEXT_PUBLIC_DASHBOARD_URL=${_DASHBOARD_URL}
+      - --build-arg
+      - NEXT_PUBLIC_WEB_URL=${_WEB_URL}
       - -t
       - ${_REGION}-docker.pkg.dev/${_PROJECT}/${_REPO}/rashpod-web:$COMMIT_SHA
       - -t
@@ -46,6 +55,12 @@ steps:
       - build
       - -f
       - apps/rashpod-dashboard/Dockerfile
+      - --build-arg
+      - NEXT_PUBLIC_API_URL=${_API_URL}
+      - --build-arg
+      - NEXT_PUBLIC_DASHBOARD_URL=${_DASHBOARD_URL}
+      - --build-arg
+      - NEXT_PUBLIC_WEB_URL=${_WEB_URL}
       - -t
       - ${_REGION}-docker.pkg.dev/${_PROJECT}/${_REPO}/rashpod-dashboard:$COMMIT_SHA
       - -t
@@ -125,7 +140,7 @@ steps:
       - --min-instances=0
       - --max-instances=5
       - --set-secrets=DATABASE_URL=DATABASE_URL:latest,JWT_SECRET=JWT_SECRET:latest,ZEPTO_SMTP_PASSWORD=ZEPTO_SMTP_PASSWORD:latest,OPENAI_API_KEY=OPENAI_API_KEY:latest,CLICK_SECRET_KEY=CLICK_SECRET_KEY:latest
-      - --set-env-vars=NODE_ENV=production,ZEPTO_SMTP_HOST=smtp.zeptomail.com,ZEPTO_SMTP_PORT=587,ZEPTO_SMTP_FROM=rashpod.uz,ZEPTO_SMTP_USERNAME=emailapikey,JWT_EXPIRES_IN=7d
+      - --set-env-vars=NODE_ENV=production,ZEPTO_SMTP_HOST=smtp.zeptomail.com,ZEPTO_SMTP_PORT=587,ZEPTO_SMTP_FROM=rashpod.uz,ZEPTO_SMTP_USERNAME=emailapikey,JWT_EXPIRES_IN=7d,WEB_URL=${_WEB_URL},DASHBOARD_URL=${_DASHBOARD_URL}
       - --add-cloudsql-instances=rashpod-production:us-central1:rashpod-db
     waitFor: [push-api]
 
