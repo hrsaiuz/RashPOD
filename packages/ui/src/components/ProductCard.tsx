@@ -30,7 +30,7 @@ export function ProductCard({ title, description, price, imageUrl, className, on
     >
       <div className="w-full h-[220px] bg-brand-bg rounded-[22px] mb-4 overflow-hidden relative">
         {imageUrl ? (
-          <img src={imageUrl} alt={title} className="w-full h-full object-cover" />
+          <img src={imageUrl} alt={`Product: ${title}`} className="w-full h-full object-cover" />
         ) : (
           <div className="w-full h-full flex items-center justify-center text-brand-muted text-4xl">🎨</div>
         )}

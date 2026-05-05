@@ -31,7 +31,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           filmsUrl="/film"
           aboutUrl="/about"
         />
-        <main className="min-h-screen bg-brand-bg">
+        <main id="main-content" className="min-h-screen bg-brand-bg">
           {children}
         </main>
         <PublicFooter />

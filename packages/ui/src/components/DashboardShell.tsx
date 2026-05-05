@@ -50,7 +50,7 @@ export const DashboardShell: React.FC<DashboardShellProps> = ({
           onMobileMenuToggle={() => setMobileSidebarOpen(!mobileSidebarOpen)}
         />
 
-        <main className={cn("flex-1 p-8", className)}>
+        <main id="main-content" className={cn("flex-1 p-8", className)}>
           {breadcrumbs && breadcrumbs.length > 0 && (
             <div className="mb-6">
               <Breadcrumbs items={breadcrumbs} />

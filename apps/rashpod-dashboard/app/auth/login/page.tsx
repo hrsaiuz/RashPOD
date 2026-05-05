@@ -91,23 +91,37 @@ function LoginForm() {
           {successMessage}
         </div>
       )}
-      <form onSubmit={onSubmit} style={{ display: "grid", gap: 10 }}>
-        <input
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          placeholder="Email"
-          type="email"
-          required
-          style={{ padding: 12, borderRadius: 12, border: "1px solid #D1D5DB" }}
-        />
-        <input
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          placeholder="Password"
-          type="password"
-          required
-          style={{ padding: 12, borderRadius: 12, border: "1px solid #D1D5DB" }}
-        />
+      <form onSubmit={onSubmit} style={{ display: "grid", gap: 14 }}>
+        <div>
+          <label htmlFor="email" style={{ fontSize: 13, fontWeight: 500, color: "#374151", display: "block", marginBottom: 6 }}>
+            Email
+          </label>
+          <input
+            id="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="Email"
+            type="email"
+            required
+            aria-required="true"
+            style={{ width: "100%", padding: 12, borderRadius: 12, border: "1px solid #D1D5DB", boxSizing: "border-box" }}
+          />
+        </div>
+        <div>
+          <label htmlFor="password" style={{ fontSize: 13, fontWeight: 500, color: "#374151", display: "block", marginBottom: 6 }}>
+            Password
+          </label>
+          <input
+            id="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="Password"
+            type="password"
+            required
+            aria-required="true"
+            style={{ width: "100%", padding: 12, borderRadius: 12, border: "1px solid #D1D5DB", boxSizing: "border-box" }}
+          />
+        </div>
         <button
           type="submit"
           disabled={loading}

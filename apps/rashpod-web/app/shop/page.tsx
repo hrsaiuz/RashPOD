@@ -171,7 +171,9 @@ function ShopContent() {
       <div>
         <h3 className="text-sm font-semibold text-brand-ink mb-3">Price Range</h3>
         <div className="flex items-center gap-2">
+          <label htmlFor="priceMin" className="sr-only">Minimum price</label>
           <Input
+            id="priceMin"
             type="number"
             placeholder="Min"
             value={priceMin}
@@ -179,7 +181,9 @@ function ShopContent() {
             className="w-full"
           />
           <span className="text-brand-muted">–</span>
+          <label htmlFor="priceMax" className="sr-only">Maximum price</label>
           <Input
+            id="priceMax"
             type="number"
             placeholder="Max"
             value={priceMax}
@@ -278,7 +282,7 @@ function ShopContent() {
             Filters {hasActiveFilters && `(${[categories, designers, priceMin, priceMax, hasFilm].filter(Boolean).length})`}
           </Button>
 
-          <FormField label="">
+          <FormField label="Sort by">
             <Select
               value={sort}
               onChange={(e) => {
@@ -301,7 +305,7 @@ function ShopContent() {
             <p className="text-sm text-brand-muted">
               {meta ? `Showing ${listings.length} of ${meta.total} products` : ""}
             </p>
-            <FormField label="">
+            <FormField label="Sort by">
               <Select
                 value={sort}
                 onChange={(e) => {
@@ -419,7 +423,7 @@ function ShopContent() {
       <Drawer open={mobileFiltersOpen} onClose={() => setMobileFiltersOpen(false)} side="left">
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-xl font-bold text-brand-ink">Filters</h2>
-          <button onClick={() => setMobileFiltersOpen(false)}>
+          <button onClick={() => setMobileFiltersOpen(false)} aria-label="Close filters">
             <X className="w-5 h-5 text-brand-muted" />
           </button>
         </div>
