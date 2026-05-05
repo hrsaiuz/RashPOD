@@ -36,7 +36,7 @@ export class CommercialRightsService {
       action: isAdmin ? "rights.admin-override" : "rights.update-own",
       entityType: "CommercialRights",
       entityId: updated.id,
-      details: { before, after: updated },
+      metadata: { before, after: updated },
     });
     return updated;
   }

@@ -52,7 +52,7 @@ export class DesignsService {
       action: "design.submit",
       entityType: "DesignAsset",
       entityId: designId,
-      details: { from: design.status, to: DesignStatus.SUBMITTED },
+      metadata: { from: design.status, to: DesignStatus.SUBMITTED },
     });
     return updated;
   }
@@ -88,7 +88,7 @@ export class DesignsService {
       action: "design.version.create",
       entityType: "DesignVersion",
       entityId: version.id,
-      details: { designId, previousVersionId: latestVersion?.id, fileId: dto.fileId },
+      metadata: { designId, previousVersionId: latestVersion?.id, fileId: dto.fileId },
     });
 
     return version;

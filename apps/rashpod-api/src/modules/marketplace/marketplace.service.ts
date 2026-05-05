@@ -43,7 +43,7 @@ export class MarketplaceService {
       action: "marketplace.export.generate",
       entityType: "MarketplaceExport",
       entityId: exportedAt,
-      details: { total: items.length, type: input.type ?? "ALL" },
+      metadata: { total: items.length, type: input.type ?? "ALL" },
     });
     return result;
   }

@@ -94,7 +94,7 @@ export class ListingsService {
       action: "listing.update",
       entityType: "CommerceListing",
       entityId: id,
-      details: { expectedType: expectedType ?? null },
+      metadata: { expectedType: expectedType ?? null },
     });
     return updated;
   }

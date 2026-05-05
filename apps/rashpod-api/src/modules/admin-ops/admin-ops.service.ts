@@ -103,7 +103,7 @@ export class AdminOpsService {
   async testEmailTemplate(actorId: string, id: string, dto: TestEmailTemplateDto) {
     const existing = this.emailTemplates.find((t) => t.id === id || t.key === dto.key);
     if (!existing) throw new NotFoundException("Email template not found");
-    await this.audit.log({ actorId, action: "email-template.test", entityType: "EmailTemplate", entityId: existing.id, details: { to: dto.to } });
+    await this.audit.log({ actorId, action: "email-template.test", entityType: "EmailTemplate", entityId: existing.id, metadata: { to: dto.to } });
     return { ok: true, to: dto.to, subject: existing.subject, preview: existing.body.slice(0, 160) };
   }
 
@@ -132,7 +132,7 @@ export class AdminOpsService {
       action: "ai.usage.register",
       entityType: "AiSettings",
       entityId: "global",
-      details: {
+      metadata: {
         operation,
         usageUsd,
         usageUsdMonth: this.aiSettings.usageUsdMonth,
@@ -155,8 +155,15 @@ export class AdminOpsService {
     return `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, "0")}`;
   }
 
-  listAuditLogs(limit = 200) {
-    return this.prisma.auditLog.findMany({ orderBy: { createdAt: "desc" }, take: Math.min(500, Math.max(1, limit)) });
+  listAuditLogs(filters: {
+    actorId?: string;
+    action?: string;
+    entityType?: string;
+    entityId?: string;
+    page?: number;
+    limit?: number;
+  }) {
+    return this.audit.query(filters);
   }
 
   async getAuditLog(id: string) {

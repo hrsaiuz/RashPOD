@@ -65,7 +65,7 @@ export class DeliveryService {
       action: "delivery.create-shipment",
       entityType: "Order",
       entityId: order.id,
-      details: { providerType, shipmentRef },
+      metadata: { providerType, shipmentRef },
     });
 
     return {
@@ -98,7 +98,7 @@ export class DeliveryService {
       action: "delivery-provider.toggle",
       entityType: "DeliverySetting",
       entityId: id,
-      details: { isActive },
+      metadata: { isActive },
     });
     return result;
   }

@@ -28,7 +28,7 @@ export class ProductionService {
       action: "production.status.update",
       entityType: "ProductionJob",
       entityId: jobId,
-      details: { from: existing.status, to: status },
+      metadata: { from: existing.status, to: status },
     });
     return updated;
   }
@@ -48,7 +48,7 @@ export class ProductionService {
       action: "production.assign",
       entityType: "ProductionJob",
       entityId: jobId,
-      details: { assigneeId, note: note ?? null },
+      metadata: { assigneeId, note: note ?? null },
     });
     return updated;
   }
@@ -83,7 +83,7 @@ export class ProductionService {
       action: "production.qc.submit",
       entityType: "ProductionJob",
       entityId: jobId,
-      details: { passed, note: note ?? null, checklist: checklist ?? null, from: existing.status, to: updated.status },
+      metadata: { passed, note: note ?? null, checklist: checklist ?? null, from: existing.status, to: updated.status },
     });
     return updated;
   }

@@ -134,7 +134,7 @@ export class JobDispatcherService {
       action: "worker-job.health.breach",
       entityType: "WorkerQueue",
       entityId: "global",
-      details: health,
+      metadata: health,
     });
     const alertJobs = [];
     for (const to of thresholds.alertRecipients) {
@@ -180,7 +180,7 @@ export class JobDispatcherService {
       action: "worker-job.retry",
       entityType: "WorkerJob",
       entityId: id,
-      details: { previousStatus: job.status, previousAttempts: job.attempts },
+      metadata: { previousStatus: job.status, previousAttempts: job.attempts },
     });
     return updated;
   }
@@ -212,7 +212,7 @@ export class JobDispatcherService {
       action: "worker-job.dead-letter.retry",
       entityType: "WorkerQueue",
       entityId: "dead-letter",
-      details: {
+      metadata: {
         requestedIds: uniqueIds,
         retriedIds: retried,
         skippedIds: uniqueIds.filter((id) => !retried.includes(id)),
@@ -239,7 +239,7 @@ export class JobDispatcherService {
       action: "worker-job.cancel",
       entityType: "WorkerJob",
       entityId: id,
-      details: { previousStatus: job.status, previousAttempts: job.attempts },
+      metadata: { previousStatus: job.status, previousAttempts: job.attempts },
     });
     return updated;
   }

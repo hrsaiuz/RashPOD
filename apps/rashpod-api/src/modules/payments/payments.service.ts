@@ -81,7 +81,7 @@ export class PaymentsService {
           action: "payment.click.webhook.duplicate-provider-ref",
           entityType: "PaymentTransaction",
           entityId: existingByRef.id,
-          details: { providerRef: payload.providerRef, incomingPaymentId: payload.paymentId },
+          metadata: { providerRef: payload.providerRef, incomingPaymentId: payload.paymentId },
         });
         return existingByRef;
       }
@@ -102,7 +102,7 @@ export class PaymentsService {
         action: "payment.click.webhook.duplicate",
         entityType: "PaymentTransaction",
         entityId: payment.id,
-        details: { providerRef: payload.providerRef, status: nextStatus },
+        metadata: { providerRef: payload.providerRef, status: nextStatus },
       });
       return payment;
     }
@@ -111,7 +111,7 @@ export class PaymentsService {
         action: "payment.click.webhook.conflict",
         entityType: "PaymentTransaction",
         entityId: payment.id,
-        details: { currentStatus: payment.status, incomingStatus: nextStatus, providerRef: payload.providerRef },
+        metadata: { currentStatus: payment.status, incomingStatus: nextStatus, providerRef: payload.providerRef },
       });
       return payment;
     }
@@ -143,7 +143,7 @@ export class PaymentsService {
       action: "payment.click.webhook",
       entityType: "PaymentTransaction",
       entityId: payment.id,
-      details: { status: nextStatus, providerRef: payload.providerRef },
+      metadata: { status: nextStatus, providerRef: payload.providerRef },
     });
     return updated;
   }

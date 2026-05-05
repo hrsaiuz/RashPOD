@@ -52,7 +52,7 @@ export class ModerationService {
       action: `moderation.${status.toLowerCase()}`,
       entityType: "DesignAsset",
       entityId: designId,
-      details: { reason, from: design.status, to: status },
+      metadata: { reason, from: design.status, to: status },
     });
     return updated;
   }

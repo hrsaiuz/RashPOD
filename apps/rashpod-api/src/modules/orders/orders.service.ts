@@ -172,7 +172,7 @@ export class OrdersService {
       action: "order.create",
       entityType: "Order",
       entityId: order.id,
-      details: { itemCount: items.length, total },
+      metadata: { itemCount: items.length, total },
     });
     return order;
   }
@@ -215,7 +215,7 @@ export class OrdersService {
       action: "order.mark-paid",
       entityType: "Order",
       entityId: orderId,
-      details: { providerRef },
+      metadata: { providerRef },
     });
     return updated;
   }

@@ -41,7 +41,7 @@ export class AdminConfigService {
       action: "product-type.create",
       entityType: "ProductType",
       entityId: productType.id,
-      details: productType as unknown as Record<string, unknown>,
+      metadata: productType as unknown as Record<string, unknown>,
     });
     return productType;
   }

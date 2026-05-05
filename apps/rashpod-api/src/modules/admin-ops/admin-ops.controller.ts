@@ -65,8 +65,22 @@ export class AdminOpsController {
 
   @Get("audit-logs")
   @RequirePermission("audit-logs:read")
-  listAuditLogs(@Query("limit") limit?: string) {
-    return this.adminOps.listAuditLogs(limit ? Number(limit) : 200);
+  listAuditLogs(
+    @Query("actorId") actorId?: string,
+    @Query("action") action?: string,
+    @Query("entityType") entityType?: string,
+    @Query("entityId") entityId?: string,
+    @Query("page") page?: string,
+    @Query("limit") limit?: string,
+  ) {
+    return this.adminOps.listAuditLogs({
+      actorId,
+      action,
+      entityType,
+      entityId,
+      page: page ? Number(page) : undefined,
+      limit: limit ? Number(limit) : undefined,
+    });
   }
 
   @Get("audit-logs/:id")

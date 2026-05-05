@@ -553,11 +553,19 @@ model WorkerJob {
 model AuditLog {
   id         String   @id @default(uuid())
   actorId    String?
+  actorEmail String?
+  actorRole  String?
   action     String
   entityType String
   entityId   String
-  detailsJson Json?
+  metadata   Json?
+  ip         String?
+  userAgent  String?
   createdAt  DateTime @default(now())
 
   actor User? @relation(fields: [actorId], references: [id])
+
+  @@index([entityType, entityId])
+  @@index([actorId])
+  @@index([createdAt])
 }

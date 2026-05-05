@@ -57,7 +57,7 @@ export class AiService {
         action: "ai.provider.error",
         entityType: "AiAssist",
         entityId: input.operation,
-        details: { status: res.status },
+        metadata: { status: res.status },
       });
       return null;
     }
