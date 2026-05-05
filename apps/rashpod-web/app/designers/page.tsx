@@ -182,17 +182,17 @@ export default function DesignersPage() {
                         <div
                           key={listing.id}
                           className="w-16 h-16 rounded-lg bg-gray-100 overflow-hidden"
-                        >
-                          {listing.imageUrl ? (
-                            <Image
-                              src={listing.imageUrl}
-                              alt=""
-                              width={64}
-                              height={64}
-                              className="object-cover w-full h-full"
-                            />
-                          ) : (
-                            <div className="w-full h-full bg-brand-bg" />
+                          >
+                            {listing.imageUrl ? (
+                              <Image
+                                src={listing.imageUrl}
+                                alt="Product thumbnail"
+                                width={64}
+                                height={64}
+                                className="object-cover w-full h-full"
+                              />
+                            ) : (
+                              <div className="w-full h-full bg-brand-bg" />
                           )}
                         </div>
                       ))}
