@@ -14,7 +14,7 @@ async function bootstrap() {
   ].filter((o): o is string => Boolean(o));
 
   app.enableCors({
-    origin: (origin, cb) => {
+    origin: (origin: string | undefined, cb: (err: Error | null, allow?: boolean) => void) => {
       if (!origin) return cb(null, true);
       if (allowedOrigins.includes(origin)) return cb(null, true);
       return cb(new Error(`CORS: origin ${origin} not allowed`), false);
