@@ -97,6 +97,7 @@ steps:
       - --max-instances=5
       - --set-secrets=DATABASE_URL=DATABASE_URL:latest,JWT_SECRET=JWT_SECRET:latest,ZEPTO_SMTP_PASSWORD=ZEPTO_SMTP_PASSWORD:latest,OPENAI_API_KEY=OPENAI_API_KEY:latest,CLICK_SECRET_KEY=CLICK_SECRET_KEY:latest
       - --set-env-vars=NODE_ENV=production,ZEPTO_SMTP_HOST=smtp.zeptomail.com,ZEPTO_SMTP_PORT=587,ZEPTO_SMTP_FROM=rashpod.uz,ZEPTO_SMTP_USERNAME=emailapikey,JWT_EXPIRES_IN=7d
+      - --add-cloudsql-instances=rashpod-production:us-central1:rashpod-db
     waitFor: [push-api]
 
   - id: deploy-worker
@@ -117,6 +118,7 @@ steps:
       - --max-instances=3
       - --set-secrets=DATABASE_URL=DATABASE_URL:latest,GCS_BUCKET_NAME=GCS_BUCKET_NAME:latest
       - --set-env-vars=NODE_ENV=production
+      - --add-cloudsql-instances=rashpod-production:us-central1:rashpod-db
     waitFor: [push-worker]
 
   - id: deploy-web
