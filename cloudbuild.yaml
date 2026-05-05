@@ -4,16 +4,13 @@ substitutions:
   _PROJECT: rashpod-production
 
 steps:
-  # ── Configure Docker auth for Artifact Registry ──────────────────────────────
-  - id: docker-auth
+  # ── Mint Artifact Registry access token ──────────────────────────────────────
+  - id: artifact-registry-token
     name: gcr.io/google.com/cloudsdktool/cloud-sdk
-    entrypoint: gcloud
-    args: ['auth', 'configure-docker', '${_REGION}-docker.pkg.dev']
-    env:
-      - HOME=/builder/home
-    volumes:
-      - name: docker-config
-        path: /builder/home/.docker
+    entrypoint: sh
+    args:
+      - -c
+      - gcloud auth print-access-token > /workspace/artifact-registry.token
     waitFor: ['-']
 
   # ── Build images ──────────────────────────────────────────────────────────────
@@ -72,43 +69,43 @@ steps:
   # ── Push images ───────────────────────────────────────────────────────────────
   - id: push-api
     name: gcr.io/cloud-builders/docker
-    args: [push, '--all-tags', '${_REGION}-docker.pkg.dev/${_PROJECT}/${_REPO}/rashpod-api']
-    env:
-      - HOME=/builder/home
-    volumes:
-      - name: docker-config
-        path: /builder/home/.docker
-    waitFor: [docker-auth, build-api]
+    entrypoint: sh
+    args:
+      - -c
+      - |
+        cat /workspace/artifact-registry.token | docker login -u oauth2accesstoken --password-stdin https://${_REGION}-docker.pkg.dev &&
+        docker push --all-tags ${_REGION}-docker.pkg.dev/${_PROJECT}/${_REPO}/rashpod-api
+    waitFor: [artifact-registry-token, build-api]
 
   - id: push-web
     name: gcr.io/cloud-builders/docker
-    args: [push, '--all-tags', '${_REGION}-docker.pkg.dev/${_PROJECT}/${_REPO}/rashpod-web']
-    env:
-      - HOME=/builder/home
-    volumes:
-      - name: docker-config
-        path: /builder/home/.docker
-    waitFor: [docker-auth, build-web]
+    entrypoint: sh
+    args:
+      - -c
+      - |
+        cat /workspace/artifact-registry.token | docker login -u oauth2accesstoken --password-stdin https://${_REGION}-docker.pkg.dev &&
+        docker push --all-tags ${_REGION}-docker.pkg.dev/${_PROJECT}/${_REPO}/rashpod-web
+    waitFor: [artifact-registry-token, build-web]
 
   - id: push-dashboard
     name: gcr.io/cloud-builders/docker
-    args: [push, '--all-tags', '${_REGION}-docker.pkg.dev/${_PROJECT}/${_REPO}/rashpod-dashboard']
-    env:
-      - HOME=/builder/home
-    volumes:
-      - name: docker-config
-        path: /builder/home/.docker
-    waitFor: [docker-auth, build-dashboard]
+    entrypoint: sh
+    args:
+      - -c
+      - |
+        cat /workspace/artifact-registry.token | docker login -u oauth2accesstoken --password-stdin https://${_REGION}-docker.pkg.dev &&
+        docker push --all-tags ${_REGION}-docker.pkg.dev/${_PROJECT}/${_REPO}/rashpod-dashboard
+    waitFor: [artifact-registry-token, build-dashboard]
 
   - id: push-worker
     name: gcr.io/cloud-builders/docker
-    args: [push, '--all-tags', '${_REGION}-docker.pkg.dev/${_PROJECT}/${_REPO}/rashpod-worker']
-    env:
-      - HOME=/builder/home
-    volumes:
-      - name: docker-config
-        path: /builder/home/.docker
-    waitFor: [docker-auth, build-worker]
+    entrypoint: sh
+    args:
+      - -c
+      - |
+        cat /workspace/artifact-registry.token | docker login -u oauth2accesstoken --password-stdin https://${_REGION}-docker.pkg.dev &&
+        docker push --all-tags ${_REGION}-docker.pkg.dev/${_PROJECT}/${_REPO}/rashpod-worker
+    waitFor: [artifact-registry-token, build-worker]
 
   # ── Deploy to Cloud Run ───────────────────────────────────────────────────────
   - id: deploy-api
