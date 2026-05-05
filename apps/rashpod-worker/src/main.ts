@@ -1,3 +1,4 @@
+import { createServer } from "node:http";
 import { WorkerDispatcher } from "./dispatcher";
 import { InMemoryWorkerRepository } from "./mock-repository";
 import { PrismaAssetRepository } from "./prisma-asset-repository";
@@ -17,6 +18,13 @@ const jobs = [
 function bootstrap() {
   // Worker skeleton with queue-dispatch wiring.
   workerLogger.info(`[rashpod-worker] ready. registered jobs: ${jobs.join(", ")}`);
+  const port = Number(process.env.PORT || 8080);
+  createServer((_, res) => {
+    res.writeHead(200, { "content-type": "text/plain; charset=utf-8" });
+    res.end("ok");
+  }).listen(port, () => {
+    workerLogger.info(`[rashpod-worker] health server listening on ${port}`);
+  });
 
   const useInMemoryDemo = (process.env.WORKER_IN_MEMORY_DEMO || "false") === "true";
   const repo = useInMemoryDemo ? new InMemoryWorkerRepository() : new PrismaAssetRepository();

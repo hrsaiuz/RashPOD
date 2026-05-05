@@ -9,9 +9,11 @@ steps:
     name: gcr.io/google.com/cloudsdktool/cloud-sdk
     entrypoint: gcloud
     args: ['auth', 'configure-docker', '${_REGION}-docker.pkg.dev']
+    env:
+      - HOME=/builder/home
     volumes:
       - name: docker-config
-        path: /root/.docker
+        path: /builder/home/.docker
     waitFor: ['-']
 
   # ── Build images ──────────────────────────────────────────────────────────────
@@ -71,33 +73,41 @@ steps:
   - id: push-api
     name: gcr.io/cloud-builders/docker
     args: [push, '--all-tags', '${_REGION}-docker.pkg.dev/${_PROJECT}/${_REPO}/rashpod-api']
+    env:
+      - HOME=/builder/home
     volumes:
       - name: docker-config
-        path: /root/.docker
+        path: /builder/home/.docker
     waitFor: [docker-auth, build-api]
 
   - id: push-web
     name: gcr.io/cloud-builders/docker
     args: [push, '--all-tags', '${_REGION}-docker.pkg.dev/${_PROJECT}/${_REPO}/rashpod-web']
+    env:
+      - HOME=/builder/home
     volumes:
       - name: docker-config
-        path: /root/.docker
+        path: /builder/home/.docker
     waitFor: [docker-auth, build-web]
 
   - id: push-dashboard
     name: gcr.io/cloud-builders/docker
     args: [push, '--all-tags', '${_REGION}-docker.pkg.dev/${_PROJECT}/${_REPO}/rashpod-dashboard']
+    env:
+      - HOME=/builder/home
     volumes:
       - name: docker-config
-        path: /root/.docker
+        path: /builder/home/.docker
     waitFor: [docker-auth, build-dashboard]
 
   - id: push-worker
     name: gcr.io/cloud-builders/docker
     args: [push, '--all-tags', '${_REGION}-docker.pkg.dev/${_PROJECT}/${_REPO}/rashpod-worker']
+    env:
+      - HOME=/builder/home
     volumes:
       - name: docker-config
-        path: /root/.docker
+        path: /builder/home/.docker
     waitFor: [docker-auth, build-worker]
 
   # ── Deploy to Cloud Run ───────────────────────────────────────────────────────
