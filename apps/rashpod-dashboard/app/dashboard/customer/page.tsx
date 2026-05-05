@@ -111,7 +111,7 @@ export default function CustomerOverview() {
             title="Failed to load dashboard"
             description={error}
             retry={
-              <Button onClick={() => window.location.reload()} variant="primary">
+              <Button onClick={() => window.location.reload()} variant="primaryBlue">
                 Retry
               </Button>
             }
@@ -156,7 +156,7 @@ export default function CustomerOverview() {
                     description="Start shopping to see your orders here."
                     action={
                       <Link href="/dashboard/customer/shop">
-                        <Button variant="primary">Browse Shop</Button>
+                        <Button variant="primaryBlue">Browse Shop</Button>
                       </Link>
                     }
                   />
@@ -175,7 +175,7 @@ export default function CustomerOverview() {
                     Browse our collection of custom-designed products and find something unique.
                   </p>
                   <Link href="/dashboard/customer/shop">
-                    <Button variant="primary">Browse Products</Button>
+                    <Button variant="primaryBlue">Browse Products</Button>
                   </Link>
                 </div>
               </div>

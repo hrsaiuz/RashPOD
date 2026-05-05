@@ -1,44 +1,168 @@
 "use client";
 
-import Link from "next/link";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useAuth } from "../../auth/auth-provider";
 import DashboardLayout from "../dashboard-layout";
+import { KpiTile, DataTable, DataTableColumn, EmptyState, ErrorState, Skeleton, Card, Button } from "@rashpod/ui";
+import { Activity, AlertTriangle, Database, CheckCircle } from "lucide-react";
+import Link from "next/link";
 
-const CONTROL_SECTIONS = [
-  { href: "/dashboard/admin/orders", label: "All Orders", icon: "📦", color: "#EEF0FB" },
-  { href: "/dashboard/admin/worker-jobs", label: "Worker Jobs", icon: "⚙️", color: "#EEF0FB" },
-  { href: "/dashboard/moderator/designs", label: "Moderation", icon: "🔍", color: "#FEF3C7" },
-  { href: "/dashboard/finance/royalties", label: "Royalties", icon: "💸", color: "#D1FAE5" },
-  { href: "/dashboard/finance/payments", label: "Payments", icon: "💳", color: "#D1FAE5" },
-  { href: "/dashboard/super-admin/roles", label: "Roles & Users", icon: "👥", color: "#EEF0FB" },
-  { href: "/dashboard/super-admin/audit-logs", label: "Audit Logs", icon: "📝", color: "#FEE2E2" },
-  { href: "/dashboard/super-admin/permissions", label: "Permissions", icon: "🔐", color: "#FEE2E2" },
-  { href: "/dashboard/super-admin/system", label: "System Health", icon: "🖥️", color: "#EEF0FB" },
-  { href: "/dashboard/super-admin/secrets", label: "Secrets / Config", icon: "🔑", color: "#FEE2E2" },
-];
+interface SuperAdminKpis {
+  servicesUp: number;
+  queueDepth: number;
+  errorsCount: number;
+  healthScore: number;
+}
 
-export default function SuperAdminPage() {
+interface AuditEntry {
+  id: string;
+  action: string;
+  user: string;
+  resource: string;
+  timestamp: string;
+}
+
+export default function SuperAdminOverview() {
+  const router = useRouter();
+  const { user, isLoading: authLoading } = useAuth();
+  const [kpis, setKpis] = useState<SuperAdminKpis | null>(null);
+  const [auditLog, setAuditLog] = useState<AuditEntry[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (authLoading) return;
+    if (!user) {
+      router.push("/auth/login?next=/dashboard/super-admin");
+      return;
+    }
+
+    const load = async () => {
+      setLoading(true);
+      setError("");
+      try {
+        // TODO: Replace with actual endpoints
+        // const healthRes = await fetch("/api/proxy/admin/health");
+        // const queueRes = await fetch("/api/proxy/admin/worker-jobs?status=queued&count=true");
+        // const auditRes = await fetch("/api/proxy/admin/audit-log?limit=5");
+        
+        setKpis({
+          servicesUp: 4,
+          queueDepth: 12,
+          errorsCount: 2,
+          healthScore: 98,
+        });
+        setAuditLog([
+          { id: "1", action: "UPDATE_SETTINGS", user: "admin@rashpod.com", resource: "delivery_settings", timestamp: "2025-01-20T10:30:00" },
+          { id: "2", action: "DELETE_USER", user: "admin@rashpod.com", resource: "user_123", timestamp: "2025-01-20T09:15:00" },
+        ]);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to load data");
+      } finally {
+        setLoading(false);
+      }
+    };
+    void load();
+  }, [user, authLoading, router]);
+
+  const auditColumns: DataTableColumn<AuditEntry>[] = [
+    { key: "action", header: "Action", sortable: true },
+    { key: "user", header: "User" },
+    { key: "resource", header: "Resource" },
+    { 
+      key: "timestamp", 
+      header: "Time",
+      render: (val) => new Date(val).toLocaleString(),
+    },
+  ];
+
   return (
     <DashboardLayout role="super-admin">
-      <h1 style={{ margin: "0 0 4px", fontSize: 22, color: "#1A1D2E" }}>Super Admin</h1>
-      <p style={{ margin: "0 0 24px", color: "#6B7280", fontSize: 14 }}>Global platform controls. Handle with care.</p>
+      <div className="space-y-8">
+        <div>
+          <h1 className="text-3xl font-bold text-brand-ink mb-2">Super Admin Dashboard</h1>
+          <p className="text-brand-muted">System health, services, and audit logs.</p>
+        </div>
 
-      <div style={{ background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 12, padding: "10px 16px", marginBottom: 24, fontSize: 13, color: "#991B1B" }}>
-        ⚠️ Actions taken here affect all users and all services. Review before making changes.
-      </div>
+        <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-sm text-red-800">
+          ⚠️ Actions taken here affect all users and all services. Review before making changes.
+        </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: 12 }}>
-        {CONTROL_SECTIONS.map((s) => (
-          <Link key={s.href} href={s.href} style={{ textDecoration: "none" }}>
-            <div style={{ background: "white", border: "1px solid #E8EAFB", borderRadius: 16, padding: "16px 18px", cursor: "pointer", transition: "box-shadow .15s, border-color .15s" }}
-              onMouseEnter={(e) => { (e.currentTarget as HTMLDivElement).style.boxShadow = "0 4px 16px rgba(120,138,224,0.14)"; (e.currentTarget as HTMLDivElement).style.borderColor = "#788AE0"; }}
-              onMouseLeave={(e) => { (e.currentTarget as HTMLDivElement).style.boxShadow = "none"; (e.currentTarget as HTMLDivElement).style.borderColor = "#E8EAFB"; }}>
-              <div style={{ width: 36, height: 36, borderRadius: 10, background: s.color, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, marginBottom: 10 }}>
-                {s.icon}
-              </div>
-              <div style={{ fontWeight: 600, fontSize: 13, color: "#1A1D2E" }}>{s.label}</div>
+        {error && (
+          <ErrorState
+            title="Failed to load dashboard"
+            description={error}
+            retry={
+              <Button onClick={() => window.location.reload()} variant="primaryBlue">
+                Retry
+              </Button>
+            }
+          />
+        )}
+
+        {!error && (
+          <>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              {loading ? (
+                <>
+                  <Skeleton className="h-32" />
+                  <Skeleton className="h-32" />
+                  <Skeleton className="h-32" />
+                  <Skeleton className="h-32" />
+                </>
+              ) : kpis ? (
+                <>
+                  <KpiTile label="Services Up" value={kpis.servicesUp} icon={<CheckCircle size={24} />} />
+                  <KpiTile label="Queue Depth" value={kpis.queueDepth} icon={<Database size={24} />} />
+                  <KpiTile label="Errors (24h)" value={kpis.errorsCount} icon={<AlertTriangle size={24} />} />
+                  <KpiTile 
+                    label="Health Score" 
+                    value={`${kpis.healthScore}%`} 
+                    icon={<Activity size={24} />}
+                    delta={{ value: 2, isPositive: true }}
+                  />
+                </>
+              ) : null}
             </div>
-          </Link>
-        ))}
+
+            <Card>
+              <h3 className="text-lg font-semibold text-brand-ink mb-4">Service Status</h3>
+              <div className="space-y-3">
+                {["rashpod-web", "rashpod-dashboard", "rashpod-api", "rashpod-worker"].map((service) => (
+                  <div key={service} className="flex items-center justify-between">
+                    <span className="text-sm text-brand-ink">{service}</span>
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 rounded-full bg-green-500" />
+                      <span className="text-xs text-brand-muted">Up</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <p className="text-xs text-brand-muted mt-4">
+                TODO: Replace with actual health check endpoints
+              </p>
+            </Card>
+
+            <Card>
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-xl font-semibold text-brand-ink">Audit Log</h2>
+              </div>
+              <DataTable
+                columns={auditColumns}
+                rows={auditLog}
+                loading={loading}
+                mobileMode="cards"
+                emptyState={
+                  <EmptyState
+                    title="No audit entries"
+                    description="Audit log will appear here."
+                  />
+                }
+              />
+            </Card>
+          </>
+        )}
       </div>
     </DashboardLayout>
   );

@@ -113,7 +113,7 @@ export default function SupportOverview() {
             title="Failed to load dashboard"
             description={error}
             retry={
-              <Button onClick={() => window.location.reload()} variant="primary">
+              <Button onClick={() => window.location.reload()} variant="primaryBlue">
                 Retry
               </Button>
             }

@@ -106,7 +106,7 @@ export default function CorporateOverview() {
             title="Failed to load dashboard"
             description={error}
             retry={
-              <Button onClick={() => window.location.reload()} variant="primary">
+              <Button onClick={() => window.location.reload()} variant="primaryBlue">
                 Retry
               </Button>
             }
@@ -151,7 +151,7 @@ export default function CorporateOverview() {
                     description="Create a custom request to get started."
                     action={
                       <Link href="/dashboard/corporate/requests/new">
-                        <Button variant="primary">New Request</Button>
+                        <Button variant="primaryBlue">New Request</Button>
                       </Link>
                     }
                   />

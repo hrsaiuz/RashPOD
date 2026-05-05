@@ -104,7 +104,7 @@ export default function DesignerOverview() {
             title="Failed to load dashboard"
             description={error}
             retry={
-              <Button onClick={() => window.location.reload()} variant="primary">
+              <Button onClick={() => window.location.reload()} variant="primaryBlue">
                 Retry
               </Button>
             }
@@ -168,7 +168,7 @@ export default function DesignerOverview() {
                     Create a new design and list it for sale on RashPOD marketplace.
                   </p>
                   <Link href="/dashboard/designer/designs/new">
-                    <Button variant="primary">Upload Design</Button>
+                    <Button variant="primaryBlue">Upload Design</Button>
                   </Link>
                 </div>
               </div>
