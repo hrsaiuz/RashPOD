@@ -2,28 +2,25 @@
 
 import * as React from "react";
 import { motion, HTMLMotionProps } from "framer-motion";
-import { clsx, type ClassValue } from "clsx";
-import { twMerge } from "tailwind-merge";
+import { cn } from "../lib/utils";
+import { Loader2 } from "lucide-react";
 
-function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs));
-}
-
-export interface ButtonProps extends HTMLMotionProps<"button"> {
-  variant?: "primaryBlue" | "primaryPeach" | "outline" | "ghost" | "danger";
+export interface ButtonProps extends Omit<HTMLMotionProps<"button">, "ref"> {
+  variant?: "primaryBlue" | "primaryPeach" | "secondary" | "ghost" | "danger";
   size?: "sm" | "md" | "lg";
+  loading?: boolean;
 }
 
 export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ className, variant = "primaryBlue", size = "md", children, ...props }, ref) => {
+  ({ className, variant = "primaryBlue", size = "md", loading = false, children, disabled, ...props }, ref) => {
     const baseStyles =
-      "inline-flex items-center justify-center rounded-full font-semibold transition-colors focus:outline-none focus:ring-4 focus:ring-focus disabled:opacity-50 disabled:pointer-events-none";
+      "inline-flex items-center justify-center gap-2 rounded-pill font-semibold transition-colors focus:outline-none focus:ring-4 focus:ring-brand-blue/20 disabled:opacity-50 disabled:pointer-events-none";
 
     const variants = {
-      primaryBlue: "bg-brand-blue text-white shadow-blueGlow hover:bg-brand-blue-second",
-      primaryPeach: "bg-brand-peach text-white shadow-peachGlow hover:bg-brand-peach-second",
-      outline: "border border-brand-blue text-brand-blue hover:bg-brand-blue/5",
-      ghost: "text-brand-text hover:bg-surface-border-soft",
+      primaryBlue: "bg-brand-blue text-white shadow-blueGlow hover:bg-brand-blueSecondary",
+      primaryPeach: "bg-brand-peach text-white shadow-peachGlow hover:bg-brand-peachSecondary",
+      secondary: "border border-brand-blue text-brand-blue hover:bg-brand-blue/5",
+      ghost: "text-brand-ink hover:bg-surface-borderSoft",
       danger: "bg-semantic-danger text-white hover:bg-semantic-danger/90",
     };
 
@@ -33,14 +30,20 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
       lg: "h-14 px-[30px] text-[16px]",
     };
 
+    const motionProps = !loading && !disabled ? {
+      whileHover: { scale: 1.02 },
+      whileTap: { scale: 0.98 },
+    } : {};
+
     return (
       <motion.button
         ref={ref}
-        whileHover={{ scale: 1.02 }}
-        whileTap={{ scale: 0.98 }}
+        {...motionProps}
         className={cn(baseStyles, variants[variant], sizes[size], className)}
+        disabled={disabled || loading}
         {...props}
       >
+        {loading && <Loader2 className="animate-spin" size={16} />}
         {children}
       </motion.button>
     );
