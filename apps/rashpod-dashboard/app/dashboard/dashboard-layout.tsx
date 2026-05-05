@@ -1,55 +1,69 @@
 "use client";
 
-import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { ReactNode } from "react";
+import { ReactNode, useMemo } from "react";
+import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "../auth/auth-provider";
-import { useRouter } from "next/navigation";
+import { DashboardShell, DashboardLink, BreadcrumbItem } from "@rashpod/ui";
+import {
+  LayoutDashboard,
+  ShoppingBag,
+  Package,
+  Tag,
+  FileText,
+  Search,
+  DollarSign,
+  CreditCard,
+  LifeBuoy,
+  Ticket,
+  Settings,
+  Briefcase,
+  Factory,
+} from "lucide-react";
 
-const ROLE_LINKS: Record<string, Array<{ href: string; label: string; icon: string }>> = {
+const ROLE_LINKS: Record<string, Array<{ href: string; label: string; icon?: any }>> = {
   designer: [
-    { href: "/dashboard/designer", label: "Overview", icon: "📊" },
-    { href: "/dashboard/designer/listings", label: "My Listings", icon: "🏷️" },
+    { href: "/dashboard/designer", label: "Overview", icon: LayoutDashboard },
+    { href: "/dashboard/designer/listings", label: "My Listings", icon: Tag },
   ],
   customer: [
-    { href: "/dashboard/customer", label: "Overview", icon: "📊" },
-    { href: "/dashboard/customer/shop", label: "Browse Shop", icon: "🛒" },
-    { href: "/dashboard/customer/orders", label: "My Orders", icon: "📦" },
+    { href: "/dashboard/customer", label: "Overview", icon: LayoutDashboard },
+    { href: "/dashboard/customer/shop", label: "Browse Shop", icon: ShoppingBag },
+    { href: "/dashboard/customer/orders", label: "My Orders", icon: Package },
   ],
   production: [
-    { href: "/dashboard/production", label: "Overview", icon: "📊" },
-    { href: "/dashboard/production/jobs", label: "Production Queue", icon: "🏭" },
+    { href: "/dashboard/production", label: "Overview", icon: LayoutDashboard },
+    { href: "/dashboard/production/jobs", label: "Production Queue", icon: Factory },
   ],
   corporate: [
-    { href: "/dashboard/corporate", label: "Overview", icon: "📊" },
-    { href: "/dashboard/corporate/requests", label: "Requests", icon: "📋" },
+    { href: "/dashboard/corporate", label: "Overview", icon: LayoutDashboard },
+    { href: "/dashboard/corporate/requests", label: "Requests", icon: FileText },
   ],
   moderator: [
-    { href: "/dashboard/moderator", label: "Overview", icon: "📊" },
-    { href: "/dashboard/moderator/designs", label: "Moderation Queue", icon: "🔍" },
+    { href: "/dashboard/moderator", label: "Overview", icon: LayoutDashboard },
+    { href: "/dashboard/moderator/designs", label: "Moderation Queue", icon: Search },
   ],
   finance: [
-    { href: "/dashboard/finance", label: "Overview", icon: "📊" },
-    { href: "/dashboard/finance/royalties", label: "Royalties", icon: "💸" },
-    { href: "/dashboard/finance/payments", label: "Payments", icon: "💳" },
+    { href: "/dashboard/finance", label: "Overview", icon: LayoutDashboard },
+    { href: "/dashboard/finance/royalties", label: "Royalties", icon: DollarSign },
+    { href: "/dashboard/finance/payments", label: "Payments", icon: CreditCard },
   ],
   support: [
-    { href: "/dashboard/support", label: "Overview", icon: "📊" },
-    { href: "/dashboard/support/tickets", label: "Tickets", icon: "🎫" },
+    { href: "/dashboard/support", label: "Overview", icon: LayoutDashboard },
+    { href: "/dashboard/support/tickets", label: "Tickets", icon: Ticket },
   ],
   admin: [
-    { href: "/dashboard/admin", label: "Overview", icon: "📊" },
-    { href: "/dashboard/admin/orders", label: "Orders", icon: "📦" },
-    { href: "/dashboard/admin/worker-jobs", label: "Worker Jobs", icon: "⚙️" },
-    { href: "/dashboard/admin/delivery-settings", label: "Delivery", icon: "🚚" },
-    { href: "/dashboard/admin/corporate", label: "Corporate", icon: "🏢" },
+    { href: "/dashboard/admin", label: "Overview", icon: LayoutDashboard },
+    { href: "/dashboard/admin/orders", label: "Orders", icon: Package },
+    { href: "/dashboard/admin/worker-jobs", label: "Worker Jobs", icon: Settings },
+    { href: "/dashboard/admin/delivery-settings", label: "Delivery", icon: Package },
+    { href: "/dashboard/admin/corporate", label: "Corporate", icon: Briefcase },
   ],
   "super-admin": [
-    { href: "/dashboard/super-admin", label: "Overview", icon: "📊" },
-    { href: "/dashboard/admin/orders", label: "All Orders", icon: "📦" },
-    { href: "/dashboard/admin/worker-jobs", label: "Worker Jobs", icon: "⚙️" },
-    { href: "/dashboard/moderator/designs", label: "Moderation", icon: "🔍" },
-    { href: "/dashboard/finance/royalties", label: "Royalties", icon: "💸" },
+    { href: "/dashboard/super-admin", label: "Overview", icon: LayoutDashboard },
+    { href: "/dashboard/admin/orders", label: "All Orders", icon: Package },
+    { href: "/dashboard/admin/worker-jobs", label: "Worker Jobs", icon: Settings },
+    { href: "/dashboard/moderator/designs", label: "Moderation", icon: Search },
+    { href: "/dashboard/finance/royalties", label: "Royalties", icon: DollarSign },
   ],
 };
 
@@ -69,60 +83,57 @@ export default function DashboardLayout({ children, role }: { children: ReactNod
   const pathname = usePathname();
   const router = useRouter();
   const { user, clearSession } = useAuth();
-  const links = ROLE_LINKS[role] ?? [];
 
-  const handleLogout = async () => {
+  const links: DashboardLink[] = useMemo(() => {
+    return (ROLE_LINKS[role] ?? []).map((l) => ({
+      href: l.href,
+      label: l.label,
+      icon: l.icon,
+    }));
+  }, [role]);
+
+  const breadcrumbs: BreadcrumbItem[] = useMemo(() => {
+    const segments = pathname.split("/").filter(Boolean);
+    const items: BreadcrumbItem[] = [{ label: "Dashboard", href: "/dashboard" }];
+
+    if (segments.length > 1) {
+      items.push({
+        label: ROLE_LABELS[segments[1]] || segments[1],
+        href: `/dashboard/${segments[1]}`,
+      });
+    }
+
+    if (segments.length > 2) {
+      for (let i = 2; i < segments.length; i++) {
+        const label = segments[i].replace(/-/g, " ");
+        items.push({
+          label: label.charAt(0).toUpperCase() + label.slice(1),
+          href: `/dashboard/${segments.slice(1, i + 1).join("/")}`,
+        });
+      }
+    }
+
+    return items;
+  }, [pathname]);
+
+  const handleSignOut = async () => {
     await clearSession();
     router.push("/auth/login");
   };
 
   return (
-    <div style={{ display: "flex", minHeight: "calc(100vh - 0px)" }}>
-      {/* Sidebar */}
-      <aside style={{ width: 220, background: "white", borderRight: "1px solid #E8EAFB", display: "flex", flexDirection: "column", padding: "20px 0", flexShrink: 0, position: "sticky", top: 0, height: "100vh", overflowY: "auto" }}>
-        <div style={{ padding: "0 16px 20px", borderBottom: "1px solid #F0F2FA" }}>
-          <Link href="/" style={{ fontWeight: 800, fontSize: 17, color: "#788AE0", textDecoration: "none", letterSpacing: -0.5 }}>RashPOD</Link>
-          <div style={{ marginTop: 4, fontSize: 11, fontWeight: 600, color: "#A3AFE5", textTransform: "uppercase", letterSpacing: 1 }}>
-            {ROLE_LABELS[role] ?? role}
-          </div>
-        </div>
-
-        <nav style={{ flex: 1, padding: "12px 8px" }}>
-          {links.map((l) => {
-            const active = pathname === l.href || (l.href !== `/dashboard/${role}` && pathname.startsWith(l.href));
-            return (
-              <Link key={l.href} href={l.href} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 10px", borderRadius: 10, textDecoration: "none", fontSize: 13, fontWeight: active ? 600 : 400, color: active ? "#788AE0" : "#4B5563", background: active ? "#EEF0FB" : "transparent", marginBottom: 2 }}>
-                <span style={{ fontSize: 15 }}>{l.icon}</span>
-                {l.label}
-              </Link>
-            );
-          })}
-        </nav>
-
-        <div style={{ padding: "12px 16px", borderTop: "1px solid #F0F2FA" }}>
-          {user && (
-            <div style={{ fontSize: 12, color: "#6B7280", marginBottom: 10, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-              {user.displayName || user.email}
-            </div>
-          )}
-          <button onClick={handleLogout} style={{ width: "100%", padding: "8px 12px", borderRadius: 10, border: "1px solid #E8EAFB", background: "white", color: "#6B7280", fontSize: 12, cursor: "pointer", textAlign: "left" }}>
-            Sign out
-          </button>
-        </div>
-      </aside>
-
-      {/* Main content */}
-      <div style={{ flex: 1, overflow: "auto" }}>
-        {/* Topbar */}
-        <header style={{ background: "white", borderBottom: "1px solid #E8EAFB", padding: "0 24px", height: 56, display: "flex", alignItems: "center", gap: 8, position: "sticky", top: 0, zIndex: 10 }}>
-          <nav style={{ fontSize: 12, color: "#9CA3AF", display: "flex", alignItems: "center", gap: 6 }}>
-            <span>Dashboard</span>
-            <span>›</span>
-            <span style={{ color: "#374151", fontWeight: 500, textTransform: "capitalize" }}>{ROLE_LABELS[role] ?? role}</span>
-          </nav>
-        </header>
-        <main style={{ padding: 24 }}>{children}</main>
-      </div>
-    </div>
+    <DashboardShell
+      role={ROLE_LABELS[role] || role}
+      links={links}
+      activePath={pathname}
+      user={{
+        name: user?.displayName || user?.email || "User",
+        email: user?.email,
+      }}
+      onSignOut={handleSignOut}
+      breadcrumbs={breadcrumbs}
+    >
+      {children}
+    </DashboardShell>
   );
 }
