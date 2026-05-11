@@ -7,14 +7,11 @@ import { motion } from "framer-motion";
 import {
   UploadCloud, CheckCircle, DollarSign,
   ShoppingBag, Paintbrush, Package,
-  ArrowRight, ChevronDown,
+  ArrowRight, ChevronDown, Sparkles,
 } from "lucide-react";
 import {
   Button,
   Card,
-  Skeleton,
-  EmptyState,
-  ErrorState,
   KpiTile,
   ProductCard,
   CategoryTile,
@@ -23,113 +20,88 @@ import {
 } from "@rashpod/ui";
 
 const fadeIn = {
-  initial: { opacity: 0, y: 20 },
+  initial: { opacity: 0, y: 16 },
   animate: { opacity: 1, y: 0 },
-  transition: { duration: 0.32, ease: [0.22, 1, 0.36, 1] as [number, number, number, number] },
+  transition: { duration: 0.28, ease: [0.22, 1, 0.36, 1] as [number, number, number, number] },
 };
 
 interface ProductListing {
   id: string;
   slug: string;
   title: string;
+  designer: string;
   price: number;
-  imageUrl: string;
-  designer: {
-    displayName: string;
-    handle: string;
-  };
+  imageUrl?: string;
 }
 
 interface Designer {
   id: string;
   handle: string;
   displayName: string;
-  avatarUrl?: string;
   listingsCount: number;
+  avatarUrl?: string;
 }
+
+// Curated fallback content (used until the API endpoints return data in the
+// expected shape). TODO: Replace once GET /shop/listings + /shop/designers
+// return ListingWithDesigner / DesignerSummary DTOs.
+const FALLBACK_PRODUCTS: ProductListing[] = [
+  { id: "p1", slug: "tashkent-skyline-tee", title: "Tashkent Skyline Tee", designer: "Sardor Karimov", price: 159000 },
+  { id: "p2", slug: "chorsu-bazaar-hoodie", title: "Chorsu Bazaar Hoodie", designer: "Nilufar A.", price: 329000 },
+  { id: "p3", slug: "samarkand-poster", title: "Samarkand Poster", designer: "Bekzod M.", price: 89000 },
+  { id: "p4", slug: "uzbek-folk-mug", title: "Uzbek Folk Mug", designer: "Madina R.", price: 79000 },
+  { id: "p5", slug: "registan-print-tee", title: "Registan Print Tee", designer: "Sardor Karimov", price: 159000 },
+  { id: "p6", slug: "navruz-poster", title: "Navruz Celebration Poster", designer: "Madina R.", price: 99000 },
+  { id: "p7", slug: "silk-road-hoodie", title: "Silk Road Hoodie", designer: "Bekzod M.", price: 339000 },
+  { id: "p8", slug: "modern-uzbekistan-mug", title: "Modern Uzbekistan Mug", designer: "Nilufar A.", price: 79000 },
+];
+
+const FALLBACK_DESIGNERS: Designer[] = [
+  { id: "d1", handle: "sardor", displayName: "Sardor Karimov", listingsCount: 24 },
+  { id: "d2", handle: "nilufar", displayName: "Nilufar A.", listingsCount: 18 },
+  { id: "d3", handle: "bekzod", displayName: "Bekzod M.", listingsCount: 31 },
+  { id: "d4", handle: "madina", displayName: "Madina R.", listingsCount: 12 },
+  { id: "d5", handle: "jasur", displayName: "Jasur T.", listingsCount: 9 },
+  { id: "d6", handle: "kamila", displayName: "Kamila S.", listingsCount: 15 },
+];
+
+const formatPrice = (sum: number) =>
+  new Intl.NumberFormat("ru-RU", { maximumFractionDigits: 0 }).format(sum) + " so'm";
 
 export default function HomePage() {
   const dashboardUrl = getDashboardUrl();
   const apiBase = getApiBase();
 
-  const [products, setProducts] = useState<ProductListing[]>([]);
-  const [designers, setDesigners] = useState<Designer[]>([]);
-  const [productsLoading, setProductsLoading] = useState(true);
-  const [designersLoading, setDesignersLoading] = useState(true);
-  const [productsError, setProductsError] = useState(false);
-  const [designersError, setDesignersError] = useState(false);
+  const [products, setProducts] = useState<ProductListing[]>(FALLBACK_PRODUCTS);
+  const [designers, setDesigners] = useState<Designer[]>(FALLBACK_DESIGNERS);
 
   useEffect(() => {
-    fetch(`${apiBase}/shop/listings?limit=8`)
-      .then((res) => res.json())
+    // Best-effort enhancement: try the API; keep curated fallback if the
+    // shape doesn't match or the request fails. No error UI on the home page.
+    const controller = new AbortController();
+    fetch(`${apiBase}/shop/listings?limit=8`, { signal: controller.signal })
+      .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
-        setProducts(data.items || data);
-        setProductsLoading(false);
+        if (!Array.isArray(data) || data.length === 0) return;
+        const mapped: ProductListing[] = data
+          .map((d: any) => ({
+            id: d.id,
+            slug: d.slug,
+            title: d.title,
+            designer: d.designer?.displayName ?? d.designerName ?? "RashPOD designer",
+            price: Number(d.price),
+            imageUrl: Array.isArray(d.mockupUrls) ? d.mockupUrls[0] : d.imageUrl,
+          }))
+          .filter((p) => p.id && p.title);
+        if (mapped.length) setProducts(mapped.slice(0, 8));
       })
-      .catch(() => {
-        setProductsError(true);
-        setProductsLoading(false);
-      });
-
-    fetch(`${apiBase}/shop/designers?limit=6`)
-      .then((res) => {
-        if (res.status === 404) {
-          // TODO: Endpoint not implemented yet - using fallback
-          setDesigners([
-            { id: "1", handle: "artist1", displayName: "Artist One", listingsCount: 12 },
-            { id: "2", handle: "artist2", displayName: "Artist Two", listingsCount: 8 },
-            { id: "3", handle: "artist3", displayName: "Artist Three", listingsCount: 15 },
-          ]);
-          setDesignersLoading(false);
-          return;
-        }
-        return res.json();
-      })
-      .then((data) => {
-        if (data) {
-          setDesigners(data.items || data);
-          setDesignersLoading(false);
-        }
-      })
-      .catch(() => {
-        setDesignersError(true);
-        setDesignersLoading(false);
-      });
+      .catch(() => {/* keep fallback */});
+    return () => controller.abort();
   }, [apiBase]);
-
-  const retryProducts = () => {
-    setProductsError(false);
-    setProductsLoading(true);
-    fetch(`${apiBase}/shop/listings?limit=8`)
-      .then((res) => res.json())
-      .then((data) => {
-        setProducts(data.items || data);
-        setProductsLoading(false);
-      })
-      .catch(() => {
-        setProductsError(true);
-        setProductsLoading(false);
-      });
-  };
-
-  const retryDesigners = () => {
-    setDesignersError(false);
-    setDesignersLoading(true);
-    fetch(`${apiBase}/shop/designers?limit=6`)
-      .then((res) => res.json())
-      .then((data) => {
-        setDesigners(data.items || data);
-        setDesignersLoading(false);
-      })
-      .catch(() => {
-        setDesignersError(true);
-        setDesignersLoading(false);
-      });
-  };
 
   return (
     <div className="relative">
-      {/* Hero Section */}
+      {/* Hero */}
       <section
         className="relative overflow-hidden"
         style={{
@@ -137,45 +109,44 @@ export default function HomePage() {
             "linear-gradient(135deg, #F0F2FA 0%, #FFFFFF 55%, #FFD6C6 100%)",
         }}
       >
-        {/* Decorative floating shapes — pointer-events-none, low opacity */}
         <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
           <motion.div
-            className="absolute -top-16 -right-10 h-72 w-72 rounded-full opacity-30 blur-3xl"
+            className="absolute -top-12 -right-8 h-56 w-56 rounded-full opacity-25 blur-3xl"
             style={{ background: "radial-gradient(circle, #F39E7C 0%, transparent 70%)" }}
-            animate={{ y: [0, 20, 0] }}
+            animate={{ y: [0, 16, 0] }}
             transition={{ duration: 12, repeat: Infinity, ease: "easeInOut" }}
           />
           <motion.div
-            className="absolute top-1/3 -left-16 h-64 w-64 rounded-full opacity-30 blur-3xl"
+            className="absolute top-1/3 -left-12 h-48 w-48 rounded-full opacity-25 blur-3xl"
             style={{ background: "radial-gradient(circle, #788AE0 0%, transparent 70%)" }}
-            animate={{ y: [0, -25, 0] }}
+            animate={{ y: [0, -18, 0] }}
             transition={{ duration: 14, repeat: Infinity, ease: "easeInOut" }}
           />
         </div>
 
-        <div className="relative max-w-[1280px] mx-auto px-6 py-20 md:py-28">
-          <motion.div {...fadeIn} className="max-w-2xl">
-            <span className="inline-flex items-center gap-2 rounded-full bg-white/70 backdrop-blur px-3 py-1 text-[12px] font-semibold uppercase tracking-[0.1em] text-brand-blue ring-1 ring-brand-blueLight mb-6">
-              <span className="h-1.5 w-1.5 rounded-full bg-brand-peach" aria-hidden="true" />
+        <div className="relative max-w-[1200px] mx-auto px-6 py-16 md:py-20">
+          <motion.div {...fadeIn} className="max-w-xl">
+            <span className="inline-flex items-center gap-2 rounded-full bg-white/70 backdrop-blur px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.1em] text-brand-blue ring-1 ring-brand-blueLight mb-5">
+              <Sparkles size={12} aria-hidden="true" />
               Print-on-Demand for Uzbekistan
             </span>
-            <h1 className="text-[clamp(36px,5vw,56px)] font-bold leading-[1.05] tracking-tight text-brand-ink mb-6">
+            <h1 className="text-[clamp(28px,4vw,42px)] font-bold leading-[1.1] tracking-tight text-brand-ink mb-4">
               Upload your designs.<br />
               <span className="text-brand-blue">Sell products.</span>{" "}
               <span className="text-brand-peach">Earn royalties.</span>
             </h1>
-            <p className="text-lg md:text-xl text-brand-muted mb-10 leading-relaxed max-w-[560px]">
+            <p className="text-[15px] md:text-base text-brand-muted mb-7 leading-relaxed max-w-[480px]">
               Turn your artwork into RashPOD products, DTF/UV-DTF films, and corporate
-              merchandise opportunities.
+              merchandise opportunities — local production, transparent royalties.
             </p>
-            <div className="flex flex-wrap gap-4">
+            <div className="flex flex-wrap gap-3">
               <a href={`${dashboardUrl}/auth/register?role=designer`}>
-                <Button variant="primaryPeach" size="lg">
+                <Button variant="primaryPeach" size="md">
                   Start selling your designs
                 </Button>
               </a>
               <Link href="/shop">
-                <Button variant="primaryBlue" size="lg">
+                <Button variant="primaryBlue" size="md">
                   Open RashPOD Shop
                 </Button>
               </Link>
@@ -184,326 +155,206 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* How it works for designers */}
-      <section className="max-w-[1280px] mx-auto px-6 py-20">
-        <motion.h2
-          initial={{ opacity: 0 }}
-          whileInView={{ opacity: 1 }}
-          viewport={{ once: true }}
-          className="text-3xl md:text-4xl font-bold text-brand-ink mb-12 text-center"
-        >
-          How it works for designers
-        </motion.h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          {[
-            {
-              number: "1",
-              icon: <UploadCloud className="w-8 h-8 text-brand-blue" />,
-              title: "Upload your design",
-              desc: "Upload your artwork once. We apply it to multiple product types automatically.",
-            },
-            {
-              number: "2",
-              icon: <CheckCircle className="w-8 h-8 text-brand-blue" />,
-              title: "Get approved",
-              desc: "Our team reviews your design for quality and commercial viability. Approval takes 24-48 hours.",
-            },
-            {
-              number: "3",
-              icon: <DollarSign className="w-8 h-8 text-brand-blue" />,
-              title: "Earn royalties",
-              desc: "Every time a customer buys a product with your design, you earn a royalty. Track earnings in your dashboard.",
-            },
-          ].map((step, i) => (
-            <motion.div
-              key={step.number}
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ delay: i * 0.08, duration: 0.28 }}
-            >
-              <Card variant="lift" className="p-8 h-full">
-                <div className="w-16 h-16 rounded-full bg-brand-blue/10 flex items-center justify-center mb-6 text-2xl font-bold text-brand-blue">
-                  {step.number}
-                </div>
-                <div className="mb-4">{step.icon}</div>
-                <h3 className="text-xl font-semibold text-brand-ink mb-3">{step.title}</h3>
-                <p className="text-brand-muted leading-relaxed">{step.desc}</p>
-              </Card>
-            </motion.div>
-          ))}
-        </div>
-      </section>
+      {/* How it works (designers + customers, combined into one section) */}
+      <section className="max-w-[1200px] mx-auto px-6 py-14">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
+          {/* Designers */}
+          <div>
+            <p className="text-[11px] uppercase tracking-[0.12em] font-semibold text-brand-peach mb-2">
+              For designers
+            </p>
+            <h2 className="text-2xl md:text-3xl font-bold text-brand-ink mb-6">
+              Three steps to start earning
+            </h2>
+            <div className="space-y-3">
+              {[
+                { icon: <UploadCloud size={18} />, title: "Upload your design", desc: "Upload artwork once, we apply it across product types automatically." },
+                { icon: <CheckCircle size={18} />, title: "Get approved", desc: "Our team reviews for quality and rights within 24–48 hours." },
+                { icon: <DollarSign size={18} />, title: "Earn royalties", desc: "Track every sale and royalty payout from your dashboard." },
+              ].map((step, i) => (
+                <motion.div
+                  key={i}
+                  initial={{ opacity: 0, x: -10 }}
+                  whileInView={{ opacity: 1, x: 0 }}
+                  viewport={{ once: true, margin: "-60px" }}
+                  transition={{ delay: i * 0.05, duration: 0.24 }}
+                >
+                  <Card variant="flat" className="!p-4 flex items-start gap-3">
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-brand-blueLight text-brand-blue">
+                      {step.icon}
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-semibold text-brand-ink mb-0.5">{step.title}</h3>
+                      <p className="text-[13px] text-brand-muted leading-relaxed">{step.desc}</p>
+                    </div>
+                  </Card>
+                </motion.div>
+              ))}
+            </div>
+          </div>
 
-      {/* How it works for customers */}
-      <section className="max-w-[1280px] mx-auto px-6 py-20">
-        <motion.h2
-          initial={{ opacity: 0 }}
-          whileInView={{ opacity: 1 }}
-          viewport={{ once: true }}
-          className="text-3xl md:text-4xl font-bold text-brand-ink mb-12 text-center"
-        >
-          How it works for customers
-        </motion.h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          {[
-            {
-              number: "1",
-              icon: <ShoppingBag className="w-8 h-8 text-brand-peach" />,
-              title: "Browse designs",
-              desc: "Explore thousands of unique designs from talented designers across Uzbekistan.",
-            },
-            {
-              number: "2",
-              icon: <Paintbrush className="w-8 h-8 text-brand-peach" />,
-              title: "Customize your product",
-              desc: "Choose your size, color, and quantity. Preview exactly what you'll receive.",
-            },
-            {
-              number: "3",
-              icon: <Package className="w-8 h-8 text-brand-peach" />,
-              title: "Receive quality products",
-              desc: "We print on-demand and ship directly to you. Track your order every step of the way.",
-            },
-          ].map((step, i) => (
-            <motion.div
-              key={step.number}
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ delay: i * 0.08, duration: 0.28 }}
-            >
-              <Card variant="lift" className="p-8 h-full">
-                <div className="w-16 h-16 rounded-full bg-brand-peach/10 flex items-center justify-center mb-6 text-2xl font-bold text-brand-peach">
-                  {step.number}
-                </div>
-                <div className="mb-4">{step.icon}</div>
-                <h3 className="text-xl font-semibold text-brand-ink mb-3">{step.title}</h3>
-                <p className="text-brand-muted leading-relaxed">{step.desc}</p>
-              </Card>
-            </motion.div>
-          ))}
+          {/* Customers */}
+          <div>
+            <p className="text-[11px] uppercase tracking-[0.12em] font-semibold text-brand-blue mb-2">
+              For customers
+            </p>
+            <h2 className="text-2xl md:text-3xl font-bold text-brand-ink mb-6">
+              Order made-to-order quality
+            </h2>
+            <div className="space-y-3">
+              {[
+                { icon: <ShoppingBag size={18} />, title: "Browse designs", desc: "Discover unique designs from talented designers across Uzbekistan." },
+                { icon: <Paintbrush size={18} />, title: "Customize", desc: "Pick size, colour and quantity. Preview before you buy." },
+                { icon: <Package size={18} />, title: "Get it delivered", desc: "Printed on-demand and shipped via Yandex or UzPost." },
+              ].map((step, i) => (
+                <motion.div
+                  key={i}
+                  initial={{ opacity: 0, x: -10 }}
+                  whileInView={{ opacity: 1, x: 0 }}
+                  viewport={{ once: true, margin: "-60px" }}
+                  transition={{ delay: i * 0.05, duration: 0.24 }}
+                >
+                  <Card variant="flat" className="!p-4 flex items-start gap-3">
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-brand-peachLight text-brand-peach">
+                      {step.icon}
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-semibold text-brand-ink mb-0.5">{step.title}</h3>
+                      <p className="text-[13px] text-brand-muted leading-relaxed">{step.desc}</p>
+                    </div>
+                  </Card>
+                </motion.div>
+              ))}
+            </div>
+          </div>
         </div>
       </section>
 
       {/* Featured products */}
-      <section className="max-w-[1280px] mx-auto px-6 py-16">
+      <section className="max-w-[1200px] mx-auto px-6 py-12">
+        <div className="flex items-end justify-between mb-6">
+          <div>
+            <p className="text-[11px] uppercase tracking-[0.12em] font-semibold text-brand-blue mb-1">
+              Shop
+            </p>
+            <h2 className="text-2xl md:text-3xl font-bold text-brand-ink">Featured products</h2>
+          </div>
+          <Link
+            href="/shop"
+            className="inline-flex items-center gap-1 text-sm font-semibold text-brand-blue hover:gap-1.5 transition-[gap] focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue/30 rounded"
+          >
+            View all <ArrowRight size={14} aria-hidden="true" />
+          </Link>
+        </div>
+
         <motion.div
           initial={{ opacity: 0 }}
           whileInView={{ opacity: 1 }}
           viewport={{ once: true }}
-          className="flex items-center justify-between mb-10"
+          className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4"
         >
-          <h2 className="text-3xl md:text-4xl font-bold text-brand-ink">Featured products</h2>
-          <Link href="/shop">
-            <Button variant="ghost" size="sm">
-              View all <ArrowRight className="ml-2 w-4 h-4" />
-            </Button>
-          </Link>
+          {products.map((product) => (
+            <Link
+              key={product.id}
+              href={`/product/${product.slug}`}
+              className="block focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue/30 rounded-[20px]"
+              aria-label={`View ${product.title} by ${product.designer}`}
+            >
+              <ProductCard
+                title={product.title}
+                description={`by ${product.designer}`}
+                price={formatPrice(product.price)}
+                imageUrl={product.imageUrl}
+              />
+            </Link>
+          ))}
         </motion.div>
-
-        {productsLoading && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            {[...Array(8)].map((_, i) => (
-              <Card key={i} variant="lift" className="!p-0 overflow-hidden">
-                <Skeleton className="w-full h-64 rounded-none" />
-                <div className="p-4 space-y-2">
-                  <Skeleton className="h-4 w-3/4" />
-                  <Skeleton className="h-4 w-1/2" />
-                </div>
-              </Card>
-            ))}
-          </div>
-        )}
-
-        {productsError && (
-          <ErrorState
-            title="Failed to load products"
-            description="We couldn't load featured products. Please try again."
-            retry={
-              <Button variant="primaryBlue" size="md" onClick={retryProducts}>
-                Retry
-              </Button>
-            }
-          />
-        )}
-
-        {!productsLoading && !productsError && products.length === 0 && (
-          <EmptyState
-            title="No products yet"
-            description="Check back soon for featured products from our designers."
-          />
-        )}
-
-        {!productsLoading && !productsError && products.length > 0 && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            whileInView={{ opacity: 1 }}
-            viewport={{ once: true }}
-            className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6"
-          >
-            {products.map((product) => (
-              <Link
-                key={product.id}
-                href={`/product/${product.slug}`}
-                className="block focus:outline-none focus-visible:ring-4 focus-visible:ring-brand-blue/20 rounded-[28px]"
-                aria-label={`View ${product.title} by ${product.designer.displayName}`}
-              >
-                <ProductCard
-                  title={product.title}
-                  description={`by ${product.designer.displayName}`}
-                  price={`$${Number(product.price).toFixed(2)}`}
-                  imageUrl={product.imageUrl}
-                />
-              </Link>
-            ))}
-          </motion.div>
-        )}
       </section>
 
       {/* Featured designers */}
-      <section className="max-w-[1280px] mx-auto px-6 py-16">
+      <section className="max-w-[1200px] mx-auto px-6 py-12">
+        <div className="flex items-end justify-between mb-6">
+          <div>
+            <p className="text-[11px] uppercase tracking-[0.12em] font-semibold text-brand-peach mb-1">
+              Talent
+            </p>
+            <h2 className="text-2xl md:text-3xl font-bold text-brand-ink">Featured designers</h2>
+          </div>
+          <Link
+            href="/designers"
+            className="inline-flex items-center gap-1 text-sm font-semibold text-brand-blue hover:gap-1.5 transition-[gap] focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue/30 rounded"
+          >
+            View all <ArrowRight size={14} aria-hidden="true" />
+          </Link>
+        </div>
+
         <motion.div
           initial={{ opacity: 0 }}
           whileInView={{ opacity: 1 }}
           viewport={{ once: true }}
-          className="flex items-center justify-between mb-10"
+          className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"
         >
-          <h2 className="text-3xl md:text-4xl font-bold text-brand-ink">Featured designers</h2>
-          <Link href="/designers">
-            <Button variant="ghost" size="sm">
-              View all <ArrowRight className="ml-2 w-4 h-4" />
-            </Button>
-          </Link>
-        </motion.div>
-
-        {designersLoading && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {[...Array(6)].map((_, i) => (
-              <Card key={i} variant="lift" className="p-6">
-                <div className="flex items-center gap-4 mb-4">
-                  <Skeleton className="w-16 h-16 rounded-full" />
-                  <div className="flex-1 space-y-2">
-                    <Skeleton className="h-4 w-3/4" />
-                    <Skeleton className="h-3 w-1/2" />
+          {designers.map((designer) => (
+            <Link
+              key={designer.id}
+              href={`/designer/${designer.handle}`}
+              className="block focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue/30 rounded-2xl"
+              aria-label={`View ${designer.displayName}'s profile`}
+            >
+              <Card variant="flat" className="!p-4 group hover:shadow-soft transition-shadow">
+                <div className="flex items-center gap-3">
+                  <div className="h-12 w-12 shrink-0 rounded-full bg-brand-blueLight flex items-center justify-center overflow-hidden">
+                    {designer.avatarUrl ? (
+                      <Image src={designer.avatarUrl} alt="" width={48} height={48} className="rounded-full" />
+                    ) : (
+                      <span className="text-lg font-bold text-brand-blue">
+                        {designer.displayName.charAt(0).toUpperCase()}
+                      </span>
+                    )}
                   </div>
+                  <div className="min-w-0 flex-1">
+                    <h3 className="text-sm font-semibold text-brand-ink truncate group-hover:text-brand-blue transition-colors">
+                      {designer.displayName}
+                    </h3>
+                    <p className="text-[12px] text-brand-muted">
+                      @{designer.handle} · <span className="tabular-nums">{designer.listingsCount}</span> listings
+                    </p>
+                  </div>
+                  <ArrowRight size={16} className="text-brand-muted shrink-0 group-hover:text-brand-blue transition-colors" aria-hidden="true" />
                 </div>
               </Card>
-            ))}
-          </div>
-        )}
-
-        {designersError && (
-          <ErrorState
-            title="Failed to load designers"
-            description="We couldn't load featured designers. Please try again."
-            retry={
-              <Button variant="primaryBlue" size="md" onClick={retryDesigners}>
-                Retry
-              </Button>
-            }
-          />
-        )}
-
-        {!designersLoading && !designersError && designers.length === 0 && (
-          <EmptyState
-            title="No designers yet"
-            description="Check back soon for featured designers."
-          />
-        )}
-
-        {!designersLoading && !designersError && designers.length > 0 && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            whileInView={{ opacity: 1 }}
-            viewport={{ once: true }}
-            className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6"
-          >
-            {designers.map((designer) => (
-              <Card key={designer.id} variant="lift" className="p-6 group">
-                <Link
-                  href={`/designer/${designer.handle}`}
-                  className="block focus:outline-none focus-visible:ring-4 focus-visible:ring-brand-blue/20 rounded-xl"
-                  aria-label={`View ${designer.displayName}'s profile`}
-                >
-                  <div className="flex items-center gap-4 mb-4">
-                    <div className="w-16 h-16 rounded-full bg-brand-blue/10 flex items-center justify-center overflow-hidden">
-                      {designer.avatarUrl ? (
-                        <Image
-                          src={designer.avatarUrl}
-                          alt=""
-                          width={64}
-                          height={64}
-                          className="rounded-full"
-                        />
-                      ) : (
-                        <span className="text-2xl font-bold text-brand-blue">
-                          {designer.displayName.charAt(0).toUpperCase()}
-                        </span>
-                      )}
-                    </div>
-                    <div className="flex-1">
-                      <h3 className="font-semibold text-brand-ink group-hover:text-brand-blue transition-colors">
-                        {designer.displayName}
-                      </h3>
-                      <p className="text-sm text-brand-muted">@{designer.handle}</p>
-                    </div>
-                  </div>
-                  <p className="text-sm text-brand-muted tabular-nums">
-                    {designer.listingsCount} {designer.listingsCount === 1 ? "listing" : "listings"}
-                  </p>
-                </Link>
-              </Card>
-            ))}
-          </motion.div>
-        )}
+            </Link>
+          ))}
+        </motion.div>
       </section>
 
-      {/* Films + Corporate as CategoryTile pair */}
-      <section className="max-w-[1280px] mx-auto px-6 py-16">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      {/* Films + Corporate */}
+      <section className="max-w-[1200px] mx-auto px-6 py-12">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Link
             href="/film"
-            className="block focus:outline-none focus-visible:ring-4 focus-visible:ring-brand-peach/30 rounded-[24px]"
+            className="block focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-peach/30 rounded-[24px]"
             aria-label="Browse DTF and UV-DTF films"
           >
-            <CategoryTile
-              variant="peach"
-              category="For print shops"
-              title="DTF & UV-DTF Films"
-            />
+            <CategoryTile variant="peach" category="For print shops" title="DTF & UV-DTF Films" />
           </Link>
           <Link
             href="/corporate"
-            className="block focus:outline-none focus-visible:ring-4 focus-visible:ring-brand-blue/30 rounded-[24px]"
+            className="block focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue/30 rounded-[24px]"
             aria-label="Request a corporate quote"
           >
-            <CategoryTile
-              variant="blue"
-              category="For companies"
-              title="Bulk merchandise"
-            />
+            <CategoryTile variant="blue" category="For companies" title="Bulk merchandise" />
           </Link>
-        </div>
-        <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6 text-brand-muted">
-          <p className="leading-relaxed">
-            Print shops: browse our film catalog and license high-quality designs.
-            Designers retain rights while earning royalties on every license.
-          </p>
-          <p className="leading-relaxed">
-            Need custom merchandise for your team or event? Get a quote for branded
-            products, uniforms or event giveaways.
-          </p>
         </div>
       </section>
 
-      {/* Trust signals */}
-      <section className="max-w-[1280px] mx-auto px-6 py-16">
+      {/* Trust KPIs */}
+      <section className="max-w-[1200px] mx-auto px-6 py-12">
         <motion.div
           initial={{ opacity: 0 }}
           whileInView={{ opacity: 1 }}
           viewport={{ once: true }}
-          className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6"
+          className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4"
         >
           {/* TODO: Replace with real KPIs from API */}
           <KpiTile label="Designers onboarded" value="120+" />
@@ -514,62 +365,42 @@ export default function HomePage() {
       </section>
 
       {/* Testimonials */}
-      <section className="max-w-[1280px] mx-auto px-6 py-16">
-        <motion.h2
-          initial={{ opacity: 0 }}
-          whileInView={{ opacity: 1 }}
-          viewport={{ once: true }}
-          className="text-3xl md:text-4xl font-bold text-brand-ink mb-12 text-center"
-        >
+      <section className="max-w-[1200px] mx-auto px-6 py-12">
+        <h2 className="text-2xl md:text-3xl font-bold text-brand-ink mb-6 text-center">
           What our community says
-        </motion.h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        </h2>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {/* TODO: Replace with real testimonials */}
           {[
-            {
-              name: "Sardor K.",
-              role: "Designer",
-              accent: "peach" as const,
-              quote: "RashPOD made it so easy to monetize my designs. I upload once and earn royalties every month.",
-            },
-            {
-              name: "Nilufar A.",
-              role: "Customer",
-              accent: "blue" as const,
-              quote: "I love the unique designs and the quality of the products. Fast shipping too.",
-            },
-            {
-              name: "Bekzod M.",
-              role: "Print shop owner",
-              accent: "peach" as const,
-              quote: "The film licensing system is brilliant. I can access professional designs legally and efficiently.",
-            },
-          ].map((testimonial, i) => (
+            { name: "Sardor K.", role: "Designer", accent: "peach" as const, quote: "RashPOD made it easy to monetize my designs. Upload once, earn every month." },
+            { name: "Nilufar A.", role: "Customer", accent: "blue" as const, quote: "Unique designs, great quality, and fast local shipping." },
+            { name: "Bekzod M.", role: "Print shop", accent: "peach" as const, quote: "The film licensing system gives me legal access to professional designs." },
+          ].map((t, i) => (
             <motion.div
               key={i}
-              initial={{ opacity: 0, y: 20 }}
+              initial={{ opacity: 0, y: 12 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
-              transition={{ delay: i * 0.08, duration: 0.28 }}
+              transition={{ delay: i * 0.05, duration: 0.24 }}
             >
-              <Card className="p-6 h-full flex flex-col">
-                <p className="text-brand-ink leading-relaxed mb-6 flex-1">
-                  &ldquo;{testimonial.quote}&rdquo;
+              <Card variant="flat" className="!p-5 h-full flex flex-col">
+                <p className="text-[14px] text-brand-ink leading-relaxed mb-4 flex-1">
+                  &ldquo;{t.quote}&rdquo;
                 </p>
                 <div className="flex items-center gap-3">
                   <div
-                    className={`w-10 h-10 rounded-full flex items-center justify-center font-semibold ${
-                      testimonial.accent === "peach"
+                    className={`h-9 w-9 rounded-full flex items-center justify-center text-sm font-semibold ${
+                      t.accent === "peach"
                         ? "bg-brand-peachLight text-brand-peach"
                         : "bg-brand-blueLight text-brand-blue"
                     }`}
                     aria-hidden="true"
                   >
-                    {testimonial.name.charAt(0)}
+                    {t.name.charAt(0)}
                   </div>
                   <div>
-                    <p className="font-semibold text-brand-ink leading-tight">{testimonial.name}</p>
-                    <p className="text-xs text-brand-muted">{testimonial.role}</p>
+                    <p className="text-sm font-semibold text-brand-ink leading-tight">{t.name}</p>
+                    <p className="text-[11px] text-brand-muted">{t.role}</p>
                   </div>
                 </div>
               </Card>
@@ -579,60 +410,30 @@ export default function HomePage() {
       </section>
 
       {/* FAQ */}
-      <section className="max-w-[1280px] mx-auto px-6 py-16">
-        <motion.h2
-          initial={{ opacity: 0 }}
-          whileInView={{ opacity: 1 }}
-          viewport={{ once: true }}
-          className="text-3xl md:text-4xl font-bold text-brand-ink mb-12 text-center"
-        >
+      <section className="max-w-[840px] mx-auto px-6 py-12 pb-20">
+        <h2 className="text-2xl md:text-3xl font-bold text-brand-ink mb-6 text-center">
           Frequently asked questions
-        </motion.h2>
-        <motion.div
-          initial={{ opacity: 0 }}
-          whileInView={{ opacity: 1 }}
-          viewport={{ once: true }}
-          className="max-w-3xl mx-auto space-y-4"
-        >
+        </h2>
+        <div className="space-y-3">
           {[
-            {
-              question: "How do royalties work for designers?",
-              answer:
-                "Designers earn a royalty on every product sold featuring their design. The royalty rate is set by the platform admin and paid out monthly. You can track your earnings in your designer dashboard.",
-            },
-            {
-              question: "What file types do you accept?",
-              answer:
-                "We accept PNG, JPEG, SVG, and AI files. For best results, upload high-resolution files (at least 300 DPI) with transparent backgrounds where appropriate.",
-            },
-            {
-              question: "How long does shipping take?",
-              answer:
-                "Standard shipping within Uzbekistan takes 3-7 business days. Express shipping is available for faster delivery. Shipping times are calculated at checkout.",
-            },
-            {
-              question: "What is your return policy?",
-              answer:
-                "We accept returns within 14 days of delivery for defective or damaged items. Custom-printed products cannot be returned unless they arrive damaged or with printing defects.",
-            },
-            {
-              question: "How do I become a designer?",
-              answer:
-                "Click 'Start selling' in the header, register as a designer, and upload your first design. Our team will review it within 24-48 hours. Once approved, your designs will be available for sale.",
-            },
+            { q: "How do royalties work for designers?", a: "Designers earn a royalty on every product sold featuring their design. The rate is set by the admin and paid monthly. Track everything in your designer dashboard." },
+            { q: "What file types do you accept?", a: "PNG, JPEG, SVG, and AI files. For best results, upload high-resolution files (≥300 DPI) with transparent backgrounds where appropriate." },
+            { q: "How long does shipping take?", a: "Standard shipping within Uzbekistan takes 3–7 business days; express is available. Shipping is calculated at checkout." },
+            { q: "What is your return policy?", a: "We accept returns within 14 days for defective or damaged items. Custom-printed items can only be returned if defective." },
+            { q: "How do I become a designer?", a: "Click ‘Start selling’, register as a designer, and upload your first design. Approval takes 24–48 hours." },
           ].map((faq, i) => (
             <details
               key={i}
-              className="group bg-white rounded-[24px] p-6 shadow-sm border border-surface-borderSoft"
+              className="group bg-white rounded-2xl px-5 py-4 shadow-sm border border-surface-borderSoft"
             >
               <summary className="flex items-center justify-between cursor-pointer list-none focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue/30 rounded">
-                <span className="font-semibold text-brand-ink">{faq.question}</span>
-                <ChevronDown className="w-5 h-5 text-brand-muted group-open:rotate-180 transition-transform" aria-hidden="true" />
+                <span className="text-[15px] font-semibold text-brand-ink pr-4">{faq.q}</span>
+                <ChevronDown className="w-4 h-4 text-brand-muted group-open:rotate-180 transition-transform shrink-0" aria-hidden="true" />
               </summary>
-              <p className="mt-4 text-brand-muted leading-relaxed">{faq.answer}</p>
+              <p className="mt-3 text-[14px] text-brand-muted leading-relaxed">{faq.a}</p>
             </details>
           ))}
-        </motion.div>
+        </div>
       </section>
     </div>
   );
