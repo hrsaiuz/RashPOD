@@ -27,6 +27,12 @@ export class CorporateController {
     return this.corporate.listRequests(user);
   }
 
+  @Get("designer/bids")
+  @RequirePermission("designer-bid:create")
+  listMyBids(@CurrentUser() user: RequestUser) {
+    return this.corporate.listMyBids(user);
+  }
+
   @Get("corporate/requests/:id")
   @RequirePermission("corporate-request:read-own")
   getRequest(@CurrentUser() user: RequestUser, @Param("id") id: string) {

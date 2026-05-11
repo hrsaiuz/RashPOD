@@ -2,6 +2,8 @@ import { Test, TestingModule } from "@nestjs/testing";
 import { INestApplication } from "@nestjs/common";
 import * as request from "supertest";
 import { AppModule } from "./app.module";
+import { PrismaService } from "./prisma/prisma.service";
+import { createFakePrisma } from "../test/helpers/fake-prisma";
 
 describe("CORS Configuration (e2e)", () => {
   let app: INestApplication;
@@ -13,9 +15,28 @@ describe("CORS Configuration (e2e)", () => {
 
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
-    }).compile();
+    })
+      .overrideProvider(PrismaService)
+      .useValue(createFakePrisma())
+      .compile();
 
     app = moduleFixture.createNestApplication();
+    const allowedOrigins = [
+      process.env.WEB_URL,
+      process.env.DASHBOARD_URL,
+      "http://localhost:3000",
+      "http://localhost:3001",
+    ].filter((o): o is string => Boolean(o));
+    app.enableCors({
+      origin: (origin: string | undefined, cb: (err: Error | null, allow?: boolean) => void) => {
+        if (!origin) return cb(null, true);
+        if (allowedOrigins.includes(origin)) return cb(null, true);
+        return cb(new Error(`CORS: origin ${origin} not allowed`), false);
+      },
+      credentials: true,
+      methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+      allowedHeaders: ["Content-Type", "Authorization"],
+    });
     await app.init();
   });
 

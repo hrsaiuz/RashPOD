@@ -53,8 +53,11 @@ Run tests
 Build Docker image
 Push to Artifact Registry
 Deploy to Cloud Run
-Run migrations
+Run migrations with `prisma migrate deploy`
 ```
+
+Seed jobs must use `prisma migrate deploy` before `tsx prisma/seed.ts`. Do not use
+`prisma db push --accept-data-loss` in production.
 
 ## Worker
 Separate deployable service for mockups, film previews, AI jobs, emails, PDFs.

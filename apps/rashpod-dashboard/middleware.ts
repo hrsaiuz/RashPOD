@@ -38,7 +38,14 @@ function decodeJwtPayloadUnsafe(token: string): Record<string, unknown> | null {
   try {
     const parts = token.split(".");
     if (parts.length !== 3) return null;
-    const payload = Buffer.from(parts[1], "base64").toString("utf8");
+    const base64 = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+    const padded = base64.padEnd(base64.length + ((4 - (base64.length % 4)) % 4), "=");
+    const payload = decodeURIComponent(
+      atob(padded)
+        .split("")
+        .map((char) => `%${char.charCodeAt(0).toString(16).padStart(2, "0")}`)
+        .join(""),
+    );
     return JSON.parse(payload);
   } catch {
     return null;

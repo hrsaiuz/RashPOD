@@ -35,6 +35,7 @@ export class AuthService {
       data: {
         email: dto.email.toLowerCase(),
         displayName: dto.displayName,
+        handle: await this.createUniqueHandle(dto.displayName),
         passwordHash: hash,
         role,
       },
@@ -109,7 +110,7 @@ export class AuthService {
       html: rendered.html,
       text: rendered.text,
     });
-    return { ok: true };
+    return this.exposeLifecycleToken(token);
   }
 
   async verifyEmailToken(token: string) {
@@ -135,7 +136,7 @@ export class AuthService {
       html: rendered.html,
       text: rendered.text,
     });
-    return { ok: true };
+    return this.exposeLifecycleToken(token);
   }
 
   async resetPassword(token: string, password: string) {
@@ -240,5 +241,27 @@ export class AuthService {
       { secret: process.env.JWT_SECRET || "rashpod-dev-secret", expiresIn: "7d" },
     );
     return { accessToken };
+  }
+
+  private exposeLifecycleToken(token: string): { ok: true; token?: string } {
+    if (process.env.NODE_ENV === "test") {
+      return { ok: true, token };
+    }
+    return { ok: true };
+  }
+
+  private async createUniqueHandle(seed: string) {
+    const base =
+      seed
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/(^-|-$)/g, "")
+        .slice(0, 48) || "designer";
+    for (let i = 0; i < 20; i += 1) {
+      const handle = i === 0 ? base : `${base}-${i + 1}`;
+      const existing = await this.prisma.user.findUnique({ where: { handle } });
+      if (!existing) return handle;
+    }
+    return `${base}-${randomInt(1000, 9999)}`;
   }
 }

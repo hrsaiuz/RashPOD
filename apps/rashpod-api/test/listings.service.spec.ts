@@ -107,7 +107,22 @@ describe("ListingsService lifecycle", () => {
         findFirst: jest.fn().mockResolvedValue({ id: "designer-7", displayName: "Alice Art" }),
       },
       commerceListing: {
-        findMany: jest.fn().mockResolvedValue([{ id: "l1", status: ListingStatus.PUBLISHED }]),
+        findMany: jest.fn().mockResolvedValue([
+          {
+            id: "l1",
+            slug: "listing-1",
+            title: "Listing 1",
+            description: null,
+            price: 100,
+            currency: "UZS",
+            type: ListingType.PRODUCT,
+            publishedAt: new Date(),
+            imagesJson: [],
+            designerId: "designer-7",
+            designer: { id: "designer-7", displayName: "Alice Art" },
+          },
+        ]),
+        count: jest.fn().mockResolvedValue(1),
       },
     };
     const service = new ListingsService(prisma, { log: jest.fn() } as any);

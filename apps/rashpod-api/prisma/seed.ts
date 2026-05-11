@@ -10,16 +10,22 @@ async function upsertUser(input: {
   password: string;
 }) {
   const hash = await bcrypt.hash(input.password, 10);
+  const handle = input.displayName
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)/g, "") || input.email.split("@")[0];
   return prisma.user.upsert({
     where: { email: input.email },
     create: {
       email: input.email,
       displayName: input.displayName,
+      handle,
       role: input.role,
       passwordHash: hash,
     },
     update: {
       displayName: input.displayName,
+      handle,
       role: input.role,
       passwordHash: hash,
     },

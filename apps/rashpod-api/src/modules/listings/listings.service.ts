@@ -159,10 +159,13 @@ export class ListingsService {
         role: UserRole.DESIGNER,
         listings: { some: { status: ListingStatus.PUBLISHED } },
       },
-      select: {
-        id: true,
-        displayName: true,
-        createdAt: true,
+        select: {
+          id: true,
+          displayName: true,
+          bio: true,
+          avatarUrl: true,
+          handle: true,
+          createdAt: true,
         listings: {
           where: { status: ListingStatus.PUBLISHED },
           orderBy: { publishedAt: "desc" },
@@ -176,10 +179,10 @@ export class ListingsService {
     return designers
       .map((d) => ({
         id: d.id,
-        handle: this.toHandle(d.displayName, d.id),
+        handle: d.handle ?? this.toHandle(d.displayName, d.id),
         displayName: d.displayName,
-        bio: null,
-        avatarUrl: null,
+        bio: d.bio,
+        avatarUrl: d.avatarUrl,
         joinedAt: d.createdAt,
         listingsCount: d._count.listings,
         topListings: d.listings.map((l) => ({
@@ -247,15 +250,15 @@ export class ListingsService {
           { email: { startsWith: `${normalized}@`, mode: "insensitive" } },
         ],
       },
-      select: { id: true, displayName: true, createdAt: true },
+      select: { id: true, displayName: true, bio: true, avatarUrl: true, coverUrl: true, handle: true, createdAt: true },
     });
     if (!designer) {
       const all = await this.prisma.user.findMany({
         where: { role: UserRole.DESIGNER },
-        select: { id: true, displayName: true, createdAt: true },
+        select: { id: true, displayName: true, bio: true, avatarUrl: true, coverUrl: true, handle: true, createdAt: true },
       });
       designer =
-        all.find((d) => this.toHandle(d.displayName, d.id) === normalized) ?? null;
+        all.find((d) => (d.handle ?? this.toHandle(d.displayName, d.id)) === normalized) ?? null;
     }
     if (!designer) return null;
 
@@ -275,10 +278,10 @@ export class ListingsService {
       designer: {
         id: designer.id,
         displayName: designer.displayName,
-        handle: this.toHandle(designer.displayName, designer.id),
-        bio: null,
-        avatarUrl: null,
-        coverUrl: null,
+        handle: designer.handle ?? this.toHandle(designer.displayName, designer.id),
+        bio: designer.bio,
+        avatarUrl: designer.avatarUrl,
+        coverUrl: designer.coverUrl,
         joinedAt: designer.createdAt,
         stats: {
           listingsCount,

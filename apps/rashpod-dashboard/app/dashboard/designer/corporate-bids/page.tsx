@@ -23,10 +23,22 @@ import { api, type CorporateRequest } from "../../../../lib/api";
 
 type Tab = "open" | "mine" | "closed";
 
+type DesignerBidRow = {
+  id: string;
+  corporateRequestId: string;
+  proposal: string;
+  designFee: string | number;
+  timelineDays: number;
+  status: "SUBMITTED" | "SHORTLISTED" | "SELECTED" | "REJECTED" | string;
+  createdAt: string;
+  corporateRequest?: CorporateRequest;
+};
+
 export default function CorporateBidsPage() {
   const router = useRouter();
   const { user, isLoading: authLoading } = useAuth();
   const [requests, setRequests] = useState<CorporateRequest[]>([]);
+  const [myBids, setMyBids] = useState<DesignerBidRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [tab, setTab] = useState<Tab>("open");
@@ -51,14 +63,27 @@ export default function CorporateBidsPage() {
     setLoading(true);
     setError("");
     try {
-      const all = await api.get<CorporateRequest[]>("/corporate/requests");
+      const [all, bids] = await Promise.all([
+        api.get<CorporateRequest[]>("/corporate/requests"),
+        api.get<DesignerBidRow[]>("/designer/bids").catch(() => [] as DesignerBidRow[]),
+      ]);
       setRequests(all);
+      setMyBids(bids);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load requests");
     } finally {
       setLoading(false);
     }
   }
+
+  // Poll my bids every 30s while on the page to surface SHORTLISTED / SELECTED transitions.
+  useEffect(() => {
+    if (!user) return;
+    const i = setInterval(() => {
+      api.get<DesignerBidRow[]>("/designer/bids").then(setMyBids).catch(() => {});
+    }, 30000);
+    return () => clearInterval(i);
+  }, [user]);
 
   const filtered = useMemo(() => {
     return requests.filter((r) => {
@@ -158,14 +183,53 @@ export default function CorporateBidsPage() {
           <Skeleton className="h-64" />
         ) : error ? (
           <ErrorState title="Could not load" description={error} retry={<Button onClick={load}>Retry</Button>} />
+        ) : tab === "mine" ? (
+          myBids.length === 0 ? (
+            <EmptyState
+              icon={<Briefcase className="text-brand-muted" size={32} />}
+              title="No bids yet"
+              description="Submit a bid on an open request to get started."
+            />
+          ) : (
+            <Card>
+              <DataTable
+                rows={myBids}
+                mobileMode="cards"
+                columns={[
+                  {
+                    key: "title",
+                    header: "Request",
+                    render: (_v, b) => (
+                      <div>
+                        <div className="font-medium text-brand-ink">{b.corporateRequest?.title ?? "—"}</div>
+                        <div className="text-xs text-brand-muted line-clamp-2">{b.proposal}</div>
+                      </div>
+                    ),
+                  },
+                  { key: "fee", header: "Fee", render: (_v, b) => <span className="text-sm">{Number(b.designFee).toLocaleString()} UZS</span> },
+                  { key: "tl", header: "Timeline", render: (_v, b) => <span className="text-sm">{b.timelineDays}d</span> },
+                  {
+                    key: "status",
+                    header: "Status",
+                    render: (_v, b) => <StatusBadge status={b.status} />,
+                  },
+                  {
+                    key: "date",
+                    header: "Submitted",
+                    render: (_v, b) => <span className="text-xs text-brand-muted">{new Date(b.createdAt).toLocaleDateString()}</span>,
+                  },
+                ]}
+              />
+            </Card>
+          )
         ) : filtered.length === 0 ? (
           <EmptyState
             icon={<Briefcase className="text-brand-muted" size={32} />}
-            title={tab === "open" ? "No open requests" : tab === "mine" ? "No bids yet" : "No closed requests"}
+            title={tab === "open" ? "No open requests" : "No closed requests"}
             description={
               tab === "open"
                 ? "Check back soon — corporate clients post requests regularly."
-                : "Submit a bid on an open request to get started."
+                : "No closed requests to show."
             }
           />
         ) : (

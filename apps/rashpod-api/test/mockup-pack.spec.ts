@@ -8,7 +8,7 @@ describe("Mockup listing pack", () => {
     const prisma = createFakePrisma();
     const audit = new AuditService(prisma as any);
     const jobs = new JobDispatcherService(prisma as any, audit);
-    const service = new MockupService(prisma as any, audit, jobs);
+    const service = new MockupService(prisma as any, audit, jobs, { createSignedReadUrl: async () => "https://signed/" } as any);
 
     const user = await prisma.user.create({
       data: { email: "mock@test.local", passwordHash: "x", displayName: "Mock", role: "DESIGNER" },
@@ -59,7 +59,7 @@ describe("Mockup listing pack", () => {
     expect(preview.type).toBe("PREVIEW");
     expect(filmPreview.type).toBe("FILM_PREVIEW");
     expect(productionFile.type).toBe("PRODUCTION_FILE");
-    expect(prisma.__state.workerJobs.map((j) => j.type)).toEqual(
+    expect(prisma.__state.workerJobs.map((j: { type: string }) => j.type)).toEqual(
       expect.arrayContaining([
         "GENERATE_LISTING_IMAGE_PACK",
         "GENERATE_PRODUCT_MOCKUPS",

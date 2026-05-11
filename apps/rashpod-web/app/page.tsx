@@ -14,6 +14,7 @@ import {
   Card,
   KpiTile,
   ProductCard,
+  ProductCategoryBentoCard,
   CategoryTile,
   getDashboardUrl,
   getApiBase,
@@ -24,6 +25,15 @@ const fadeIn = {
   animate: { opacity: 1, y: 0 },
   transition: { duration: 0.28, ease: [0.22, 1, 0.36, 1] as [number, number, number, number] },
 };
+
+interface CategoryCard {
+  slug: string;
+  name: string;
+  category: string;
+  variant: "blue" | "peach";
+  imageUrl?: string | null;
+  showShopButton?: boolean;
+}
 
 interface ProductListing {
   id: string;
@@ -41,6 +51,19 @@ interface Designer {
   listingsCount: number;
   avatarUrl?: string;
 }
+
+// Bento grid category cards – matches the screenshot layout.
+// Row 1: large (span-5) + medium (span-4) + compact (span-3)
+// Row 2: compact (span-3) + medium (span-4) + large (span-5)
+// Images will be populated once admin uploads them via the media library.
+const FALLBACK_CATEGORIES: CategoryCard[] = [
+  { slug: "T_SHIRT",     name: "t-shirt",       category: "clothes",  variant: "blue",  showShopButton: true },
+  { slug: "POSTAL_CARD", name: "postal card",    category: "prints",   variant: "peach" },
+  { slug: "MUG",         name: "mug",            category: "ceramics", variant: "blue"  },
+  { slug: "HOODIE",      name: "hoodie",         category: "clothes",  variant: "peach" },
+  { slug: "HAT",         name: "hat",            category: "clothes",  variant: "blue"  },
+  { slug: "POSTER_FRAME",name: "poster\nframe",  category: "prints",   variant: "peach" },
+];
 
 // Curated fallback content (used until the API endpoints return data in the
 // expected shape). TODO: Replace once GET /shop/listings + /shop/designers
@@ -72,6 +95,7 @@ export default function HomePage() {
   const dashboardUrl = getDashboardUrl();
   const apiBase = getApiBase();
 
+  const [categories, setCategories] = useState<CategoryCard[]>(FALLBACK_CATEGORIES);
   const [products, setProducts] = useState<ProductListing[]>(FALLBACK_PRODUCTS);
   const [designers, setDesigners] = useState<Designer[]>(FALLBACK_DESIGNERS);
 
@@ -80,6 +104,25 @@ export default function HomePage() {
     // shape doesn't match or the request fails. No error UI on the home page.
     const controller = new AbortController();
     const opts = { signal: controller.signal };
+
+    // Fetch product types for category bento grid
+    fetch(`${apiBase}/shop/product-types`, opts)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (!Array.isArray(data) || data.length === 0) return;
+        const mapped: CategoryCard[] = data
+          .map((d: any, i: number) => ({
+            slug: d.slug,
+            name: d.name?.toLowerCase() ?? d.slug,
+            category: d.category?.toLowerCase() ?? "",
+            variant: (i % 2 === 0 ? "blue" : "peach") as "blue" | "peach",
+            imageUrl: d.imageUrl ?? d.metadataJson?.imageUrl ?? null,
+            showShopButton: i === 0,
+          }))
+          .filter((c) => c.slug && c.name);
+        if (mapped.length) setCategories(mapped.slice(0, 6));
+      })
+      .catch(() => {/* keep fallback */});
 
     fetch(`${apiBase}/shop/listings?limit=8`, opts)
       .then((res) => (res.ok ? res.json() : null))
@@ -249,7 +292,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Browse by category */}
+      {/* Browse by category – bento grid */}
       <section className="max-w-[1200px] mx-auto px-6 py-12">
         <div className="flex items-end justify-between mb-6">
           <div>
@@ -266,37 +309,39 @@ export default function HomePage() {
           </Link>
         </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-          {[
-            { label: "T-shirts", slug: "T_SHIRT", emoji: "👕", tone: "blue" as const },
-            { label: "Hoodies", slug: "HOODIE", emoji: "🧥", tone: "peach" as const },
-            { label: "Posters", slug: "POSTER", emoji: "🖼️", tone: "blue" as const },
-            { label: "Mugs", slug: "MUG", emoji: "☕", tone: "peach" as const },
-            { label: "DTF Films", slug: "DTF_FILM", emoji: "🎞️", tone: "blue" as const },
-            { label: "UV-DTF Films", slug: "UV_DTF_FILM", emoji: "✨", tone: "peach" as const },
-          ].map((cat) => (
-            <Link
-              key={cat.slug}
-              href={`/shop?productType=${cat.slug}`}
-              className="block focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue/30 rounded-2xl"
-              aria-label={`Browse ${cat.label}`}
-            >
-              <Card variant="flat" className="!p-4 group hover:shadow-soft transition-shadow text-center">
-                <div
-                  className={`mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-xl text-2xl ${
-                    cat.tone === "blue" ? "bg-brand-blueLight" : "bg-brand-peachLight"
-                  }`}
-                  aria-hidden="true"
-                >
-                  {cat.emoji}
-                </div>
-                <p className="text-[13px] font-semibold text-brand-ink group-hover:text-brand-blue transition-colors">
-                  {cat.label}
-                </p>
-              </Card>
-            </Link>
-          ))}
-        </div>
+        {/* Bento grid: row 1 = 5+4+3, row 2 = 3+4+5 on desktop */}
+        <motion.div
+          initial={{ opacity: 0 }}
+          whileInView={{ opacity: 1 }}
+          viewport={{ once: true }}
+          className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-4"
+        >
+          {categories.map((cat, i) => {
+            // Determine column span to create the asymmetric bento layout
+            // Row 1 (items 0-2): 5, 4, 3
+            // Row 2 (items 3-5): 3, 4, 5
+            const spanMap = [5, 4, 3, 3, 4, 5];
+            const colSpan = spanMap[i] ?? 4;
+
+            return (
+              <Link
+                key={cat.slug}
+                href={`/shop?productType=${cat.slug}`}
+                className={`block focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue/30 rounded-[20px] lg:col-span-${colSpan}`}
+                style={{ gridColumn: `span ${colSpan}` }}
+                aria-label={`Browse ${cat.name}`}
+              >
+                <ProductCategoryBentoCard
+                  category={cat.category}
+                  productName={cat.name}
+                  variant={cat.variant}
+                  imageUrl={cat.imageUrl}
+                  showShopButton={cat.showShopButton}
+                />
+              </Link>
+            );
+          })}
+        </motion.div>
       </section>
 
       {/* Featured products */}

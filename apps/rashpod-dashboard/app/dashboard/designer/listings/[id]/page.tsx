@@ -13,7 +13,7 @@ import {
   StatusBadge,
   Textarea,
 } from "@rashpod/ui";
-import { ArrowLeft, Save, Send, Archive } from "lucide-react";
+import { ArrowLeft, Save, Send, Archive, Languages } from "lucide-react";
 import { useAuth } from "../../../../auth/auth-provider";
 import DashboardLayout from "../../../dashboard-layout";
 import { api, type Listing } from "../../../../../lib/api";
@@ -30,6 +30,32 @@ export default function ListingEditPage() {
   const [saving, setSaving] = useState<"" | "save" | "publish" | "archive">("");
   const [form, setForm] = useState({ title: "", description: "", price: "" });
   const [message, setMessage] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
+  const [translating, setTranslating] = useState<"" | "uz" | "ru" | "en">("");
+
+  async function translateTo(lang: "uz" | "ru" | "en") {
+    setTranslating(lang);
+    setMessage(null);
+    try {
+      const [titleRes, descRes] = await Promise.all([
+        form.title
+          ? api.post<{ translatedText: string }>("/ai/translate", { text: form.title, targetLanguage: lang })
+          : Promise.resolve({ translatedText: "" }),
+        form.description
+          ? api.post<{ translatedText: string }>("/ai/translate", { text: form.description, targetLanguage: lang })
+          : Promise.resolve({ translatedText: "" }),
+      ]);
+      setForm((prev) => ({
+        ...prev,
+        title: titleRes.translatedText || prev.title,
+        description: descRes.translatedText || prev.description,
+      }));
+      setMessage({ kind: "ok", text: `Translated to ${lang.toUpperCase()}. Review and Save to persist.` });
+    } catch (e) {
+      setMessage({ kind: "err", text: e instanceof Error ? e.message : "Translation failed" });
+    } finally {
+      setTranslating("");
+    }
+  }
 
   useEffect(() => {
     if (authLoading) return;
@@ -138,6 +164,30 @@ export default function ListingEditPage() {
                 <FormField label="Price (UZS)">
                   <Input type="number" min={0} value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} />
                 </FormField>
+
+                <div className="rounded-2xl border border-brand-line bg-brand-bg/40 p-4">
+                  <div className="flex items-center gap-2 text-sm font-medium text-brand-ink">
+                    <Languages size={16} className="text-brand-blue" /> AI translation
+                  </div>
+                  <p className="text-xs text-brand-muted mt-1">
+                    Translate the title and description into UZ / RU / EN. Review and Save to persist.
+                  </p>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {(["uz", "ru", "en"] as const).map((lang) => (
+                      <Button
+                        key={lang}
+                        size="sm"
+                        variant="ghost"
+                        loading={translating === lang}
+                        disabled={!!translating || (!form.title && !form.description)}
+                        onClick={() => translateTo(lang)}
+                      >
+                        Translate → {lang.toUpperCase()}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+
                 {message && (
                   <p className={"text-sm " + (message.kind === "ok" ? "text-semantic-success" : "text-semantic-danger")}>
                     {message.text}

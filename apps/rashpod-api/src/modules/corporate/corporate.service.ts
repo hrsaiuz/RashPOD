@@ -108,6 +108,14 @@ export class CorporateService {
     });
   }
 
+  listMyBids(user: RequestUser) {
+    return this.prisma.designerBid.findMany({
+      where: { designerId: user.sub },
+      orderBy: { createdAt: "desc" },
+      include: { corporateRequest: true },
+    });
+  }
+
   async selectBid(actorId: string, bidId: string) {
     const bid = await this.prisma.designerBid.findUnique({ where: { id: bidId } });
     if (!bid) throw new NotFoundException("Bid not found");

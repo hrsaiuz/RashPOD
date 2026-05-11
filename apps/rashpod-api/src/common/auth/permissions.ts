@@ -23,7 +23,7 @@ export const permissions = {
   "order:manage-all": ["ADMIN", "SUPER_ADMIN", "OPERATIONS_MANAGER", "FINANCE_STAFF", "SUPPORT_STAFF"],
   "production:manage": ["PRODUCTION_STAFF", "ADMIN", "SUPER_ADMIN", "OPERATIONS_MANAGER"],
   "corporate-request:create": ["CORPORATE_CLIENT", "ADMIN", "SUPER_ADMIN"],
-  "corporate-request:read-own": ["CORPORATE_CLIENT", "ADMIN", "SUPER_ADMIN", "OPERATIONS_MANAGER"],
+  "corporate-request:read-own": ["CORPORATE_CLIENT", "DESIGNER", "ADMIN", "SUPER_ADMIN", "OPERATIONS_MANAGER"],
   "corporate-request:manage": ["ADMIN", "SUPER_ADMIN", "OPERATIONS_MANAGER"],
   "designer-bid:create": ["DESIGNER", "ADMIN", "SUPER_ADMIN"],
   "designer-bid:manage": ["ADMIN", "SUPER_ADMIN", "OPERATIONS_MANAGER"],

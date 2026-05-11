@@ -7,6 +7,7 @@ export * from "./lib/api";
 // Existing components
 export * from "./components/ProductCard";
 export * from "./components/CategoryTile";
+export * from "./components/ProductCategoryBentoCard";
 export * from "./components/DecorativeBackground";
 export * from "./components/MetricCard";
 export * from "./components/ChartWrapper";

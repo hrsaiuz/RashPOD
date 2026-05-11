@@ -152,6 +152,7 @@ export interface DesignerOverview {
   soldItems: number;
   lifetimeEarnings?: number;
   monthEarnings?: number;
+  nextPayoutEstimate?: number;
   royaltyPct?: number;
   designStatus?: Record<string, number>;
   pendingModeration?: number;

@@ -55,12 +55,26 @@ export class DashboardService {
       designStatus[row.status] = row._count._all;
     }
 
+    // Next payout estimate: sum of royalties on items whose orders are DELIVERED.
+    // (Approximates the unpaid balance ready to be paid out.)
+    const deliveredItems = items.filter((it) => (it as { orderStatus?: string }).orderStatus === "DELIVERED");
+    // items above doesn't include order.status; recompute via a dedicated query:
+    const payoutItems = await this.prisma.orderItem.findMany({
+      where: { listing: { designerId }, order: { status: "DELIVERED" } },
+      select: { totalPrice: true },
+    });
+    let nextPayoutEstimate = 0;
+    for (const it of payoutItems) nextPayoutEstimate += this.decimal(it.totalPrice) * rate;
+    // suppress unused warning for deliveredItems if linter complains
+    void deliveredItems;
+
     return {
       designs,
       listings,
       soldItems: orders,
       lifetimeEarnings: Number(lifetimeEarnings.toFixed(2)),
       monthEarnings: Number(monthEarnings.toFixed(2)),
+      nextPayoutEstimate: Number(nextPayoutEstimate.toFixed(2)),
       royaltyPct,
       designStatus,
       pendingModeration: designStatus["SUBMITTED"] ?? 0,

@@ -1,4 +1,5 @@
 import { Body, Controller, Get, Patch, Post, UseGuards } from "@nestjs/common";
+import { Prisma } from "@prisma/client";
 import { PrismaService } from "../../prisma/prisma.service";
 import { CurrentUser, RequestUser } from "../../common/auth/current-user.decorator";
 import { JwtAuthGuard } from "../../common/auth/jwt-auth.guard";
@@ -34,7 +35,19 @@ export class AuthController {
   async me(@CurrentUser() user: RequestUser) {
     return this.prisma.user.findUnique({
       where: { id: user.sub },
-      select: { id: true, email: true, displayName: true, role: true, createdAt: true },
+      select: {
+        id: true,
+        email: true,
+        displayName: true,
+        bio: true,
+        avatarUrl: true,
+        coverUrl: true,
+        handle: true,
+        socialLinks: true,
+        role: true,
+        createdAt: true,
+        preferences: true,
+      },
     });
   }
 
@@ -42,17 +55,72 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   async updateMe(
     @CurrentUser() user: RequestUser,
-    @Body() body: { displayName?: string },
+    @Body()
+    body: {
+      displayName?: string;
+      bio?: string | null;
+      avatarUrl?: string | null;
+      coverUrl?: string | null;
+      socialLinks?: Record<string, unknown> | null;
+      portfolio?: Record<string, unknown> | null;
+      payoutDetails?: Record<string, unknown> | null;
+      notifications?: Record<string, unknown> | null;
+    },
   ) {
-    const data: { displayName?: string } = {};
+    const existing = await this.prisma.user.findUnique({
+      where: { id: user.sub },
+      select: { id: true, email: true, displayName: true, handle: true },
+    });
+    const data: {
+      displayName?: string;
+      bio?: string | null;
+      avatarUrl?: string | null;
+      coverUrl?: string | null;
+      socialLinks?: Prisma.InputJsonValue | typeof Prisma.JsonNull;
+      handle?: string;
+    } = {};
     if (typeof body?.displayName === "string") {
       const trimmed = body.displayName.trim();
       if (trimmed.length > 0 && trimmed.length <= 120) data.displayName = trimmed;
     }
+    if (body.bio !== undefined) data.bio = typeof body.bio === "string" ? body.bio.trim().slice(0, 1000) : null;
+    if (body.avatarUrl !== undefined) data.avatarUrl = typeof body.avatarUrl === "string" ? body.avatarUrl.trim().slice(0, 500) : null;
+    if (body.coverUrl !== undefined) data.coverUrl = typeof body.coverUrl === "string" ? body.coverUrl.trim().slice(0, 500) : null;
+    if (body.socialLinks !== undefined) data.socialLinks = body.socialLinks === null ? Prisma.JsonNull : (body.socialLinks as Prisma.InputJsonValue);
+    if (!existing?.handle) {
+      data.handle = await this.createUniqueHandle(data.displayName ?? existing?.displayName ?? existing?.email ?? "designer");
+    }
+    const preferencesPatch: {
+      portfolioJson?: Prisma.InputJsonValue | typeof Prisma.JsonNull;
+      payoutDetailsJson?: Prisma.InputJsonValue | typeof Prisma.JsonNull;
+      notificationJson?: Prisma.InputJsonValue | typeof Prisma.JsonNull;
+    } = {};
+    if (body.portfolio !== undefined) preferencesPatch.portfolioJson = body.portfolio === null ? Prisma.JsonNull : (body.portfolio as Prisma.InputJsonValue);
+    if (body.payoutDetails !== undefined) preferencesPatch.payoutDetailsJson = body.payoutDetails === null ? Prisma.JsonNull : (body.payoutDetails as Prisma.InputJsonValue);
+    if (body.notifications !== undefined) preferencesPatch.notificationJson = body.notifications === null ? Prisma.JsonNull : (body.notifications as Prisma.InputJsonValue);
+    if (Object.keys(preferencesPatch).length > 0) {
+      await this.prisma.userPreferences.upsert({
+        where: { userId: user.sub },
+        create: { userId: user.sub, ...preferencesPatch },
+        update: preferencesPatch,
+      });
+    }
     return this.prisma.user.update({
       where: { id: user.sub },
       data,
-      select: { id: true, email: true, displayName: true, role: true, createdAt: true },
+      select: {
+        id: true,
+        email: true,
+        displayName: true,
+        bio: true,
+        avatarUrl: true,
+        coverUrl: true,
+        handle: true,
+        socialLinks: true,
+        role: true,
+        createdAt: true,
+        preferences: true,
+      },
     });
   }
 
@@ -90,5 +158,20 @@ export class AuthController {
   @Post("otp/verify")
   verifyEmailOtp(@Body() dto: VerifyEmailOtpDto) {
     return this.authService.verifyEmailOtp(dto.email, dto.code);
+  }
+
+  private async createUniqueHandle(seed: string) {
+    const base =
+      seed
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/(^-|-$)/g, "")
+        .slice(0, 48) || "designer";
+    for (let i = 0; i < 20; i += 1) {
+      const handle = i === 0 ? base : `${base}-${i + 1}`;
+      const existing = await this.prisma.user.findUnique({ where: { handle } });
+      if (!existing) return handle;
+    }
+    return `${base}-${Math.floor(1000 + Math.random() * 9000)}`;
   }
 }

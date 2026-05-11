@@ -2,6 +2,7 @@ import { ForbiddenException, Injectable, NotFoundException } from "@nestjs/commo
 import { PrismaService } from "../../prisma/prisma.service";
 import { AuditService } from "../audit/audit.service";
 import { JobDispatcherService } from "../worker-jobs/job-dispatcher.service";
+import { StorageService } from "../files/storage.service";
 import { CreatePlacementDto } from "./dto/create-placement.dto";
 import { UpdatePlacementDto } from "./dto/update-placement.dto";
 
@@ -11,6 +12,7 @@ export class MockupService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly jobs: JobDispatcherService,
+    private readonly storage: StorageService,
   ) {}
 
   private async assertDesignOwner(designAssetId: string, userId: string) {
@@ -44,8 +46,40 @@ export class MockupService {
     return placement;
   }
 
-  getPlacement(id: string) {
-    return this.prisma.mockupPlacement.findUnique({ where: { id } });
+  async getPlacement(id: string) {
+    const placement = await this.prisma.mockupPlacement.findUnique({
+      where: { id },
+      include: {
+        mockupTemplate: { include: { printAreas: true, baseProduct: true } },
+        printArea: true,
+        designAsset: true,
+        designVersion: true,
+        generatedAssets: { orderBy: { createdAt: "desc" }, take: 12 },
+      },
+    });
+    if (!placement) return null;
+    // attach signed-read URLs for canvas rendering
+    const templateBgUrl = placement.mockupTemplate?.baseImageKey
+      ? await this.safeSignedUrl(placement.mockupTemplate.baseImageKey)
+      : null;
+    const designUrl = placement.designVersion?.fileKey
+      ? await this.safeSignedUrl(placement.designVersion.fileKey)
+      : null;
+    const generatedUrls = await Promise.all(
+      (placement.generatedAssets ?? []).map(async (g) => ({
+        ...g,
+        url: g.fileKey ? await this.safeSignedUrl(g.fileKey) : null,
+      })),
+    );
+    return { ...placement, templateBgUrl, designUrl, generatedAssets: generatedUrls };
+  }
+
+  private async safeSignedUrl(key: string) {
+    try {
+      return await this.storage.createSignedReadUrl({ objectKey: key, expiresSeconds: 60 * 60 });
+    } catch {
+      return null;
+    }
   }
 
   async updatePlacement(userId: string, id: string, dto: UpdatePlacementDto) {

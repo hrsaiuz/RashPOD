@@ -133,6 +133,15 @@ export default function DashboardLayout({ children, role }: { children: ReactNod
     router.push("/auth/login");
   };
 
+  // Impersonation banner: when an admin/super-admin/ops user views a sidebar for a different role.
+  const actualRole = (user?.role || "").toUpperCase();
+  const isElevated = ["ADMIN", "SUPER_ADMIN", "OPERATIONS_MANAGER"].includes(actualRole);
+  const viewingRole = role.toUpperCase().replace("-", "_");
+  const impersonating =
+    isElevated &&
+    viewingRole !== actualRole &&
+    !(actualRole === "SUPER_ADMIN" && viewingRole === "ADMIN");
+
   return (
     <DashboardShell
       role={ROLE_LABELS[role] || role}
@@ -145,6 +154,20 @@ export default function DashboardLayout({ children, role }: { children: ReactNod
       onSignOut={handleSignOut}
       breadcrumbs={breadcrumbs}
     >
+      {impersonating && (
+        <div className="mb-4 rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3 flex items-center justify-between gap-3">
+          <div className="text-sm text-amber-900">
+            <span className="font-semibold">Admin view:</span> you're viewing the {ROLE_LABELS[role] || role} dashboard as
+            an admin. Actions you take are logged with your admin identity.
+          </div>
+          <button
+            onClick={() => router.push("/dashboard/admin")}
+            className="text-xs font-semibold px-3 py-1.5 rounded-pill bg-amber-900 text-amber-50 hover:bg-amber-800"
+          >
+            Exit to admin
+          </button>
+        </div>
+      )}
       {children}
     </DashboardShell>
   );

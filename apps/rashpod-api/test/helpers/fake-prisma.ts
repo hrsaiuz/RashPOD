@@ -5,6 +5,11 @@ type User = {
   email: string;
   passwordHash: string;
   displayName: string;
+  bio?: string | null;
+  avatarUrl?: string | null;
+  coverUrl?: string | null;
+  handle?: string | null;
+  socialLinks?: unknown;
   role: UserRole;
   createdAt: Date;
 };
@@ -88,11 +93,31 @@ type ProductionJob = {
   createdAt: Date;
   updatedAt: Date;
 };
+type PlatformSetting = { key: string; value: unknown; updatedAt: Date };
+type AiSetting = { key: string; value: unknown; updatedAt: Date };
+type EmailTemplate = {
+  id: string;
+  key: string;
+  subject: string;
+  body: string;
+  variables?: unknown;
+  createdAt: Date;
+  updatedAt: Date;
+};
+type UserPreferences = {
+  id: string;
+  userId: string;
+  portfolioJson?: unknown;
+  payoutDetailsJson?: unknown;
+  notificationJson?: unknown;
+  createdAt: Date;
+  updatedAt: Date;
+};
 
 let idCounter = 0;
 const nextId = (prefix: string) => `${prefix}_${++idCounter}`;
 
-export function createFakePrisma() {
+export function createFakePrisma(): any {
   const users: User[] = [];
   const designs: Design[] = [];
   const rights: Array<{ id: string; designAssetId: string; allowFilmSales: boolean; allowProductSales: boolean; allowMarketplacePublishing: boolean; allowCorporateBidding: boolean; filmConsentGrantedAt?: Date | null; filmConsentRevokedAt?: Date | null; filmConsentVersionId?: string | null; filmRoyaltyRate?: number | null; updatedAt: Date; }> = [];
@@ -110,6 +135,10 @@ export function createFakePrisma() {
   const orders: Order[] = [];
   const commerceListings: CommerceListing[] = [];
   const productionJobs: ProductionJob[] = [];
+  const platformSettings: PlatformSetting[] = [];
+  const aiSettings: AiSetting[] = [];
+  const emailTemplates: EmailTemplate[] = [];
+  const userPreferences: UserPreferences[] = [];
   const audits: any[] = [];
 
   return {
@@ -119,7 +148,35 @@ export function createFakePrisma() {
         users.push(record);
         return record;
       },
-      findUnique: async ({ where }: any) => users.find((u) => u.id === where.id || u.email === where.email) ?? null,
+      findUnique: async ({ where, select }: any) => {
+        const row = users.find((u) => u.id === where.id || u.email === where.email || u.handle === where.handle) ?? null;
+        if (!row) return null;
+        return applyUserSelect(row, select, userPreferences);
+      },
+      findFirst: async ({ where, select }: any = {}) => {
+        const row = users.find((u) => {
+          if (where?.role && u.role !== where.role) return false;
+          if (where?.id && u.id !== where.id) return false;
+          if (where?.email?.startsWith && !u.email.toLowerCase().startsWith(String(where.email.startsWith).toLowerCase())) return false;
+          if (where?.displayName?.equals && u.displayName.toLowerCase() !== String(where.displayName.equals).toLowerCase()) return false;
+          if (Array.isArray(where?.OR)) {
+            return where.OR.some((clause: any) => {
+              if (clause.id) return u.id === clause.id;
+              if (clause.displayName?.equals) return u.displayName.toLowerCase() === String(clause.displayName.equals).toLowerCase();
+              if (clause.email?.startsWith) return u.email.toLowerCase().startsWith(String(clause.email.startsWith).toLowerCase());
+              return false;
+            });
+          }
+          return true;
+        }) ?? null;
+        return row ? applyUserSelect(row, select, userPreferences) : null;
+      },
+      findMany: async ({ where, select, take }: any = {}) => {
+        let rows = [...users];
+        if (where?.role) rows = rows.filter((u) => u.role === where.role);
+        const mapped = rows.map((u) => applyUserSelect(u, select, userPreferences));
+        return typeof take === "number" ? mapped.slice(0, take) : mapped;
+      },
       upsert: async ({ where, create, update }: any) => {
         const existing = users.find((u) => u.email === where.email);
         if (existing) {
@@ -130,10 +187,24 @@ export function createFakePrisma() {
         users.push(record);
         return record;
       },
-      update: async ({ where, data }: any) => {
+      update: async ({ where, data, select }: any) => {
         const row = users.find((u) => u.id === where.id)!;
         Object.assign(row, data);
-        return row;
+        return applyUserSelect(row, select, userPreferences);
+      },
+    },
+    userPreferences: {
+      findUnique: async ({ where }: any) => userPreferences.find((p) => p.userId === where.userId || p.id === where.id) ?? null,
+      upsert: async ({ where, create, update }: any) => {
+        const row = userPreferences.find((p) => p.userId === where.userId);
+        if (row) {
+          Object.assign(row, update, { updatedAt: new Date() });
+          return row;
+        }
+        const now = new Date();
+        const created: UserPreferences = { id: nextId("upr"), createdAt: now, updatedAt: now, ...create };
+        userPreferences.push(created);
+        return created;
       },
     },
     designAsset: {
@@ -415,6 +486,13 @@ export function createFakePrisma() {
         }
         return typeof take === "number" ? rows.slice(0, take) : rows;
       },
+      count: async ({ where }: any = {}) => {
+        let rows = [...commerceListings];
+        if (where?.status) rows = rows.filter((l) => l.status === where.status);
+        if (where?.designerId) rows = rows.filter((l) => l.designerId === where.designerId);
+        if (where?.type) rows = rows.filter((l) => l.type === where.type);
+        return rows.length;
+      },
       update: async ({ where, data }: any) => {
         const row = commerceListings.find((l) => l.id === where.id)!;
         Object.assign(row, data, { updatedAt: new Date() });
@@ -477,8 +555,96 @@ export function createFakePrisma() {
         }
         return typeof take === "number" ? rows.slice(0, take) : rows;
       },
+      count: async () => audits.length,
       findUnique: async ({ where }: any) => audits.find((a) => a.id === where.id) ?? null,
     },
-    __state: { users, designs, files, versions, moderationCases, audits, productTypes, baseProducts, mockupTemplates, printAreas, mockupPlacements, generatedAssets, workerJobs, deliverySettings, orders, commerceListings, productionJobs },
+    platformSetting: {
+      findUnique: async ({ where }: any) => platformSettings.find((s) => s.key === where.key) ?? null,
+      create: async ({ data }: any) => {
+        const row: PlatformSetting = { key: data.key, value: data.value, updatedAt: new Date() };
+        platformSettings.push(row);
+        return row;
+      },
+      upsert: async ({ where, create, update }: any) => {
+        const row = platformSettings.find((s) => s.key === where.key);
+        if (row) {
+          Object.assign(row, update, { updatedAt: new Date() });
+          return row;
+        }
+        const created: PlatformSetting = { key: create.key, value: create.value, updatedAt: new Date() };
+        platformSettings.push(created);
+        return created;
+      },
+    },
+    aiSetting: {
+      findUnique: async ({ where }: any) => aiSettings.find((s) => s.key === where.key) ?? null,
+      create: async ({ data }: any) => {
+        const row: AiSetting = { key: data.key, value: data.value, updatedAt: new Date() };
+        aiSettings.push(row);
+        return row;
+      },
+      upsert: async ({ where, create, update }: any) => {
+        const row = aiSettings.find((s) => s.key === where.key);
+        if (row) {
+          Object.assign(row, update, { updatedAt: new Date() });
+          return row;
+        }
+        const created: AiSetting = { key: create.key, value: create.value, updatedAt: new Date() };
+        aiSettings.push(created);
+        return created;
+      },
+    },
+    emailTemplate: {
+      findMany: async ({ orderBy }: any = {}) => {
+        const rows = [...emailTemplates];
+        if (orderBy?.updatedAt === "desc") rows.sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime());
+        return rows;
+      },
+      findUnique: async ({ where }: any) =>
+        emailTemplates.find((t) => t.id === where.id || t.key === where.key) ?? null,
+      findFirst: async ({ where }: any = {}) => {
+        if (where?.OR) {
+          return (
+            emailTemplates.find((t) =>
+              where.OR.some((clause: any) => (clause.id && t.id === clause.id) || (clause.key && t.key === clause.key)),
+            ) ?? null
+          );
+        }
+        return emailTemplates[0] ?? null;
+      },
+      create: async ({ data }: any) => {
+        const now = new Date();
+        const row: EmailTemplate = {
+          id: nextId("eml"),
+          key: data.key,
+          subject: data.subject,
+          body: data.body,
+          variables: data.variables ?? null,
+          createdAt: now,
+          updatedAt: now,
+        };
+        emailTemplates.push(row);
+        return row;
+      },
+      update: async ({ where, data }: any) => {
+        const row = emailTemplates.find((t) => t.id === where.id)!;
+        Object.assign(row, data, { updatedAt: new Date() });
+        return row;
+      },
+    },
+    __state: { users, designs, files, versions, moderationCases, audits, productTypes, baseProducts, mockupTemplates, printAreas, mockupPlacements, generatedAssets, workerJobs, deliverySettings, orders, commerceListings, productionJobs, platformSettings, aiSettings, emailTemplates, userPreferences },
   };
+}
+
+function applyUserSelect(row: User, select: any, userPreferences: UserPreferences[]) {
+  if (!select) return row;
+  const result: Record<string, unknown> = {};
+  for (const key of Object.keys(select)) {
+    if (key === "preferences" && select[key]) {
+      result.preferences = userPreferences.find((p) => p.userId === row.id) ?? null;
+    } else if (select[key]) {
+      result[key] = (row as any)[key];
+    }
+  }
+  return result;
 }

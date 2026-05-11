@@ -29,7 +29,7 @@ steps:
           --set-secrets=DATABASE_URL=DATABASE_URL:latest \
           --set-env-vars=NODE_ENV=production \
           --command=sh \
-          --args=-c,"npx prisma db push --skip-generate --accept-data-loss && npx tsx prisma/seed.ts" \
+          --args=-c,"npx prisma migrate deploy && npx tsx prisma/seed.ts" \
           --max-retries=0 \
           --task-timeout=10m \
           --memory=512Mi

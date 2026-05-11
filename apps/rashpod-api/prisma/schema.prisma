@@ -126,6 +126,11 @@ model User {
   email        String   @unique
   passwordHash String
   displayName  String
+  bio          String?
+  avatarUrl    String?
+  coverUrl     String?
+  handle       String?  @unique
+  socialLinks  Json?
   role         UserRole
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
@@ -137,6 +142,19 @@ model User {
   orders       Order[] @relation("CustomerOrders")
   corporateRequests CorporateRequest[] @relation("CorporateClientRequests")
   designerBids DesignerBid[] @relation("BidDesigner")
+  preferences  UserPreferences?
+}
+
+model UserPreferences {
+  id                 String   @id @default(uuid())
+  userId             String   @unique
+  portfolioJson      Json?
+  payoutDetailsJson  Json?
+  notificationJson   Json?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model DesignAsset {

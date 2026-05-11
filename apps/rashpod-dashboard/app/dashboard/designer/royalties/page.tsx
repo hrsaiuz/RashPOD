@@ -97,7 +97,7 @@ export default function RoyaltiesPage() {
             />
             <KpiTile
               label="Next payout"
-              value="—"
+              value={formatCurrency(overview?.nextPayoutEstimate ?? 0)}
               icon={<Wallet className="text-brand-muted" />}
             />
           </div>
