@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
-import { PublicHeader, PublicFooter, getDashboardUrl } from "@rashpod/ui";
+import { PublicHeader, PublicFooter, MotionProvider, getDashboardUrl } from "@rashpod/ui";
 
 import "./globals.css";
 
@@ -23,18 +23,20 @@ export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en" className={inter.variable}>
       <body className="font-rash antialiased">
-        <PublicHeader
-          signInUrl={`${dashboardUrl}/auth/login`}
-          startSellingUrl={`${dashboardUrl}/auth/register?role=designer`}
-          shopUrl="/shop"
-          designersUrl="/designers"
-          filmsUrl="/film"
-          aboutUrl="/about"
-        />
-        <main id="main-content" className="min-h-screen bg-brand-bg">
-          {children}
-        </main>
-        <PublicFooter />
+        <MotionProvider>
+          <PublicHeader
+            signInUrl={`${dashboardUrl}/auth/login`}
+            startSellingUrl={`${dashboardUrl}/auth/register?role=designer`}
+            shopUrl="/shop"
+            designersUrl="/designers"
+            filmsUrl="/film"
+            aboutUrl="/about"
+          />
+          <main id="main-content" className="min-h-screen bg-brand-bg">
+            {children}
+          </main>
+          <PublicFooter />
+        </MotionProvider>
       </body>
     </html>
   );

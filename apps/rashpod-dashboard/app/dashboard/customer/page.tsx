@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "../../auth/auth-provider";
 import DashboardLayout from "../dashboard-layout";
-import { KpiTile, DataTable, DataTableColumn, EmptyState, ErrorState, Skeleton, Card, Button } from "@rashpod/ui";
+import { KpiTile, DataTable, DataTableColumn, EmptyState, ErrorState, Skeleton, Card, Button, StatusBadge } from "@rashpod/ui";
 import { Package, TruckIcon, CheckCircle, Heart, ShoppingBag } from "lucide-react";
 import Link from "next/link";
 
@@ -71,16 +71,12 @@ export default function CustomerOverview() {
     { 
       key: "status", 
       header: "Status",
-      render: (val) => (
-        <span className="px-3 py-1 rounded-full text-xs font-medium bg-brand-blueLight text-brand-blue">
-          {val}
-        </span>
-      ),
+      render: (val) => <StatusBadge status={String(val)} />,
     },
     { 
       key: "total", 
       header: "Total",
-      render: (val) => `$${val.toFixed(2)}`,
+      render: (val) => <span className="tabular-nums">${Number(val).toFixed(2)}</span>,
     },
     { 
       key: "createdAt", 

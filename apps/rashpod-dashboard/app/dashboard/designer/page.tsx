@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "../../auth/auth-provider";
 import DashboardLayout from "../dashboard-layout";
-import { KpiTile, DataTable, DataTableColumn, EmptyState, ErrorState, Skeleton, Card, Button } from "@rashpod/ui";
+import { KpiTile, DataTable, DataTableColumn, EmptyState, ErrorState, Skeleton, Card, Button, StatusBadge } from "@rashpod/ui";
 import { DollarSign, Tag, Search, Upload, TrendingUp } from "lucide-react";
 import Link from "next/link";
 
@@ -71,18 +71,12 @@ export default function DesignerOverview() {
     { 
       key: "amount", 
       header: "Amount",
-      render: (val) => `$${val.toFixed(2)}`,
+      render: (val) => <span className="tabular-nums font-medium text-brand-ink">${Number(val).toFixed(2)}</span>,
     },
     { 
       key: "status", 
       header: "Status",
-      render: (val) => (
-        <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-          val === 'paid' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'
-        }`}>
-          {val}
-        </span>
-      ),
+      render: (val) => <StatusBadge status={String(val)} />,
     },
     { 
       key: "date", 

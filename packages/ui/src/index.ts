@@ -28,6 +28,8 @@ export * from "./components/Spinner";
 export * from "./components/Modal";
 export * from "./components/Drawer";
 export * from "./components/KpiTile";
+export * from "./components/MotionProvider";
+export * from "./components/StatusBadge";
 
 // Layout components
 export * from "./components/PublicHeader";

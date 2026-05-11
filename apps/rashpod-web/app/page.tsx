@@ -4,10 +4,10 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { motion } from "framer-motion";
-import { 
-  UploadCloud, CheckCircle, DollarSign, 
+import {
+  UploadCloud, CheckCircle, DollarSign,
   ShoppingBag, Paintbrush, Package,
-  ArrowRight, ChevronDown
+  ArrowRight, ChevronDown,
 } from "lucide-react";
 import {
   Button,
@@ -16,6 +16,8 @@ import {
   EmptyState,
   ErrorState,
   KpiTile,
+  ProductCard,
+  CategoryTile,
   getDashboardUrl,
   getApiBase,
 } from "@rashpod/ui";
@@ -23,7 +25,7 @@ import {
 const fadeIn = {
   initial: { opacity: 0, y: 20 },
   animate: { opacity: 1, y: 0 },
-  transition: { duration: 0.5 },
+  transition: { duration: 0.32, ease: [0.22, 1, 0.36, 1] as [number, number, number, number] },
 };
 
 interface ProductListing {
@@ -128,31 +130,62 @@ export default function HomePage() {
   return (
     <div className="relative">
       {/* Hero Section */}
-      <section className="max-w-[1120px] mx-auto px-6 py-24">
-        <motion.div {...fadeIn} className="max-w-2xl">
-          <h1 className="text-[clamp(36px,5vw,56px)] font-bold leading-[1.1] tracking-tight text-brand-ink mb-6">
-            Upload your designs.<br />Sell products. Earn royalties.
-          </h1>
-          <p className="text-lg md:text-xl text-brand-muted mb-10 leading-relaxed max-w-[560px]">
-            Turn your artwork into RashPOD products, DTF/UV-DTF films, and corporate merchandise opportunities.
-          </p>
-          <div className="flex flex-wrap gap-4">
-            <a href={`${dashboardUrl}/auth/register?role=designer`}>
-              <Button variant="primaryPeach" size="lg">
-                Start selling your designs
-              </Button>
-            </a>
-            <Link href="/shop">
-              <Button variant="primaryBlue" size="lg">
-                Open RashPOD Shop
-              </Button>
-            </Link>
-          </div>
-        </motion.div>
+      <section
+        className="relative overflow-hidden"
+        style={{
+          background:
+            "linear-gradient(135deg, #F0F2FA 0%, #FFFFFF 55%, #FFD6C6 100%)",
+        }}
+      >
+        {/* Decorative floating shapes — pointer-events-none, low opacity */}
+        <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
+          <motion.div
+            className="absolute -top-16 -right-10 h-72 w-72 rounded-full opacity-30 blur-3xl"
+            style={{ background: "radial-gradient(circle, #F39E7C 0%, transparent 70%)" }}
+            animate={{ y: [0, 20, 0] }}
+            transition={{ duration: 12, repeat: Infinity, ease: "easeInOut" }}
+          />
+          <motion.div
+            className="absolute top-1/3 -left-16 h-64 w-64 rounded-full opacity-30 blur-3xl"
+            style={{ background: "radial-gradient(circle, #788AE0 0%, transparent 70%)" }}
+            animate={{ y: [0, -25, 0] }}
+            transition={{ duration: 14, repeat: Infinity, ease: "easeInOut" }}
+          />
+        </div>
+
+        <div className="relative max-w-[1280px] mx-auto px-6 py-20 md:py-28">
+          <motion.div {...fadeIn} className="max-w-2xl">
+            <span className="inline-flex items-center gap-2 rounded-full bg-white/70 backdrop-blur px-3 py-1 text-[12px] font-semibold uppercase tracking-[0.1em] text-brand-blue ring-1 ring-brand-blueLight mb-6">
+              <span className="h-1.5 w-1.5 rounded-full bg-brand-peach" aria-hidden="true" />
+              Print-on-Demand for Uzbekistan
+            </span>
+            <h1 className="text-[clamp(36px,5vw,56px)] font-bold leading-[1.05] tracking-tight text-brand-ink mb-6">
+              Upload your designs.<br />
+              <span className="text-brand-blue">Sell products.</span>{" "}
+              <span className="text-brand-peach">Earn royalties.</span>
+            </h1>
+            <p className="text-lg md:text-xl text-brand-muted mb-10 leading-relaxed max-w-[560px]">
+              Turn your artwork into RashPOD products, DTF/UV-DTF films, and corporate
+              merchandise opportunities.
+            </p>
+            <div className="flex flex-wrap gap-4">
+              <a href={`${dashboardUrl}/auth/register?role=designer`}>
+                <Button variant="primaryPeach" size="lg">
+                  Start selling your designs
+                </Button>
+              </a>
+              <Link href="/shop">
+                <Button variant="primaryBlue" size="lg">
+                  Open RashPOD Shop
+                </Button>
+              </Link>
+            </div>
+          </motion.div>
+        </div>
       </section>
 
       {/* How it works for designers */}
-      <section className="max-w-[1120px] mx-auto px-6 py-16">
+      <section className="max-w-[1280px] mx-auto px-6 py-20">
         <motion.h2
           initial={{ opacity: 0 }}
           whileInView={{ opacity: 1 }}
@@ -187,7 +220,7 @@ export default function HomePage() {
               initial={{ opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
-              transition={{ delay: i * 0.1 }}
+              transition={{ delay: i * 0.08, duration: 0.28 }}
             >
               <Card variant="lift" className="p-8 h-full">
                 <div className="w-16 h-16 rounded-full bg-brand-blue/10 flex items-center justify-center mb-6 text-2xl font-bold text-brand-blue">
@@ -203,7 +236,7 @@ export default function HomePage() {
       </section>
 
       {/* How it works for customers */}
-      <section className="max-w-[1120px] mx-auto px-6 py-16">
+      <section className="max-w-[1280px] mx-auto px-6 py-20">
         <motion.h2
           initial={{ opacity: 0 }}
           whileInView={{ opacity: 1 }}
@@ -238,7 +271,7 @@ export default function HomePage() {
               initial={{ opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
-              transition={{ delay: i * 0.1 }}
+              transition={{ delay: i * 0.08, duration: 0.28 }}
             >
               <Card variant="lift" className="p-8 h-full">
                 <div className="w-16 h-16 rounded-full bg-brand-peach/10 flex items-center justify-center mb-6 text-2xl font-bold text-brand-peach">
@@ -254,12 +287,12 @@ export default function HomePage() {
       </section>
 
       {/* Featured products */}
-      <section className="max-w-[1120px] mx-auto px-6 py-16">
+      <section className="max-w-[1280px] mx-auto px-6 py-16">
         <motion.div
           initial={{ opacity: 0 }}
           whileInView={{ opacity: 1 }}
           viewport={{ once: true }}
-          className="flex items-center justify-between mb-12"
+          className="flex items-center justify-between mb-10"
         >
           <h2 className="text-3xl md:text-4xl font-bold text-brand-ink">Featured products</h2>
           <Link href="/shop">
@@ -272,8 +305,8 @@ export default function HomePage() {
         {productsLoading && (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
             {[...Array(8)].map((_, i) => (
-              <Card key={i} variant="lift" className="overflow-hidden">
-                <Skeleton className="w-full h-64" />
+              <Card key={i} variant="lift" className="!p-0 overflow-hidden">
+                <Skeleton className="w-full h-64 rounded-none" />
                 <div className="p-4 space-y-2">
                   <Skeleton className="h-4 w-3/4" />
                   <Skeleton className="h-4 w-1/2" />
@@ -310,42 +343,31 @@ export default function HomePage() {
             className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6"
           >
             {products.map((product) => (
-              <Card key={product.id} variant="lift" className="overflow-hidden group">
-                <Link href={`/product/${product.slug}`}>
-                  <div className="relative w-full h-64 bg-gray-100">
-                    {product.imageUrl ? (
-                      <Image
-                        src={product.imageUrl}
-                        alt={product.title}
-                        fill
-                        className="object-cover group-hover:scale-105 transition-transform"
-                        sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center text-gray-400">
-                        <Package className="w-12 h-12" />
-                      </div>
-                    )}
-                  </div>
-                  <div className="p-4">
-                    <h3 className="font-semibold text-brand-ink mb-1 line-clamp-2">{product.title}</h3>
-                    <p className="text-sm text-brand-muted mb-2">by {product.designer.displayName}</p>
-                    <p className="text-lg font-bold text-brand-blue">{product.price.toLocaleString()} UZS</p>
-                  </div>
-                </Link>
-              </Card>
+              <Link
+                key={product.id}
+                href={`/product/${product.slug}`}
+                className="block focus:outline-none focus-visible:ring-4 focus-visible:ring-brand-blue/20 rounded-[28px]"
+                aria-label={`View ${product.title} by ${product.designer.displayName}`}
+              >
+                <ProductCard
+                  title={product.title}
+                  description={`by ${product.designer.displayName}`}
+                  price={`$${Number(product.price).toFixed(2)}`}
+                  imageUrl={product.imageUrl}
+                />
+              </Link>
             ))}
           </motion.div>
         )}
       </section>
 
       {/* Featured designers */}
-      <section className="max-w-[1120px] mx-auto px-6 py-16">
+      <section className="max-w-[1280px] mx-auto px-6 py-16">
         <motion.div
           initial={{ opacity: 0 }}
           whileInView={{ opacity: 1 }}
           viewport={{ once: true }}
-          className="flex items-center justify-between mb-12"
+          className="flex items-center justify-between mb-10"
         >
           <h2 className="text-3xl md:text-4xl font-bold text-brand-ink">Featured designers</h2>
           <Link href="/designers">
@@ -399,13 +421,17 @@ export default function HomePage() {
           >
             {designers.map((designer) => (
               <Card key={designer.id} variant="lift" className="p-6 group">
-                <Link href={`/designer/${designer.handle}`}>
+                <Link
+                  href={`/designer/${designer.handle}`}
+                  className="block focus:outline-none focus-visible:ring-4 focus-visible:ring-brand-blue/20 rounded-xl"
+                  aria-label={`View ${designer.displayName}'s profile`}
+                >
                   <div className="flex items-center gap-4 mb-4">
-                    <div className="w-16 h-16 rounded-full bg-brand-blue/10 flex items-center justify-center">
+                    <div className="w-16 h-16 rounded-full bg-brand-blue/10 flex items-center justify-center overflow-hidden">
                       {designer.avatarUrl ? (
                         <Image
                           src={designer.avatarUrl}
-                          alt={designer.displayName}
+                          alt=""
                           width={64}
                           height={64}
                           className="rounded-full"
@@ -423,7 +449,7 @@ export default function HomePage() {
                       <p className="text-sm text-brand-muted">@{designer.handle}</p>
                     </div>
                   </div>
-                  <p className="text-sm text-brand-muted">
+                  <p className="text-sm text-brand-muted tabular-nums">
                     {designer.listingsCount} {designer.listingsCount === 1 ? "listing" : "listings"}
                   </p>
                 </Link>
@@ -433,58 +459,51 @@ export default function HomePage() {
         )}
       </section>
 
-      {/* Films / DTF section */}
-      <section className="bg-gradient-to-r from-brand-peach/10 to-brand-peach/5 py-20">
-        <motion.div
-          initial={{ opacity: 0 }}
-          whileInView={{ opacity: 1 }}
-          viewport={{ once: true }}
-          className="max-w-[1120px] mx-auto px-6 text-center"
-        >
-          <h2 className="text-3xl md:text-4xl font-bold text-brand-ink mb-6">
-            License designs for DTF/UV-DTF printing
-          </h2>
-          <p className="text-lg text-brand-muted mb-8 max-w-2xl mx-auto">
-            Print shops: browse our film catalog and license high-quality designs for your printing business.
+      {/* Films + Corporate as CategoryTile pair */}
+      <section className="max-w-[1280px] mx-auto px-6 py-16">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <Link
+            href="/film"
+            className="block focus:outline-none focus-visible:ring-4 focus-visible:ring-brand-peach/30 rounded-[24px]"
+            aria-label="Browse DTF and UV-DTF films"
+          >
+            <CategoryTile
+              variant="peach"
+              category="For print shops"
+              title="DTF & UV-DTF Films"
+            />
+          </Link>
+          <Link
+            href="/corporate"
+            className="block focus:outline-none focus-visible:ring-4 focus-visible:ring-brand-blue/30 rounded-[24px]"
+            aria-label="Request a corporate quote"
+          >
+            <CategoryTile
+              variant="blue"
+              category="For companies"
+              title="Bulk merchandise"
+            />
+          </Link>
+        </div>
+        <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6 text-brand-muted">
+          <p className="leading-relaxed">
+            Print shops: browse our film catalog and license high-quality designs.
             Designers retain rights while earning royalties on every license.
           </p>
-          <Link href="/film">
-            <Button variant="primaryPeach" size="lg">
-              Browse Films
-            </Button>
-          </Link>
-        </motion.div>
-      </section>
-
-      {/* Corporate CTA */}
-      <section className="bg-gradient-to-r from-brand-blue/10 to-brand-blue/5 py-20">
-        <motion.div
-          initial={{ opacity: 0 }}
-          whileInView={{ opacity: 1 }}
-          viewport={{ once: true }}
-          className="max-w-[1120px] mx-auto px-6 text-center"
-        >
-          <h2 className="text-3xl md:text-4xl font-bold text-brand-ink mb-6">
-            Need bulk merchandise for your team or event?
-          </h2>
-          <p className="text-lg text-brand-muted mb-8 max-w-2xl mx-auto">
-            We offer custom corporate merchandise solutions. Get a quote for branded products, team uniforms, or event giveaways.
+          <p className="leading-relaxed">
+            Need custom merchandise for your team or event? Get a quote for branded
+            products, uniforms or event giveaways.
           </p>
-          <Link href="/corporate">
-            <Button variant="primaryBlue" size="lg">
-              Request a quote
-            </Button>
-          </Link>
-        </motion.div>
+        </div>
       </section>
 
       {/* Trust signals */}
-      <section className="max-w-[1120px] mx-auto px-6 py-16">
+      <section className="max-w-[1280px] mx-auto px-6 py-16">
         <motion.div
           initial={{ opacity: 0 }}
           whileInView={{ opacity: 1 }}
           viewport={{ once: true }}
-          className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6"
+          className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6"
         >
           {/* TODO: Replace with real KPIs from API */}
           <KpiTile label="Designers onboarded" value="120+" />
@@ -495,7 +514,7 @@ export default function HomePage() {
       </section>
 
       {/* Testimonials */}
-      <section className="max-w-[1120px] mx-auto px-6 py-16">
+      <section className="max-w-[1280px] mx-auto px-6 py-16">
         <motion.h2
           initial={{ opacity: 0 }}
           whileInView={{ opacity: 1 }}
@@ -510,16 +529,19 @@ export default function HomePage() {
             {
               name: "Sardor K.",
               role: "Designer",
-              quote: "RashPOD made it so easy to monetize my designs. I upload once and earn royalties every month!",
+              accent: "peach" as const,
+              quote: "RashPOD made it so easy to monetize my designs. I upload once and earn royalties every month.",
             },
             {
               name: "Nilufar A.",
               role: "Customer",
-              quote: "I love the unique designs and the quality of the products. Fast shipping too!",
+              accent: "blue" as const,
+              quote: "I love the unique designs and the quality of the products. Fast shipping too.",
             },
             {
               name: "Bekzod M.",
-              role: "Print Shop Owner",
+              role: "Print shop owner",
+              accent: "peach" as const,
               quote: "The film licensing system is brilliant. I can access professional designs legally and efficiently.",
             },
           ].map((testimonial, i) => (
@@ -528,13 +550,27 @@ export default function HomePage() {
               initial={{ opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
-              transition={{ delay: i * 0.1 }}
+              transition={{ delay: i * 0.08, duration: 0.28 }}
             >
-              <Card className="p-6 h-full">
-                <p className="text-brand-muted italic mb-4">"{testimonial.quote}"</p>
-                <div>
-                  <p className="font-semibold text-brand-ink">{testimonial.name}</p>
-                  <p className="text-sm text-brand-muted">{testimonial.role}</p>
+              <Card className="p-6 h-full flex flex-col">
+                <p className="text-brand-ink leading-relaxed mb-6 flex-1">
+                  &ldquo;{testimonial.quote}&rdquo;
+                </p>
+                <div className="flex items-center gap-3">
+                  <div
+                    className={`w-10 h-10 rounded-full flex items-center justify-center font-semibold ${
+                      testimonial.accent === "peach"
+                        ? "bg-brand-peachLight text-brand-peach"
+                        : "bg-brand-blueLight text-brand-blue"
+                    }`}
+                    aria-hidden="true"
+                  >
+                    {testimonial.name.charAt(0)}
+                  </div>
+                  <div>
+                    <p className="font-semibold text-brand-ink leading-tight">{testimonial.name}</p>
+                    <p className="text-xs text-brand-muted">{testimonial.role}</p>
+                  </div>
                 </div>
               </Card>
             </motion.div>
@@ -543,7 +579,7 @@ export default function HomePage() {
       </section>
 
       {/* FAQ */}
-      <section className="max-w-[1120px] mx-auto px-6 py-16">
+      <section className="max-w-[1280px] mx-auto px-6 py-16">
         <motion.h2
           initial={{ opacity: 0 }}
           whileInView={{ opacity: 1 }}
@@ -587,11 +623,11 @@ export default function HomePage() {
           ].map((faq, i) => (
             <details
               key={i}
-              className="group bg-white rounded-[24px] p-6 shadow-sm border border-surface-border-soft"
+              className="group bg-white rounded-[24px] p-6 shadow-sm border border-surface-borderSoft"
             >
-              <summary className="flex items-center justify-between cursor-pointer list-none">
+              <summary className="flex items-center justify-between cursor-pointer list-none focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue/30 rounded">
                 <span className="font-semibold text-brand-ink">{faq.question}</span>
-                <ChevronDown className="w-5 h-5 text-brand-muted group-open:rotate-180 transition-transform" />
+                <ChevronDown className="w-5 h-5 text-brand-muted group-open:rotate-180 transition-transform" aria-hidden="true" />
               </summary>
               <p className="mt-4 text-brand-muted leading-relaxed">{faq.answer}</p>
             </details>
