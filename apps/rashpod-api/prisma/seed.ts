@@ -139,12 +139,12 @@ async function seedSampleListings() {
   if (designers.length === 0) return;
 
   const samples = [
-    { title: "Tashkent Skyline Tee", slug: "tashkent-skyline-tee", price: 159000 },
-    { title: "Chorsu Bazaar Hoodie", slug: "chorsu-bazaar-hoodie", price: 329000 },
-    { title: "Samarkand Poster", slug: "samarkand-poster", price: 89000 },
-    { title: "Uzbek Folk Mug", slug: "uzbek-folk-mug", price: 79000 },
-    { title: "Registan Print Tee", slug: "registan-print-tee", price: 159000 },
-    { title: "Navruz Celebration Poster", slug: "navruz-poster", price: 99000 },
+    { title: "Tashkent Skyline Tee", slug: "tashkent-skyline-tee", price: 159000, seed: "tashkent-tee" },
+    { title: "Chorsu Bazaar Hoodie", slug: "chorsu-bazaar-hoodie", price: 329000, seed: "chorsu-hoodie" },
+    { title: "Samarkand Poster", slug: "samarkand-poster", price: 89000, seed: "samarkand-poster" },
+    { title: "Uzbek Folk Mug", slug: "uzbek-folk-mug", price: 79000, seed: "folk-mug" },
+    { title: "Registan Print Tee", slug: "registan-print-tee", price: 159000, seed: "registan-tee" },
+    { title: "Navruz Celebration Poster", slug: "navruz-poster", price: 99000, seed: "navruz-poster" },
   ];
 
   for (let i = 0; i < samples.length; i++) {
@@ -173,6 +173,11 @@ async function seedSampleListings() {
         slug: sample.slug,
         price: sample.price,
         currency: "UZS",
+        imagesJson: [
+          `https://picsum.photos/seed/${sample.seed}/640/640`,
+          `https://picsum.photos/seed/${sample.seed}-2/640/640`,
+          `https://picsum.photos/seed/${sample.seed}-3/640/640`,
+        ],
         publishedAt: new Date(),
       },
     });

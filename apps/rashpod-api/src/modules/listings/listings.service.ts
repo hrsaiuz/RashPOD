@@ -137,20 +137,86 @@ export class ListingsService {
     return updated;
   }
 
-  shopList(type?: string, q?: string) {
-    return this.prisma.commerceListing.findMany({
+  async shopList(type?: string, q?: string, limit?: number) {
+    const take = Math.min(Math.max(limit ?? 100, 1), 100);
+    const rows = await this.prisma.commerceListing.findMany({
       where: {
         status: ListingStatus.PUBLISHED,
         ...(type ? { type: type as any } : {}),
         ...(q ? { title: { contains: q, mode: "insensitive" } } : {}),
       },
       orderBy: { publishedAt: "desc" },
-      take: 100,
+      take,
+      include: { designer: { select: { id: true, displayName: true } } },
     });
+    return rows.map((row) => this.toShopListingDto(row));
   }
 
-  shopBySlug(slug: string) {
-    return this.prisma.commerceListing.findUnique({ where: { slug } });
+  async shopDesignersList(limit?: number) {
+    const take = Math.min(Math.max(limit ?? 24, 1), 100);
+    const designers = await this.prisma.user.findMany({
+      where: {
+        role: UserRole.DESIGNER,
+        listings: { some: { status: ListingStatus.PUBLISHED } },
+      },
+      select: {
+        id: true,
+        displayName: true,
+        _count: { select: { listings: { where: { status: ListingStatus.PUBLISHED } } } },
+      },
+      take,
+    });
+    return designers
+      .map((d) => ({
+        id: d.id,
+        handle: this.toHandle(d.displayName, d.id),
+        displayName: d.displayName,
+        listingsCount: d._count.listings,
+      }))
+      .sort((a, b) => b.listingsCount - a.listingsCount);
+  }
+
+  async shopBySlug(slug: string) {
+    const row = await this.prisma.commerceListing.findUnique({
+      where: { slug },
+      include: { designer: { select: { id: true, displayName: true } } },
+    });
+    return row ? this.toShopListingDto(row) : null;
+  }
+
+  private toShopListingDto(row: {
+    id: string;
+    slug: string;
+    title: string;
+    description: string | null;
+    price: any;
+    currency: string;
+    type: ListingType;
+    publishedAt: Date | null;
+    imagesJson: any;
+    designerId: string;
+    designer: { id: string; displayName: string };
+  }) {
+    const images = Array.isArray(row.imagesJson)
+      ? (row.imagesJson as unknown[]).filter((v): v is string => typeof v === "string")
+      : [];
+    return {
+      id: row.id,
+      slug: row.slug,
+      title: row.title,
+      description: row.description,
+      price: Number(row.price),
+      currency: row.currency,
+      type: row.type,
+      publishedAt: row.publishedAt,
+      imageUrl: images[0] ?? null,
+      images,
+      designer: {
+        id: row.designer.id,
+        displayName: row.designer.displayName,
+        handle: this.toHandle(row.designer.displayName, row.designer.id),
+      },
+    };
   }
 
   async shopByDesigner(handle: string) {
@@ -175,6 +241,7 @@ export class ListingsService {
       },
       orderBy: { publishedAt: "desc" },
       take: 100,
+      include: { designer: { select: { id: true, displayName: true } } },
     });
     return {
       designer: {
@@ -182,7 +249,7 @@ export class ListingsService {
         displayName: designer.displayName,
         handle: this.toHandle(designer.displayName, designer.id),
       },
-      listings,
+      listings: listings.map((l) => this.toShopListingDto(l)),
     };
   }
 

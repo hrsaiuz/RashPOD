@@ -79,7 +79,9 @@ export default function HomePage() {
     // Best-effort enhancement: try the API; keep curated fallback if the
     // shape doesn't match or the request fails. No error UI on the home page.
     const controller = new AbortController();
-    fetch(`${apiBase}/shop/listings?limit=8`, { signal: controller.signal })
+    const opts = { signal: controller.signal };
+
+    fetch(`${apiBase}/shop/listings?limit=8`, opts)
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
         if (!Array.isArray(data) || data.length === 0) return;
@@ -88,14 +90,31 @@ export default function HomePage() {
             id: d.id,
             slug: d.slug,
             title: d.title,
-            designer: d.designer?.displayName ?? d.designerName ?? "RashPOD designer",
+            designer: d.designer?.displayName ?? "RashPOD designer",
             price: Number(d.price),
-            imageUrl: Array.isArray(d.mockupUrls) ? d.mockupUrls[0] : d.imageUrl,
+            imageUrl: d.imageUrl ?? (Array.isArray(d.images) ? d.images[0] : undefined),
           }))
           .filter((p) => p.id && p.title);
         if (mapped.length) setProducts(mapped.slice(0, 8));
       })
       .catch(() => {/* keep fallback */});
+
+    fetch(`${apiBase}/shop/designers?limit=6`, opts)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (!Array.isArray(data) || data.length === 0) return;
+        const mapped: Designer[] = data
+          .map((d: any) => ({
+            id: d.id,
+            handle: d.handle,
+            displayName: d.displayName,
+            listingsCount: Number(d.listingsCount ?? 0),
+          }))
+          .filter((d) => d.id && d.displayName);
+        if (mapped.length) setDesigners(mapped.slice(0, 6));
+      })
+      .catch(() => {/* keep fallback */});
+
     return () => controller.abort();
   }, [apiBase]);
 

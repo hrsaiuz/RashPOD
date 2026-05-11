@@ -70,8 +70,19 @@ export class ListingsController {
   }
 
   @Get("shop/listings")
-  shopList(@Query("type") type?: string, @Query("q") q?: string) {
-    return this.listings.shopList(type, q);
+  shopList(
+    @Query("type") type?: string,
+    @Query("q") q?: string,
+    @Query("limit") limit?: string,
+  ) {
+    const parsed = limit ? Number(limit) : undefined;
+    return this.listings.shopList(type, q, Number.isFinite(parsed) ? parsed : undefined);
+  }
+
+  @Get("shop/designers")
+  shopDesigners(@Query("limit") limit?: string) {
+    const parsed = limit ? Number(limit) : undefined;
+    return this.listings.shopDesignersList(Number.isFinite(parsed) ? parsed : undefined);
   }
 
   @Get("shop/listings/:slug")
