@@ -9,6 +9,8 @@ import { ForgotPasswordDto } from "./dto/forgot-password.dto";
 import { ResetPasswordDto } from "./dto/reset-password.dto";
 import { VerifyEmailDto } from "./dto/verify-email.dto";
 import { VerifyEmailTokenDto } from "./dto/verify-email-token.dto";
+import { RequestEmailOtpDto } from "./dto/request-email-otp.dto";
+import { VerifyEmailOtpDto } from "./dto/verify-email-otp.dto";
 
 @Controller("auth")
 export class AuthController {
@@ -78,5 +80,15 @@ export class AuthController {
   @Post("reset-password")
   resetPassword(@Body() dto: ResetPasswordDto) {
     return this.authService.resetPassword(dto.token, dto.password);
+  }
+
+  @Post("otp/request")
+  requestEmailOtp(@Body() dto: RequestEmailOtpDto) {
+    return this.authService.requestEmailOtp(dto.email, dto.displayName);
+  }
+
+  @Post("otp/verify")
+  verifyEmailOtp(@Body() dto: VerifyEmailOtpDto) {
+    return this.authService.verifyEmailOtp(dto.email, dto.code);
   }
 }

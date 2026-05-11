@@ -2,24 +2,28 @@ import { BadRequestException, Injectable, UnauthorizedException } from "@nestjs/
 import { JwtService } from "@nestjs/jwt";
 import { UserRole } from "@prisma/client";
 import * as bcrypt from "bcryptjs";
-import { randomUUID } from "crypto";
+import { randomUUID, randomInt } from "crypto";
 import { PrismaService } from "../../prisma/prisma.service";
 import { RegisterDto } from "./dto/register.dto";
 import { LoginDto } from "./dto/login.dto";
 import { AuditService } from "../audit/audit.service";
 import { AuthSessionStore } from "./auth-session.store";
 import { MailerService } from "../mailer/mailer.service";
+import { EmailTemplatesService } from "../email-templates/email-templates.service";
 
 @Injectable()
 export class AuthService {
   private readonly emailVerificationTtlMs = 1000 * 60 * 60 * 24;
   private readonly passwordResetTtlMs = 1000 * 60 * 30;
+  private readonly otpTtlMs = 1000 * 60 * 10;
+  private readonly otpTtlMinutes = 10;
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
     private readonly audit: AuditService,
     private readonly mailer: MailerService,
+    private readonly emailTemplates: EmailTemplatesService,
   ) {}
 
   async register(dto: RegisterDto) {
@@ -38,7 +42,40 @@ export class AuthService {
     const verifyToken = `verify_${randomUUID()}`;
     AuthSessionStore.issueEmailVerificationToken(user.id, verifyToken, this.emailVerificationTtlMs);
     await this.audit.log({ actorId: user.id, action: "auth.register", entityType: "User", entityId: user.id });
+    void this.sendWelcomeEmail(user.id, user.email, user.displayName, role);
     return this.sign(user.id, user.role, user.email);
+  }
+
+  private async sendWelcomeEmail(userId: string, email: string, displayName: string, role: UserRole) {
+    try {
+      const isDesigner = role === UserRole.DESIGNER;
+      const rendered = isDesigner
+        ? this.emailTemplates.welcomeDesigner({ name: displayName })
+        : this.emailTemplates.welcomeCustomer({ name: displayName });
+      const result = await this.mailer.send({
+        to: email,
+        toName: displayName,
+        subject: rendered.subject,
+        html: rendered.html,
+        text: rendered.text,
+      });
+      await this.audit.log({
+        actorId: userId,
+        action: isDesigner ? "auth.welcome-email.designer" : "auth.welcome-email.customer",
+        entityType: "User",
+        entityId: userId,
+        metadata: { ok: result.ok, error: result.error ?? null, providerRef: result.providerRef ?? null },
+      });
+    } catch (err) {
+      // Welcome email is non-blocking. Log but never break registration.
+      await this.audit.log({
+        actorId: userId,
+        action: "auth.welcome-email.failed",
+        entityType: "User",
+        entityId: userId,
+        metadata: { error: (err as Error)?.message ?? String(err) },
+      });
+    }
   }
 
   async login(dto: LoginDto) {
@@ -64,11 +101,13 @@ export class AuthService {
     await this.audit.log({ actorId: user.id, action: "auth.verify-email.request", entityType: "User", entityId: user.id });
     const webUrl = process.env.WEB_URL || process.env.NEXT_PUBLIC_WEB_URL || "https://rashpod.uz";
     const link = `${webUrl}/auth/verify-email?token=${encodeURIComponent(token)}`;
+    const rendered = this.emailTemplates.emailVerification({ name: user.displayName, link });
     await this.mailer.send({
       to: user.email,
       toName: user.displayName,
-      subject: "Verify your RashPOD email",
-      html: `<p>Hi ${escapeHtml(user.displayName)},</p><p>Please verify your email by clicking the link below:</p><p><a href="${link}">Verify email</a></p><p>If the button doesn't work, paste this URL into your browser:<br/><code>${link}</code></p><p>— RashPOD</p>`,
+      subject: rendered.subject,
+      html: rendered.html,
+      text: rendered.text,
     });
     return { ok: true };
   }
@@ -88,11 +127,13 @@ export class AuthService {
     await this.audit.log({ actorId: user.id, action: "auth.forgot-password", entityType: "User", entityId: user.id });
     const webUrl = process.env.WEB_URL || process.env.NEXT_PUBLIC_WEB_URL || "https://rashpod.uz";
     const link = `${webUrl}/auth/reset-password?token=${encodeURIComponent(token)}`;
+    const rendered = this.emailTemplates.passwordReset({ name: user.displayName, link });
     await this.mailer.send({
       to: user.email,
       toName: user.displayName,
-      subject: "Reset your RashPOD password",
-      html: `<p>Hi ${escapeHtml(user.displayName)},</p><p>You requested a password reset. Click the link below to choose a new password (valid for 30 minutes):</p><p><a href="${link}">Reset password</a></p><p>If you didn't request this, you can safely ignore this email.</p><p>— RashPOD</p>`,
+      subject: rendered.subject,
+      html: rendered.html,
+      text: rendered.text,
     });
     return { ok: true };
   }
@@ -107,6 +148,91 @@ export class AuthService {
     return { ok: true };
   }
 
+  // ──────────────────────────────────────────────────────────────────────
+  // Email OTP (customer login / signup)
+  // ──────────────────────────────────────────────────────────────────────
+
+  async requestEmailOtp(email: string, displayName?: string) {
+    const normalized = email.toLowerCase();
+    const rate = AuthSessionStore.checkOtpRateLimit(normalized);
+    if (!rate.ok) {
+      // Always 200 + ok:true to clients to avoid enumeration; throttle silently after window.
+      throw new BadRequestException("Too many requests. Please try again later.");
+    }
+    const existing = await this.prisma.user.findUnique({ where: { email: normalized } });
+    const purpose: "signup" | "signin" = existing ? "signin" : "signup";
+    const displayedName = existing?.displayName || displayName || normalized.split("@")[0];
+
+    const code = String(randomInt(0, 1_000_000)).padStart(6, "0");
+    const codeHash = await bcrypt.hash(code, 10);
+    AuthSessionStore.issueOtp(normalized, codeHash, this.otpTtlMs, { displayName: displayedName, purpose });
+
+    const rendered = this.emailTemplates.emailOtp({
+      name: displayedName,
+      code,
+      ttlMinutes: this.otpTtlMinutes,
+      purpose,
+    });
+    await this.mailer.send({
+      to: normalized,
+      toName: displayedName,
+      subject: rendered.subject,
+      html: rendered.html,
+      text: rendered.text,
+    });
+    if (existing) {
+      await this.audit.log({
+        actorId: existing.id,
+        action: "auth.otp.request",
+        entityType: "User",
+        entityId: existing.id,
+        metadata: { purpose },
+      });
+    }
+    return { ok: true, ttlMinutes: this.otpTtlMinutes };
+  }
+
+  async verifyEmailOtp(email: string, code: string) {
+    const normalized = email.toLowerCase();
+    const entry = AuthSessionStore.peekOtp(normalized);
+    if (!entry) throw new BadRequestException("Code is invalid or expired");
+    const valid = await bcrypt.compare(code, entry.codeHash);
+    if (!valid) {
+      const { remaining, locked } = AuthSessionStore.recordOtpAttempt(normalized);
+      if (locked) throw new BadRequestException("Too many attempts. Please request a new code.");
+      throw new BadRequestException(`Invalid code. ${remaining} attempt${remaining === 1 ? "" : "s"} remaining.`);
+    }
+    AuthSessionStore.consumeOtp(normalized);
+
+    let user = await this.prisma.user.findUnique({ where: { email: normalized } });
+    if (!user) {
+      const placeholderHash = await bcrypt.hash(`otp_${randomUUID()}_${Date.now()}`, 10);
+      user = await this.prisma.user.create({
+        data: {
+          email: normalized,
+          displayName: entry.displayName || normalized.split("@")[0],
+          passwordHash: placeholderHash,
+          role: UserRole.CUSTOMER,
+        },
+      });
+      await this.audit.log({
+        actorId: user.id,
+        action: "auth.otp.register",
+        entityType: "User",
+        entityId: user.id,
+      });
+      void this.sendWelcomeEmail(user.id, user.email, user.displayName, user.role);
+    } else {
+      await this.audit.log({
+        actorId: user.id,
+        action: "auth.otp.verify",
+        entityType: "User",
+        entityId: user.id,
+      });
+    }
+    return this.sign(user.id, user.role, user.email);
+  }
+
   private async sign(sub: string, role: UserRole, email: string) {
     const sessionVersion = AuthSessionStore.getSessionVersion(sub);
     const accessToken = await this.jwtService.signAsync(
@@ -115,8 +241,4 @@ export class AuthService {
     );
     return { accessToken };
   }
-}
-
-function escapeHtml(input: string): string {
-  return input.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c] as string));
 }

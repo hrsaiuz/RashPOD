@@ -12,8 +12,15 @@ describe("Phase1 flow integration-style", () => {
     const prisma = createFakePrisma();
     const jwt = new JwtService();
     const audit = new AuditService(prisma as any);
-    const mailer = { sendEmail: async () => undefined, isConfigured: () => false } as any;
-    const auth = new AuthService(prisma as any, jwt, audit, mailer);
+    const mailer = { send: async () => ({ ok: false, error: "test" }), isConfigured: () => false } as any;
+    const emailTemplates = {
+      welcomeDesigner: () => ({ subject: "", html: "", text: "" }),
+      welcomeCustomer: () => ({ subject: "", html: "", text: "" }),
+      emailOtp: () => ({ subject: "", html: "", text: "" }),
+      emailVerification: () => ({ subject: "", html: "", text: "" }),
+      passwordReset: () => ({ subject: "", html: "", text: "" }),
+    } as any;
+    const auth = new AuthService(prisma as any, jwt, audit, mailer, emailTemplates);
     const designs = new DesignsService(prisma as any, audit);
     const files = new FilesService(prisma as any, new StorageService());
     const moderation = new ModerationService(prisma as any, audit);

@@ -21,6 +21,7 @@ import { AdminOpsModule } from "./modules/admin-ops/admin-ops.module";
 import { AiModule } from "./modules/ai/ai.module";
 import { MarketplaceModule } from "./modules/marketplace/marketplace.module";
 import { MailerModule } from "./modules/mailer/mailer.module";
+import { EmailTemplatesModule } from "./modules/email-templates/email-templates.module";
 import { MediaModule } from "./modules/media/media.module";
 import { AdminUsersModule } from "./modules/admin-users/admin-users.module";
 
@@ -48,6 +49,7 @@ import { AdminUsersModule } from "./modules/admin-users/admin-users.module";
     AdminOpsModule,
     MarketplaceModule,
     MailerModule,
+    EmailTemplatesModule,
     MediaModule,
     AdminUsersModule,
   ],
