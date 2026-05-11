@@ -28,8 +28,8 @@ steps:
           --set-cloudsql-instances=${_PROJECT}:${_REGION}:rashpod-db \
           --set-secrets=DATABASE_URL=DATABASE_URL:latest \
           --set-env-vars=NODE_ENV=production \
-          --command=npx \
-          --args=tsx,prisma/seed.ts \
+          --command=sh \
+          --args=-c,"npx prisma migrate deploy && npx tsx prisma/seed.ts" \
           --max-retries=0 \
           --task-timeout=10m \
           --memory=512Mi

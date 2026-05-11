@@ -238,7 +238,7 @@ export class ListingsService {
 
   async shopByDesigner(handle: string) {
     const normalized = handle.trim().toLowerCase();
-    const designer = await this.prisma.user.findFirst({
+    let designer = await this.prisma.user.findFirst({
       where: {
         role: UserRole.DESIGNER,
         OR: [
@@ -249,6 +249,14 @@ export class ListingsService {
       },
       select: { id: true, displayName: true, createdAt: true },
     });
+    if (!designer) {
+      const all = await this.prisma.user.findMany({
+        where: { role: UserRole.DESIGNER },
+        select: { id: true, displayName: true, createdAt: true },
+      });
+      designer =
+        all.find((d) => this.toHandle(d.displayName, d.id) === normalized) ?? null;
+    }
     if (!designer) return null;
 
     const [listings, listingsCount] = await Promise.all([
