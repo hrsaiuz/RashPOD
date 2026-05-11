@@ -9,18 +9,26 @@ import { DollarSign, Tag, Search, Upload, TrendingUp } from "lucide-react";
 import Link from "next/link";
 
 interface DesignerKpis {
-  pendingEarnings: number;
+  lifetimeEarnings: number;
+  monthEarnings: number;
   listingsLive: number;
   inModeration: number;
   designsUploaded: number;
+  soldItems: number;
 }
 
 interface RoyaltyEntry {
   id: string;
+  listingId: string;
   listingTitle: string;
-  amount: number;
-  status: string;
-  date: string;
+  royalty: number;
+  totalPrice: number;
+  orderStatus: string;
+  createdAt: string;
+}
+
+function uzs(value: number) {
+  return new Intl.NumberFormat("en-US", { style: "currency", currency: "UZS", maximumFractionDigits: 0 }).format(value || 0);
 }
 
 export default function DesignerOverview() {
@@ -42,18 +50,21 @@ export default function DesignerOverview() {
       setLoading(true);
       setError("");
       try {
-        const [overview, designs] = await Promise.all([
+        const [overview, royalties] = await Promise.all([
           fetch("/api/proxy/dashboard/designer").then((r) => (r.ok ? r.json() : null)),
-          fetch("/api/proxy/designs").then((r) => (r.ok ? r.json() : [])) as Promise<Array<{ status: string }>>,
+          fetch("/api/proxy/dashboard/designer/royalties?limit=5").then((r) => (r.ok ? r.json() : [])) as Promise<RoyaltyEntry[]>,
         ]);
-        const inModeration = Array.isArray(designs) ? designs.filter((d) => d.status === "SUBMITTED" || d.status === "NEEDS_FIX").length : 0;
+        const status: Record<string, number> = overview?.designStatus ?? {};
+        const inModeration = (status.SUBMITTED ?? 0) + (status.NEEDS_FIX ?? 0);
         setKpis({
-          pendingEarnings: 0,
+          lifetimeEarnings: overview?.lifetimeEarnings ?? 0,
+          monthEarnings: overview?.monthEarnings ?? 0,
           listingsLive: overview?.listings ?? 0,
           inModeration,
-          designsUploaded: overview?.designs ?? (Array.isArray(designs) ? designs.length : 0),
+          designsUploaded: overview?.designs ?? 0,
+          soldItems: overview?.soldItems ?? 0,
         });
-        setRecentRoyalties([]);
+        setRecentRoyalties(Array.isArray(royalties) ? royalties : []);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to load data");
       } finally {
@@ -65,18 +76,18 @@ export default function DesignerOverview() {
 
   const royaltyColumns: DataTableColumn<RoyaltyEntry>[] = [
     { key: "listingTitle", header: "Listing", sortable: true },
-    { 
-      key: "amount", 
-      header: "Amount",
-      render: (val) => <span className="tabular-nums font-medium text-brand-ink">${Number(val).toFixed(2)}</span>,
+    {
+      key: "royalty",
+      header: "Royalty",
+      render: (val) => <span className="tabular-nums font-medium text-brand-ink">{uzs(Number(val))}</span>,
     },
-    { 
-      key: "status", 
+    {
+      key: "orderStatus",
       header: "Status",
       render: (val) => <StatusBadge status={String(val)} />,
     },
-    { 
-      key: "date", 
+    {
+      key: "createdAt",
       header: "Date",
       render: (val) => new Date(val).toLocaleDateString(),
     },
@@ -114,14 +125,18 @@ export default function DesignerOverview() {
                 </>
               ) : kpis ? (
                 <>
-                  <KpiTile 
-                    label="Pending Earnings" 
-                    value={`${kpis.pendingEarnings.toFixed(0)} UZS`} 
+                  <KpiTile
+                    label="Lifetime earnings"
+                    value={uzs(kpis.lifetimeEarnings)}
                     icon={<DollarSign size={24} />}
+                  />
+                  <KpiTile
+                    label="This month"
+                    value={uzs(kpis.monthEarnings)}
+                    icon={<TrendingUp size={24} />}
                   />
                   <KpiTile label="Listings Live" value={kpis.listingsLive} icon={<Tag size={24} />} />
                   <KpiTile label="In Moderation" value={kpis.inModeration} icon={<Search size={24} />} />
-                  <KpiTile label="Designs Uploaded" value={kpis.designsUploaded} icon={<Upload size={24} />} />
                 </>
               ) : null}
             </div>

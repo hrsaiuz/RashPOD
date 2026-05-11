@@ -150,6 +150,26 @@ export interface DesignerOverview {
   designs: number;
   listings: number;
   soldItems: number;
+  lifetimeEarnings?: number;
+  monthEarnings?: number;
+  royaltyPct?: number;
+  designStatus?: Record<string, number>;
+  pendingModeration?: number;
+  needsFix?: number;
+}
+
+export interface RoyaltyEntry {
+  id: string;
+  orderId: string;
+  orderStatus: string;
+  listingId: string;
+  listingTitle: string;
+  quantity: number;
+  unitPrice: number;
+  totalPrice: number;
+  royalty: number;
+  royaltyPct: number;
+  createdAt: string;
 }
 
 export interface CorporateRequest {
