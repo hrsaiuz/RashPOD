@@ -37,6 +37,9 @@ export const permissions = {
   "ai:assist": ["DESIGNER", "ADMIN", "SUPER_ADMIN", "MODERATOR", "OPERATIONS_MANAGER", "CORPORATE_CLIENT"],
   "marketplace-export:manage": ["ADMIN", "SUPER_ADMIN", "OPERATIONS_MANAGER"],
   "audit-logs:read": ["ADMIN", "SUPER_ADMIN", "OPERATIONS_MANAGER", "FINANCE_STAFF", "SUPPORT_STAFF"],
+  "media:manage": ["ADMIN", "SUPER_ADMIN", "OPERATIONS_MANAGER"],
+  "branding:manage": ["ADMIN", "SUPER_ADMIN"],
+  "user:manage": ["ADMIN", "SUPER_ADMIN"],
 } as const;
 
 export type PermissionKey = keyof typeof permissions;

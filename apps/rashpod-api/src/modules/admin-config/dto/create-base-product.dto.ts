@@ -14,6 +14,14 @@ export class CreateBaseProductDto {
   @IsOptional()
   isActive?: boolean;
 
+  @IsString()
+  @IsOptional()
+  imageUrl?: string;
+
+  @IsString()
+  @IsOptional()
+  description?: string;
+
   @IsArray()
   @IsOptional()
   availableColors?: string[];

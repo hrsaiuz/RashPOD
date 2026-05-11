@@ -19,6 +19,11 @@ import {
   Briefcase,
   Factory,
   Image as ImageIcon,
+  Images,
+  Palette,
+  Users,
+  Building2,
+  Boxes,
   Layers,
   Film,
 } from "lucide-react";
@@ -56,6 +61,11 @@ const ROLE_LINKS: Record<string, Array<{ href: string; label: string; icon?: any
   admin: [
     { href: "/dashboard/admin", label: "Overview", icon: LayoutDashboard },
     { href: "/dashboard/admin/orders", label: "Orders", icon: Package },
+    { href: "/dashboard/admin/designers", label: "Designers", icon: Users },
+    { href: "/dashboard/admin/customers", label: "Customers", icon: Users },
+    { href: "/dashboard/admin/base-products", label: "Base Products", icon: Boxes },
+    { href: "/dashboard/admin/media-library", label: "Media Library", icon: Images },
+    { href: "/dashboard/admin/branding", label: "Branding", icon: Palette },
     { href: "/dashboard/admin/worker-jobs", label: "Worker Jobs", icon: Settings },
     { href: "/dashboard/admin/delivery-settings", label: "Delivery", icon: Package },
     { href: "/dashboard/admin/corporate", label: "Corporate", icon: Briefcase },

@@ -7,18 +7,39 @@ import "./globals.css";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 
-export const metadata: Metadata = {
-  title: { default: "RashPOD", template: "%s | RashPOD" },
-  description: "Upload your designs. Sell products. Earn royalties.",
-  metadataBase: new URL(process.env.NEXT_PUBLIC_WEB_URL || "https://rashpod.uz"),
-  openGraph: {
-    siteName: "RashPOD",
-    type: "website",
-  },
-};
+async function getBranding(): Promise<{
+  storefrontLogoUrl: string | null;
+  faviconUrl: string | null;
+  theme: { storeName?: string; storeTagline?: string };
+} | null> {
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL || process.env.API_URL;
+  if (!apiUrl) return null;
+  try {
+    const res = await fetch(`${apiUrl}/branding`, { next: { revalidate: 60 } });
+    if (!res.ok) return null;
+    return await res.json();
+  } catch {
+    return null;
+  }
+}
 
-export default function RootLayout({ children }: { children: ReactNode }) {
+export async function generateMetadata(): Promise<Metadata> {
+  const branding = await getBranding();
+  const name = branding?.theme?.storeName || "RashPOD";
+  const description = branding?.theme?.storeTagline || "Upload your designs. Sell products. Earn royalties.";
+  return {
+    title: { default: name, template: `%s | ${name}` },
+    description,
+    metadataBase: new URL(process.env.NEXT_PUBLIC_WEB_URL || "https://rashpod.uz"),
+    icons: branding?.faviconUrl ? [{ rel: "icon", url: branding.faviconUrl }] : undefined,
+    openGraph: { siteName: name, type: "website" },
+  };
+}
+
+export default async function RootLayout({ children }: { children: ReactNode }) {
   const dashboardUrl = getDashboardUrl();
+  const branding = await getBranding();
+  const brandName = branding?.theme?.storeName || "RashPOD";
 
   return (
     <html lang="en" className={inter.variable}>
@@ -31,6 +52,8 @@ export default function RootLayout({ children }: { children: ReactNode }) {
             designersUrl="/designers"
             filmsUrl="/film"
             aboutUrl="/about"
+            logoUrl={branding?.storefrontLogoUrl ?? null}
+            brandName={brandName}
           />
           <main id="main-content" className="min-h-screen bg-brand-bg">
             {children}

@@ -15,6 +15,8 @@ export interface PublicHeaderProps {
   aboutUrl?: string;
   signInUrl?: string;
   startSellingUrl?: string;
+  logoUrl?: string | null;
+  brandName?: string;
   className?: string;
 }
 
@@ -26,6 +28,8 @@ export const PublicHeader: React.FC<PublicHeaderProps> = ({
   aboutUrl = "/about",
   signInUrl,
   startSellingUrl,
+  logoUrl,
+  brandName = "RashPOD",
   className,
 }) => {
   const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false);
@@ -49,8 +53,13 @@ export const PublicHeader: React.FC<PublicHeaderProps> = ({
       </a>
       <header className={cn("sticky top-0 z-20 bg-white/80 backdrop-blur-md border-b border-surface-borderSoft", className)}>
         <div className="max-w-[1280px] mx-auto px-6 h-[76px] flex items-center justify-between">
-          <Link href="/" className="text-2xl font-bold text-brand-blue">
-            RashPOD
+          <Link href="/" className="flex items-center gap-2 text-2xl font-bold text-brand-blue">
+            {logoUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={logoUrl} alt={brandName} className="h-9 w-auto" />
+            ) : (
+              brandName
+            )}
           </Link>
 
           {/* Desktop Nav */}

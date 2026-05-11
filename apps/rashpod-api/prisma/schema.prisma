@@ -257,6 +257,8 @@ model BaseProduct {
   isActive        Boolean  @default(true)
   baseCost        Decimal? @db.Decimal(10, 2)
   defaultPrice    Decimal? @db.Decimal(10, 2)
+  imageUrl        String?
+  description     String?
   availableColors Json?
   availableSizes  Json?
   createdAt       DateTime @default(now())
@@ -590,4 +592,38 @@ model AiSetting {
   key       String   @id
   value     Json
   updatedAt DateTime @updatedAt
+}
+
+enum MediaCategory {
+  UI_ASSET
+  BRANDING_LOGO_WEB
+  BRANDING_LOGO_DASHBOARD
+  BRANDING_LOGO_LOGIN
+  BRANDING_FAVICON
+  BASE_PRODUCT_IMAGE
+  MOCKUP_TEMPLATE
+}
+
+model MediaAsset {
+  id           String        @id @default(uuid())
+  key          String        @unique
+  category     MediaCategory
+  title        String
+  description  String?
+  bucket       String
+  objectKey    String
+  publicUrl    String?
+  mimeType     String
+  sizeBytes    Int
+  width        Int?
+  height       Int?
+  uploaderId   String?
+  isActive     Boolean       @default(true)
+  sortOrder    Int           @default(0)
+  metadata     Json?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  @@index([category, isActive])
+  @@index([category, sortOrder])
 }

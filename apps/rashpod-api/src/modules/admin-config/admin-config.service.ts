@@ -96,7 +96,10 @@ export class AdminConfigService {
   }
 
   listBaseProducts() {
-    return this.prisma.baseProduct.findMany({ orderBy: { createdAt: "desc" } });
+    return this.prisma.baseProduct.findMany({
+      orderBy: { createdAt: "desc" },
+      include: { productType: { select: { id: true, name: true, slug: true, category: true } } },
+    });
   }
 
   async createBaseProduct(actorId: string, dto: CreateBaseProductDto) {
@@ -106,6 +109,8 @@ export class AdminConfigService {
         name: dto.name,
         skuPrefix: dto.skuPrefix,
         isActive: dto.isActive ?? true,
+        imageUrl: dto.imageUrl,
+        description: dto.description,
         availableColors: dto.availableColors ?? [],
         availableSizes: dto.availableSizes ?? [],
       },
@@ -115,7 +120,13 @@ export class AdminConfigService {
   }
 
   async getBaseProduct(id: string) {
-    const item = await this.prisma.baseProduct.findUnique({ where: { id } });
+    const item = await this.prisma.baseProduct.findUnique({
+      where: { id },
+      include: {
+        productType: true,
+        mockupTemplates: { orderBy: { sortOrder: "asc" } },
+      },
+    });
     if (!item) throw new NotFoundException("Base product not found");
     return item;
   }
@@ -128,6 +139,8 @@ export class AdminConfigService {
         name: dto.name,
         skuPrefix: dto.skuPrefix,
         isActive: dto.isActive,
+        imageUrl: dto.imageUrl,
+        description: dto.description,
         availableColors: dto.availableColors,
         availableSizes: dto.availableSizes,
       },
