@@ -58,6 +58,8 @@ function ShopContent() {
   const [sort, setSort] = useState("newest");
   const [page, setPage] = useState(1);
 
+  const [availableDesigners, setAvailableDesigners] = useState<Array<{ handle: string; displayName: string }>>([]);
+
   // Initialize from URL params
   useEffect(() => {
     const categoriesParam = searchParams.get("categories");
@@ -76,6 +78,19 @@ function ShopContent() {
     if (sortParam) setSort(sortParam);
     if (pageParam) setPage(parseInt(pageParam, 10));
   }, []);
+
+  useEffect(() => {
+    fetch(`${apiBase}/shop/designers?limit=50`)
+      .then((r) => (r.ok ? r.json() : []))
+      .then((data) => {
+        const list = Array.isArray(data) ? data : data?.items ?? [];
+        setAvailableDesigners(list.map((d: { handle?: string; displayName?: string }) => ({
+          handle: d.handle || "",
+          displayName: d.displayName || d.handle || "",
+        })).filter((d: { handle: string }) => d.handle));
+      })
+      .catch(() => setAvailableDesigners([]));
+  }, [apiBase]);
 
   const fetchListings = async () => {
     setLoading(true);
@@ -207,26 +222,29 @@ function ShopContent() {
 
       <div>
         <h3 className="text-sm font-semibold text-brand-ink mb-3">Designer</h3>
-        {/* TODO: Fetch designers list from API */}
-        <div className="space-y-2">
-          {["Artist One", "Artist Two", "Artist Three"].map((des) => (
-            <label key={des} className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={designers.includes(des)}
-                onChange={(e) => {
-                  if (e.target.checked) {
-                    setDesigners([...designers, des]);
-                  } else {
-                    setDesigners(designers.filter((d) => d !== des));
-                  }
-                  setPage(1);
-                }}
-                className="w-4 h-4 rounded border-gray-300 text-brand-blue focus:ring-brand-blue"
-              />
-              <span className="text-sm text-brand-muted">{des}</span>
-            </label>
-          ))}
+        <div className="space-y-2 max-h-48 overflow-y-auto">
+          {availableDesigners.length === 0 ? (
+            <p className="text-sm text-brand-muted">No designers yet</p>
+          ) : (
+            availableDesigners.map((des) => (
+              <label key={des.handle} className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={designers.includes(des.handle)}
+                  onChange={(e) => {
+                    if (e.target.checked) {
+                      setDesigners([...designers, des.handle]);
+                    } else {
+                      setDesigners(designers.filter((d) => d !== des.handle));
+                    }
+                    setPage(1);
+                  }}
+                  className="w-4 h-4 rounded border-gray-300 text-brand-blue focus:ring-brand-blue"
+                />
+                <span className="text-sm text-brand-muted">{des.displayName}</span>
+              </label>
+            ))
+          )}
         </div>
       </div>
 

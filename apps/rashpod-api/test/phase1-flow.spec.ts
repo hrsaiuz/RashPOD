@@ -12,7 +12,8 @@ describe("Phase1 flow integration-style", () => {
     const prisma = createFakePrisma();
     const jwt = new JwtService();
     const audit = new AuditService(prisma as any);
-    const auth = new AuthService(prisma as any, jwt, audit);
+    const mailer = { sendEmail: async () => undefined, isConfigured: () => false } as any;
+    const auth = new AuthService(prisma as any, jwt, audit, mailer);
     const designs = new DesignsService(prisma as any, audit);
     const files = new FilesService(prisma as any, new StorageService());
     const moderation = new ModerationService(prisma as any, audit);

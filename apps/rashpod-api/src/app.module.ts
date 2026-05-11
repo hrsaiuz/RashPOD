@@ -20,6 +20,7 @@ import { DeliveryModule } from "./modules/delivery/delivery.module";
 import { AdminOpsModule } from "./modules/admin-ops/admin-ops.module";
 import { AiModule } from "./modules/ai/ai.module";
 import { MarketplaceModule } from "./modules/marketplace/marketplace.module";
+import { MailerModule } from "./modules/mailer/mailer.module";
 
 @Module({
   imports: [
@@ -44,6 +45,7 @@ import { MarketplaceModule } from "./modules/marketplace/marketplace.module";
     AdminConfigModule,
     AdminOpsModule,
     MarketplaceModule,
+    MailerModule,
   ],
 })
 export class AppModule {}

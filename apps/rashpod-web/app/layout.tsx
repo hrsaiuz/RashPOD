@@ -25,7 +25,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       <body className="font-rash antialiased">
         <MotionProvider>
           <PublicHeader
-            signInUrl={`${dashboardUrl}/auth/login`}
+            signInUrl="/auth/login"
             startSellingUrl={`${dashboardUrl}/auth/register?role=designer`}
             shopUrl="/shop"
             designersUrl="/designers"

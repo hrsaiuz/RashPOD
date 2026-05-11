@@ -34,19 +34,12 @@ const ROLE_LINKS: Record<string, Array<{ href: string; label: string; icon?: any
     { href: "/dashboard/designer/royalties", label: "Royalties", icon: DollarSign },
     { href: "/dashboard/designer/settings", label: "Settings", icon: Settings },
   ],
-  customer: [
-    { href: "/dashboard/customer", label: "Overview", icon: LayoutDashboard },
-    { href: "/dashboard/customer/shop", label: "Browse Shop", icon: ShoppingBag },
-    { href: "/dashboard/customer/orders", label: "My Orders", icon: Package },
-  ],
+  customer: [],
   production: [
     { href: "/dashboard/production", label: "Overview", icon: LayoutDashboard },
     { href: "/dashboard/production/jobs", label: "Production Queue", icon: Factory },
   ],
-  corporate: [
-    { href: "/dashboard/corporate", label: "Overview", icon: LayoutDashboard },
-    { href: "/dashboard/corporate/requests", label: "Requests", icon: FileText },
-  ],
+  corporate: [],
   moderator: [
     { href: "/dashboard/moderator", label: "Overview", icon: LayoutDashboard },
     { href: "/dashboard/moderator/designs", label: "Moderation Queue", icon: Search },

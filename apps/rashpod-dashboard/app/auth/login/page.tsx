@@ -16,6 +16,8 @@ const ROLE_PRIORITY = [
   "CUSTOMER",
 ];
 
+const WEB_URL = process.env.NEXT_PUBLIC_WEB_URL || "https://rashpod.uz";
+
 const ROLE_ROUTES: Record<string, string> = {
   SUPER_ADMIN: "/dashboard/super-admin",
   ADMIN: "/dashboard/admin",
@@ -25,8 +27,8 @@ const ROLE_ROUTES: Record<string, string> = {
   FINANCE_STAFF: "/dashboard/finance",
   SUPPORT_STAFF: "/dashboard/support",
   DESIGNER: "/dashboard/designer",
-  CUSTOMER: "/dashboard/customer",
-  CORPORATE_CLIENT: "/dashboard/corporate",
+  CUSTOMER: `${WEB_URL}/account`,
+  CORPORATE_CLIENT: `${WEB_URL}/business`,
 };
 
 function normalizeRole(roleValue: string | string[]): string {
@@ -63,12 +65,17 @@ function LoginForm() {
     try {
       const { role: rawRole } = await login(email, password);
       const role = normalizeRole(rawRole);
-      const defaultDest = ROLE_ROUTES[role] || "/dashboard/customer";
+      const defaultDest = ROLE_ROUTES[role] || "/dashboard/designer";
+
+      if (defaultDest.startsWith("http")) {
+        window.location.href = defaultDest;
+        return;
+      }
 
       const nextParam = searchParams.get("next");
       if (nextParam && nextParam.startsWith("/dashboard")) {
         const expectedPrefix = ROLE_ROUTES[role];
-        if (expectedPrefix && nextParam.startsWith(expectedPrefix)) {
+        if (expectedPrefix && !expectedPrefix.startsWith("http") && nextParam.startsWith(expectedPrefix)) {
           router.push(nextParam);
           return;
         }
