@@ -48,29 +48,29 @@ const ACCENT_CLASSES: Record<NonNullable<DashboardSidebarProps["accent"]>, {
 }> = {
   blue: {
     dot: "bg-brand-blue",
-    activeBg: "bg-brand-blueLight",
-    activeText: "text-brand-blue",
+    activeBg: "bg-brand-blue",
+    activeText: "text-white",
     bar: "bg-brand-blue",
     ring: "focus:ring-brand-blue/30",
   },
   peach: {
     dot: "bg-brand-peach",
-    activeBg: "bg-brand-peachLight",
-    activeText: "text-brand-peach",
+    activeBg: "bg-brand-peach",
+    activeText: "text-white",
     bar: "bg-brand-peach",
     ring: "focus:ring-brand-peach/30",
   },
   green: {
     dot: "bg-semantic-success",
-    activeBg: "bg-semantic-successBg",
-    activeText: "text-semantic-successText",
+    activeBg: "bg-semantic-success",
+    activeText: "text-white",
     bar: "bg-semantic-success",
     ring: "focus:ring-semantic-success/30",
   },
   ink: {
     dot: "bg-brand-ink",
-    activeBg: "bg-surface-borderSoft",
-    activeText: "text-brand-ink",
+    activeBg: "bg-brand-ink",
+    activeText: "text-white",
     bar: "bg-brand-ink",
     ring: "focus:ring-brand-ink/30",
   },
@@ -149,7 +149,7 @@ export const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
                     <span
                       className={cn(
                         "inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full text-[11px] font-semibold tabular-nums",
-                        isActive ? "bg-white/60 text-current" : "bg-brand-blueLight text-brand-blue"
+                        isActive ? "bg-white/25 text-white" : "bg-brand-blueLight text-brand-blue"
                       )}
                     >
                       {link.badge}

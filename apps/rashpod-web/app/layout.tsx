@@ -1,11 +1,21 @@
 import type { ReactNode } from "react";
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import { DM_Sans, Inter } from "next/font/google";
 import { PublicHeader, PublicFooter, MotionProvider, getDashboardUrl } from "@rashpod/ui";
 
 import "./globals.css";
 
-const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
+const dmSans = DM_Sans({
+  subsets: ["latin", "latin-ext"],
+  weight: ["400", "500", "600", "700"],
+  variable: "--font-dm-sans",
+  display: "swap",
+});
+const inter = Inter({
+  subsets: ["latin", "latin-ext", "cyrillic", "cyrillic-ext"],
+  variable: "--font-inter",
+  display: "swap",
+});
 
 async function getBranding(): Promise<{
   storefrontLogoUrl: string | null;
@@ -42,7 +52,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
   const brandName = branding?.theme?.storeName || "RashPOD";
 
   return (
-    <html lang="en" className={inter.variable}>
+    <html lang="en" className={`${dmSans.variable} ${inter.variable}`}>
       <body className="font-rash antialiased">
         <MotionProvider>
           <PublicHeader

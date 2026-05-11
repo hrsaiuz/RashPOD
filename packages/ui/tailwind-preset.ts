@@ -50,7 +50,7 @@ const preset: Omit<Config, "content"> = {
         peachGlow: "0 18px 44px rgba(243, 158, 124, 0.28)",
       },
       fontFamily: {
-        rash: ['var(--font-inter)', 'Inter', 'system-ui', 'sans-serif'],
+        rash: ['var(--font-dm-sans)', 'var(--font-inter)', 'Inter', 'system-ui', 'sans-serif'],
       },
     },
   },
