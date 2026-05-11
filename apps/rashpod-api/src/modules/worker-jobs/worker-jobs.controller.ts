@@ -28,13 +28,13 @@ export class WorkerJobsController {
   }
 
   @Get("health")
-  health() {
-    return this.jobs.health(this.adminOps.getQueueAlertThresholds());
+  async health() {
+    return this.jobs.health(await this.adminOps.getQueueAlertThresholds());
   }
 
   @Post("health/check")
-  checkHealth(@CurrentUser() user: RequestUser) {
-    return this.jobs.checkHealthAndAlert(user.sub, this.adminOps.getQueueAlertThresholds());
+  async checkHealth(@CurrentUser() user: RequestUser) {
+    return this.jobs.checkHealthAndAlert(user.sub, await this.adminOps.getQueueAlertThresholds());
   }
 
   @Get("dead-letter")

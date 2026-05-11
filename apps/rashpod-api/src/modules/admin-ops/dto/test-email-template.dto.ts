@@ -1,4 +1,4 @@
-import { IsEmail, IsString } from "class-validator";
+import { IsEmail, IsObject, IsOptional, IsString } from "class-validator";
 
 export class TestEmailTemplateDto {
   @IsEmail()
@@ -6,4 +6,8 @@ export class TestEmailTemplateDto {
 
   @IsString()
   key!: string;
+
+  @IsOptional()
+  @IsObject()
+  variables?: Record<string, unknown>;
 }

@@ -569,3 +569,25 @@ model AuditLog {
   @@index([actorId])
   @@index([createdAt])
 }
+
+model PlatformSetting {
+  key       String   @id
+  value     Json
+  updatedAt DateTime @updatedAt
+}
+
+model EmailTemplate {
+  id        String   @id @default(uuid())
+  key       String   @unique
+  subject   String
+  body      String
+  variables Json?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model AiSetting {
+  key       String   @id
+  value     Json
+  updatedAt DateTime @updatedAt
+}

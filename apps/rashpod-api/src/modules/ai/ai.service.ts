@@ -9,8 +9,8 @@ export class AiService {
     private readonly audit: AuditService,
   ) {}
 
-  private assertEnabled() {
-    const settings = this.adminOps.getAiSettings() as Record<string, unknown>;
+  private async assertEnabled() {
+    const settings = await this.adminOps.getAiSettings();
     if (settings.enabled === false) {
       throw new ForbiddenException("AI assist is disabled by admin settings");
     }
@@ -27,7 +27,7 @@ export class AiService {
     const apiKey = process.env.OPENAI_API_KEY;
     const model = input.modelEnv || "gpt-4o-mini";
     const estimatedUsd = 0.002;
-    if (!this.adminOps.canSpendAi(estimatedUsd)) {
+    if (!(await this.adminOps.canSpendAi(estimatedUsd))) {
       throw new ForbiddenException("AI monthly budget exceeded");
     }
 
@@ -70,7 +70,7 @@ export class AiService {
   }
 
   async listingCopy(actorId: string, input: { titleHint?: string; descriptionHint?: string; tagsHint?: string[] }) {
-    this.assertEnabled();
+    await this.assertEnabled();
     const providerText = await this.runOpenAiText({
       operation: "listing-copy",
       actorId,
@@ -96,7 +96,7 @@ export class AiService {
   }
 
   async translate(actorId: string, input: { text: string; targetLanguage: "uz" | "ru" | "en" }) {
-    this.assertEnabled();
+    await this.assertEnabled();
     const providerText = await this.runOpenAiText({
       operation: "translate",
       actorId,
@@ -115,8 +115,8 @@ export class AiService {
   }
 
   async moderationAssist(actorId: string, input: { title?: string; description?: string }) {
-    this.assertEnabled();
-    const settings = this.adminOps.getAiSettings() as Record<string, unknown>;
+    await this.assertEnabled();
+    const settings = await this.adminOps.getAiSettings();
     if (settings.moderationAssistEnabled === false) {
       throw new ForbiddenException("Moderation assist is disabled");
     }
@@ -146,7 +146,7 @@ export class AiService {
   }
 
   async filmReadiness(actorId: string, input: { widthPx: number; heightPx: number; hasTransparency: boolean }) {
-    this.assertEnabled();
+    await this.assertEnabled();
     await this.audit.log({
       actorId,
       action: "ai.film-readiness.generate",
@@ -166,7 +166,7 @@ export class AiService {
   }
 
   async corporateOfferDraft(actorId: string, input: { brief: string; quantity?: number; budget?: number }) {
-    this.assertEnabled();
+    await this.assertEnabled();
     const providerText = await this.runOpenAiText({
       operation: "corporate-offer-draft",
       actorId,

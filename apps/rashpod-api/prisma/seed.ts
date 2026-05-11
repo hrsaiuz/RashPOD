@@ -185,12 +185,81 @@ async function seedSampleListings() {
 }
 
 
+async function seedBaseProductsAndMockups() {
+  const slugs = ["t-shirt", "hoodie", "mug", "poster"];
+  for (const slug of slugs) {
+    const type = await prisma.productType.findUnique({ where: { slug } });
+    if (!type) continue;
+
+    const skuPrefix = slug.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 6) || "SKU";
+    let baseProduct = await prisma.baseProduct.findFirst({
+      where: { productTypeId: type.id, skuPrefix },
+    });
+    if (!baseProduct) {
+      baseProduct = await prisma.baseProduct.create({
+        data: {
+          productTypeId: type.id,
+          name: `${type.name} (Standard)`,
+          skuPrefix,
+          baseCost: "5.00",
+          defaultPrice: "19.99",
+          availableColors: ["white", "black", "gray"],
+          availableSizes: slug === "mug" || slug === "poster" ? ["one-size"] : ["S", "M", "L", "XL"],
+        },
+      });
+    }
+
+    let template = await prisma.mockupTemplate.findFirst({
+      where: { baseProductId: baseProduct.id, name: "Front" },
+    });
+    if (!template) {
+      template = await prisma.mockupTemplate.create({
+        data: {
+          baseProductId: baseProduct.id,
+          name: "Front",
+          baseImageKey: `mockup-templates/${slug}/front-base.png`,
+          lifestyleImageKey: `mockup-templates/${slug}/front-lifestyle.png`,
+          closeupImageKey: `mockup-templates/${slug}/front-closeup.png`,
+          sortOrder: 0,
+        },
+      });
+    }
+
+    const existingArea = await prisma.printArea.findFirst({
+      where: { mockupTemplateId: template.id, name: "Front Print" },
+    });
+    if (!existingArea) {
+      const isFlat = slug === "mug" || slug === "poster";
+      await prisma.printArea.create({
+        data: {
+          mockupTemplateId: template.id,
+          name: "Front Print",
+          x: 300,
+          y: 350,
+          width: 600,
+          height: 800,
+          safeX: 320,
+          safeY: 370,
+          safeWidth: 560,
+          safeHeight: 760,
+          allowMove: true,
+          allowResize: true,
+          allowRotate: !isFlat,
+          minScale: 0.2,
+          maxScale: 1.5,
+        },
+      });
+    }
+  }
+}
+
 async function main() {
   await seedUsers();
   await seedProductTypes();
   await seedRoyaltyDefault();
   await seedFilmSettings();
   await seedDeliverySettings();
+  await seedBaseProductsAndMockups();
   await seedSampleListings();
   console.log("Seed completed.");
 }
