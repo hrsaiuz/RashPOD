@@ -18,12 +18,21 @@ import {
   Settings,
   Briefcase,
   Factory,
+  Image as ImageIcon,
+  Layers,
+  Film,
 } from "lucide-react";
 
 const ROLE_LINKS: Record<string, Array<{ href: string; label: string; icon?: any }>> = {
   designer: [
     { href: "/dashboard/designer", label: "Overview", icon: LayoutDashboard },
+    { href: "/dashboard/designer/designs", label: "My Designs", icon: ImageIcon },
+    { href: "/dashboard/designer/mockup-studio", label: "Mockup Studio", icon: Layers },
     { href: "/dashboard/designer/listings", label: "My Listings", icon: Tag },
+    { href: "/dashboard/designer/film-rights", label: "Film Rights", icon: Film },
+    { href: "/dashboard/designer/corporate-bids", label: "Corporate Bids", icon: Briefcase },
+    { href: "/dashboard/designer/royalties", label: "Royalties", icon: DollarSign },
+    { href: "/dashboard/designer/settings", label: "Settings", icon: Settings },
   ],
   customer: [
     { href: "/dashboard/customer", label: "Overview", icon: LayoutDashboard },

@@ -1,8 +1,12 @@
-export default function Page() {
-  return (
-    <main style={{ maxWidth: 1120, margin: "0 auto", padding: 24 }}>
-      <h1>My Products</h1>
-      <p>Published and draft product listings.</p>
-    </main>
-  );
+"use client";
+
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
+
+export default function DesignerProductsRedirect() {
+  const router = useRouter();
+  useEffect(() => {
+    router.replace("/dashboard/designer/listings");
+  }, [router]);
+  return null;
 }

@@ -1,119 +1,241 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
+import {
+  Button,
+  Card,
+  DataTable,
+  DataTableColumn,
+  EmptyState,
+  ErrorState,
+  FormField,
+  Input,
+  Modal,
+  Select,
+  Skeleton,
+  StatusBadge,
+  Textarea,
+} from "@rashpod/ui";
+import { Plus, Sparkles, Tag } from "lucide-react";
 import { useAuth } from "../../../auth/auth-provider";
 import DashboardLayout from "../../dashboard-layout";
-
-type Design = { id: string; title: string };
-type Listing = { id: string; title: string; status: string; slug: string; price: string };
+import { api, type Design, type Listing } from "../../../../lib/api";
 
 export default function DesignerListingsPage() {
   const router = useRouter();
-  const { user, isLoading } = useAuth();
+  const { user, isLoading: authLoading } = useAuth();
   const [designs, setDesigns] = useState<Design[]>([]);
   const [listings, setListings] = useState<Listing[]>([]);
-  const [form, setForm] = useState({ designAssetId: "", title: "", description: "", price: "0", type: "PRODUCT" });
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [createOpen, setCreateOpen] = useState(false);
+  const [form, setForm] = useState({
+    designAssetId: "",
+    type: "PRODUCT",
+    title: "",
+    description: "",
+    price: "",
+  });
+  const [aiLoading, setAiLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-
-  const load = async () => {
-    const [dRes, lRes] = await Promise.all([
-      fetch(`/api/proxy/designs`),
-      fetch(`/api/proxy/listings`),
-    ]);
-    if (dRes.ok) setDesigns(await dRes.json() as Design[]);
-    if (lRes.ok) setListings(await lRes.json() as Listing[]);
-  };
+  const [submitError, setSubmitError] = useState("");
 
   useEffect(() => {
-    if (isLoading || !user) return;
+    if (authLoading) return;
+    if (!user) {
+      router.push("/auth/login?next=/dashboard/designer/listings");
+      return;
+    }
     void load();
-  }, [user, isLoading, router]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, authLoading]);
 
-  const onCreate = async (e: FormEvent) => {
-    e.preventDefault();
-    if (!user) return;
+  async function load() {
+    setLoading(true);
     setError("");
-    setSubmitting(true);
     try {
-      const res = await fetch(`/api/proxy/listings`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...form, price: Number(form.price) }),
-      });
-      if (!res.ok) throw new Error(`Create failed (${res.status})`);
-      setForm({ designAssetId: "", title: "", description: "", price: "0", type: "PRODUCT" });
-      await load();
+      const [d, l] = await Promise.all([api.get<Design[]>("/designs"), api.get<Listing[]>("/listings")]);
+      setDesigns(d);
+      setListings(l);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to create listing.");
+      setError(e instanceof Error ? e.message : "Failed to load listings");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  const approvedDesigns = useMemo(
+    () => designs.filter((d) => ["APPROVED", "READY_FOR_MOCKUP", "READY_TO_PUBLISH", "PUBLISHED"].includes(d.status)),
+    [designs],
+  );
+
+  async function aiAssist() {
+    if (!form.title && !form.description) return;
+    setAiLoading(true);
+    try {
+      const res = await api.post<{ title?: string; description?: string; tags?: string[] }>("/ai/listing-copy", {
+        titleHint: form.title,
+        descriptionHint: form.description,
+      });
+      setForm((f) => ({
+        ...f,
+        title: res.title || f.title,
+        description: res.description || f.description,
+      }));
+    } catch {
+      // ignore — endpoint may be gated
+    } finally {
+      setAiLoading(false);
+    }
+  }
+
+  async function onCreate(e: FormEvent) {
+    e.preventDefault();
+    setSubmitting(true);
+    setSubmitError("");
+    try {
+      const created = await api.post<Listing>("/listings", {
+        designAssetId: form.designAssetId,
+        type: form.type,
+        title: form.title,
+        description: form.description || null,
+        price: Number(form.price),
+      });
+      setCreateOpen(false);
+      setForm({ designAssetId: "", type: "PRODUCT", title: "", description: "", price: "" });
+      router.push(`/dashboard/designer/listings/${created.id}`);
+    } catch (e) {
+      setSubmitError(e instanceof Error ? e.message : "Create failed");
     } finally {
       setSubmitting(false);
     }
-  };
+  }
 
-  const inputStyle = { padding: "9px 12px", borderRadius: 10, border: "1px solid #E8EAFB", fontSize: 13, width: "100%", boxSizing: "border-box" as const };
-  const labelStyle = { fontSize: 12, fontWeight: 500, color: "#374151", marginBottom: 4, display: "block" } as const;
+  const columns: DataTableColumn<Listing>[] = [
+    {
+      key: "title",
+      header: "Title",
+      render: (_v, l) => (
+        <Link href={`/dashboard/designer/listings/${l.id}`} className="font-medium text-brand-ink hover:text-brand-blue">
+          {l.title}
+        </Link>
+      ),
+    },
+    { key: "type", header: "Type", render: (_v, l) => <StatusBadge status={l.type} /> },
+    { key: "status", header: "Status", render: (_v, l) => <StatusBadge status={l.status} /> },
+    {
+      key: "price",
+      header: "Price",
+      render: (_v, l) => <span className="tabular-nums text-sm text-brand-ink">{l.price} {l.currency}</span>,
+    },
+    {
+      key: "updatedAt",
+      header: "Updated",
+      render: (_v, l) => <span className="text-xs text-brand-muted">{new Date(l.updatedAt).toLocaleDateString()}</span>,
+    },
+  ];
 
   return (
     <DashboardLayout role="designer">
-      <h1 style={{ margin: "0 0 20px", fontSize: 22, color: "#1A1D2E" }}>My Listings</h1>
-
-      <div style={{ background: "white", border: "1px solid #E8EAFB", borderRadius: 16, padding: 20, marginBottom: 24 }}>
-        <h2 style={{ margin: "0 0 16px", fontSize: 16, color: "#1A1D2E" }}>Create new listing</h2>
-        <form onSubmit={onCreate} style={{ display: "grid", gap: 12 }}>
+      <div className="space-y-6">
+        <div className="flex items-start justify-between flex-wrap gap-3">
           <div>
-            <label htmlFor="listing-design" style={labelStyle}>Design</label>
-            <select id="listing-design" value={form.designAssetId} onChange={(e) => setForm({ ...form, designAssetId: e.target.value })} required style={inputStyle}>
-              <option value="">Select design…</option>
-              {designs.map((d) => <option key={d.id} value={d.id}>{d.title}</option>)}
-            </select>
+            <h1 className="text-3xl font-bold text-brand-ink">My Listings</h1>
+            <p className="text-brand-muted mt-1">Storefront listings powered by your approved designs.</p>
           </div>
-          <div>
-            <label htmlFor="listing-type" style={labelStyle}>Type</label>
-            <select id="listing-type" value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })} style={inputStyle}>
-              <option value="PRODUCT">PRODUCT</option>
-              <option value="FILM">FILM</option>
-            </select>
-          </div>
-          <div>
-            <label htmlFor="listing-title" style={labelStyle}>Title</label>
-            <input id="listing-title" placeholder="Listing title" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} required style={inputStyle} />
-          </div>
-          <div>
-            <label htmlFor="listing-desc" style={labelStyle}>Description</label>
-            <input id="listing-desc" placeholder="Short description" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} style={inputStyle} />
-          </div>
-          <div>
-            <label htmlFor="listing-price" style={labelStyle}>Price (UZS)</label>
-            <input id="listing-price" type="number" min="0" placeholder="0" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} required style={inputStyle} />
-          </div>
-          {error && <p role="alert" style={{ margin: 0, color: "#B42318", fontSize: 13 }}>{error}</p>}
-          <button type="submit" disabled={submitting} style={{ padding: "10px 20px", borderRadius: 999, border: "none", background: "#788AE0", color: "white", fontWeight: 600, fontSize: 13, cursor: submitting ? "not-allowed" : "pointer", opacity: submitting ? 0.7 : 1, alignSelf: "flex-start" }}>
-            {submitting ? "Creating…" : "Create listing"}
-          </button>
-        </form>
-      </div>
-
-      <h2 style={{ fontSize: 16, color: "#1A1D2E", marginBottom: 12 }}>My listings</h2>
-      {listings.length === 0 ? (
-        <p style={{ color: "#9CA3AF", fontSize: 14 }}>No listings yet. Create your first one above.</p>
-      ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          {listings.map((l) => (
-            <div key={l.id} style={{ background: "white", border: "1px solid #E8EAFB", borderRadius: 14, padding: "12px 16px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
-              <div>
-                <div style={{ fontWeight: 600, fontSize: 14, color: "#1A1D2E" }}>{l.title}</div>
-                <div style={{ fontSize: 12, color: "#6B7280", marginTop: 2 }}>{l.price} UZS</div>
-              </div>
-              <span style={{ padding: "3px 10px", borderRadius: 999, fontSize: 11, fontWeight: 600, background: l.status === "ACTIVE" ? "#D1FAE5" : "#FEF3C7", color: l.status === "ACTIVE" ? "#065F46" : "#92400E" }}>
-                {l.status}
-              </span>
-            </div>
-          ))}
+          <Button
+            variant="primaryBlue"
+            disabled={approvedDesigns.length === 0}
+            onClick={() => setCreateOpen(true)}
+          >
+            <Plus size={16} /> New listing
+          </Button>
         </div>
-      )}
+
+        {loading ? (
+          <Skeleton className="h-64" />
+        ) : error ? (
+          <ErrorState title="Could not load" description={error} retry={<Button onClick={load}>Retry</Button>} />
+        ) : listings.length === 0 ? (
+          <EmptyState
+            icon={<Tag className="text-brand-muted" size={32} />}
+            title="No listings yet"
+            description={
+              approvedDesigns.length > 0
+                ? "Create your first listing from an approved design."
+                : "You need at least one approved design before creating a listing."
+            }
+            action={
+              approvedDesigns.length > 0 ? (
+                <Button variant="primaryBlue" onClick={() => setCreateOpen(true)}>
+                  <Plus size={16} /> New listing
+                </Button>
+              ) : (
+                <Link href="/dashboard/designer/designs/new">
+                  <Button variant="primaryBlue">Upload design</Button>
+                </Link>
+              )
+            }
+          />
+        ) : (
+          <Card>
+            <DataTable rows={listings} columns={columns} mobileMode="cards" />
+          </Card>
+        )}
+
+        <Modal
+          open={createOpen}
+          onClose={() => setCreateOpen(false)}
+          title="Create listing"
+          footer={
+            <div className="flex justify-end gap-2">
+              <Button variant="ghost" onClick={() => setCreateOpen(false)}>Cancel</Button>
+              <Button
+                variant="primaryBlue"
+                loading={submitting}
+                disabled={!form.designAssetId || !form.title || !form.price}
+                onClick={(e) => onCreate(e as unknown as FormEvent)}
+              >
+                Create
+              </Button>
+            </div>
+          }
+        >
+          <form onSubmit={onCreate} className="space-y-4">
+            <FormField label="Design" required>
+              <Select value={form.designAssetId} onChange={(e) => setForm({ ...form, designAssetId: e.target.value })} required>
+                <option value="">Select an approved design…</option>
+                {approvedDesigns.map((d) => (
+                  <option key={d.id} value={d.id}>{d.title}</option>
+                ))}
+              </Select>
+            </FormField>
+            <FormField label="Type">
+              <Select value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })}>
+                <option value="PRODUCT">Product</option>
+                <option value="FILM">Film (DTF / UV-DTF)</option>
+              </Select>
+            </FormField>
+            <FormField label="Title" required>
+              <Input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} required />
+            </FormField>
+            <FormField label="Description">
+              <Textarea rows={3} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
+            </FormField>
+            <div>
+              <Button variant="ghost" size="sm" type="button" loading={aiLoading} onClick={aiAssist}>
+                <Sparkles size={14} /> AI: improve copy
+              </Button>
+            </div>
+            <FormField label="Price (UZS)" required>
+              <Input type="number" min={0} value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} required />
+            </FormField>
+            {submitError && <p className="text-sm text-semantic-danger">{submitError}</p>}
+          </form>
+        </Modal>
+      </div>
     </DashboardLayout>
   );
 }
-

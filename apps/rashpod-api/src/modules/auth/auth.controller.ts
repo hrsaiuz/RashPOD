@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, UseGuards } from "@nestjs/common";
+import { Body, Controller, Get, Patch, Post, UseGuards } from "@nestjs/common";
 import { PrismaService } from "../../prisma/prisma.service";
 import { CurrentUser, RequestUser } from "../../common/auth/current-user.decorator";
 import { JwtAuthGuard } from "../../common/auth/jwt-auth.guard";
@@ -32,6 +32,24 @@ export class AuthController {
   async me(@CurrentUser() user: RequestUser) {
     return this.prisma.user.findUnique({
       where: { id: user.sub },
+      select: { id: true, email: true, displayName: true, role: true, createdAt: true },
+    });
+  }
+
+  @Patch("me")
+  @UseGuards(JwtAuthGuard)
+  async updateMe(
+    @CurrentUser() user: RequestUser,
+    @Body() body: { displayName?: string },
+  ) {
+    const data: { displayName?: string } = {};
+    if (typeof body?.displayName === "string") {
+      const trimmed = body.displayName.trim();
+      if (trimmed.length > 0 && trimmed.length <= 120) data.displayName = trimmed;
+    }
+    return this.prisma.user.update({
+      where: { id: user.sub },
+      data,
       select: { id: true, email: true, displayName: true, role: true, createdAt: true },
     });
   }

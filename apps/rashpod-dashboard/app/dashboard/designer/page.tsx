@@ -42,21 +42,18 @@ export default function DesignerOverview() {
       setLoading(true);
       setError("");
       try {
-        // TODO: Replace with actual endpoints
-        // const kpiRes = await fetch("/api/proxy/designer/kpis");
-        // const royaltiesRes = await fetch("/api/proxy/designer/royalties?limit=5");
-        
-        // Mock data for now
-        setKpis({
-          pendingEarnings: 234.50,
-          listingsLive: 18,
-          inModeration: 3,
-          designsUploaded: 42,
-        });
-        setRecentRoyalties([
-          { id: "1", listingTitle: "Abstract Pattern Tee", amount: 12.50, status: "paid", date: "2025-01-10" },
-          { id: "2", listingTitle: "Mountain Landscape Poster", amount: 8.75, status: "pending", date: "2025-01-15" },
+        const [overview, designs] = await Promise.all([
+          fetch("/api/proxy/dashboard/designer").then((r) => (r.ok ? r.json() : null)),
+          fetch("/api/proxy/designs").then((r) => (r.ok ? r.json() : [])) as Promise<Array<{ status: string }>>,
         ]);
+        const inModeration = Array.isArray(designs) ? designs.filter((d) => d.status === "SUBMITTED" || d.status === "NEEDS_FIX").length : 0;
+        setKpis({
+          pendingEarnings: 0,
+          listingsLive: overview?.listings ?? 0,
+          inModeration,
+          designsUploaded: overview?.designs ?? (Array.isArray(designs) ? designs.length : 0),
+        });
+        setRecentRoyalties([]);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to load data");
       } finally {
@@ -119,9 +116,8 @@ export default function DesignerOverview() {
                 <>
                   <KpiTile 
                     label="Pending Earnings" 
-                    value={`$${kpis.pendingEarnings.toFixed(2)}`} 
+                    value={`${kpis.pendingEarnings.toFixed(0)} UZS`} 
                     icon={<DollarSign size={24} />}
-                    delta={{ value: 12, isPositive: true }}
                   />
                   <KpiTile label="Listings Live" value={kpis.listingsLive} icon={<Tag size={24} />} />
                   <KpiTile label="In Moderation" value={kpis.inModeration} icon={<Search size={24} />} />
