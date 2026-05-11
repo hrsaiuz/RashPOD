@@ -249,6 +249,56 @@ export default function HomePage() {
         </div>
       </section>
 
+      {/* Browse by category */}
+      <section className="max-w-[1200px] mx-auto px-6 py-12">
+        <div className="flex items-end justify-between mb-6">
+          <div>
+            <p className="text-[11px] uppercase tracking-[0.12em] font-semibold text-brand-blue mb-1">
+              Categories
+            </p>
+            <h2 className="text-2xl md:text-3xl font-bold text-brand-ink">Browse by category</h2>
+          </div>
+          <Link
+            href="/shop"
+            className="inline-flex items-center gap-1 text-sm font-semibold text-brand-blue hover:gap-1.5 transition-[gap] focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue/30 rounded"
+          >
+            All categories <ArrowRight size={14} aria-hidden="true" />
+          </Link>
+        </div>
+
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+          {[
+            { label: "T-shirts", slug: "T_SHIRT", emoji: "👕", tone: "blue" as const },
+            { label: "Hoodies", slug: "HOODIE", emoji: "🧥", tone: "peach" as const },
+            { label: "Posters", slug: "POSTER", emoji: "🖼️", tone: "blue" as const },
+            { label: "Mugs", slug: "MUG", emoji: "☕", tone: "peach" as const },
+            { label: "DTF Films", slug: "DTF_FILM", emoji: "🎞️", tone: "blue" as const },
+            { label: "UV-DTF Films", slug: "UV_DTF_FILM", emoji: "✨", tone: "peach" as const },
+          ].map((cat) => (
+            <Link
+              key={cat.slug}
+              href={`/shop?productType=${cat.slug}`}
+              className="block focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue/30 rounded-2xl"
+              aria-label={`Browse ${cat.label}`}
+            >
+              <Card variant="flat" className="!p-4 group hover:shadow-soft transition-shadow text-center">
+                <div
+                  className={`mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-xl text-2xl ${
+                    cat.tone === "blue" ? "bg-brand-blueLight" : "bg-brand-peachLight"
+                  }`}
+                  aria-hidden="true"
+                >
+                  {cat.emoji}
+                </div>
+                <p className="text-[13px] font-semibold text-brand-ink group-hover:text-brand-blue transition-colors">
+                  {cat.label}
+                </p>
+              </Card>
+            </Link>
+          ))}
+        </div>
+      </section>
+
       {/* Featured products */}
       <section className="max-w-[1200px] mx-auto px-6 py-12">
         <div className="flex items-end justify-between mb-6">

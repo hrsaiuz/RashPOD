@@ -162,6 +162,13 @@ export class ListingsService {
       select: {
         id: true,
         displayName: true,
+        createdAt: true,
+        listings: {
+          where: { status: ListingStatus.PUBLISHED },
+          orderBy: { publishedAt: "desc" },
+          take: 3,
+          select: { id: true, imagesJson: true },
+        },
         _count: { select: { listings: { where: { status: ListingStatus.PUBLISHED } } } },
       },
       take,
@@ -171,7 +178,17 @@ export class ListingsService {
         id: d.id,
         handle: this.toHandle(d.displayName, d.id),
         displayName: d.displayName,
+        bio: null,
+        avatarUrl: null,
+        joinedAt: d.createdAt,
         listingsCount: d._count.listings,
+        topListings: d.listings.map((l) => ({
+          id: l.id,
+          imageUrl:
+            Array.isArray(l.imagesJson) && typeof (l.imagesJson as any)[0] === "string"
+              ? ((l.imagesJson as any)[0] as string)
+              : null,
+        })),
       }))
       .sort((a, b) => b.listingsCount - a.listingsCount);
   }
@@ -230,24 +247,34 @@ export class ListingsService {
           { email: { startsWith: `${normalized}@`, mode: "insensitive" } },
         ],
       },
-      select: { id: true, displayName: true },
+      select: { id: true, displayName: true, createdAt: true },
     });
     if (!designer) return null;
 
-    const listings = await this.prisma.commerceListing.findMany({
-      where: {
-        designerId: designer.id,
-        status: ListingStatus.PUBLISHED,
-      },
-      orderBy: { publishedAt: "desc" },
-      take: 100,
-      include: { designer: { select: { id: true, displayName: true } } },
-    });
+    const [listings, listingsCount] = await Promise.all([
+      this.prisma.commerceListing.findMany({
+        where: { designerId: designer.id, status: ListingStatus.PUBLISHED },
+        orderBy: { publishedAt: "desc" },
+        take: 100,
+        include: { designer: { select: { id: true, displayName: true } } },
+      }),
+      this.prisma.commerceListing.count({
+        where: { designerId: designer.id, status: ListingStatus.PUBLISHED },
+      }),
+    ]);
+
     return {
       designer: {
         id: designer.id,
         displayName: designer.displayName,
         handle: this.toHandle(designer.displayName, designer.id),
+        bio: null,
+        avatarUrl: null,
+        coverUrl: null,
+        joinedAt: designer.createdAt,
+        stats: {
+          listingsCount,
+        },
       },
       listings: listings.map((l) => this.toShopListingDto(l)),
     };

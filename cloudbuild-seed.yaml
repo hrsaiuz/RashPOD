@@ -1,0 +1,39 @@
+substitutions:
+  _REGION: us-central1
+  _REPO: rashpod
+  _PROJECT: rashpod-production
+
+# One-shot seed pipeline.
+#
+# Usage:
+#   gcloud builds submit --config cloudbuild-seed.yaml --no-source
+#
+# This runs the API image's seed script against the production database
+# via the Cloud SQL Auth Proxy. The job is idempotent — re-running it
+# upserts users and skips listings that already exist.
+#
+# Required secrets in Secret Manager: DATABASE_URL.
+
+steps:
+  - id: run-seed
+    name: gcr.io/google.com/cloudsdktool/cloud-sdk
+    entrypoint: bash
+    args:
+      - -c
+      - |
+        set -euo pipefail
+        gcloud run jobs deploy rashpod-seed \
+          --region=${_REGION} \
+          --image=${_REGION}-docker.pkg.dev/${_PROJECT}/${_REPO}/rashpod-api:latest \
+          --set-cloudsql-instances=${_PROJECT}:${_REGION}:rashpod-db \
+          --set-secrets=DATABASE_URL=DATABASE_URL:latest \
+          --set-env-vars=NODE_ENV=production \
+          --command=npx \
+          --args=tsx,prisma/seed.ts \
+          --max-retries=0 \
+          --task-timeout=10m \
+          --memory=512Mi
+        gcloud run jobs execute rashpod-seed --region=${_REGION} --wait
+
+options:
+  logging: CLOUD_LOGGING_ONLY
