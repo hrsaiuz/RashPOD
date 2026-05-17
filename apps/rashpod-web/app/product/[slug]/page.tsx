@@ -1,140 +1,134 @@
 "use client";
 
-import { use, useState, useEffect } from "react";
-import Link from "next/link";
+import { use, useEffect, useMemo, useState, type ReactNode } from "react";
 import Image from "next/image";
-import { motion } from "framer-motion";
+import Link from "next/link";
 import {
-  Button,
-  Card,
-  Select,
-  FormField,
-  Skeleton,
-  ErrorState,
-  Breadcrumbs,
-  getDashboardUrl,
-  getApiBase,
-} from "@rashpod/ui";
-import {
-  Star,
+  Bookmark,
+  Check,
   ChevronLeft,
   ChevronRight,
   Heart,
-  Share2,
+  MessageSquare,
   Package,
+  Share2,
+  ShoppingBag,
+  Star,
   Truck,
-  Shield,
-  ArrowLeft,
-  X,
 } from "lucide-react";
-import { ProductCard } from "../../../components/ProductCard";
+import { ErrorState, Skeleton, getApiBase } from "@rashpod/ui";
+import { useCart } from "../../../components/cart/CartProvider";
 
-interface ProductDetail {
+type ProductDetail = {
   id: string;
   slug: string;
   title: string;
-  description: string;
+  description?: string | null;
   price: number;
-  images: string[];
+  currency?: string;
+  imageUrl?: string | null;
+  images?: string[];
+  type?: string;
   designer: {
+    id?: string;
     displayName: string;
     handle: string;
-    avatarUrl?: string;
+    avatarUrl?: string | null;
   };
-  variants: {
-    sizes: string[];
-    colors: string[];
+  variants?: {
+    sizes?: string[];
+    colors?: string[];
   };
-  category: string;
-  royaltyRate?: number;
   reviews?: {
     average: number;
     count: number;
   };
-}
+};
 
-interface RelatedProduct {
+type ListingCard = {
   id: string;
   slug: string;
   title: string;
   price: number;
-  imageUrl: string;
-  designer: {
-    displayName: string;
-    handle: string;
-  };
-}
+  currency?: string;
+  imageUrl?: string | null;
+  designer?: { displayName?: string };
+};
+
+const FALLBACK_IMAGE_KEYS = ["mockup-main", "mockup-side", "mockup-flat", "mockup-pack"];
+
+const COLOR_SWATCHES = [
+  { label: "Peach", value: "#ead7c5" },
+  { label: "Lime", value: "#bfd676" },
+  { label: "Periwinkle", value: "#aab4f6" },
+  { label: "Pink", value: "#f5c2ea" },
+  { label: "Sage", value: "linear-gradient(180deg, #e1bda8 0 49%, #9cac7c 50% 100%)" },
+];
+
+const DEFAULT_SIZES = ["Small", "Medium", "Large", "XL", "XXL"];
 
 export default function ProductPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = use(params);
   const apiBase = getApiBase();
-  const dashboardUrl = getDashboardUrl();
-
+  const { addItem } = useCart();
   const [product, setProduct] = useState<ProductDetail | null>(null);
-  const [relatedProducts, setRelatedProducts] = useState<RelatedProduct[]>([]);
+  const [related, setRelated] = useState<ListingCard[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
-
-  const [selectedSize, setSelectedSize] = useState("");
-  const [selectedColor, setSelectedColor] = useState("");
-  const [quantity, setQuantity] = useState(1);
-  const [currentImageIndex, setCurrentImageIndex] = useState(0);
-  const [fullscreenImage, setFullscreenImage] = useState(false);
-  const [activeTab, setActiveTab] = useState<"description" | "shipping" | "reviews" | "designer">("description");
+  const [selectedImage, setSelectedImage] = useState(0);
+  const [selectedColor, setSelectedColor] = useState(COLOR_SWATCHES[0].label);
+  const [selectedSize, setSelectedSize] = useState(DEFAULT_SIZES[0]);
+  const [quantity, setQuantity] = useState(5);
 
   useEffect(() => {
-    const fetchProduct = async () => {
+    let cancelled = false;
+    async function load() {
       setLoading(true);
       setError(false);
-
       try {
-        const res = await fetch(`${apiBase}/shop/listings/${slug}`, {
-          next: { revalidate: 60 },
-        });
-
+        const res = await fetch(`${apiBase}/shop/listings/${slug}`, { next: { revalidate: 60 } });
         if (!res.ok) throw new Error("Product not found");
-
-        const data = await res.json();
+        const data = (await res.json()) as ProductDetail;
+        if (cancelled) return;
         setProduct(data);
+        setSelectedSize(data.variants?.sizes?.[0] || DEFAULT_SIZES[0]);
+        setSelectedColor(data.variants?.colors?.[0] || COLOR_SWATCHES[0].label);
 
-        if (data.variants?.sizes?.length) setSelectedSize(data.variants.sizes[0]);
-        if (data.variants?.colors?.length) setSelectedColor(data.variants.colors[0]);
-
-        // Fetch related products
-        const relatedRes = await fetch(`${apiBase}/shop/listings?category=${data.category}&limit=4`, {
-          next: { revalidate: 60 },
-        });
+        const relatedRes = await fetch(`${apiBase}/shop/listings?limit=4`, { next: { revalidate: 60 } });
         if (relatedRes.ok) {
-          const relatedData = await relatedRes.json();
-          setRelatedProducts((relatedData.items || relatedData).filter((p: RelatedProduct) => p.slug !== slug));
+          const rows = (await relatedRes.json()) as ListingCard[] | { items?: ListingCard[] };
+          const items = Array.isArray(rows) ? rows : rows.items || [];
+          setRelated(items.filter((item) => item.slug !== slug).slice(0, 4));
         }
-
-        setLoading(false);
-      } catch (err) {
-        setError(true);
-        setLoading(false);
+      } catch {
+        if (!cancelled) setError(true);
+      } finally {
+        if (!cancelled) setLoading(false);
       }
+    }
+    void load();
+    return () => {
+      cancelled = true;
     };
+  }, [apiBase, slug]);
 
-    fetchProduct();
-  }, [slug, apiBase]);
-
-  const handleAddToCart = () => {
-    // Since web has no auth, redirect to dashboard login with next param
-    const checkoutUrl = encodeURIComponent(`/dashboard/customer/checkout?slug=${slug}&size=${selectedSize}&color=${selectedColor}&quantity=${quantity}`);
-    window.location.href = `${dashboardUrl}/auth/login?next=${checkoutUrl}`;
-  };
+  const images = useMemo(() => {
+    const productImages = product?.images?.filter(Boolean) || [];
+    if (product?.imageUrl && !productImages.includes(product.imageUrl)) productImages.unshift(product.imageUrl);
+    return productImages;
+  }, [product]);
 
   if (loading) {
     return (
-      <div className="max-w-storefront mx-auto px-6 py-10">
-        <Skeleton className="h-6 w-48 mb-8" />
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
-          <Skeleton className="w-full aspect-[4/5]" />
-          <div className="space-y-6">
-            <Skeleton className="h-10 w-3/4" />
-            <Skeleton className="h-6 w-1/2" />
-            <Skeleton className="h-20 w-full" />
+      <div className="mx-auto max-w-[1232px] px-5 py-8">
+        <Skeleton className="mb-8 h-10 w-[410px] rounded-[9px]" />
+        <div className="grid gap-24 lg:grid-cols-[520px_1fr]">
+          <Skeleton className="aspect-[0.86] rounded-[30px]" />
+          <div className="space-y-5">
+            <Skeleton className="h-9 w-44" />
+            <Skeleton className="h-24 w-full" />
+            <Skeleton className="h-16 w-full" />
+            <Skeleton className="h-16 w-full" />
           </div>
         </div>
       </div>
@@ -143,342 +137,292 @@ export default function ProductPage({ params }: { params: Promise<{ slug: string
 
   if (error || !product) {
     return (
-      <div className="max-w-storefront mx-auto px-6 py-20">
-        <ErrorState
-          title="Product not found"
-          description="We couldn't find the product you're looking for."
-          retry={
-            <Link href="/shop">
-              <Button variant="primaryBlue" size="md">
-                Browse shop
-              </Button>
-            </Link>
-          }
-        />
+      <div className="mx-auto max-w-[1232px] px-5 py-20">
+        <ErrorState title="Product not found" description="We could not find this product." />
       </div>
     );
   }
 
-  const breadcrumbs = [
-    { label: "Home", href: "/" },
-    { label: "Shop", href: "/shop" },
-    { label: product.title, href: `/product/${slug}` },
-  ];
+  const price = toMoney(product.price, product.currency);
+  const oldPrice = toMoney(product.price, product.currency);
+  const relatedCards = related.length ? related : createFallbackRelated(product);
+
+  function handleAddToCart() {
+    addItem({
+      listingId: product!.id,
+      slug: product!.slug,
+      title: product!.title,
+      price: toCartPrice(product!.price),
+      imageUrl: images[selectedImage],
+      designerName: product!.designer.displayName,
+      size: selectedSize,
+      color: selectedColor,
+      quantity,
+    });
+  }
 
   return (
-    <div className="max-w-storefront mx-auto px-6 py-10">
-      {/* Breadcrumbs */}
-      <div className="mb-8">
-        <Breadcrumbs items={breadcrumbs} />
-      </div>
+    <div className="bg-white">
+      <div className="mx-auto max-w-[1232px] px-5 pb-12 pt-4">
+        <BreadcrumbTrail current="Products" />
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 mb-16">
-        {/* Left: Image gallery */}
-        <div>
-          <div className="relative w-full aspect-[4/5] bg-brand-bg rounded-[28px] overflow-hidden mb-4 shadow-product">
-            {product.images && product.images.length > 0 ? (
-              <>
-                <Image
-                  src={product.images[currentImageIndex]}
-                  alt={product.title}
-                  fill
-                  className="object-cover cursor-pointer"
-                  sizes="(max-width: 1024px) 100vw, 50vw"
-                  priority
-                  onClick={() => setFullscreenImage(true)}
-                />
-                {product.images.length > 1 && (
-                  <>
-                    <button
-                      className="absolute top-1/2 left-4 -translate-y-1/2 w-10 h-10 bg-white/90 rounded-full shadow-soft flex items-center justify-center hover:bg-white transition-colors"
-                      onClick={() =>
-                        setCurrentImageIndex(
-                          (currentImageIndex - 1 + product.images.length) % product.images.length
-                        )
-                      }
-                    >
-                      <ChevronLeft className="w-5 h-5 text-brand-ink" />
-                    </button>
-                    <button
-                      className="absolute top-1/2 right-4 -translate-y-1/2 w-10 h-10 bg-white/90 rounded-full shadow-soft flex items-center justify-center hover:bg-white transition-colors"
-                      onClick={() =>
-                        setCurrentImageIndex((currentImageIndex + 1) % product.images.length)
-                      }
-                    >
-                      <ChevronRight className="w-5 h-5 text-brand-ink" />
-                    </button>
-                  </>
-                )}
-              </>
-            ) : (
-              <div className="w-full h-full flex items-center justify-center text-brand-muted">
-                <Package className="w-20 h-20" />
-              </div>
-            )}
-          </div>
-
-          {/* Thumbnail strip */}
-          {product.images && product.images.length > 1 && (
-            <div className="flex gap-4 overflow-x-auto">
-              {product.images.map((img, i) => (
-                <button
-                  key={i}
-                  className={`w-20 h-20 rounded-2xl overflow-hidden flex-shrink-0 border-2 transition-colors ${
-                    i === currentImageIndex ? "border-brand-blue" : "border-transparent"
-                  }`}
-                  onClick={() => setCurrentImageIndex(i)}
-                >
-                  <Image
-                    src={img}
-                    alt={`${product.title} ${i + 1}`}
-                    width={80}
-                    height={80}
-                    className="object-cover w-full h-full"
-                  />
-                </button>
-              ))}
+        <section className="mt-7 grid gap-24 lg:grid-cols-[520px_1fr]">
+          <div>
+            <div className="relative aspect-[0.88] overflow-hidden rounded-[31px] bg-brand-bg">
+              {images[selectedImage] ? (
+                <Image src={images[selectedImage]} alt={product.title} fill priority sizes="(max-width: 1024px) 100vw, 520px" className="object-cover" />
+              ) : (
+                <ProductImagePlaceholder />
+              )}
             </div>
-          )}
-        </div>
-
-        {/* Right: Product info */}
-        <div className="flex flex-col">
-          <div className="flex justify-between items-start mb-2">
-            <h1 className="text-3xl font-bold text-brand-ink">{product.title}</h1>
-            <div className="flex gap-2">
-              <button className="w-10 h-10 rounded-full border border-surface-borderSoft flex items-center justify-center hover:bg-surface-app text-brand-ink transition-colors">
-                <Heart className="w-5 h-5" />
+            <div className="mt-7 flex items-center gap-4">
+              <button className="text-brand-peach" aria-label="Previous image" onClick={() => setSelectedImage((selectedImage - 1 + images.length) % images.length)}>
+                <ChevronLeft size={34} strokeWidth={1.6} />
               </button>
-              <button className="w-10 h-10 rounded-full border border-surface-borderSoft flex items-center justify-center hover:bg-surface-app text-brand-ink transition-colors">
-                <Share2 className="w-5 h-5" />
+              <div className="flex gap-4 overflow-x-auto">
+                {(images.length ? images.slice(0, 4) : FALLBACK_IMAGE_KEYS).map((image, index) => (
+                  <button
+                    key={image}
+                    onClick={() => setSelectedImage(index)}
+                    className={`relative h-[83px] w-[92px] shrink-0 overflow-hidden rounded-[10px] border-2 ${selectedImage === index ? "border-brand-blue" : "border-transparent"}`}
+                  >
+                    {images[index] ? (
+                      <Image src={images[index]} alt={`${product.title} preview ${index + 1}`} fill sizes="92px" className="object-cover" />
+                    ) : (
+                      <ProductImagePlaceholder compact />
+                    )}
+                  </button>
+                ))}
+              </div>
+              <button className="text-brand-peach" aria-label="Next image" onClick={() => setSelectedImage((selectedImage + 1) % images.length)}>
+                <ChevronRight size={34} strokeWidth={1.6} />
               </button>
             </div>
           </div>
 
-          <div className="flex items-center gap-3 mb-6">
-            <Link href={`/designer/${product.designer.handle}`} className="text-brand-muted hover:text-brand-blue">
-              by <span className="font-medium">{product.designer.displayName}</span>
-            </Link>
-            {product.royaltyRate && (
-              <span className="inline-flex items-center justify-center h-7 px-3 text-xs rounded-full font-medium bg-[#FFF1E8] text-[#C85F35]">
-                {product.royaltyRate}% royalty to designer
-              </span>
-            )}
-          </div>
-
-          <div className="flex items-center gap-4 mb-8 pb-8 border-b border-surface-borderSoft">
-            <span className="text-[32px] font-bold text-brand-ink">
-              {product.price.toLocaleString()} UZS
-            </span>
-            {product.reviews && (
-              <div className="flex items-center gap-1 bg-[#FFF5F1] text-brand-peach px-3 py-1 rounded-full text-sm font-semibold">
-                <Star className="w-4 h-4 fill-current" />
-                {product.reviews.average} ({product.reviews.count})
-              </div>
-            )}
-          </div>
-
-          {/* Size selector */}
-          {product.variants?.sizes && product.variants.sizes.length > 0 && (
-            <div className="mb-6">
-              <FormField label="Size">
-                <Select value={selectedSize} onChange={(e) => setSelectedSize(e.target.value)}>
-                  {product.variants.sizes.map((size) => (
-                    <option key={size} value={size}>
-                      {size}
-                    </option>
-                  ))}
-                </Select>
-              </FormField>
-            </div>
-          )}
-
-          {/* Color selector */}
-          {product.variants?.colors && product.variants.colors.length > 0 && (
-            <div className="mb-6">
-              <FormField label="Color">
-                <Select value={selectedColor} onChange={(e) => setSelectedColor(e.target.value)}>
-                  {product.variants.colors.map((color) => (
-                    <option key={color} value={color}>
-                      {color}
-                    </option>
-                  ))}
-                </Select>
-              </FormField>
-            </div>
-          )}
-
-          {/* Quantity */}
-          <div className="mb-8">
-            <FormField label="Quantity">
-              <div className="flex items-center bg-surface-app rounded-full h-14 px-2 w-fit border border-surface-borderSoft">
-                <button
-                  className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-white text-brand-ink text-xl font-semibold"
-                  onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                  disabled={quantity <= 1}
-                >
-                  -
-                </button>
-                <span className="w-12 text-center font-semibold">{quantity}</span>
-                <button
-                  className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-white text-brand-ink text-xl font-semibold"
-                  onClick={() => setQuantity(quantity + 1)}
-                >
-                  +
-                </button>
-              </div>
-            </FormField>
-          </div>
-
-          <Button variant="primaryPeach" size="lg" className="mb-8" onClick={handleAddToCart}>
-            Add To Cart
-          </Button>
-
-          <div className="space-y-4 bg-white rounded-[20px] border border-surface-borderSoft p-5 shadow-soft">
-            <div className="flex items-start gap-3">
-              <Truck className="w-5 h-5 text-brand-blue mt-0.5" />
+          <div className="pt-2">
+            <div className="flex items-start justify-between gap-5">
               <div>
-                <h4 className="font-semibold text-brand-ink text-sm">Free Delivery</h4>
-                <p className="text-sm text-brand-muted">3-7 business days within Uzbekistan</p>
+                <h1 className="text-[30px] font-black lowercase leading-none text-black">{product.title}</h1>
+                <p className="mt-4 max-w-[160px] text-[16px] leading-[1.05] text-[#50505B]">designed by {product.designer.displayName}</p>
+              </div>
+              <div className="flex gap-3">
+                <IconPill><Heart size={20} className="text-brand-peach" /></IconPill>
+                <IconPill><Bookmark size={21} /></IconPill>
+                <IconPill><Share2 size={20} /></IconPill>
               </div>
             </div>
-            <div className="flex items-start gap-3">
-              <Shield className="w-5 h-5 text-brand-blue mt-0.5" />
-              <div>
-                <h4 className="font-semibold text-brand-ink text-sm">Quality Guarantee</h4>
-                <p className="text-sm text-brand-muted">14-day return for defective items</p>
+
+            <div className="mt-1 border-t border-[#DFE3F5] py-5">
+              <div className="flex flex-wrap items-center gap-5">
+                <div>
+                  <p className="text-[30px] font-black text-black">{price}</p>
+                  <p className="text-[18px] text-[#858585] line-through">{oldPrice}</p>
+                </div>
+                <span className="inline-flex h-[28px] items-center gap-2 rounded-full bg-brand-bg px-4 text-[13px] font-bold text-brand-peach">
+                  <Star size={15} /> 4.8
+                </span>
+                <span className="inline-flex h-[28px] items-center gap-2 rounded-full bg-brand-bg px-4 text-[13px] font-bold text-brand-blue">
+                  <MessageSquare size={15} /> 67 Reviews
+                </span>
               </div>
+              <p className="mt-2 text-[14px] text-[#8A8A8A]"><span className="font-bold text-[#36A349]">93%</span> of buyers have recommended this.</p>
+            </div>
+
+            <div className="border-t border-[#DFE3F5] py-5">
+              <h2 className="mb-4 text-[16px] font-medium text-[#33333A]">Choose a Color</h2>
+              <div className="flex flex-wrap gap-5">
+                {COLOR_SWATCHES.map((swatch) => (
+                  <button
+                    key={swatch.label}
+                    aria-label={swatch.label}
+                    onClick={() => setSelectedColor(swatch.label)}
+                    className={`grid h-[52px] w-[52px] place-items-center rounded-full ${selectedColor === swatch.label ? "ring-2 ring-[#EBD9C9] ring-offset-4" : ""}`}
+                    style={{ background: swatch.value }}
+                  >
+                    {selectedColor === swatch.label ? <Check size={26} className="text-white" /> : null}
+                  </button>
+                ))}
+              </div>
+              <p className="mt-4 text-[12px] text-[#33333A]">The colors may differ by up to 15% from what you see in the image.</p>
+            </div>
+
+            <div className="border-t border-[#DFE3F5] py-5">
+              <div className="mb-5 flex items-center justify-between">
+                <h2 className="text-[16px] font-medium text-[#33333A]">Choose a Size</h2>
+                <button className="text-[15px] text-[#33333A]">Size Guide</button>
+              </div>
+              <div className="flex flex-wrap gap-3">
+                {DEFAULT_SIZES.map((size) => (
+                  <button
+                    key={size}
+                    onClick={() => setSelectedSize(size)}
+                    className={`inline-flex h-[28px] items-center gap-2 rounded-[6px] px-3 text-[14px] ${selectedSize === size ? "bg-brand-bg text-brand-blue" : "bg-brand-bg text-[#33333A]"}`}
+                  >
+                    <span className={`h-4 w-4 rounded-full border ${selectedSize === size ? "border-brand-blue bg-brand-blue" : "border-[#33333A]"}`} />
+                    {size}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="border-t border-[#DFE3F5] py-5">
+              <div className="flex flex-wrap gap-4">
+                <div className="inline-flex h-[53px] min-w-[140px] items-center justify-between rounded-[14px] bg-brand-bg px-6 text-[18px] font-black text-black">
+                  <button onClick={() => setQuantity(Math.max(1, quantity - 1))}>-</button>
+                  <span>{quantity}</span>
+                  <button onClick={() => setQuantity(quantity + 1)}>+</button>
+                </div>
+                <button onClick={handleAddToCart} className="h-[53px] min-w-[250px] rounded-[14px] bg-brand-peach px-8 text-[16px] font-bold text-white">
+                  Add To Cart
+                </button>
+              </div>
+            </div>
+
+            <div className="rounded-[10px] bg-brand-bg p-4">
+              <DeliveryRow icon={<Truck size={19} />} title="Free Delivery" detail="Enter your Postal code for Delivery Availability" />
+              <div className="my-4 h-px bg-[#E8EBF8]" />
+              <DeliveryRow icon={<ShoppingBag size={18} />} title="Return Delivery" detail="Free 30 days Delivery Return. Details" />
             </div>
           </div>
-        </div>
-      </div>
+        </section>
 
-      {/* Tabs */}
-      <div className="border-t border-surface-borderSoft pt-12 mb-16">
-        <div className="flex gap-8 mb-8 border-b border-surface-borderSoft">
-          {[
-            { id: "description", label: "Description" },
-            { id: "shipping", label: "Shipping & Returns" },
-            { id: "reviews", label: "Reviews" },
-            { id: "designer", label: "Designer" },
-          ].map((tab) => (
-            <button
-              key={tab.id}
-              className={`pb-4 font-semibold transition-colors ${
-                activeTab === tab.id
-                  ? "text-brand-blue border-b-2 border-brand-blue"
-                  : "text-brand-muted hover:text-brand-ink"
-              }`}
-              onClick={() => setActiveTab(tab.id as any)}
-            >
-              {tab.label}
+        <ProductCopy />
+
+        <section className="mt-8">
+          <div className="mb-6 flex items-center justify-between">
+            <h2 className="text-[28px] font-black text-black">You Might Like</h2>
+            <button className="grid h-[52px] w-[52px] place-items-center rounded-full border border-brand-peach text-brand-peach" aria-label="Next products">
+              <ChevronRight size={34} />
             </button>
-          ))}
-        </div>
-
-        {activeTab === "description" && (
-          <div className="max-w-3xl">
-            <p className="text-brand-muted leading-relaxed mb-6">{product.description}</p>
-            <h3 className="font-bold text-brand-ink mb-4">Product Features</h3>
-            <ul className="space-y-2">
-              <li className="text-brand-muted text-sm">• High-quality printing with vibrant colors</li>
-              <li className="text-brand-muted text-sm">• Durable materials for long-lasting use</li>
-              <li className="text-brand-muted text-sm">• Designed by local Uzbek artists</li>
-              <li className="text-brand-muted text-sm">• Supports creative community</li>
-            </ul>
           </div>
-        )}
-
-        {activeTab === "shipping" && (
-          <div className="max-w-3xl">
-            <h3 className="font-bold text-brand-ink mb-4">Shipping</h3>
-            <p className="text-brand-muted leading-relaxed mb-6">
-              Standard shipping within Uzbekistan takes 3-7 business days. We partner with Yandex and UzPost
-              for reliable delivery. Shipping is free for all orders.
-            </p>
-            <h3 className="font-bold text-brand-ink mb-4">Returns</h3>
-            <p className="text-brand-muted leading-relaxed">
-              We accept returns within 14 days of delivery for defective or damaged items. Custom-printed
-              products cannot be returned unless they arrive damaged or with printing defects. Contact
-              support to initiate a return.
-            </p>
+          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+            {relatedCards.map((item) => <RelatedCard key={item.id} item={item} />)}
           </div>
-        )}
-
-        {activeTab === "reviews" && (
-          <div className="max-w-3xl">
-            <p className="text-brand-muted">Reviews coming soon. Be the first to review this product!</p>
-          </div>
-        )}
-
-        {activeTab === "designer" && (
-          <Card className="max-w-3xl p-6">
-            <Link href={`/designer/${product.designer.handle}`}>
-              <div className="flex items-center gap-4 group">
-                <div className="w-16 h-16 rounded-full bg-brand-blue/10 flex items-center justify-center">
-                  {product.designer.avatarUrl ? (
-                    <Image
-                      src={product.designer.avatarUrl}
-                      alt={product.designer.displayName}
-                      width={64}
-                      height={64}
-                      className="rounded-full"
-                    />
-                  ) : (
-                    <span className="text-2xl font-bold text-brand-blue">
-                      {product.designer.displayName.charAt(0).toUpperCase()}
-                    </span>
-                  )}
-                </div>
-                <div className="flex-1">
-                  <h3 className="font-semibold text-brand-ink group-hover:text-brand-blue transition-colors">
-                    {product.designer.displayName}
-                  </h3>
-                  <p className="text-sm text-brand-muted">@{product.designer.handle}</p>
-                </div>
-                <Button variant="secondary" size="sm">
-                  View profile
-                </Button>
-              </div>
-            </Link>
-          </Card>
-        )}
+        </section>
       </div>
-
-      {/* Related products */}
-      {relatedProducts.length > 0 && (
-        <div>
-          <h2 className="text-2xl font-bold text-brand-ink mb-8">You might also like</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            {relatedProducts.map((related) => (
-              <ProductCard key={related.id} {...related} />
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Fullscreen image modal */}
-      {fullscreenImage && product.images && (
-        <div
-          className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-8"
-          onClick={() => setFullscreenImage(false)}
-        >
-          <button
-            className="absolute top-4 right-4 w-10 h-10 bg-white/90 rounded-full flex items-center justify-center hover:bg-white transition-colors"
-            onClick={() => setFullscreenImage(false)}
-          >
-            <X className="w-5 h-5 text-brand-ink" />
-          </button>
-          <Image
-            src={product.images[currentImageIndex]}
-            alt={product.title}
-            width={1200}
-            height={1500}
-            className="max-w-full max-h-full object-contain"
-          />
-        </div>
-      )}
     </div>
   );
 }
 
+function BreadcrumbTrail({ current }: { current: string }) {
+  return (
+    <nav className="inline-flex min-h-[39px] items-center gap-5 rounded-[9px] bg-brand-bg px-4 text-[18px] text-[#3B3B43]">
+      {["Home", "Category", "Tshirts"].map((item) => (
+        <span key={item} className="contents">
+          <Link href={item === "Home" ? "/" : "/shop"}>{item}</Link>
+          <ChevronRight size={21} strokeWidth={2.1} />
+        </span>
+      ))}
+      <span className="font-bold text-black">{current}</span>
+    </nav>
+  );
+}
+
+function IconPill({ children }: { children: ReactNode }) {
+  return <button className="grid h-[38px] min-w-[38px] place-items-center rounded-[10px] bg-brand-bg text-black">{children}</button>;
+}
+
+function DeliveryRow({ icon, title, detail }: { icon: ReactNode; title: string; detail: string }) {
+  return (
+    <div className="flex gap-4">
+      <span className="mt-1 text-brand-peach">{icon}</span>
+      <div>
+        <h3 className="text-[16px] font-black text-black">{title}</h3>
+        <p className="mt-1 text-[13px] text-[#555] underline">{detail}</p>
+      </div>
+    </div>
+  );
+}
+
+function ProductCopy() {
+  const benefits = [
+    "Durable leather is easily cleanable so you can keep your look fresh.",
+    "Water-repellent finish and internal membrane help keep your feet dry.",
+    "Toe piece with star pattern adds durability.",
+    "Synthetic insulation helps keep you warm.",
+    "Originally designed for performance hoops, the Air unit delivers lightweight cushioning.",
+    "Plush tongue wraps over the ankle to help keep out the moisture and cold.",
+    "Rubber outsole with aggressive traction pattern adds durable grip.",
+    "Durable leather is easily cleanable so you can keep your look fresh.",
+  ];
+  return (
+    <section className="mt-28 max-w-[1040px]">
+      <h2 className="text-[28px] font-black text-black">Product Description</h2>
+      <p className="mt-6 max-w-[1060px] text-[17px] leading-[1.65] text-[#8A8A8A]">
+        When it's colder than the far side of the moon and spitting rain too, you've still got to look good.
+        From water-repellent leather to a rugged outsole, this product keeps your design bright, wearable,
+        and ready for everyday movement.
+      </p>
+      <DetailList title="Benefits" items={benefits} blue />
+      <DetailList title="Product Details" items={["Not intended for use as Personal Protective Equipment (PPE)", "Water-repellent finish and internal membrane help keep your feet dry."]} />
+      <DetailList title="more Details" items={["Lunarlon midsole delivers ultra-plush responsiveness", "Encapsulated Air-Sole heel unit for lightweight cushioning", "Colour Shown: Ale Brown/Black/Goldtone/Ale Brown", "Style: 805899-202"]} />
+    </section>
+  );
+}
+
+function DetailList({ title, items, blue }: { title: string; items: string[]; blue?: boolean }) {
+  return (
+    <div className="mt-10">
+      <h2 className="text-[28px] font-black text-black">{title}</h2>
+      <ul className="mt-6 space-y-5">
+        {items.map((item) => (
+          <li key={item} className="flex items-start gap-4 text-[17px] text-[#8A8A8A]">
+            <span className={`mt-1 grid h-5 w-5 shrink-0 place-items-center rounded-full ${blue ? "bg-brand-bg text-brand-blue" : "bg-[#EEF0F7] text-black"}`}>
+              <Check size={14} strokeWidth={3} />
+            </span>
+            {item}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function RelatedCard({ item }: { item: ListingCard }) {
+  return (
+    <Link href={`/product/${item.slug}`} className="block rounded-[13px] bg-white p-6 shadow-[0_18px_35px_rgba(0,0,0,0.14)]">
+      <div className="relative aspect-[0.95] overflow-hidden rounded-[22px] bg-brand-bg">
+        {item.imageUrl ? <Image src={item.imageUrl} alt={item.title} fill sizes="280px" className="object-cover" /> : <Package className="m-auto h-full w-20 text-brand-blue" />}
+        <span className="absolute left-6 top-6 rounded-[7px] bg-[#D67AD2] px-2 py-1 text-[9px] font-bold text-white">Best Seller</span>
+      </div>
+      <h3 className="mt-5 text-[16px] font-black text-black">CLASSIC&nbsp; Black T-Shirt</h3>
+      <p className="mt-2 text-[13px] text-black">high quality, 100% cotton, perfect for vibrant</p>
+      <p className="mt-4 text-[11px] text-[#8A8A8A]">Designed by Shuwaan</p>
+    </Link>
+  );
+}
+
+function createFallbackRelated(product: ProductDetail): ListingCard[] {
+  return FALLBACK_IMAGE_KEYS.map((_, index) => ({
+    id: `${product.id}-fallback-${index}`,
+    slug: product.slug,
+    title: product.title,
+    price: product.price,
+    currency: product.currency,
+    imageUrl: null,
+    designer: { displayName: product.designer.displayName },
+  }));
+}
+
+function ProductImagePlaceholder({ compact }: { compact?: boolean }) {
+  return (
+    <div className="flex h-full w-full items-center justify-center bg-[#F0F2FA]">
+      <div className={compact ? "relative h-12 w-12 rounded-[12px] bg-white" : "relative h-[72%] w-[72%] rounded-[28px] bg-white shadow-soft"}>
+        <Package className="absolute left-1/2 top-1/2 h-12 w-12 -translate-x-1/2 -translate-y-1/2 text-brand-blue" />
+        {!compact ? <span className="absolute left-8 top-8 rounded-[7px] bg-[#D67AD2] px-2 py-1 text-[10px] font-bold text-white">Best Seller</span> : null}
+      </div>
+    </div>
+  );
+}
+
+function toCartPrice(price: number) {
+  if (!Number.isFinite(price) || price <= 0) return 71.56;
+  return price > 1000 ? Math.round(price / 100) / 100 : price;
+}
+
+function toMoney(price: number, currency?: string) {
+  if (!Number.isFinite(price) || price <= 0) return "$71.56";
+  if (currency && currency !== "USD" && price > 1000) return `${Math.round(price).toLocaleString()} ${currency}`;
+  return `$${toCartPrice(price).toFixed(2)}`;
+}

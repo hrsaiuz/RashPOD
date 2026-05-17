@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { DM_Sans, Inter } from "next/font/google";
 import localFont from "next/font/local";
 import { PublicHeader, PublicFooter, MotionProvider, getDashboardUrl } from "@rashpod/ui";
+import { CartProvider } from "../components/cart/CartProvider";
 
 import "./globals.css";
 
@@ -66,20 +67,22 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
     <html lang="en" className={`${googleSans.variable} ${dmSans.variable} ${inter.variable}`}>
       <body className="font-rash antialiased">
         <MotionProvider>
-          <PublicHeader
-            signInUrl="/auth/login"
-            startSellingUrl={`${dashboardUrl}/auth/register?role=designer`}
-            shopUrl="/shop"
-            designersUrl="/designers"
-            filmsUrl="/film"
-            aboutUrl="/about"
-            logoUrl={branding?.storefrontLogoUrl ?? null}
-            brandName={brandName}
-          />
-          <main id="main-content" className="min-h-screen bg-brand-bg">
-            {children}
-          </main>
-          <PublicFooter />
+          <CartProvider>
+            <PublicHeader
+              signInUrl="/auth/login"
+              startSellingUrl={`${dashboardUrl}/auth/register?role=designer`}
+              shopUrl="/shop"
+              designersUrl="/designers"
+              filmsUrl="/film"
+              aboutUrl="/about"
+              logoUrl={branding?.storefrontLogoUrl ?? null}
+              brandName={brandName}
+            />
+            <main id="main-content" className="min-h-screen bg-brand-bg">
+              {children}
+            </main>
+            <PublicFooter />
+          </CartProvider>
         </MotionProvider>
       </body>
     </html>
