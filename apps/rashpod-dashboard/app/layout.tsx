@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import type { Metadata } from "next";
 import { DM_Sans, Inter } from "next/font/google";
+import localFont from "next/font/local";
 import { MotionProvider } from "@rashpod/ui";
 import { AuthProvider } from "./auth/auth-provider";
 import "./globals.css";
@@ -9,6 +10,16 @@ const dmSans = DM_Sans({
   subsets: ["latin", "latin-ext"],
   weight: ["400", "500", "600", "700"],
   variable: "--font-dm-sans",
+  display: "swap",
+});
+const googleSans = localFont({
+  src: [
+    { path: "./fonts/google-sans-regular.ttf", weight: "400", style: "normal" },
+    { path: "./fonts/google-sans-medium.ttf", weight: "500", style: "normal" },
+    { path: "./fonts/google-sans-bold.ttf", weight: "700", style: "normal" },
+    { path: "./fonts/google-sans-italic.ttf", weight: "400", style: "italic" },
+  ],
+  variable: "--font-google-sans",
   display: "swap",
 });
 const inter = Inter({
@@ -24,7 +35,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="en" className={`${dmSans.variable} ${inter.variable}`}>
+    <html lang="en" className={`${googleSans.variable} ${dmSans.variable} ${inter.variable}`}>
       <body className="font-rash antialiased min-h-screen bg-brand-bg">
         <MotionProvider>
           <AuthProvider>{children}</AuthProvider>

@@ -53,39 +53,39 @@ export const PublicHeader: React.FC<PublicHeaderProps> = ({
         Skip to content
       </a>
       <header className={cn("sticky top-0 z-20 bg-[#F0F2FA]/95 backdrop-blur-md", className)}>
-        <div className="mx-auto flex h-[66px] max-w-[1450px] items-center justify-between gap-6 px-6 lg:px-10">
-          <Link href="/" className="flex shrink-0 items-center text-[34px] font-normal lowercase leading-none tracking-[0.16em] text-brand-blue">
+        <div className="mx-auto flex h-[56px] max-w-[1232px] items-center justify-between gap-5 px-5">
+          <Link href="/" className="flex shrink-0 items-center text-[29px] font-normal lowercase leading-none tracking-[0.16em] text-brand-blue">
             {logoUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={logoUrl} alt={brandName} className="h-8 w-auto" />
+              <img src={logoUrl} alt={brandName} className="h-7 w-auto" />
             ) : (
               <span>{brandName}</span>
             )}
           </Link>
 
           {/* Desktop Nav */}
-          <nav className="hidden items-center gap-11 lg:flex" aria-label="Main navigation">
+          <nav className="hidden items-center gap-9 lg:flex" aria-label="Main navigation">
             {navLinks.map((link) => (
               <Link
                 key={link.href}
                 href={link.href}
-                className="inline-flex items-center gap-2 text-[15px] font-medium text-black transition-colors hover:text-brand-blue"
+                className="inline-flex items-center gap-2 text-[13px] font-medium text-black transition-colors hover:text-brand-blue"
               >
                 {link.label}
-                {link.hasChevron && <ChevronDown size={16} strokeWidth={2.2} aria-hidden="true" />}
+                {link.hasChevron && <ChevronDown size={14} strokeWidth={2.2} aria-hidden="true" />}
               </Link>
             ))}
           </nav>
 
           {/* Desktop Actions */}
-          <div className="hidden items-center gap-5 lg:flex">
+          <div className="hidden items-center gap-4 lg:flex">
             <Link href={finalSignInUrl}>
-              <span className="inline-flex h-10 items-center justify-center rounded-[12px] border border-brand-peach bg-transparent px-4 text-[15px] font-medium text-brand-ink transition-colors hover:bg-brand-peach hover:text-white">
+              <span className="inline-flex h-[34px] items-center justify-center rounded-[10px] border border-brand-peach bg-transparent px-4 text-[13px] font-medium text-brand-ink transition-colors hover:bg-brand-peach hover:text-white">
                 Sign in
               </span>
             </Link>
             <Link href={finalStartSellingUrl}>
-              <span className="inline-flex h-10 items-center justify-center rounded-[12px] bg-brand-peach px-5 text-[15px] font-medium text-white transition-colors hover:bg-[#EA8F6E]">
+              <span className="inline-flex h-[34px] items-center justify-center rounded-[10px] bg-brand-peach px-4 text-[13px] font-medium text-white transition-colors hover:bg-[#EA8F6E]">
                 Start Selling
               </span>
             </Link>
@@ -93,7 +93,7 @@ export const PublicHeader: React.FC<PublicHeaderProps> = ({
 
           {/* Mobile Menu Button */}
           <button
-            className="md:hidden p-2 rounded-lg hover:bg-surface-borderSoft transition-colors"
+            className="rounded-lg p-2 transition-colors hover:bg-surface-borderSoft lg:hidden"
             onClick={() => setMobileMenuOpen(true)}
             aria-label="Menu"
           >

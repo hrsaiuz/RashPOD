@@ -45,43 +45,43 @@ export const PublicFooter: React.FC<PublicFooterProps> = ({
   className,
 }) => {
   return (
-    <footer className={cn("relative overflow-hidden bg-brand-peach pt-[320px]", className)}>
-      <div className="relative rounded-t-[44px] bg-white px-6 pb-8 pt-20 md:rounded-t-[64px]">
-        <div className="mx-auto grid max-w-[1420px] grid-cols-1 gap-10 md:grid-cols-2 lg:grid-cols-[1fr_1fr_1fr_1.8fr]">
+    <footer className={cn("relative overflow-hidden bg-brand-peach pt-[272px]", className)}>
+      <div className="relative rounded-t-[37px] bg-white px-5 pb-7 pt-[68px] md:rounded-t-[54px]">
+        <div className="mx-auto grid max-w-[1207px] grid-cols-1 gap-9 md:grid-cols-2 lg:grid-cols-[1fr_1fr_1fr_1.8fr]">
           <FooterColumn title="Shop" links={shopLinks} />
           <FooterColumn title="For Designers" links={designerLinks} />
           <FooterColumn title="Company" links={companyLinks} />
 
           <div>
-            <h3 className="mb-7 text-[21px] font-extrabold text-black">Join the RASH POD Club</h3>
+            <h3 className="mb-6 text-[18px] font-extrabold text-black">Join the RASH POD Club</h3>
             <Link
               href="/auth/register"
-              className="mb-7 inline-flex h-16 min-w-[166px] items-center justify-center rounded-[18px] bg-brand-blue px-8 text-[20px] font-extrabold tracking-[0.08em] text-white"
+              className="mb-6 inline-flex h-[54px] min-w-[141px] items-center justify-center rounded-[15px] bg-brand-blue px-7 text-[17px] font-extrabold tracking-[0.08em] text-white"
             >
               join Now
             </Link>
-            <p className="mb-2 text-[21px] font-semibold tracking-[0.16em] text-black">Be the first to get the next drop</p>
-            <p className="text-[19px] text-black">Receive a mystery design every month</p>
-            <div className="mt-20 flex gap-8">
+            <p className="mb-2 text-[18px] font-semibold tracking-[0.16em] text-black">Be the first to get the next drop</p>
+            <p className="text-[16px] text-black">Receive a mystery design every month</p>
+            <div className="mt-[68px] flex gap-7">
               <a href="https://t.me/rashpod" target="_blank" rel="noopener noreferrer" aria-label="Telegram" className="text-black transition-transform hover:scale-110">
-                <Send size={38} strokeWidth={2.3} />
+                <Send size={32} strokeWidth={2.3} />
               </a>
               <a href="https://instagram.com/rashpod" target="_blank" rel="noopener noreferrer" aria-label="Instagram" className="text-black transition-transform hover:scale-110">
-                <Camera size={38} strokeWidth={2.3} />
+                <Camera size={32} strokeWidth={2.3} />
               </a>
             </div>
           </div>
         </div>
 
-        <div className="mx-auto mt-14 flex max-w-[1420px] flex-wrap items-center gap-x-12 gap-y-4 text-[18px] text-[#4B4B55]">
+        <div className="mx-auto mt-12 flex max-w-[1207px] flex-wrap items-center gap-x-10 gap-y-4 text-[15px] text-[#4B4B55]">
           <span>© 2026 RashPOD, All rights reserved.</span>
           <Link href={termsUrl} className="hover:text-brand-blue">Terms</Link>
           <Link href={privacyUrl} className="hover:text-brand-blue">Privacy</Link>
           <Link href={cookiesUrl} className="hover:text-brand-blue">Cookies</Link>
         </div>
 
-        <div className="pointer-events-none mx-auto mt-20 max-w-[1420px] overflow-hidden">
-          <p className="select-none text-center text-[clamp(120px,18vw,246px)] font-black lowercase leading-[0.75] tracking-[-0.09em] text-brand-peach">
+        <div className="pointer-events-none mx-auto mt-[68px] max-w-[1207px] overflow-hidden">
+          <p className="select-none text-center text-[clamp(102px,15.3vw,209px)] font-black lowercase leading-[0.75] tracking-[-0.09em] text-brand-peach">
             rashpod
           </p>
         </div>
@@ -93,11 +93,11 @@ export const PublicFooter: React.FC<PublicFooterProps> = ({
 function FooterColumn({ title, links }: { title: string; links: PublicFooterLink[] }) {
   return (
     <div>
-      <h3 className="mb-8 text-[19px] font-medium text-[#33333A]">{title}</h3>
-      <ul className="space-y-6">
+      <h3 className="mb-7 text-[16px] font-medium text-[#33333A]">{title}</h3>
+      <ul className="space-y-5">
         {links.map((link) => (
           <li key={link.href}>
-            <Link href={link.href} className="text-[19px] text-[#5B5B66] transition-colors hover:text-brand-blue">
+            <Link href={link.href} className="text-[16px] text-[#5B5B66] transition-colors hover:text-brand-blue">
               {link.label}
             </Link>
           </li>

@@ -81,7 +81,7 @@ const preset: Omit<Config, "content"> = {
         dashboard: "1440px",
       },
       fontFamily: {
-        rash: ['var(--font-inter)', 'var(--font-dm-sans)', 'Inter', 'SF Pro Display', 'Segoe UI', 'system-ui', 'sans-serif'],
+        rash: ['var(--font-google-sans)', 'var(--font-dm-sans)', 'var(--font-inter)', 'Google Sans', 'DM Sans', 'Inter', 'SF Pro Display', 'Segoe UI', 'system-ui', 'sans-serif'],
       },
     },
   },
