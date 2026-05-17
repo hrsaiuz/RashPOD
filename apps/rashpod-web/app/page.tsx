@@ -29,6 +29,7 @@ interface Designer {
   displayName: string;
   listingsCount: number;
   avatarUrl?: string;
+  profileImageUrl?: string;
   location?: string;
 }
 
@@ -106,6 +107,7 @@ const normalizeDesigners = (data: unknown): Designer[] => {
       displayName: String(item.displayName ?? item.name ?? "Designer"),
       listingsCount: Number(item.listingsCount ?? item._count?.listings ?? 0),
       avatarUrl: getOptionalString(item.avatarUrl),
+      profileImageUrl: getOptionalString(item.profileImageUrl) ?? getOptionalString(item.coverUrl),
       location: getOptionalString(item.city) ?? getOptionalString(item.location),
     }))
     .filter((designer) => designer.id && designer.handle && designer.displayName)
@@ -171,7 +173,7 @@ export default function HomePage() {
       <MarketplaceLogoStrip />
       <CollectionCarousel products={collections} />
       <ClubCta dashboardUrl={dashboardUrl} />
-      <DesignerCarousel designers={designers} media={homeMedia} />
+      <DesignerCarousel designers={designers} />
       <ActionCards dashboardUrl={dashboardUrl} />
     </div>
   );
@@ -237,7 +239,6 @@ function FigmaHero({ media, dashboardUrl }: { media: HomeBrandingMedia; dashboar
           ) : null}
         </motion.div>
       </div>
-      <p className="absolute bottom-7 left-0 text-[20px] uppercase text-brand-subtle">Best Selling 2</p>
     </section>
   );
 }
@@ -247,34 +248,26 @@ function HeroLetter({ letter, decorated }: { letter: string; decorated?: "target
     <span className="relative inline-block">
       {letter}
       {decorated === "target" && (
-        <span className="absolute left-[0.17em] top-[0.48em] grid h-[0.34em] w-[0.34em] -translate-y-1/2 place-items-center rounded-full bg-brand-blue" aria-hidden="true">
-          <span className="grid h-[72%] w-[72%] place-items-center rounded-full bg-white">
-            <span className="grid h-[62%] w-[62%] place-items-center rounded-full bg-brand-blue">
-              <span className="h-[43%] w-[43%] rounded-full bg-white" />
+        <span className="absolute left-[0.18em] top-[0.5em] grid h-[0.37em] w-[0.37em] -translate-y-1/2 place-items-center rounded-full bg-white" aria-hidden="true">
+          <span className="grid h-[88%] w-[88%] place-items-center rounded-full bg-brand-blue">
+            <span className="grid h-[68%] w-[68%] place-items-center rounded-full bg-white">
+              <span className="grid h-[62%] w-[62%] place-items-center rounded-full bg-brand-blue">
+                <span className="h-[46%] w-[46%] rounded-full bg-white" />
+              </span>
             </span>
           </span>
         </span>
       )}
       {decorated === "wheel" && (
-        <span className="absolute left-[0.34em] top-[0.47em] h-[0.34em] w-[0.34em] -translate-x-1/2 -translate-y-1/2 rounded-full" aria-hidden="true">
-          {Array.from({ length: 8 }).map((_, index) => (
+        <span className="absolute left-[0.34em] top-[0.48em] h-[0.38em] w-[0.38em] -translate-x-1/2 -translate-y-1/2 rounded-full" aria-hidden="true">
+          {Array.from({ length: 12 }).map((_, index) => (
             <span
               key={index}
-              className="absolute left-1/2 top-1/2 h-[0.06em] w-[0.17em] origin-left rounded-full bg-brand-blue"
-              style={{ transform: `rotate(${index * 45}deg)` }}
+              className="absolute left-1/2 top-1/2 h-[0.15em] w-[0.075em] origin-[50%_0.01em] rounded-full bg-brand-blue"
+              style={{ transform: `translate(-50%, -50%) rotate(${index * 30}deg) translateY(-0.12em)` }}
             />
           ))}
-          {Array.from({ length: 8 }).map((_, index) => (
-            <span
-              key={index}
-              className="absolute h-[0.085em] w-[0.085em] rounded-full bg-brand-blue"
-              style={{
-                left: `${50 + Math.cos((index * Math.PI) / 4) * 35}%`,
-                top: `${50 + Math.sin((index * Math.PI) / 4) * 35}%`,
-                transform: "translate(-50%, -50%)",
-              }}
-            />
-          ))}
+          <span className="absolute left-1/2 top-1/2 h-[0.1em] w-[0.1em] -translate-x-1/2 -translate-y-1/2 rounded-full bg-white" />
         </span>
       )}
     </span>
@@ -455,77 +448,45 @@ function ClubCta({ dashboardUrl }: { dashboardUrl: string }) {
   );
 }
 
-function DesignerCarousel({ designers, media }: { designers: Designer[]; media: HomeBrandingMedia }) {
+function DesignerCarousel({ designers }: { designers: Designer[] }) {
   const shown = designers.slice(0, 5);
-  const center = shown[2] ?? shown[0] ?? FALLBACK_DESIGNERS[2];
 
   return (
     <section className="bg-white py-10">
       <SectionHeader title="Meet Our Wonderful Designers" href="/designers" />
       <div className={`mx-auto flex ${HOME_MAX} gap-5 overflow-x-auto ${HOME_GUTTER} pb-7 pt-2 xl:overflow-visible`}>
-        {shown.map((designer, index) =>
-          index === 2 ? (
-            <FeaturedDesignerCard key={designer.id} designer={center} imageUrl={media.homeDesignerSectionImageUrl} alt={media.homeDesignerSectionImageAlt} />
-          ) : (
-            <SideDesignerCard key={designer.id} designer={designer} index={index} />
-          ),
-        )}
+        {shown.map((designer) => (
+          <DesignerCard key={designer.id} designer={designer} />
+        ))}
       </div>
       <p className="text-[20px] uppercase text-brand-subtle">Designers 6</p>
     </section>
   );
 }
 
-function SideDesignerCard({ designer, index }: { designer: Designer; index: number }) {
-  return (
-    <Link href={`/designer/${designer.handle}`} className="group min-w-[187px] flex-[0_0_187px] overflow-hidden rounded-[8px] border border-black bg-brand-blueLight transition-[flex-basis,transform] duration-300 hover:flex-[0_0_250px] hover:scale-[1.015] motion-reduce:transition-none xl:flex-[0_0_190px]">
-      <div className="relative h-[646px] overflow-hidden">
-        <div className="absolute inset-x-[10%] bottom-[8%] h-[476px] rounded-t-full bg-brand-peach transition-transform duration-300 group-hover:scale-110 motion-reduce:transition-none" />
-        {designer.avatarUrl ? (
-          <Image src={designer.avatarUrl} alt={designer.displayName} fill sizes="230px" className="grayscale object-cover object-bottom transition-transform duration-300 group-hover:scale-[1.15] motion-reduce:transition-none" />
-        ) : (
-          <PortraitFallback gender={index % 2 === 0 ? "male" : "female"} />
-        )}
-      </div>
-    </Link>
-  );
-}
+function DesignerCard({ designer }: { designer: Designer }) {
+  const imageUrl = designer.avatarUrl ?? designer.profileImageUrl;
 
-function FeaturedDesignerCard({ designer, imageUrl, alt }: { designer: Designer; imageUrl?: string; alt?: string }) {
   return (
-    <Link href={`/designer/${designer.handle}`} className="group min-w-[400px] flex-[0_0_400px] overflow-hidden rounded-[8px] bg-brand-blueLight transition-[flex-basis,transform] duration-300 hover:flex-[0_0_450px] hover:scale-[1.015] motion-reduce:transition-none">
-      <article className="relative h-[646px] overflow-hidden p-8">
-        <div className="relative z-20">
-          <h3 className="text-[36px] font-black uppercase leading-none text-black">{designer.displayName}</h3>
-          <p className="mt-3 text-[14px] text-black">from</p>
-          <p className="ml-7 text-[17px] text-black">{designer.location ?? "Samarkand"}</p>
-        </div>
-        <div className="absolute right-8 top-7 z-20 flex flex-col items-end gap-3">
-          <span className="rounded-[8px] bg-[#D877CF] px-3 py-2 text-[9px] font-bold uppercase text-white">UIUX Designer</span>
-          <span className="rounded-[8px] bg-[#2E70B8] px-3 py-2 text-[9px] font-bold uppercase text-white">Graphic Designer</span>
-        </div>
-        <div className="absolute left-[18%] top-[20%] h-[391px] w-[306px] rounded-[46%] border-[10px] border-brand-blue transition-transform duration-300 group-hover:scale-105 motion-reduce:transition-none" />
+    <Link href={`/designer/${designer.handle}`} className="group min-w-[187px] flex-[0_0_187px] overflow-hidden rounded-[8px] border border-black bg-brand-blueLight transition-[flex-basis,transform] duration-300 hover:flex-[0_0_400px] hover:scale-[1.015] motion-reduce:transition-none xl:flex-[1_1_0] xl:hover:flex-[2.15_1_0]">
+      <div className="relative h-[646px] overflow-hidden">
         {imageUrl ? (
-          <Image src={imageUrl} alt={alt ?? designer.displayName} fill sizes="420px" className="z-10 object-cover object-bottom transition-transform duration-500 group-hover:scale-110 motion-reduce:transition-none" />
+          <Image src={imageUrl} alt={designer.displayName} fill sizes="(min-width: 1280px) 400px, 260px" className="grayscale object-cover object-center transition-transform duration-500 group-hover:scale-[1.14] group-hover:grayscale-0 motion-reduce:transition-none" />
         ) : (
-          <PortraitFallback featured />
+          <div className="flex h-full w-full items-center justify-center bg-brand-blueLight text-[72px] font-black uppercase text-brand-blue" aria-hidden="true">
+            {designer.displayName.charAt(0)}
+          </div>
         )}
-        <div className="absolute inset-x-0 bottom-0 z-30 flex h-[150px] items-center justify-center bg-white/58 backdrop-blur-md">
+        <div className="absolute inset-x-0 bottom-0 z-20 flex h-[148px] translate-y-full items-center justify-center bg-white/58 opacity-0 backdrop-blur-md transition-all duration-300 group-hover:translate-y-0 group-hover:opacity-100 motion-reduce:transition-none">
           <span className="rounded-[8px] bg-brand-peach px-7 py-3 text-[14px] font-bold text-white">{designer.displayName}'s Designs</span>
         </div>
-      </article>
+        <div className="absolute left-6 top-6 z-20 translate-y-3 opacity-0 transition-all duration-300 group-hover:translate-y-0 group-hover:opacity-100 motion-reduce:transition-none">
+          <h3 className="text-[36px] font-black uppercase leading-none text-black">{designer.displayName}</h3>
+          <p className="mt-2 text-[15px] text-black">from</p>
+          <p className="ml-6 text-[18px] text-black">{designer.location ?? "Samarkand"}</p>
+        </div>
+      </div>
     </Link>
-  );
-}
-
-function PortraitFallback({ gender, featured }: { gender?: "male" | "female"; featured?: boolean }) {
-  return (
-    <div className="absolute inset-0 z-10 transition-transform duration-500 group-hover:scale-110" aria-hidden="true">
-      <div className={`${featured ? "left-[37%] top-[24%] h-[112px] w-[112px]" : "left-[27%] top-[20%] h-[107px] w-[107px]"} absolute rounded-full bg-[#E9C5B4]`} />
-      <div className={`${featured ? "left-[34%] top-[18%] h-[146px] w-[162px]" : "left-[18%] top-[16%] h-[145px] w-[145px]"} absolute rounded-t-full ${gender === "male" ? "bg-[#1d1d1d]" : "bg-[#171717]"}`} />
-      <div className={`${featured ? "left-[21%] bottom-[0] h-[400px] w-[272px] bg-white" : "left-[12%] bottom-0 h-[400px] w-[162px] bg-white"} absolute rounded-t-[68px] grayscale`} />
-      <div className={`${featured ? "left-[49%] top-[42%] h-[27px] w-[94px]" : "left-[41%] top-[37%] h-[19px] w-[63px]"} absolute rounded-full bg-brand-peach`} />
-    </div>
   );
 }
 

@@ -150,10 +150,10 @@ export default function DesignerSettingsPage() {
               <FormField label="Bio" helperText="Shown on your public designer profile.">
                 <Textarea rows={4} value={bio} onChange={(e) => setBio(e.target.value)} placeholder="Tell customers about your style, process, and product focus." />
               </FormField>
-              <FormField label="Avatar URL" helperText="Use a signed media URL or public image URL. File upload is handled in Media Library.">
+              <FormField label="Avatar image URL" helperText="Used inside designer cards and your public designer profile. Use a Media Library public URL.">
                 <Input value={avatarUrl} onChange={(e) => setAvatarUrl(e.target.value)} placeholder="https://..." />
               </FormField>
-              <FormField label="Cover image URL">
+              <FormField label="Profile picture URL" helperText="Optional larger profile image. If empty, RashPOD uses the avatar image.">
                 <Input value={coverUrl} onChange={(e) => setCoverUrl(e.target.value)} placeholder="https://..." />
               </FormField>
               <Feedback message={message} />

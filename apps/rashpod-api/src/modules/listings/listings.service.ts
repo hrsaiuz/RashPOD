@@ -164,6 +164,7 @@ export class ListingsService {
           displayName: true,
           bio: true,
           avatarUrl: true,
+          coverUrl: true,
           handle: true,
           createdAt: true,
         listings: {
@@ -183,6 +184,7 @@ export class ListingsService {
         displayName: d.displayName,
         bio: d.bio,
         avatarUrl: d.avatarUrl,
+        profileImageUrl: d.coverUrl,
         joinedAt: d.createdAt,
         listingsCount: d._count.listings,
         topListings: d.listings.map((l) => ({
