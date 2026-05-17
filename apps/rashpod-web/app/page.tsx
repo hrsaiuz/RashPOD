@@ -1,39 +1,17 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { motion } from "framer-motion";
 import {
-  UploadCloud, CheckCircle, DollarSign,
-  ShoppingBag, Paintbrush, Package,
-  ArrowRight, ChevronDown, Sparkles,
+  ArrowRight,
+  BadgeDollarSign,
+  Gift,
+  PackageCheck,
+  Tags,
 } from "lucide-react";
-import {
-  Button,
-  Card,
-  KpiTile,
-  ProductCard,
-  ProductCategoryBentoCard,
-  CategoryTile,
-  getDashboardUrl,
-  getApiBase,
-} from "@rashpod/ui";
-
-const fadeIn = {
-  initial: { opacity: 0, y: 16 },
-  animate: { opacity: 1, y: 0 },
-  transition: { duration: 0.28, ease: [0.22, 1, 0.36, 1] as [number, number, number, number] },
-};
-
-interface CategoryCard {
-  slug: string;
-  name: string;
-  category: string;
-  variant: "blue" | "peach";
-  imageUrl?: string | null;
-  showShopButton?: boolean;
-}
+import { getApiBase, getDashboardUrl } from "@rashpod/ui";
 
 interface ProductListing {
   id: string;
@@ -42,6 +20,7 @@ interface ProductListing {
   designer: string;
   price: number;
   imageUrl?: string;
+  category?: string;
 }
 
 interface Designer {
@@ -50,6 +29,7 @@ interface Designer {
   displayName: string;
   listingsCount: number;
   avatarUrl?: string;
+  location?: string;
 }
 
 interface HomeBrandingMedia {
@@ -59,115 +39,104 @@ interface HomeBrandingMedia {
   homeDesignerSectionImageAlt?: string;
 }
 
-// Bento grid category cards – matches the screenshot layout.
-// Row 1: large (span-5) + medium (span-4) + compact (span-3)
-// Row 2: compact (span-3) + medium (span-4) + large (span-5)
-// Images will be populated once admin uploads them via the media library.
-const FALLBACK_CATEGORIES: CategoryCard[] = [
-  { slug: "T_SHIRT",     name: "t-shirt",       category: "clothes",  variant: "blue",  showShopButton: true },
-  { slug: "POSTAL_CARD", name: "postal card",    category: "prints",   variant: "peach" },
-  { slug: "MUG",         name: "mug",            category: "ceramics", variant: "blue"  },
-  { slug: "HOODIE",      name: "hoodie",         category: "clothes",  variant: "peach" },
-  { slug: "HAT",         name: "hat",            category: "clothes",  variant: "blue"  },
-  { slug: "POSTER_FRAME",name: "poster\nframe",  category: "prints",   variant: "peach" },
-];
-
-// Curated fallback content (used until the API endpoints return data in the
-// expected shape). TODO: Replace once GET /shop/listings + /shop/designers
-// return ListingWithDesigner / DesignerSummary DTOs.
 const FALLBACK_PRODUCTS: ProductListing[] = [
-  { id: "p1", slug: "tashkent-skyline-tee", title: "Tashkent Skyline Tee", designer: "Sardor Karimov", price: 159000 },
-  { id: "p2", slug: "chorsu-bazaar-hoodie", title: "Chorsu Bazaar Hoodie", designer: "Nilufar A.", price: 329000 },
-  { id: "p3", slug: "samarkand-poster", title: "Samarkand Poster", designer: "Bekzod M.", price: 89000 },
-  { id: "p4", slug: "uzbek-folk-mug", title: "Uzbek Folk Mug", designer: "Madina R.", price: 79000 },
-  { id: "p5", slug: "registan-print-tee", title: "Registan Print Tee", designer: "Sardor Karimov", price: 159000 },
-  { id: "p6", slug: "navruz-poster", title: "Navruz Celebration Poster", designer: "Madina R.", price: 99000 },
-  { id: "p7", slug: "silk-road-hoodie", title: "Silk Road Hoodie", designer: "Bekzod M.", price: 339000 },
-  { id: "p8", slug: "modern-uzbekistan-mug", title: "Modern Uzbekistan Mug", designer: "Nilufar A.", price: 79000 },
+  { id: "p1", slug: "classic-black-t-shirt", title: "CLASSIC Black T-Shirt", designer: "Shuwaan", price: 159000, category: "Funny Quets" },
+  { id: "p2", slug: "samarkand-white-t-shirt", title: "CLASSIC Black T-Shirt", designer: "Shuwaan", price: 169000, category: "Admired People" },
+  { id: "p3", slug: "black-signature-t-shirt", title: "CLASSIC Black T-Shirt", designer: "Shuwaan", price: 179000, category: "Uzbakistan Cities" },
+  { id: "p4", slug: "postal-stamp-t-shirt", title: "CLASSIC Black T-Shirt", designer: "Shuwaan", price: 159000, category: "Funny Quets" },
+  { id: "p5", slug: "black-quets-t-shirt", title: "FUNNY QUETS", designer: "Shuwaan", price: 159000, category: "Funny Quets" },
+  { id: "p6", slug: "admired-people-tee", title: "ADMIRED PEOPLE", designer: "Shuwaan", price: 169000, category: "Admired People" },
+  { id: "p7", slug: "uzbakistan-cities-tee", title: "UZBAKISTAN CITIES", designer: "Shuwaan", price: 179000, category: "Uzbakistan Cities" },
+  { id: "p8", slug: "new-black-quets-t-shirt", title: "FUNNY QUETS", designer: "Shuwaan", price: 159000, category: "Funny Quets" },
 ];
 
 const FALLBACK_DESIGNERS: Designer[] = [
-  { id: "d1", handle: "sardor", displayName: "Sardor Karimov", listingsCount: 24 },
-  { id: "d2", handle: "nilufar", displayName: "Nilufar A.", listingsCount: 18 },
-  { id: "d3", handle: "bekzod", displayName: "Bekzod M.", listingsCount: 31 },
-  { id: "d4", handle: "madina", displayName: "Madina R.", listingsCount: 12 },
-  { id: "d5", handle: "jasur", displayName: "Jasur T.", listingsCount: 9 },
-  { id: "d6", handle: "kamila", displayName: "Kamila S.", listingsCount: 15 },
+  { id: "d1", handle: "aziz", displayName: "Aziz", listingsCount: 24, location: "Tashkent" },
+  { id: "d2", handle: "nargiza", displayName: "Nargiza", listingsCount: 18, location: "Bukhara" },
+  { id: "d3", handle: "madina", displayName: "Madina", listingsCount: 31, location: "Samarkand" },
+  { id: "d4", handle: "nilufar", displayName: "Nilufar", listingsCount: 14, location: "Samarkand" },
+  { id: "d5", handle: "jasur", displayName: "Jasur", listingsCount: 21, location: "Tashkent" },
+  { id: "d6", handle: "kamila", displayName: "Kamila", listingsCount: 15, location: "Andijan" },
 ];
 
-const formatPrice = (sum: number) =>
-  new Intl.NumberFormat("ru-RU", { maximumFractionDigits: 0 }).format(sum) + " so'm";
+const MARKETPLACES = [
+  { label: "a", name: "Amazon", className: "font-serif text-[74px]" },
+  { label: "Etsy", name: "Etsy", className: "font-serif text-[44px]" },
+  { label: "S", name: "Shopify", className: "font-serif text-[60px]" },
+  { label: "U", name: "Uz marketplace", className: "text-[54px] font-semibold" },
+  { label: "wb", name: "Wildberries", className: "text-[48px] font-semibold" },
+];
+
+const fadeUp = {
+  initial: { opacity: 0, y: 18 },
+  whileInView: { opacity: 1, y: 0 },
+  viewport: { once: true, margin: "-80px" },
+  transition: { duration: 0.32, ease: [0.22, 1, 0.36, 1] as [number, number, number, number] },
+};
 
 const getOptionalString = (value: unknown) =>
   typeof value === "string" && value.trim().length > 0 ? value : undefined;
+
+const normalizeProducts = (data: unknown): ProductListing[] => {
+  const rows = Array.isArray(data) ? data : Array.isArray((data as { items?: unknown })?.items) ? (data as { items: unknown[] }).items : [];
+
+  return rows
+    .map((item: any) => ({
+      id: String(item.id ?? ""),
+      slug: String(item.slug ?? item.id ?? ""),
+      title: String(item.title ?? "CLASSIC Black T-Shirt"),
+      designer: String(item.designer?.displayName ?? item.designerName ?? "Shuwaan"),
+      price: Number(item.price ?? 0),
+      imageUrl: getOptionalString(item.imageUrl) ?? (Array.isArray(item.images) ? getOptionalString(item.images[0]) : undefined),
+      category: getOptionalString(item.category) ?? getOptionalString(item.productType?.name),
+    }))
+    .filter((item) => item.id && item.slug)
+    .slice(0, 8);
+};
+
+const normalizeDesigners = (data: unknown): Designer[] => {
+  const rows = Array.isArray(data) ? data : Array.isArray((data as { items?: unknown })?.items) ? (data as { items: unknown[] }).items : [];
+
+  return rows
+    .map((item: any) => ({
+      id: String(item.id ?? ""),
+      handle: String(item.handle ?? item.id ?? ""),
+      displayName: String(item.displayName ?? item.name ?? "Designer"),
+      listingsCount: Number(item.listingsCount ?? item._count?.listings ?? 0),
+      avatarUrl: getOptionalString(item.avatarUrl),
+      location: getOptionalString(item.city) ?? getOptionalString(item.location),
+    }))
+    .filter((designer) => designer.id && designer.handle && designer.displayName)
+    .slice(0, 6);
+};
 
 export default function HomePage() {
   const dashboardUrl = getDashboardUrl();
   const apiBase = getApiBase();
 
-  const [categories, setCategories] = useState<CategoryCard[]>(FALLBACK_CATEGORIES);
   const [products, setProducts] = useState<ProductListing[]>(FALLBACK_PRODUCTS);
   const [designers, setDesigners] = useState<Designer[]>(FALLBACK_DESIGNERS);
   const [homeMedia, setHomeMedia] = useState<HomeBrandingMedia>({});
 
   useEffect(() => {
-    // Best-effort enhancement: try the API; keep curated fallback if the
-    // shape doesn't match or the request fails. No error UI on the home page.
     const controller = new AbortController();
     const opts = { signal: controller.signal };
-
-    // Fetch product types for category bento grid
-    fetch(`${apiBase}/shop/product-types`, opts)
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data) => {
-        if (!Array.isArray(data) || data.length === 0) return;
-        const mapped: CategoryCard[] = data
-          .map((d: any, i: number) => ({
-            slug: d.slug,
-            name: d.name?.toLowerCase() ?? d.slug,
-            category: d.category?.toLowerCase() ?? "",
-            variant: (i % 2 === 0 ? "blue" : "peach") as "blue" | "peach",
-            imageUrl: d.imageUrl ?? d.metadataJson?.imageUrl ?? null,
-            showShopButton: i === 0,
-          }))
-          .filter((c) => c.slug && c.name);
-        if (mapped.length) setCategories(mapped.slice(0, 6));
-      })
-      .catch(() => {/* keep fallback */});
 
     fetch(`${apiBase}/shop/listings?limit=8`, opts)
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
-        if (!Array.isArray(data) || data.length === 0) return;
-        const mapped: ProductListing[] = data
-          .map((d: any) => ({
-            id: d.id,
-            slug: d.slug,
-            title: d.title,
-            designer: d.designer?.displayName ?? "RashPOD designer",
-            price: Number(d.price),
-            imageUrl: d.imageUrl ?? (Array.isArray(d.images) ? d.images[0] : undefined),
-          }))
-          .filter((p) => p.id && p.title);
-        if (mapped.length) setProducts(mapped.slice(0, 8));
+        const mapped = normalizeProducts(data);
+        if (mapped.length) setProducts(mapped);
       })
-      .catch(() => {/* keep fallback */});
+      .catch(() => undefined);
 
     fetch(`${apiBase}/shop/designers?limit=6`, opts)
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
-        if (!Array.isArray(data) || data.length === 0) return;
-        const mapped: Designer[] = data
-          .map((d: any) => ({
-            id: d.id,
-            handle: d.handle,
-            displayName: d.displayName,
-            listingsCount: Number(d.listingsCount ?? 0),
-          }))
-          .filter((d) => d.id && d.displayName);
-        if (mapped.length) setDesigners(mapped.slice(0, 6));
+        const mapped = normalizeDesigners(data);
+        if (mapped.length) setDesigners(mapped);
       })
-      .catch(() => {/* keep fallback */});
+      .catch(() => undefined);
 
     fetch(`${apiBase}/branding`, opts)
       .then((res) => (res.ok ? res.json() : null))
@@ -185,478 +154,388 @@ export default function HomePage() {
             getOptionalString((theme as Record<string, unknown>).homeDesignerSectionImageAlt),
         });
       })
-      .catch(() => {/* keep fallback artwork */});
+      .catch(() => undefined);
 
     return () => controller.abort();
   }, [apiBase]);
 
-  const heroImageUrl = homeMedia.homeHeroImageUrl;
-  const designerSectionImageUrl = homeMedia.homeDesignerSectionImageUrl;
+  const collections = useMemo(() => products.slice(4, 8).concat(products.slice(0, Math.max(0, 4 - products.slice(4, 8).length))).slice(0, 4), [products]);
 
   return (
-    <div className="relative">
-      {/* Hero */}
-      <section
-        className="relative overflow-hidden"
-        style={{
-          background: "linear-gradient(135deg, #F0F2FA 0%, #FFFFFF 55%, #FFD6C6 100%)",
-        }}
-      >
-        <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
-          <div
-            className="absolute right-[8%] top-10 h-28 w-28 rotate-12 rounded-[28px] border border-brand-blue/20 bg-brand-blueLight/35"
-          />
-          <div
-            className="absolute right-[22%] bottom-8 h-20 w-20 -rotate-12 rounded-full border border-brand-peach/30 bg-brand-peachLight/45"
-          />
-          <div
-            className="absolute left-6 top-1/3 h-24 w-24 rotate-45 rounded-[24px] border border-brand-blue/15"
-          />
-          <div
-            className="absolute inset-0 opacity-[0.16]"
-            style={{
-              backgroundImage:
-                "radial-gradient(circle at 18px 18px, #788AE0 1.4px, transparent 1.4px)",
-              backgroundSize: "36px 36px",
-            }}
-          />
-        </div>
+    <div className="bg-white text-brand-ink">
+      <FigmaHero media={homeMedia} dashboardUrl={dashboardUrl} />
+      <ServiceStrip />
+      <HomepageProductCarousel title="Bestselling Designs" products={products.slice(0, 4)} badge="Best Seller" />
+      <MarketplaceLogoStrip />
+      <CollectionCarousel products={collections} />
+      <ClubCta dashboardUrl={dashboardUrl} />
+      <DesignerCarousel designers={designers} media={homeMedia} />
+      <ActionCards dashboardUrl={dashboardUrl} />
+    </div>
+  );
+}
 
-        <div className="relative max-w-[1200px] mx-auto px-6 py-14 md:py-20">
-          <motion.div {...fadeIn} className="grid items-center gap-10 lg:grid-cols-[1.02fr_0.98fr]">
-            <div className="max-w-xl">
-              <span className="inline-flex items-center gap-2 rounded-full bg-white/70 backdrop-blur px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.1em] text-brand-blue ring-1 ring-brand-blueLight mb-5">
-                <Sparkles size={12} aria-hidden="true" />
-                Print-on-Demand for Uzbekistan
-              </span>
-              <h1 className="text-[clamp(34px,5vw,56px)] font-bold leading-[1.08] text-brand-ink mb-4">
-                Upload your designs.<br />
-                <span className="text-brand-blue">Sell products.</span>{" "}
-                <span className="text-brand-peach">Earn royalties.</span>
-              </h1>
-              <p className="text-[15px] md:text-base text-brand-muted mb-7 leading-relaxed max-w-[480px]">
-                Turn your artwork into RashPOD products, DTF/UV-DTF films, and corporate
-                merchandise opportunities with local production and transparent royalties.
-              </p>
-              <div className="flex flex-wrap gap-3">
-                <a href={`${dashboardUrl}/auth/register?role=designer`}>
-                  <Button variant="primaryPeach" size="md">
-                    Start selling your designs
-                  </Button>
-                </a>
-                <Link href="/shop">
-                  <Button variant="primaryBlue" size="md">
-                    Open RashPOD Shop
-                  </Button>
-                </Link>
-              </div>
-            </div>
-            {heroImageUrl ? (
-              <div className="relative min-h-[280px] sm:min-h-[360px] lg:min-h-[420px]">
-                <div className="absolute inset-0 rounded-[32px] border border-white/70 bg-white/80 p-3 shadow-product backdrop-blur">
-                  <div className="relative h-full overflow-hidden rounded-[26px] bg-white">
-                    <Image
-                      src={heroImageUrl}
-                      alt={homeMedia.homeHeroImageAlt ?? "RashPOD product mockup and designer artwork preview"}
-                      fill
-                      priority
-                      sizes="(min-width: 1024px) 560px, 100vw"
-                      className="object-cover"
-                    />
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div className="relative hidden min-h-[360px] lg:block">
-                <div className="absolute right-0 top-0 w-[84%] rounded-[32px] border border-white/70 bg-white/80 p-5 shadow-product backdrop-blur">
-                  <div className="aspect-[4/3] rounded-[24px] bg-gradient-to-br from-brand-blueLight via-white to-brand-peachLight p-5">
-                    <div className="grid h-full grid-cols-[1fr_0.72fr] gap-4">
-                      <div className="rounded-[22px] bg-white/85 p-4 shadow-soft">
-                        <div className="h-48 rounded-[20px] bg-brand-blue/10" />
-                        <div className="mt-4 h-3 w-2/3 rounded-full bg-brand-ink/15" />
-                        <div className="mt-2 h-3 w-1/2 rounded-full bg-brand-muted/15" />
-                      </div>
-                      <div className="space-y-3">
-                        <div className="rounded-[20px] bg-brand-blue p-4 text-white shadow-blueGlow">
-                          <div className="h-3 w-16 rounded-full bg-white/40" />
-                          <div className="mt-8 h-12 w-12 rounded-2xl bg-white/20" />
-                        </div>
-                        <div className="rounded-[20px] bg-brand-peach p-4 text-white shadow-peachGlow">
-                          <div className="h-3 w-20 rounded-full bg-white/45" />
-                          <div className="mt-5 h-10 w-24 rounded-full bg-white/25" />
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-                <div className="absolute bottom-2 left-8 rounded-[24px] border border-surface-borderSoft bg-white p-4 shadow-lift">
-                  <div className="flex items-center gap-3">
-                    <div className="h-12 w-12 rounded-2xl bg-brand-peachLight" />
-                    <div>
-                      <div className="h-3 w-28 rounded-full bg-brand-ink/15" />
-                      <div className="mt-2 h-3 w-20 rounded-full bg-brand-blue/25" />
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-          </motion.div>
-        </div>
-      </section>
-
-      {/* How it works (designers + customers, combined into one section) */}
-      <section className="max-w-[1200px] mx-auto px-6 py-14">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
-          {/* Designers */}
-          <div>
-            <p className="text-[11px] uppercase tracking-[0.12em] font-semibold text-brand-peach mb-2">
-              For designers
-            </p>
-            <h2 className="text-2xl md:text-3xl font-bold text-brand-ink mb-6">
-              Three steps to start earning
-            </h2>
-            <div className="space-y-3">
-              {[
-                { icon: <UploadCloud size={18} />, title: "Upload your design", desc: "Upload artwork once, we apply it across product types automatically." },
-                { icon: <CheckCircle size={18} />, title: "Get approved", desc: "Our team reviews for quality and rights within 24–48 hours." },
-                { icon: <DollarSign size={18} />, title: "Earn royalties", desc: "Track every sale and royalty payout from your dashboard." },
-              ].map((step, i) => (
-                <motion.div
-                  key={i}
-                  initial={{ opacity: 0, x: -10 }}
-                  whileInView={{ opacity: 1, x: 0 }}
-                  viewport={{ once: true, margin: "-60px" }}
-                  transition={{ delay: i * 0.05, duration: 0.24 }}
-                >
-                  <Card variant="flat" className="!p-4 flex items-start gap-3">
-                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-brand-blueLight text-brand-blue">
-                      {step.icon}
-                    </div>
-                    <div>
-                      <h3 className="text-sm font-semibold text-brand-ink mb-0.5">{step.title}</h3>
-                      <p className="text-[13px] text-brand-muted leading-relaxed">{step.desc}</p>
-                    </div>
-                  </Card>
-                </motion.div>
-              ))}
-            </div>
-          </div>
-
-          {/* Customers */}
-          <div>
-            <p className="text-[11px] uppercase tracking-[0.12em] font-semibold text-brand-blue mb-2">
-              For customers
-            </p>
-            <h2 className="text-2xl md:text-3xl font-bold text-brand-ink mb-6">
-              Order made-to-order quality
-            </h2>
-            <div className="space-y-3">
-              {[
-                { icon: <ShoppingBag size={18} />, title: "Browse designs", desc: "Discover unique designs from talented designers across Uzbekistan." },
-                { icon: <Paintbrush size={18} />, title: "Customize", desc: "Pick size, colour and quantity. Preview before you buy." },
-                { icon: <Package size={18} />, title: "Get it delivered", desc: "Printed on-demand and shipped via Yandex or UzPost." },
-              ].map((step, i) => (
-                <motion.div
-                  key={i}
-                  initial={{ opacity: 0, x: -10 }}
-                  whileInView={{ opacity: 1, x: 0 }}
-                  viewport={{ once: true, margin: "-60px" }}
-                  transition={{ delay: i * 0.05, duration: 0.24 }}
-                >
-                  <Card variant="flat" className="!p-4 flex items-start gap-3">
-                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-brand-peachLight text-brand-peach">
-                      {step.icon}
-                    </div>
-                    <div>
-                      <h3 className="text-sm font-semibold text-brand-ink mb-0.5">{step.title}</h3>
-                      <p className="text-[13px] text-brand-muted leading-relaxed">{step.desc}</p>
-                    </div>
-                  </Card>
-                </motion.div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Browse by category – bento grid */}
-      <section className="max-w-[1200px] mx-auto px-6 py-12">
-        <div className="flex items-end justify-between mb-6">
-          <div>
-            <p className="text-[11px] uppercase tracking-[0.12em] font-semibold text-brand-blue mb-1">
-              Categories
-            </p>
-            <h2 className="text-2xl md:text-3xl font-bold text-brand-ink">Browse by category</h2>
-          </div>
-          <Link
-            href="/shop"
-            className="inline-flex items-center gap-1 text-sm font-semibold text-brand-blue hover:gap-1.5 transition-[gap] focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue/30 rounded"
-          >
-            All categories <ArrowRight size={14} aria-hidden="true" />
-          </Link>
-        </div>
-
-        {/* Bento grid: row 1 = 5+4+3, row 2 = 3+4+5 on desktop */}
-        <motion.div
-          initial={{ opacity: 0 }}
-          whileInView={{ opacity: 1 }}
-          viewport={{ once: true }}
-          className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-4"
-        >
-          {categories.map((cat, i) => {
-            // Determine column span to create the asymmetric bento layout
-            // Row 1 (items 0-2): 5, 4, 3
-            // Row 2 (items 3-5): 3, 4, 5
-            const spanMap = [5, 4, 3, 3, 4, 5];
-            const colSpan = spanMap[i] ?? 4;
-
-            return (
-              <Link
-                key={cat.slug}
-                href={`/shop?productType=${cat.slug}`}
-                className={`block focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue/30 rounded-[20px] lg:col-span-${colSpan}`}
-                style={{ gridColumn: `span ${colSpan}` }}
-                aria-label={`Browse ${cat.name}`}
-              >
-                <ProductCategoryBentoCard
-                  category={cat.category}
-                  productName={cat.name}
-                  variant={cat.variant}
-                  imageUrl={cat.imageUrl}
-                  showShopButton={cat.showShopButton}
-                />
-              </Link>
-            );
-          })}
-        </motion.div>
-      </section>
-
-      {/* Featured products */}
-      <section className="max-w-[1200px] mx-auto px-6 py-12">
-        <div className="flex items-end justify-between mb-6">
-          <div>
-            <p className="text-[11px] uppercase tracking-[0.12em] font-semibold text-brand-blue mb-1">
-              Shop
-            </p>
-            <h2 className="text-2xl md:text-3xl font-bold text-brand-ink">Featured products</h2>
-          </div>
-          <Link
-            href="/shop"
-            className="inline-flex items-center gap-1 text-sm font-semibold text-brand-blue hover:gap-1.5 transition-[gap] focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue/30 rounded"
-          >
-            View all <ArrowRight size={14} aria-hidden="true" />
-          </Link>
-        </div>
-
-        <motion.div
-          initial={{ opacity: 0 }}
-          whileInView={{ opacity: 1 }}
-          viewport={{ once: true }}
-          className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4"
-        >
-          {products.map((product) => (
-            <Link
-              key={product.id}
-              href={`/product/${product.slug}`}
-              className="block focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue/30 rounded-[20px]"
-              aria-label={`View ${product.title} by ${product.designer}`}
+function FigmaHero({ media, dashboardUrl }: { media: HomeBrandingMedia; dashboardUrl: string }) {
+  return (
+    <section className="relative overflow-hidden bg-white">
+      <div className="mx-auto grid min-h-[900px] max-w-[1450px] grid-cols-1 items-center gap-8 px-6 pb-8 pt-16 lg:grid-cols-[0.48fr_0.52fr] lg:px-10 lg:pt-8">
+        <motion.div {...fadeUp} className="relative z-10 max-w-[610px]">
+          <h1 className="leading-none tracking-[0] text-brand-ink">
+            <span className="block text-[clamp(30px,3vw,42px)] font-normal">Shop original</span>
+            <span className="relative mt-1 block text-[clamp(86px,7.4vw,132px)] font-normal leading-[0.86] text-brand-peach">
+              <span className="absolute left-2 top-[48%] h-[0.2em] w-[0.2em] rounded-full border-[0.06em] border-brand-blue" aria-hidden="true" />
+              designs
+            </span>
+            <span className="block text-center text-[clamp(50px,4.2vw,72px)] font-normal leading-[0.82] text-brand-blue">
+              Sell your own
+            </span>
+            <span className="block text-center text-[clamp(34px,3.1vw,48px)] font-normal leading-[1.12]">
+              Printed on demand
+            </span>
+          </h1>
+          <p className="mt-12 max-w-[610px] text-[21px] leading-[1.52] text-brand-ink">
+            Discover unique products by independent designers - or upload your own artwork and earn royalties with RashPOD's local print-on-demand system.
+          </p>
+          <div className="mt-14 flex flex-wrap gap-6">
+            <a
+              href={`${dashboardUrl}/auth/register?role=designer`}
+              className="inline-flex h-[88px] min-w-[222px] items-center justify-center rounded-[22px] bg-brand-blue px-10 text-[19px] font-extrabold tracking-[0.12em] text-white shadow-none transition-transform hover:scale-[1.02]"
             >
-              <ProductCard
-                title={product.title}
-                description={`by ${product.designer}`}
-                price={formatPrice(product.price)}
-                imageUrl={product.imageUrl}
-              />
+              Start Selling
+            </a>
+            <Link
+              href="/shop"
+              className="inline-flex h-[88px] min-w-[222px] items-center justify-center rounded-[22px] bg-brand-peach px-10 text-[19px] font-extrabold tracking-[0.12em] text-white shadow-none transition-transform hover:scale-[1.02]"
+            >
+              RashPOD Shop
+            </Link>
+          </div>
+          <p className="mt-6 text-[17px] text-brand-ink">Local production - Transparent royalties - Made in Uzbekistan</p>
+        </motion.div>
+
+        <motion.div
+          {...fadeUp}
+          className={media.homeHeroImageUrl ? "relative min-h-[650px] lg:min-h-[850px]" : "hidden min-h-[650px] lg:block lg:min-h-[850px]"}
+          aria-hidden={!media.homeHeroImageUrl}
+        >
+          {media.homeHeroImageUrl ? (
+            <Image
+              src={media.homeHeroImageUrl}
+              alt={media.homeHeroImageAlt ?? "RashPOD designers and product artwork"}
+              fill
+              priority
+              sizes="(min-width: 1024px) 760px, 100vw"
+              className="relative z-10 object-contain object-bottom"
+            />
+          ) : null}
+        </motion.div>
+      </div>
+      <p className="absolute bottom-8 left-0 text-[23px] uppercase text-brand-subtle">Best Selling 2</p>
+    </section>
+  );
+}
+
+function ServiceStrip() {
+  const services = [
+    { label: "Designed\nby creators", icon: Gift, shape: "flower" },
+    { label: "Produced\nlocally", icon: PackageCheck, shape: "arch" },
+    { label: "Sold\non demand", icon: Tags, shape: "flower" },
+    { label: "Royalties\ntracked", icon: BadgeDollarSign, shape: "pin" },
+  ];
+
+  return (
+    <section className="bg-white py-14">
+      <div className="mx-auto grid max-w-[1450px] grid-cols-1 gap-6 px-6 md:grid-cols-2 xl:grid-cols-4">
+        {services.map(({ label, icon: Icon, shape }) => (
+          <div key={label} className="relative flex h-[128px] items-center overflow-hidden rounded-[16px] bg-[#EEF1FA] px-8">
+            <ServiceShape shape={shape} />
+            <Icon className="relative z-10 mr-10 h-[78px] w-[78px] stroke-[1.25] text-brand-ink" />
+            <p className="relative z-10 whitespace-pre-line text-[34px] leading-[1.1] tracking-[0] text-brand-ink">{label}</p>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function ServiceShape({ shape }: { shape: string }) {
+  if (shape === "arch") {
+    return <div className="absolute left-0 top-0 h-full w-[118px] rounded-r-full bg-brand-blueLight" aria-hidden="true" />;
+  }
+  if (shape === "pin") {
+    return <div className="absolute left-6 top-6 h-[102px] w-[102px] rotate-45 rounded-[42px_42px_70px_42px] bg-brand-blueLight" aria-hidden="true" />;
+  }
+  return (
+    <div className="absolute left-0 top-0 h-[128px] w-[128px]" aria-hidden="true">
+      {Array.from({ length: 12 }).map((_, index) => (
+        <span
+          key={index}
+          className="absolute left-[54px] top-[10px] h-[56px] w-[22px] origin-[11px_54px] rounded-full bg-brand-blueLight"
+          style={{ transform: `rotate(${index * 30}deg)` }}
+        />
+      ))}
+    </div>
+  );
+}
+
+function HomepageProductCarousel({ title, products, badge }: { title: string; products: ProductListing[]; badge: string }) {
+  return (
+    <section className="bg-white py-10">
+      <SectionHeader title={title} href="/shop" />
+      <div className="mx-auto flex max-w-[1450px] snap-x gap-6 overflow-x-auto px-6 pb-8 pt-2 xl:grid xl:grid-cols-4 xl:overflow-visible">
+        {products.map((product, index) => (
+          <Link key={`${product.id}-${index}`} href={`/product/${product.slug}`} className="min-w-[300px] snap-start xl:min-w-0">
+            <FigmaProductCard product={product} badge={badge} secondaryBadge={index === 1 ? "new" : undefined} />
+          </Link>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function FigmaProductCard({ product, badge, secondaryBadge }: { product: ProductListing; badge: string; secondaryBadge?: string }) {
+  return (
+    <motion.article
+      whileHover={{ y: -4 }}
+      className="h-full rounded-[18px] bg-white p-7 shadow-[0_16px_38px_rgba(0,0,0,0.14)]"
+    >
+      <div className="relative h-[314px] overflow-hidden rounded-[32px] bg-[#F0F2FA]">
+        <span className="absolute left-6 top-6 z-10 rounded-[8px] bg-[#D877CF] px-3 py-2 text-[10px] font-bold text-white">{badge}</span>
+        {secondaryBadge && <span className="absolute left-6 top-[66px] z-10 rounded-[8px] bg-[#3473C4] px-3 py-2 text-[10px] font-bold text-white">{secondaryBadge}</span>}
+        {product.imageUrl ? (
+          <Image src={product.imageUrl} alt={product.title} fill sizes="320px" className="object-cover" />
+        ) : (
+          <ProductPlaceholder dark={product.slug.includes("black")} />
+        )}
+      </div>
+      <h3 className="mt-6 text-[17px] font-extrabold tracking-[-0.01em] text-black">{product.title}</h3>
+      <p className="mt-3 text-[14px] text-black">high quality, 100% cotton, perfect for vibrant</p>
+      <p className="mt-4 text-[11px] text-[#777]">Designed by {product.designer}</p>
+    </motion.article>
+  );
+}
+
+function ProductPlaceholder({ dark }: { dark?: boolean }) {
+  return (
+    <div className={`absolute inset-0 ${dark ? "bg-[#162216]" : "bg-white"}`} aria-hidden="true">
+      <div className={`absolute left-1/2 top-0 h-[360px] w-[260px] -translate-x-1/2 rounded-b-[70px] ${dark ? "bg-black" : "bg-white"} shadow-[inset_0_0_40px_rgba(0,0,0,0.09)]`} />
+      <div className="absolute left-1/2 top-[42%] h-[74px] w-[74px] -translate-x-1/2 rounded-[18px] border-[6px] border-brand-peach bg-brand-blueLight" />
+      <div className="absolute left-1/2 top-[58%] h-2 w-20 -translate-x-1/2 rounded-full bg-brand-peach" />
+    </div>
+  );
+}
+
+function MarketplaceLogoStrip() {
+  return (
+    <section className="overflow-x-auto bg-white py-8">
+      <div className="mx-auto flex w-max min-w-full max-w-[1250px] items-center justify-between gap-10 px-8">
+        {MARKETPLACES.map((logo) => (
+          <div key={logo.name} className="grid h-[84px] min-w-[110px] place-items-center text-brand-ink drop-shadow-[2px_3px_0_rgba(120,138,224,0.28)]" aria-label={logo.name}>
+            <span className={logo.className}>{logo.label}</span>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function CollectionCarousel({ products }: { products: ProductListing[] }) {
+  return (
+    <section className="bg-white py-12">
+      <SectionHeader title="New Collections" href="/shop?sort=new" />
+      <div className="mx-auto flex max-w-[1450px] snap-x gap-6 overflow-x-auto px-6 pb-8 pt-2 xl:grid xl:grid-cols-4 xl:overflow-visible">
+        {products.map((product, index) => (
+          <Link key={`${product.id}-collection-${index}`} href={`/product/${product.slug}`} className="min-w-[300px] snap-start xl:min-w-0">
+            <article className="rounded-[16px] bg-[#EEF1FA] p-7">
+              <div className="relative h-[318px] overflow-hidden rounded-[32px] bg-white">
+                <span className="absolute left-5 top-6 z-10 rounded-[8px] bg-[#3473C4] px-3 py-2 text-[10px] font-bold lowercase text-white">new</span>
+                {product.imageUrl ? (
+                  <Image src={product.imageUrl} alt={product.title} fill sizes="320px" className="object-cover" />
+                ) : (
+                  <ProductPlaceholder dark={index === 0 || index === 3} />
+                )}
+              </div>
+              <h3 className="mt-4 text-[17px] font-extrabold uppercase text-black">{product.category ?? product.title}</h3>
+            </article>
+          </Link>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function ClubCta({ dashboardUrl }: { dashboardUrl: string }) {
+  return (
+    <section className="relative my-16 overflow-hidden bg-[#F0F2FA] py-16">
+      <div className="pointer-events-none absolute inset-0" aria-hidden="true">
+        <div className="absolute -left-14 top-0 h-[96px] w-[96px] rounded-br-full bg-brand-blue" />
+        <div className="absolute left-[17%] bottom-0 h-[128px] w-[158px] rounded-t-full border-[48px] border-brand-blue" />
+        <div className="absolute left-[32%] -top-2 h-[58px] w-[156px] rounded-b-[28px] bg-brand-peachLight" />
+        <div className="absolute right-[8%] bottom-0 h-[142px] w-[132px] rounded-t-full bg-brand-peach" />
+        <div className="absolute -right-2 top-0 h-[118px] w-[118px] rounded-full border-[14px] border-dashed border-brand-blue" />
+      </div>
+      <div className="relative mx-auto grid max-w-[1300px] grid-cols-1 items-center gap-8 px-6 text-center md:grid-cols-3">
+        <p className="text-[21px] tracking-[0.17em] text-black">Be the first to get the next drop</p>
+        <div>
+          <h2 className="mb-12 text-[31px] font-extrabold text-black">Join the RASH POD Club</h2>
+          <a
+            href={`${dashboardUrl}/auth/register`}
+            className="relative inline-flex h-16 min-w-[166px] items-center justify-center rounded-[18px] bg-brand-blue px-9 text-[20px] font-extrabold tracking-[0.08em] text-white"
+          >
+            join Now
+            <span className="absolute -right-4 -top-4 text-[48px] leading-none text-brand-peach">*</span>
+          </a>
+        </div>
+        <p className="text-[19px] text-black">Receive a mystery design every month</p>
+      </div>
+    </section>
+  );
+}
+
+function DesignerCarousel({ designers, media }: { designers: Designer[]; media: HomeBrandingMedia }) {
+  const shown = designers.slice(0, 5);
+  const center = shown[2] ?? shown[0] ?? FALLBACK_DESIGNERS[2];
+
+  return (
+    <section className="bg-white py-12">
+      <SectionHeader title="Meet Our Wonderful Designers" href="/designers" />
+      <div className="mx-auto flex max-w-[1450px] gap-5 overflow-x-auto px-6 pb-8 pt-2 xl:grid xl:grid-cols-[0.9fr_0.9fr_1.9fr_0.9fr_0.9fr] xl:overflow-visible">
+        {shown.map((designer, index) =>
+          index === 2 ? (
+            <FeaturedDesignerCard key={designer.id} designer={center} imageUrl={media.homeDesignerSectionImageUrl} alt={media.homeDesignerSectionImageAlt} />
+          ) : (
+            <SideDesignerCard key={designer.id} designer={designer} index={index} />
+          ),
+        )}
+      </div>
+      <p className="text-[23px] uppercase text-brand-subtle">Designers 6</p>
+    </section>
+  );
+}
+
+function SideDesignerCard({ designer, index }: { designer: Designer; index: number }) {
+  return (
+    <Link href={`/designer/${designer.handle}`} className="group min-w-[220px] overflow-hidden rounded-[8px] border border-black bg-brand-blueLight xl:min-w-0">
+      <div className="relative h-[760px] overflow-hidden">
+        <div className="absolute inset-x-[10%] bottom-[8%] h-[560px] rounded-t-full bg-brand-peach transition-transform duration-300 group-hover:scale-105" />
+        {designer.avatarUrl ? (
+          <Image src={designer.avatarUrl} alt={designer.displayName} fill sizes="230px" className="grayscale object-cover object-bottom transition-transform duration-300 group-hover:scale-110" />
+        ) : (
+          <PortraitFallback gender={index % 2 === 0 ? "male" : "female"} />
+        )}
+      </div>
+    </Link>
+  );
+}
+
+function FeaturedDesignerCard({ designer, imageUrl, alt }: { designer: Designer; imageUrl?: string; alt?: string }) {
+  return (
+    <Link href={`/designer/${designer.handle}`} className="group min-w-[470px] overflow-hidden rounded-[8px] bg-brand-blueLight xl:min-w-0">
+      <article className="relative h-[760px] overflow-hidden p-9">
+        <div className="relative z-20">
+          <h3 className="text-[42px] font-black uppercase leading-none text-black">{designer.displayName}</h3>
+          <p className="mt-3 text-[16px] text-black">from</p>
+          <p className="ml-8 text-[20px] text-black">{designer.location ?? "Samarkand"}</p>
+        </div>
+        <div className="absolute right-9 top-8 z-20 flex flex-col items-end gap-3">
+          <span className="rounded-[9px] bg-[#D877CF] px-3 py-2 text-[11px] font-bold uppercase text-white">UIUX Designer</span>
+          <span className="rounded-[9px] bg-[#2E70B8] px-3 py-2 text-[11px] font-bold uppercase text-white">Graphic Designer</span>
+        </div>
+        <div className="absolute left-[18%] top-[20%] h-[460px] w-[360px] rounded-[46%] border-[12px] border-brand-blue" />
+        {imageUrl ? (
+          <Image src={imageUrl} alt={alt ?? designer.displayName} fill sizes="480px" className="z-10 object-cover object-bottom transition-transform duration-500 group-hover:scale-110" />
+        ) : (
+          <PortraitFallback featured />
+        )}
+        <div className="absolute inset-x-0 bottom-0 z-30 flex h-[176px] items-center justify-center bg-white/58 backdrop-blur-md">
+          <span className="rounded-[8px] bg-brand-peach px-8 py-4 text-[16px] font-bold text-white">{designer.displayName}'s Designs</span>
+        </div>
+      </article>
+    </Link>
+  );
+}
+
+function PortraitFallback({ gender, featured }: { gender?: "male" | "female"; featured?: boolean }) {
+  return (
+    <div className="absolute inset-0 z-10 transition-transform duration-500 group-hover:scale-110" aria-hidden="true">
+      <div className={`${featured ? "left-[37%] top-[24%] h-[132px] w-[132px]" : "left-[27%] top-[20%] h-[126px] w-[126px]"} absolute rounded-full bg-[#E9C5B4]`} />
+      <div className={`${featured ? "left-[34%] top-[18%] h-[172px] w-[190px]" : "left-[18%] top-[16%] h-[170px] w-[170px]"} absolute rounded-t-full ${gender === "male" ? "bg-[#1d1d1d]" : "bg-[#171717]"}`} />
+      <div className={`${featured ? "left-[21%] bottom-[0] h-[470px] w-[320px] bg-white" : "left-[12%] bottom-0 h-[470px] w-[190px] bg-white"} absolute rounded-t-[80px] grayscale`} />
+      <div className={`${featured ? "left-[49%] top-[42%] h-[32px] w-[110px]" : "left-[41%] top-[37%] h-[22px] w-[74px]"} absolute rounded-full bg-brand-peach`} />
+    </div>
+  );
+}
+
+function ActionCards({ dashboardUrl }: { dashboardUrl: string }) {
+  const cards = [
+    {
+      titleTop: "DESIG",
+      titleBottom: "NERS",
+      body: "Upload artwork, publish products, and earn royalties without handling inventory",
+      href: `${dashboardUrl}/auth/register?role=designer`,
+      cta: "Start selling",
+      className: "bg-brand-peach text-black",
+      button: "bg-[#EEF1FA] text-black",
+    },
+    {
+      titleTop: "custom",
+      titleBottom: "ORDERS",
+      body: "Create branded products for teams, events, campaigns, and corporate gifts",
+      href: "/corporate",
+      cta: "Request a quote",
+      className: "bg-[#303137] text-white",
+      button: "bg-brand-blue text-white",
+    },
+    {
+      titleTop: "your",
+      titleBottom: "BUSINESS",
+      body: "Order ready-to-press films for apparel, stickers, packaging, and production runs",
+      href: "/film",
+      cta: "Explore films",
+      className: "bg-[#F0F2FA] text-black",
+      button: "bg-[#303137] text-white",
+    },
+    {
+      titleTop: "SHOP",
+      titleBottom: "now",
+      body: "Buy apparel, original products by independent designers",
+      href: "/shop",
+      cta: "RASHPOD SHOP",
+      className: "bg-brand-blue text-white",
+      button: "bg-brand-peach text-white",
+    },
+  ];
+
+  return (
+    <section className="bg-white pb-20 pt-10">
+      <div className="mx-auto max-w-[1450px] px-6">
+        <h2 className="mb-10 text-[clamp(34px,3.2vw,46px)] font-normal text-black">Shop, design, order, or produce with RashPOD</h2>
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-4">
+          {cards.map((card) => (
+            <Link key={card.titleTop} href={card.href} className={`relative flex h-[760px] flex-col overflow-hidden rounded-[8px] p-0 ${card.className}`}>
+              <div className="pt-6 text-[clamp(64px,6vw,92px)] font-black uppercase leading-[0.78] tracking-[-0.06em]">
+                <span className="block">{card.titleTop}</span>
+                <span className="block">{card.titleBottom}</span>
+              </div>
+              <p className="mx-auto mt-auto max-w-[280px] pb-44 text-center text-[21px] font-medium leading-[1.25]">{card.body}</p>
+              <span className={`absolute bottom-[102px] left-1/2 inline-flex h-16 -translate-x-1/2 items-center justify-center whitespace-nowrap rounded-[18px] px-7 text-[18px] font-extrabold tracking-[0.12em] ${card.button}`}>
+                {card.cta}
+              </span>
             </Link>
           ))}
-        </motion.div>
-      </section>
-
-      {/* Featured designers */}
-      <section className="max-w-[1200px] mx-auto px-6 py-12">
-        <div className="flex items-end justify-between mb-6">
-          <div>
-            <p className="text-[11px] uppercase tracking-[0.12em] font-semibold text-brand-peach mb-1">
-              Talent
-            </p>
-            <h2 className="text-2xl md:text-3xl font-bold text-brand-ink">Featured designers</h2>
-          </div>
-          <Link
-            href="/designers"
-            className="inline-flex items-center gap-1 text-sm font-semibold text-brand-blue hover:gap-1.5 transition-[gap] focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue/30 rounded"
-          >
-            View all <ArrowRight size={14} aria-hidden="true" />
-          </Link>
         </div>
+      </div>
+    </section>
+  );
+}
 
-        <div className={designerSectionImageUrl ? "grid grid-cols-1 lg:grid-cols-[0.82fr_1.18fr] gap-6" : ""}>
-          {designerSectionImageUrl && (
-            <motion.div
-              initial={{ opacity: 0, y: 12 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              className="relative min-h-[280px] overflow-hidden rounded-[32px] border border-white/70 bg-white p-3 shadow-product"
-            >
-              <div className="relative h-full min-h-[260px] overflow-hidden rounded-[26px] bg-brand-bg">
-                <Image
-                  src={designerSectionImageUrl}
-                  alt={homeMedia.homeDesignerSectionImageAlt ?? "RashPOD designer community artwork"}
-                  fill
-                  sizes="(min-width: 1024px) 440px, 100vw"
-                  className="object-cover"
-                />
-              </div>
-            </motion.div>
-          )}
-
-          <motion.div
-            initial={{ opacity: 0 }}
-            whileInView={{ opacity: 1 }}
-            viewport={{ once: true }}
-            className={designerSectionImageUrl ? "grid grid-cols-1 sm:grid-cols-2 gap-4" : "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"}
-          >
-            {designers.map((designer) => (
-              <Link
-                key={designer.id}
-                href={`/designer/${designer.handle}`}
-                className="block focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue/30 rounded-2xl"
-                aria-label={`View ${designer.displayName}'s profile`}
-              >
-                <Card variant="flat" className="!p-4 group hover:shadow-soft transition-shadow">
-                  <div className="flex items-center gap-3">
-                    <div className="h-12 w-12 shrink-0 rounded-full bg-brand-blueLight flex items-center justify-center overflow-hidden">
-                      {designer.avatarUrl ? (
-                        <Image src={designer.avatarUrl} alt="" width={48} height={48} className="rounded-full" />
-                      ) : (
-                        <span className="text-lg font-bold text-brand-blue">
-                          {designer.displayName.charAt(0).toUpperCase()}
-                        </span>
-                      )}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <h3 className="text-sm font-semibold text-brand-ink truncate group-hover:text-brand-blue transition-colors">
-                        {designer.displayName}
-                      </h3>
-                      <p className="text-[12px] text-brand-muted">
-                        @{designer.handle} · <span className="tabular-nums">{designer.listingsCount}</span> listings
-                      </p>
-                    </div>
-                    <ArrowRight size={16} className="text-brand-muted shrink-0 group-hover:text-brand-blue transition-colors" aria-hidden="true" />
-                  </div>
-                </Card>
-              </Link>
-            ))}
-          </motion.div>
-        </div>
-      </section>
-
-      {/* Films + Corporate */}
-      <section className="max-w-[1200px] mx-auto px-6 py-12">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <Link
-            href="/film"
-            className="block focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-peach/30 rounded-[24px]"
-            aria-label="Browse DTF and UV-DTF films"
-          >
-            <CategoryTile variant="peach" category="For print shops" title="DTF & UV-DTF Films" />
-          </Link>
-          <Link
-            href="/corporate"
-            className="block focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue/30 rounded-[24px]"
-            aria-label="Request a corporate quote"
-          >
-            <CategoryTile variant="blue" category="For companies" title="Bulk merchandise" />
-          </Link>
-        </div>
-      </section>
-
-      {/* Trust KPIs */}
-      <section className="max-w-[1200px] mx-auto px-6 py-12">
-        <motion.div
-          initial={{ opacity: 0 }}
-          whileInView={{ opacity: 1 }}
-          viewport={{ once: true }}
-          className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4"
-        >
-          {/* TODO: Replace with real KPIs from API */}
-          <KpiTile label="Designers onboarded" value="120+" />
-          <KpiTile label="Designs sold" value="3,500+" />
-          <KpiTile label="Cities served" value="15+" />
-          <KpiTile label="On-time delivery" value="98%" />
-        </motion.div>
-      </section>
-
-      {/* Testimonials */}
-      <section className="max-w-[1200px] mx-auto px-6 py-12">
-        <h2 className="text-2xl md:text-3xl font-bold text-brand-ink mb-6 text-center">
-          What our community says
-        </h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {/* TODO: Replace with real testimonials */}
-          {[
-            { name: "Sardor K.", role: "Designer", accent: "peach" as const, quote: "RashPOD made it easy to monetize my designs. Upload once, earn every month." },
-            { name: "Nilufar A.", role: "Customer", accent: "blue" as const, quote: "Unique designs, great quality, and fast local shipping." },
-            { name: "Bekzod M.", role: "Print shop", accent: "peach" as const, quote: "The film licensing system gives me legal access to professional designs." },
-          ].map((t, i) => (
-            <motion.div
-              key={i}
-              initial={{ opacity: 0, y: 12 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ delay: i * 0.05, duration: 0.24 }}
-            >
-              <Card variant="flat" className="!p-5 h-full flex flex-col">
-                <p className="text-[14px] text-brand-ink leading-relaxed mb-4 flex-1">
-                  &ldquo;{t.quote}&rdquo;
-                </p>
-                <div className="flex items-center gap-3">
-                  <div
-                    className={`h-9 w-9 rounded-full flex items-center justify-center text-sm font-semibold ${
-                      t.accent === "peach"
-                        ? "bg-brand-peachLight text-brand-peach"
-                        : "bg-brand-blueLight text-brand-blue"
-                    }`}
-                    aria-hidden="true"
-                  >
-                    {t.name.charAt(0)}
-                  </div>
-                  <div>
-                    <p className="text-sm font-semibold text-brand-ink leading-tight">{t.name}</p>
-                    <p className="text-[11px] text-brand-muted">{t.role}</p>
-                  </div>
-                </div>
-              </Card>
-            </motion.div>
-          ))}
-        </div>
-      </section>
-
-      {/* FAQ */}
-      <section className="max-w-[840px] mx-auto px-6 py-12 pb-20">
-        <h2 className="text-2xl md:text-3xl font-bold text-brand-ink mb-6 text-center">
-          Frequently asked questions
-        </h2>
-        <div className="space-y-3">
-          {[
-            { q: "How do royalties work for designers?", a: "Designers earn a royalty on every product sold featuring their design. The rate is set by the admin and paid monthly. Track everything in your designer dashboard." },
-            { q: "What file types do you accept?", a: "PNG, JPEG, SVG, and AI files. For best results, upload high-resolution files (≥300 DPI) with transparent backgrounds where appropriate." },
-            { q: "How long does shipping take?", a: "Standard shipping within Uzbekistan takes 3–7 business days; express is available. Shipping is calculated at checkout." },
-            { q: "What is your return policy?", a: "We accept returns within 14 days for defective or damaged items. Custom-printed items can only be returned if defective." },
-            { q: "How do I become a designer?", a: "Click ‘Start selling’, register as a designer, and upload your first design. Approval takes 24–48 hours." },
-          ].map((faq, i) => (
-            <details
-              key={i}
-              className="group bg-white rounded-2xl px-5 py-4 shadow-soft border border-surface-borderSoft"
-            >
-              <summary className="flex items-center justify-between cursor-pointer list-none focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue/30 rounded">
-                <span className="text-[15px] font-semibold text-brand-ink pr-4">{faq.q}</span>
-                <ChevronDown className="w-4 h-4 text-brand-muted group-open:rotate-180 transition-transform shrink-0" aria-hidden="true" />
-              </summary>
-              <p className="mt-3 text-[14px] text-brand-muted leading-relaxed">{faq.a}</p>
-            </details>
-          ))}
-        </div>
-      </section>
+function SectionHeader({ title, href }: { title: string; href: string }) {
+  return (
+    <div className="mx-auto mb-7 flex max-w-[1450px] items-center justify-between px-6">
+      <h2 className="text-[clamp(36px,3vw,42px)] font-normal leading-tight text-black">{title}</h2>
+      <Link href={href} className="grid h-[62px] w-[62px] place-items-center rounded-full border border-brand-peach text-brand-peach transition-colors hover:bg-brand-peach hover:text-white" aria-label={`View ${title}`}>
+        <ArrowRight size={38} strokeWidth={1.4} />
+      </Link>
     </div>
   );
 }

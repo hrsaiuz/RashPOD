@@ -3,9 +3,8 @@
 import * as React from "react";
 import Link from "next/link";
 import { cn } from "../lib/utils";
-import { Menu, X, Globe } from "lucide-react";
+import { ChevronDown, Menu } from "lucide-react";
 import { Drawer } from "./Drawer";
-import { Button } from "./Button";
 
 export interface PublicHeaderProps {
   dashboardUrl?: string;
@@ -38,9 +37,11 @@ export const PublicHeader: React.FC<PublicHeaderProps> = ({
 
   const navLinks = [
     { href: shopUrl, label: "Shop" },
-    { href: designersUrl, label: "Designers" },
-    { href: filmsUrl, label: "Films" },
-    { href: aboutUrl, label: "About" },
+    { href: `${shopUrl}#categories`, label: "Categories" },
+    { href: finalStartSellingUrl, label: "Sell on RashPOD" },
+    { href: "/corporate", label: "Custom order" },
+    { href: "/business", label: "Start Your Business", hasChevron: true },
+    { href: aboutUrl, label: "About Us" },
   ];
 
   return (
@@ -51,49 +52,42 @@ export const PublicHeader: React.FC<PublicHeaderProps> = ({
       >
         Skip to content
       </a>
-      <header className={cn("sticky top-0 z-20 bg-white/90 backdrop-blur-md border-b border-surface-borderSoft", className)}>
-        <div className="max-w-storefront mx-auto px-6 h-[76px] flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-2 text-2xl font-bold tracking-tight text-brand-blue">
+      <header className={cn("sticky top-0 z-20 bg-[#F0F2FA]/95 backdrop-blur-md", className)}>
+        <div className="mx-auto flex h-[66px] max-w-[1450px] items-center justify-between gap-6 px-6 lg:px-10">
+          <Link href="/" className="flex shrink-0 items-center text-[34px] font-normal lowercase leading-none tracking-[0.16em] text-brand-blue">
             {logoUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={logoUrl} alt={brandName} className="h-9 w-auto" />
+              <img src={logoUrl} alt={brandName} className="h-8 w-auto" />
             ) : (
-              <>
-                <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-brand-blue text-base text-white shadow-blueGlow">
-                  R
-                </span>
-                <span>{brandName}</span>
-              </>
+              <span>{brandName}</span>
             )}
           </Link>
 
           {/* Desktop Nav */}
-          <nav className="hidden md:flex items-center gap-8" aria-label="Main navigation">
+          <nav className="hidden items-center gap-11 lg:flex" aria-label="Main navigation">
             {navLinks.map((link) => (
               <Link
                 key={link.href}
                 href={link.href}
-                className="text-sm font-medium text-brand-ink hover:text-brand-blue transition-colors"
+                className="inline-flex items-center gap-2 text-[15px] font-medium text-black transition-colors hover:text-brand-blue"
               >
                 {link.label}
+                {link.hasChevron && <ChevronDown size={16} strokeWidth={2.2} aria-hidden="true" />}
               </Link>
             ))}
           </nav>
 
           {/* Desktop Actions */}
-          <div className="hidden md:flex items-center gap-4">
-            <button className="p-2 rounded-lg hover:bg-surface-borderSoft transition-colors" aria-label="Language">
-              <Globe size={20} className="text-brand-muted" />
-            </button>
+          <div className="hidden items-center gap-5 lg:flex">
             <Link href={finalSignInUrl}>
-              <Button variant="ghost" size="sm">
+              <span className="inline-flex h-10 items-center justify-center rounded-[12px] border border-brand-peach bg-transparent px-4 text-[15px] font-medium text-brand-ink transition-colors hover:bg-brand-peach hover:text-white">
                 Sign in
-              </Button>
+              </span>
             </Link>
             <Link href={finalStartSellingUrl}>
-              <Button variant="primaryPeach" size="sm">
-                Start selling
-              </Button>
+              <span className="inline-flex h-10 items-center justify-center rounded-[12px] bg-brand-peach px-5 text-[15px] font-medium text-white transition-colors hover:bg-[#EA8F6E]">
+                Start Selling
+              </span>
             </Link>
           </div>
 
@@ -114,22 +108,23 @@ export const PublicHeader: React.FC<PublicHeaderProps> = ({
               <Link
                 key={link.href}
                 href={link.href}
-                className="text-base font-medium text-brand-ink hover:text-brand-blue transition-colors py-2"
+                className="flex items-center justify-between py-2 text-base font-medium text-brand-ink transition-colors hover:text-brand-blue"
                 onClick={() => setMobileMenuOpen(false)}
               >
-                {link.label}
+                <span>{link.label}</span>
+                {link.hasChevron && <ChevronDown size={16} aria-hidden="true" />}
               </Link>
             ))}
             <div className="border-t border-surface-borderSoft pt-4 mt-4 flex flex-col gap-3">
               <Link href={finalSignInUrl} onClick={() => setMobileMenuOpen(false)}>
-                <Button variant="ghost" size="md" className="w-full">
+                <span className="inline-flex h-11 w-full items-center justify-center rounded-[12px] border border-brand-peach text-brand-ink">
                   Sign in
-                </Button>
+                </span>
               </Link>
               <Link href={finalStartSellingUrl} onClick={() => setMobileMenuOpen(false)}>
-                <Button variant="primaryPeach" size="md" className="w-full">
-                  Start selling
-                </Button>
+                <span className="inline-flex h-11 w-full items-center justify-center rounded-[12px] bg-brand-peach text-white">
+                  Start Selling
+                </span>
               </Link>
             </div>
           </nav>
