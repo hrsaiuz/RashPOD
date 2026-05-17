@@ -51,6 +51,57 @@ body {
   box-shadow: 0 0 0 4px var(--rash-focus);
 }
 
+.free-shipping-flow {
+  position: relative;
+  min-width: 12px;
+  overflow: hidden;
+}
+
+.free-shipping-flow::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(
+      110deg,
+      transparent 0%,
+      transparent 28%,
+      rgba(255, 255, 255, 0.48) 42%,
+      rgba(255, 255, 255, 0.18) 54%,
+      transparent 70%,
+      transparent 100%
+    );
+  transform: translateX(-100%);
+  animation: rash-free-shipping-flow 1.65s linear infinite;
+}
+
+.cart-flower {
+  clip-path: polygon(
+    50% 0%,
+    60% 28%,
+    88% 12%,
+    72% 40%,
+    100% 50%,
+    72% 60%,
+    88% 88%,
+    60% 72%,
+    50% 100%,
+    40% 72%,
+    12% 88%,
+    28% 60%,
+    0% 50%,
+    28% 40%,
+    12% 12%,
+    40% 28%
+  );
+}
+
+@keyframes rash-free-shipping-flow {
+  to {
+    transform: translateX(100%);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

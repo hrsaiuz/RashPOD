@@ -3,7 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { X, Tag } from "lucide-react";
+import { Package, Tag, X } from "lucide-react";
 
 export interface CartItem {
   key: string;
@@ -57,6 +57,20 @@ export function CartProvider({ children }: { children: ReactNode }) {
     if (!hydrated) return;
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
   }, [hydrated, items]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setIsOpen(false);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [isOpen]);
 
   const subtotal = useMemo(() => items.reduce((sum, item) => sum + item.price * item.quantity, 0), [items]);
   const itemCount = useMemo(() => items.reduce((sum, item) => sum + item.quantity, 0), [items]);
@@ -117,19 +131,39 @@ function MiniCartDrawer() {
 
   return (
     <>
-      <div className={`fixed inset-0 z-40 bg-black/20 transition-opacity ${isOpen ? "opacity-100" : "pointer-events-none opacity-0"}`} onClick={closeCart} />
-      <aside className={`fixed right-0 top-0 z-50 h-dvh w-full max-w-[620px] overflow-hidden rounded-l-[12px] bg-brand-bg shadow-[0_24px_60px_rgba(0,0,0,0.22)] transition-transform duration-300 ${isOpen ? "translate-x-0" : "translate-x-full"}`}>
-        <div className="flex h-full flex-col px-10 py-8">
+      <div
+        aria-hidden="true"
+        className={`fixed inset-0 z-40 bg-black/25 transition-opacity duration-300 ${isOpen ? "opacity-100" : "pointer-events-none opacity-0"}`}
+        style={{ opacity: isOpen ? 1 : 0, pointerEvents: isOpen ? "auto" : "none" }}
+        onClick={closeCart}
+      />
+      <aside
+        aria-hidden={!isOpen}
+        className="fixed right-0 top-0 z-50 h-dvh w-full max-w-[620px] overflow-hidden rounded-l-[12px] bg-brand-bg shadow-[0_24px_60px_rgba(0,0,0,0.22)] transition-transform duration-300 ease-out"
+        style={{
+          position: "fixed",
+          right: 0,
+          top: 0,
+          zIndex: 50,
+          width: "min(100vw, 620px)",
+          maxWidth: "620px",
+          height: "100dvh",
+          transform: isOpen ? "translateX(0)" : "translateX(100%)",
+          visibility: "visible",
+          pointerEvents: isOpen ? "auto" : "none",
+        }}
+      >
+        <div className="flex h-full flex-col px-5 py-6 sm:px-10 sm:py-8">
           <div className="mb-8 flex items-center justify-between">
             <h2 className="text-[20px] font-bold uppercase tracking-[0.04em] text-[#33333A]">Order Summary</h2>
-            <button onClick={closeCart} aria-label="Close cart" className="grid h-9 w-9 place-items-center rounded-full text-[#33333A] hover:bg-white">
+            <button type="button" onClick={closeCart} aria-label="Close cart" className="grid h-9 w-9 place-items-center rounded-full text-[#33333A] transition-colors hover:bg-white">
               <X size={25} strokeWidth={1.8} />
             </button>
           </div>
 
           <FreeDeliveryBar subtotal={subtotal} remaining={remaining} progress={progress} />
 
-          <div className="mb-4 grid grid-cols-[1fr_140px_90px] rounded-[5px] bg-brand-peach px-5 py-2 text-[11px] font-bold text-white">
+          <div className="mb-4 grid grid-cols-[1fr_100px_82px] rounded-[5px] bg-brand-peach px-5 py-2 text-[11px] font-bold text-white sm:grid-cols-[1fr_140px_90px]">
             <span>product</span>
             <span className="text-center">Quantity</span>
             <span className="text-right">Total</span>
@@ -139,9 +173,15 @@ function MiniCartDrawer() {
             {items.length === 0 ? (
               <div className="rounded-[12px] bg-white p-10 text-center text-brand-muted">Your cart is empty.</div>
             ) : items.map((item) => (
-              <div key={item.key} className="grid grid-cols-[96px_1fr_110px_88px] items-center gap-4 rounded-[9px] bg-white p-4">
+              <div key={item.key} className="grid grid-cols-[74px_1fr] items-center gap-4 rounded-[9px] bg-white p-4 sm:grid-cols-[96px_1fr_110px_88px]">
                 <div className="relative h-[92px] overflow-hidden rounded-[7px] bg-brand-bg">
-                  {item.imageUrl ? <Image src={item.imageUrl} alt={item.title} fill sizes="96px" className="object-cover" /> : null}
+                  {item.imageUrl ? (
+                    <Image src={item.imageUrl} alt={item.title} fill sizes="96px" className="object-cover" />
+                  ) : (
+                    <div className="grid h-full w-full place-items-center text-brand-blue">
+                      <Package size={28} />
+                    </div>
+                  )}
                 </div>
                 <div>
                   <h3 className="text-[13px] font-black uppercase text-black">{item.title}</h3>
@@ -154,11 +194,11 @@ function MiniCartDrawer() {
                     {item.color}
                   </p>
                 </div>
-                <div>
+                <div className="col-start-2 sm:col-start-auto">
                   <QuantityPill quantity={item.quantity} onChange={(next) => updateQuantity(item.key, next)} />
-                  <button onClick={() => removeItem(item.key)} className="mt-4 text-[10px] font-medium text-brand-peach">Remove</button>
+                  <button type="button" onClick={() => removeItem(item.key)} className="mt-4 text-[10px] font-medium text-brand-peach">Remove</button>
                 </div>
-                <p className="text-right text-[18px] font-black text-black">${(item.price * item.quantity).toFixed(2)}</p>
+                <p className="text-right text-[18px] font-black text-black sm:text-right">${(item.price * item.quantity).toFixed(2)}</p>
               </div>
             ))}
           </div>
@@ -168,7 +208,7 @@ function MiniCartDrawer() {
               <span>Coupon Code</span>
               <Tag size={17} className="ml-auto text-brand-peach" />
             </div>
-            <Link href="/checkout" onClick={closeCart} className="inline-flex h-[55px] min-w-[128px] items-center justify-center rounded-[16px] bg-brand-peach px-7 text-[20px] font-bold lowercase text-white">
+            <Link href="/checkout" onClick={closeCart} className="inline-flex h-[55px] min-w-[128px] items-center justify-center rounded-[16px] bg-brand-peach px-7 text-[20px] font-bold lowercase text-white transition-transform hover:-translate-y-0.5">
               continue
             </Link>
           </div>
@@ -185,12 +225,12 @@ export function FreeDeliveryBar({ subtotal, remaining, progress, compact }: { su
         <span>10$</span>
         <span>{remaining > 0 ? `You're $${remaining.toFixed(0)} away from free shipping` : "You unlocked free shipping"}</span>
         <span className="relative grid h-9 w-9 place-items-center text-[10px] font-black">
-          <span className="absolute inset-0 rounded-full bg-brand-peach" />
+          <span className="cart-flower absolute inset-0 bg-brand-peach" />
           <span className="relative z-10">500$</span>
         </span>
       </div>
-      <div className="h-[13px] rounded-full border border-brand-blue bg-brand-bg">
-        <div className="h-full rounded-full bg-brand-blue" style={{ width: `${progress}%` }} />
+      <div className="h-[13px] overflow-hidden rounded-full border border-brand-blue bg-white">
+        <div className="free-shipping-flow h-full rounded-full bg-brand-blue" style={{ width: `${progress}%` }} />
       </div>
     </div>
   );
@@ -199,9 +239,9 @@ export function FreeDeliveryBar({ subtotal, remaining, progress, compact }: { su
 function QuantityPill({ quantity, onChange }: { quantity: number; onChange: (quantity: number) => void }) {
   return (
     <div className="inline-flex h-[34px] min-w-[80px] items-center justify-between rounded-full bg-brand-bg px-4 text-[13px] font-black text-black">
-      <button onClick={() => onChange(Math.max(1, quantity - 1))}>-</button>
+      <button type="button" onClick={() => onChange(Math.max(1, quantity - 1))}>-</button>
       <span>{quantity}</span>
-      <button onClick={() => onChange(quantity + 1)}>+</button>
+      <button type="button" onClick={() => onChange(quantity + 1)}>+</button>
     </div>
   );
 }
