@@ -27,7 +27,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex h-screen overflow-hidden bg-brand-bg">
       {/* Sidebar */}
-      <aside className="w-[260px] bg-surface-darkShell text-[#C8CDD6] flex flex-col m-4 rounded-[14px] overflow-hidden shadow-sm shrink-0 hidden md:flex">
+      <aside className="w-[260px] bg-surface-darkShell text-[#C8CDD6] flex flex-col m-4 rounded-[14px] overflow-hidden shadow-soft shrink-0 hidden md:flex">
         <div className="h-[76px] flex items-center px-6 border-b border-white/5">
           <Link href="/admin" className="text-white font-bold text-xl tracking-tight">RashPOD Admin</Link>
         </div>
@@ -53,7 +53,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col min-w-0">
-        <header className="h-[76px] bg-white border-b border-surface-border-soft flex items-center justify-between px-8 shrink-0">
+        <header className="h-[76px] bg-white border-b border-surface-borderSoft flex items-center justify-between px-8 shrink-0">
           <button className="md:hidden text-brand-ink"><Menu className="w-6 h-6" /></button>
           <div className="flex-1" />
           <div className="flex items-center gap-4">

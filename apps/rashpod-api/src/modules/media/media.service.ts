@@ -167,11 +167,19 @@ export class MediaService {
     const pick = (cat: MediaCategory) => assets.find((a) => a.category === cat)?.publicUrl ?? null;
     const settings = await this.prisma.platformSetting.findUnique({ where: { key: "branding" } });
     const themeRaw = (settings?.value ?? {}) as Record<string, unknown>;
+    const themeString = (key: string) => {
+      const value = themeRaw[key];
+      return typeof value === "string" && value.trim().length > 0 ? value : null;
+    };
     return {
       storefrontLogoUrl: pick(MediaCategory.BRANDING_LOGO_WEB),
       dashboardLogoUrl: pick(MediaCategory.BRANDING_LOGO_DASHBOARD),
       loginLogoUrl: pick(MediaCategory.BRANDING_LOGO_LOGIN),
       faviconUrl: pick(MediaCategory.BRANDING_FAVICON),
+      homeHeroImageUrl: themeString("homeHeroImageUrl"),
+      homeHeroImageAlt: themeString("homeHeroImageAlt"),
+      homeDesignerSectionImageUrl: themeString("homeDesignerSectionImageUrl"),
+      homeDesignerSectionImageAlt: themeString("homeDesignerSectionImageAlt"),
       theme: themeRaw,
     };
   }

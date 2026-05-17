@@ -268,8 +268,8 @@ export default function AdminBaseProductsPage() {
 
       {showForm && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="p-6 border-b border-gray-100 flex items-center justify-between">
+          <div className="bg-white rounded-[24px] shadow-card max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6 border-b border-surface-borderSoft flex items-center justify-between">
               <h2 className="text-xl font-semibold text-brand-ink">New base product</h2>
               <button onClick={() => setShowForm(false)} aria-label="Close">
                 <X size={20} className="text-brand-muted" />
@@ -282,7 +282,7 @@ export default function AdminBaseProductsPage() {
                   required
                   value={form.productTypeId}
                   onChange={(e) => setForm({ ...form, productTypeId: e.target.value })}
-                  className="mt-1 w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-blue"
+                  className="mt-1 w-full rounded-input border border-surface-borderSoft px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-blue"
                 >
                   <option value="">Select a product type…</option>
                   {productTypes.map((p) => (
@@ -301,7 +301,7 @@ export default function AdminBaseProductsPage() {
                     value={form.name}
                     onChange={(e) => setForm({ ...form, name: e.target.value })}
                     placeholder="Classic Unisex Tee"
-                    className="mt-1 w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-blue"
+                    className="mt-1 w-full rounded-input border border-surface-borderSoft px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-blue"
                   />
                 </div>
                 <div>
@@ -312,7 +312,7 @@ export default function AdminBaseProductsPage() {
                     value={form.skuPrefix}
                     onChange={(e) => setForm({ ...form, skuPrefix: e.target.value.toUpperCase() })}
                     placeholder="TEE-UNI"
-                    className="mt-1 w-full rounded-md border border-gray-200 px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-brand-blue"
+                    className="mt-1 w-full rounded-input border border-surface-borderSoft px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-brand-blue"
                   />
                 </div>
               </div>
@@ -323,7 +323,7 @@ export default function AdminBaseProductsPage() {
                   value={form.description}
                   onChange={(e) => setForm({ ...form, description: e.target.value })}
                   placeholder="180g cotton, ringspun, unisex fit."
-                  className="mt-1 w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-blue"
+                  className="mt-1 w-full rounded-input border border-surface-borderSoft px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-blue"
                 />
               </div>
               <div className="grid grid-cols-2 gap-4">
@@ -334,7 +334,7 @@ export default function AdminBaseProductsPage() {
                     value={form.availableColors}
                     onChange={(e) => setForm({ ...form, availableColors: e.target.value })}
                     placeholder="white, black, navy"
-                    className="mt-1 w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-blue"
+                    className="mt-1 w-full rounded-input border border-surface-borderSoft px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-blue"
                   />
                 </div>
                 <div>
@@ -344,7 +344,7 @@ export default function AdminBaseProductsPage() {
                     value={form.availableSizes}
                     onChange={(e) => setForm({ ...form, availableSizes: e.target.value })}
                     placeholder="S, M, L, XL"
-                    className="mt-1 w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-blue"
+                    className="mt-1 w-full rounded-input border border-surface-borderSoft px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-blue"
                   />
                 </div>
               </div>
@@ -373,7 +373,7 @@ export default function AdminBaseProductsPage() {
                       }}
                       disabled={uploading}
                     />
-                    <span className="inline-flex items-center gap-2 rounded-full bg-brand-blue px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-brand-blue/90">
+                    <span className="inline-flex items-center gap-2 rounded-full bg-brand-blue px-4 py-2 text-sm font-medium text-white shadow-soft hover:bg-brand-blue/90">
                       <Upload size={14} />
                       {uploading ? "Uploading…" : form.imageUrl ? "Replace image" : "Upload image"}
                     </span>

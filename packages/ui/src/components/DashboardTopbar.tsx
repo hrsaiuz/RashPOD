@@ -35,7 +35,7 @@ export const DashboardTopbar: React.FC<DashboardTopbarProps> = ({
       </a>
       <header
         className={cn(
-          "h-[76px] bg-white border-b border-surface-borderSoft flex items-center justify-between px-6 sticky top-0 z-10",
+          "h-[76px] bg-white/90 backdrop-blur-md border-b border-surface-borderSoft flex items-center justify-between px-6 sticky top-0 z-10",
           className
         )}
         role="banner"
@@ -44,7 +44,7 @@ export const DashboardTopbar: React.FC<DashboardTopbarProps> = ({
           {onMobileMenuToggle && (
             <button
               onClick={onMobileMenuToggle}
-              className="md:hidden p-2 rounded-lg hover:bg-surface-borderSoft transition-colors"
+              className="md:hidden p-2 rounded-xl hover:bg-surface-borderSoft transition-colors"
               aria-label="Menu"
             >
               <Menu size={24} />
@@ -57,7 +57,7 @@ export const DashboardTopbar: React.FC<DashboardTopbarProps> = ({
                 type="search"
                 placeholder="Search..."
                 aria-label="Search dashboard"
-                className="w-80 h-10 pl-10 pr-4 rounded-xl border border-surface-border bg-white text-sm focus:outline-none focus:ring-2 focus:ring-brand-blue/20 focus:border-brand-blue"
+                className="w-80 h-11 pl-10 pr-4 rounded-[16px] border border-surface-borderSoft bg-white/80 text-sm text-brand-text placeholder:text-brand-subtle shadow-xs focus:outline-none focus:ring-4 focus:ring-brand-blue/20 focus:border-brand-blue"
               />
             </div>
           )}
@@ -65,7 +65,7 @@ export const DashboardTopbar: React.FC<DashboardTopbarProps> = ({
 
         <div className="flex items-center gap-3">
           <button
-            className="p-2 rounded-lg hover:bg-surface-borderSoft transition-colors relative"
+            className="p-2 rounded-xl hover:bg-surface-borderSoft transition-colors relative"
             aria-label="Notifications"
           >
             <Bell size={20} className="text-brand-muted" />
@@ -75,7 +75,7 @@ export const DashboardTopbar: React.FC<DashboardTopbarProps> = ({
           <div className="relative">
             <button
               onClick={() => setUserMenuOpen(!userMenuOpen)}
-              className="flex items-center gap-2 p-2 rounded-lg hover:bg-surface-borderSoft transition-colors"
+              className="flex items-center gap-2 p-2 rounded-xl hover:bg-surface-borderSoft transition-colors"
               aria-label="User menu"
               aria-expanded={userMenuOpen}
             >
@@ -96,7 +96,7 @@ export const DashboardTopbar: React.FC<DashboardTopbarProps> = ({
                   onClick={() => setUserMenuOpen(false)}
                   aria-hidden="true"
                 />
-                <div className="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-lift border border-surface-borderSoft py-2 z-20">
+                <div className="absolute right-0 mt-2 w-56 bg-white rounded-2xl shadow-lift border border-surface-borderSoft py-2 z-20">
                   <div className="px-4 py-3 border-b border-surface-borderSoft">
                     <p className="text-sm font-medium text-brand-ink">{user.name}</p>
                     {user.email && <p className="text-xs text-brand-muted">{user.email}</p>}

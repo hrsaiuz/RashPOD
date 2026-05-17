@@ -175,7 +175,7 @@ function ShopContent() {
                   }
                   setPage(1);
                 }}
-                className="w-4 h-4 rounded border-gray-300 text-brand-blue focus:ring-brand-blue"
+                className="w-4 h-4 rounded border-surface-borderSoft text-brand-blue focus:ring-brand-blue"
               />
               <span className="text-sm text-brand-muted">{cat}</span>
             </label>
@@ -239,7 +239,7 @@ function ShopContent() {
                     }
                     setPage(1);
                   }}
-                  className="w-4 h-4 rounded border-gray-300 text-brand-blue focus:ring-brand-blue"
+                  className="w-4 h-4 rounded border-surface-borderSoft text-brand-blue focus:ring-brand-blue"
                 />
                 <span className="text-sm text-brand-muted">{des.displayName}</span>
               </label>
@@ -257,7 +257,7 @@ function ShopContent() {
               setHasFilm(e.target.checked);
               setPage(1);
             }}
-            className="w-4 h-4 rounded border-gray-300 text-brand-blue focus:ring-brand-blue"
+            className="w-4 h-4 rounded border-surface-borderSoft text-brand-blue focus:ring-brand-blue"
           />
           <span className="text-sm font-semibold text-brand-ink">Has film available</span>
         </label>
@@ -272,10 +272,11 @@ function ShopContent() {
   );
 
   return (
-    <div className="max-w-[1280px] mx-auto px-6 py-10">
-      <div className="mb-8">
-        <h1 className="text-4xl font-bold text-brand-ink mb-2">Shop</h1>
-        <p className="text-brand-muted">Discover unique designs from local creators</p>
+    <div className="max-w-storefront mx-auto px-6 py-10">
+      <div className="mb-8 rounded-[32px] border border-white/70 bg-rash-hero px-6 py-10 shadow-soft">
+        <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-brand-blue">RashPOD shop</p>
+        <h1 className="text-[clamp(32px,5vw,52px)] font-bold leading-[1.08] text-brand-ink mb-3">Shop creator-made products</h1>
+        <p className="max-w-2xl text-brand-muted">Discover unique RashPOD products and film-ready designs from local creators.</p>
       </div>
 
       <div className="flex flex-col lg:flex-row gap-8">
@@ -463,9 +464,8 @@ function ShopContent() {
 
 export default function ShopPage() {
   return (
-    <Suspense fallback={<div className="max-w-[1280px] mx-auto px-6 py-10"><Skeleton className="h-96 w-full" /></div>}>
+    <Suspense fallback={<div className="max-w-storefront mx-auto px-6 py-10"><Skeleton className="h-96 w-full" /></div>}>
       <ShopContent />
     </Suspense>
   );
 }
-

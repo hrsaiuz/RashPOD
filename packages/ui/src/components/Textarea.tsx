@@ -13,7 +13,7 @@ export const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
       <textarea
         ref={ref}
         className={cn(
-          "w-full min-h-[120px] p-4 rounded-xl border bg-white text-brand-ink text-sm",
+          "w-full min-h-[120px] p-4 rounded-[14px] border bg-white text-brand-text text-sm shadow-xs",
           "transition-colors focus:outline-none focus:ring-4 focus:ring-brand-blue/20 focus:border-brand-blue",
           "disabled:opacity-50 disabled:cursor-not-allowed resize-y",
           error ? "border-semantic-danger" : "border-surface-border",

@@ -51,14 +51,19 @@ export const PublicHeader: React.FC<PublicHeaderProps> = ({
       >
         Skip to content
       </a>
-      <header className={cn("sticky top-0 z-20 bg-white/80 backdrop-blur-md border-b border-surface-borderSoft", className)}>
-        <div className="max-w-[1280px] mx-auto px-6 h-[76px] flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-2 text-2xl font-bold text-brand-blue">
+      <header className={cn("sticky top-0 z-20 bg-white/90 backdrop-blur-md border-b border-surface-borderSoft", className)}>
+        <div className="max-w-storefront mx-auto px-6 h-[76px] flex items-center justify-between">
+          <Link href="/" className="flex items-center gap-2 text-2xl font-bold tracking-tight text-brand-blue">
             {logoUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={logoUrl} alt={brandName} className="h-9 w-auto" />
             ) : (
-              brandName
+              <>
+                <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-brand-blue text-base text-white shadow-blueGlow">
+                  R
+                </span>
+                <span>{brandName}</span>
+              </>
             )}
           </Link>
 

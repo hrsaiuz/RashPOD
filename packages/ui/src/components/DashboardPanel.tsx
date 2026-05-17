@@ -15,13 +15,13 @@ export function DashboardPanel({ title, action, className, children, ...props }:
   return (
     <div
       className={cn(
-        "bg-surface-card border border-surface-border-soft rounded-2xl shadow-sm overflow-hidden",
+        "bg-white/95 border border-surface-borderSoft rounded-2xl shadow-soft overflow-hidden",
         className
       )}
       {...props}
     >
       {(title || action) && (
-        <div className="flex items-center justify-between px-6 py-5 border-b border-surface-border-soft">
+        <div className="flex items-center justify-between px-6 py-5 border-b border-surface-borderSoft bg-gradient-to-b from-white to-surface-app">
           {title && <h3 className="text-lg font-semibold text-brand-ink">{title}</h3>}
           {action && <div>{action}</div>}
         </div>

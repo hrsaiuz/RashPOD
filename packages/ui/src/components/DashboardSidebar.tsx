@@ -91,15 +91,18 @@ export const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
   return (
     <aside
       className={cn(
-        "w-[260px] bg-white border-r border-surface-borderSoft h-full md:h-screen md:sticky md:top-0 overflow-y-auto",
+        "w-[260px] bg-white/92 backdrop-blur-md border-r border-surface-borderSoft h-full md:h-screen md:sticky md:top-0 overflow-y-auto shadow-soft",
         className
       )}
       aria-label={`${role} navigation`}
     >
       <div className="p-6">
         <div className="mb-8 flex items-center gap-3">
-          <Link href="/" className="text-2xl font-bold text-brand-blue tracking-tight focus:outline-none focus:ring-2 focus:ring-brand-blue/30 rounded">
-            RashPOD
+          <Link href="/" className="flex items-center gap-2 text-2xl font-bold text-brand-blue tracking-tight focus:outline-none focus:ring-2 focus:ring-brand-blue/30 rounded">
+            <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-brand-blue text-base text-white shadow-blueGlow">
+              R
+            </span>
+            <span>RashPOD</span>
           </Link>
         </div>
 
@@ -136,11 +139,11 @@ export const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
                   onClick={onNavigate}
                   aria-current={isActive ? "page" : undefined}
                   className={cn(
-                    "flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-colors focus:outline-none focus:ring-2",
+                    "flex items-center gap-3 px-4 py-3 rounded-[16px] text-sm font-medium transition-colors focus:outline-none focus:ring-2",
                     a.ring,
                     isActive
-                      ? cn(a.activeBg, a.activeText, "font-semibold")
-                      : "text-brand-ink hover:bg-surface-borderSoft"
+                      ? cn(a.activeBg, a.activeText, "font-semibold shadow-soft")
+                      : "text-brand-text hover:bg-surface-borderSoft"
                   )}
                 >
                   {Icon && <Icon size={20} aria-hidden="true" />}

@@ -52,6 +52,13 @@ interface Designer {
   avatarUrl?: string;
 }
 
+interface HomeBrandingMedia {
+  homeHeroImageUrl?: string;
+  homeHeroImageAlt?: string;
+  homeDesignerSectionImageUrl?: string;
+  homeDesignerSectionImageAlt?: string;
+}
+
 // Bento grid category cards – matches the screenshot layout.
 // Row 1: large (span-5) + medium (span-4) + compact (span-3)
 // Row 2: compact (span-3) + medium (span-4) + large (span-5)
@@ -91,6 +98,9 @@ const FALLBACK_DESIGNERS: Designer[] = [
 const formatPrice = (sum: number) =>
   new Intl.NumberFormat("ru-RU", { maximumFractionDigits: 0 }).format(sum) + " so'm";
 
+const getOptionalString = (value: unknown) =>
+  typeof value === "string" && value.trim().length > 0 ? value : undefined;
+
 export default function HomePage() {
   const dashboardUrl = getDashboardUrl();
   const apiBase = getApiBase();
@@ -98,6 +108,7 @@ export default function HomePage() {
   const [categories, setCategories] = useState<CategoryCard[]>(FALLBACK_CATEGORIES);
   const [products, setProducts] = useState<ProductListing[]>(FALLBACK_PRODUCTS);
   const [designers, setDesigners] = useState<Designer[]>(FALLBACK_DESIGNERS);
+  const [homeMedia, setHomeMedia] = useState<HomeBrandingMedia>({});
 
   useEffect(() => {
     // Best-effort enhancement: try the API; keep curated fallback if the
@@ -158,8 +169,29 @@ export default function HomePage() {
       })
       .catch(() => {/* keep fallback */});
 
+    fetch(`${apiBase}/branding`, opts)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (!data || typeof data !== "object") return;
+        const theme = typeof data.theme === "object" && data.theme ? data.theme : {};
+        setHomeMedia({
+          homeHeroImageUrl: getOptionalString(data.homeHeroImageUrl) ?? getOptionalString((theme as Record<string, unknown>).homeHeroImageUrl),
+          homeHeroImageAlt: getOptionalString(data.homeHeroImageAlt) ?? getOptionalString((theme as Record<string, unknown>).homeHeroImageAlt),
+          homeDesignerSectionImageUrl:
+            getOptionalString(data.homeDesignerSectionImageUrl) ??
+            getOptionalString((theme as Record<string, unknown>).homeDesignerSectionImageUrl),
+          homeDesignerSectionImageAlt:
+            getOptionalString(data.homeDesignerSectionImageAlt) ??
+            getOptionalString((theme as Record<string, unknown>).homeDesignerSectionImageAlt),
+        });
+      })
+      .catch(() => {/* keep fallback artwork */});
+
     return () => controller.abort();
   }, [apiBase]);
+
+  const heroImageUrl = homeMedia.homeHeroImageUrl;
+  const designerSectionImageUrl = homeMedia.homeDesignerSectionImageUrl;
 
   return (
     <div className="relative">
@@ -167,52 +199,107 @@ export default function HomePage() {
       <section
         className="relative overflow-hidden"
         style={{
-          background:
-            "linear-gradient(135deg, #F0F2FA 0%, #FFFFFF 55%, #FFD6C6 100%)",
+          background: "linear-gradient(135deg, #F0F2FA 0%, #FFFFFF 55%, #FFD6C6 100%)",
         }}
       >
         <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
-          <motion.div
-            className="absolute -top-12 -right-8 h-56 w-56 rounded-full opacity-25 blur-3xl"
-            style={{ background: "radial-gradient(circle, #F39E7C 0%, transparent 70%)" }}
-            animate={{ y: [0, 16, 0] }}
-            transition={{ duration: 12, repeat: Infinity, ease: "easeInOut" }}
+          <div
+            className="absolute right-[8%] top-10 h-28 w-28 rotate-12 rounded-[28px] border border-brand-blue/20 bg-brand-blueLight/35"
           />
-          <motion.div
-            className="absolute top-1/3 -left-12 h-48 w-48 rounded-full opacity-25 blur-3xl"
-            style={{ background: "radial-gradient(circle, #788AE0 0%, transparent 70%)" }}
-            animate={{ y: [0, -18, 0] }}
-            transition={{ duration: 14, repeat: Infinity, ease: "easeInOut" }}
+          <div
+            className="absolute right-[22%] bottom-8 h-20 w-20 -rotate-12 rounded-full border border-brand-peach/30 bg-brand-peachLight/45"
+          />
+          <div
+            className="absolute left-6 top-1/3 h-24 w-24 rotate-45 rounded-[24px] border border-brand-blue/15"
+          />
+          <div
+            className="absolute inset-0 opacity-[0.16]"
+            style={{
+              backgroundImage:
+                "radial-gradient(circle at 18px 18px, #788AE0 1.4px, transparent 1.4px)",
+              backgroundSize: "36px 36px",
+            }}
           />
         </div>
 
-        <div className="relative max-w-[1200px] mx-auto px-6 py-16 md:py-20">
-          <motion.div {...fadeIn} className="max-w-xl">
-            <span className="inline-flex items-center gap-2 rounded-full bg-white/70 backdrop-blur px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.1em] text-brand-blue ring-1 ring-brand-blueLight mb-5">
-              <Sparkles size={12} aria-hidden="true" />
-              Print-on-Demand for Uzbekistan
-            </span>
-            <h1 className="text-[clamp(28px,4vw,42px)] font-bold leading-[1.1] tracking-tight text-brand-ink mb-4">
-              Upload your designs.<br />
-              <span className="text-brand-blue">Sell products.</span>{" "}
-              <span className="text-brand-peach">Earn royalties.</span>
-            </h1>
-            <p className="text-[15px] md:text-base text-brand-muted mb-7 leading-relaxed max-w-[480px]">
-              Turn your artwork into RashPOD products, DTF/UV-DTF films, and corporate
-              merchandise opportunities — local production, transparent royalties.
-            </p>
-            <div className="flex flex-wrap gap-3">
-              <a href={`${dashboardUrl}/auth/register?role=designer`}>
-                <Button variant="primaryPeach" size="md">
-                  Start selling your designs
-                </Button>
-              </a>
-              <Link href="/shop">
-                <Button variant="primaryBlue" size="md">
-                  Open RashPOD Shop
-                </Button>
-              </Link>
+        <div className="relative max-w-[1200px] mx-auto px-6 py-14 md:py-20">
+          <motion.div {...fadeIn} className="grid items-center gap-10 lg:grid-cols-[1.02fr_0.98fr]">
+            <div className="max-w-xl">
+              <span className="inline-flex items-center gap-2 rounded-full bg-white/70 backdrop-blur px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.1em] text-brand-blue ring-1 ring-brand-blueLight mb-5">
+                <Sparkles size={12} aria-hidden="true" />
+                Print-on-Demand for Uzbekistan
+              </span>
+              <h1 className="text-[clamp(34px,5vw,56px)] font-bold leading-[1.08] text-brand-ink mb-4">
+                Upload your designs.<br />
+                <span className="text-brand-blue">Sell products.</span>{" "}
+                <span className="text-brand-peach">Earn royalties.</span>
+              </h1>
+              <p className="text-[15px] md:text-base text-brand-muted mb-7 leading-relaxed max-w-[480px]">
+                Turn your artwork into RashPOD products, DTF/UV-DTF films, and corporate
+                merchandise opportunities with local production and transparent royalties.
+              </p>
+              <div className="flex flex-wrap gap-3">
+                <a href={`${dashboardUrl}/auth/register?role=designer`}>
+                  <Button variant="primaryPeach" size="md">
+                    Start selling your designs
+                  </Button>
+                </a>
+                <Link href="/shop">
+                  <Button variant="primaryBlue" size="md">
+                    Open RashPOD Shop
+                  </Button>
+                </Link>
+              </div>
             </div>
+            {heroImageUrl ? (
+              <div className="relative min-h-[280px] sm:min-h-[360px] lg:min-h-[420px]">
+                <div className="absolute inset-0 rounded-[32px] border border-white/70 bg-white/80 p-3 shadow-product backdrop-blur">
+                  <div className="relative h-full overflow-hidden rounded-[26px] bg-white">
+                    <Image
+                      src={heroImageUrl}
+                      alt={homeMedia.homeHeroImageAlt ?? "RashPOD product mockup and designer artwork preview"}
+                      fill
+                      priority
+                      sizes="(min-width: 1024px) 560px, 100vw"
+                      className="object-cover"
+                    />
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="relative hidden min-h-[360px] lg:block">
+                <div className="absolute right-0 top-0 w-[84%] rounded-[32px] border border-white/70 bg-white/80 p-5 shadow-product backdrop-blur">
+                  <div className="aspect-[4/3] rounded-[24px] bg-gradient-to-br from-brand-blueLight via-white to-brand-peachLight p-5">
+                    <div className="grid h-full grid-cols-[1fr_0.72fr] gap-4">
+                      <div className="rounded-[22px] bg-white/85 p-4 shadow-soft">
+                        <div className="h-48 rounded-[20px] bg-brand-blue/10" />
+                        <div className="mt-4 h-3 w-2/3 rounded-full bg-brand-ink/15" />
+                        <div className="mt-2 h-3 w-1/2 rounded-full bg-brand-muted/15" />
+                      </div>
+                      <div className="space-y-3">
+                        <div className="rounded-[20px] bg-brand-blue p-4 text-white shadow-blueGlow">
+                          <div className="h-3 w-16 rounded-full bg-white/40" />
+                          <div className="mt-8 h-12 w-12 rounded-2xl bg-white/20" />
+                        </div>
+                        <div className="rounded-[20px] bg-brand-peach p-4 text-white shadow-peachGlow">
+                          <div className="h-3 w-20 rounded-full bg-white/45" />
+                          <div className="mt-5 h-10 w-24 rounded-full bg-white/25" />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div className="absolute bottom-2 left-8 rounded-[24px] border border-surface-borderSoft bg-white p-4 shadow-lift">
+                  <div className="flex items-center gap-3">
+                    <div className="h-12 w-12 rounded-2xl bg-brand-peachLight" />
+                    <div>
+                      <div className="h-3 w-28 rounded-full bg-brand-ink/15" />
+                      <div className="mt-2 h-3 w-20 rounded-full bg-brand-blue/25" />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
           </motion.div>
         </div>
       </section>
@@ -402,44 +489,65 @@ export default function HomePage() {
           </Link>
         </div>
 
-        <motion.div
-          initial={{ opacity: 0 }}
-          whileInView={{ opacity: 1 }}
-          viewport={{ once: true }}
-          className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"
-        >
-          {designers.map((designer) => (
-            <Link
-              key={designer.id}
-              href={`/designer/${designer.handle}`}
-              className="block focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue/30 rounded-2xl"
-              aria-label={`View ${designer.displayName}'s profile`}
+        <div className={designerSectionImageUrl ? "grid grid-cols-1 lg:grid-cols-[0.82fr_1.18fr] gap-6" : ""}>
+          {designerSectionImageUrl && (
+            <motion.div
+              initial={{ opacity: 0, y: 12 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              className="relative min-h-[280px] overflow-hidden rounded-[32px] border border-white/70 bg-white p-3 shadow-product"
             >
-              <Card variant="flat" className="!p-4 group hover:shadow-soft transition-shadow">
-                <div className="flex items-center gap-3">
-                  <div className="h-12 w-12 shrink-0 rounded-full bg-brand-blueLight flex items-center justify-center overflow-hidden">
-                    {designer.avatarUrl ? (
-                      <Image src={designer.avatarUrl} alt="" width={48} height={48} className="rounded-full" />
-                    ) : (
-                      <span className="text-lg font-bold text-brand-blue">
-                        {designer.displayName.charAt(0).toUpperCase()}
-                      </span>
-                    )}
+              <div className="relative h-full min-h-[260px] overflow-hidden rounded-[26px] bg-brand-bg">
+                <Image
+                  src={designerSectionImageUrl}
+                  alt={homeMedia.homeDesignerSectionImageAlt ?? "RashPOD designer community artwork"}
+                  fill
+                  sizes="(min-width: 1024px) 440px, 100vw"
+                  className="object-cover"
+                />
+              </div>
+            </motion.div>
+          )}
+
+          <motion.div
+            initial={{ opacity: 0 }}
+            whileInView={{ opacity: 1 }}
+            viewport={{ once: true }}
+            className={designerSectionImageUrl ? "grid grid-cols-1 sm:grid-cols-2 gap-4" : "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"}
+          >
+            {designers.map((designer) => (
+              <Link
+                key={designer.id}
+                href={`/designer/${designer.handle}`}
+                className="block focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue/30 rounded-2xl"
+                aria-label={`View ${designer.displayName}'s profile`}
+              >
+                <Card variant="flat" className="!p-4 group hover:shadow-soft transition-shadow">
+                  <div className="flex items-center gap-3">
+                    <div className="h-12 w-12 shrink-0 rounded-full bg-brand-blueLight flex items-center justify-center overflow-hidden">
+                      {designer.avatarUrl ? (
+                        <Image src={designer.avatarUrl} alt="" width={48} height={48} className="rounded-full" />
+                      ) : (
+                        <span className="text-lg font-bold text-brand-blue">
+                          {designer.displayName.charAt(0).toUpperCase()}
+                        </span>
+                      )}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <h3 className="text-sm font-semibold text-brand-ink truncate group-hover:text-brand-blue transition-colors">
+                        {designer.displayName}
+                      </h3>
+                      <p className="text-[12px] text-brand-muted">
+                        @{designer.handle} · <span className="tabular-nums">{designer.listingsCount}</span> listings
+                      </p>
+                    </div>
+                    <ArrowRight size={16} className="text-brand-muted shrink-0 group-hover:text-brand-blue transition-colors" aria-hidden="true" />
                   </div>
-                  <div className="min-w-0 flex-1">
-                    <h3 className="text-sm font-semibold text-brand-ink truncate group-hover:text-brand-blue transition-colors">
-                      {designer.displayName}
-                    </h3>
-                    <p className="text-[12px] text-brand-muted">
-                      @{designer.handle} · <span className="tabular-nums">{designer.listingsCount}</span> listings
-                    </p>
-                  </div>
-                  <ArrowRight size={16} className="text-brand-muted shrink-0 group-hover:text-brand-blue transition-colors" aria-hidden="true" />
-                </div>
-              </Card>
-            </Link>
-          ))}
-        </motion.div>
+                </Card>
+              </Link>
+            ))}
+          </motion.div>
+        </div>
       </section>
 
       {/* Films + Corporate */}
@@ -538,7 +646,7 @@ export default function HomePage() {
           ].map((faq, i) => (
             <details
               key={i}
-              className="group bg-white rounded-2xl px-5 py-4 shadow-sm border border-surface-borderSoft"
+              className="group bg-white rounded-2xl px-5 py-4 shadow-soft border border-surface-borderSoft"
             >
               <summary className="flex items-center justify-between cursor-pointer list-none focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue/30 rounded">
                 <span className="text-[15px] font-semibold text-brand-ink pr-4">{faq.q}</span>

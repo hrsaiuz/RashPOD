@@ -28,7 +28,7 @@ export const KpiTile: React.FC<KpiTileProps> = ({
       whileHover={{ y: -4, scale: 1.01 }}
       transition={{ duration: 0.18 }}
       className={cn(
-        "bg-white rounded-2xl p-6 shadow-soft border border-surface-borderSoft",
+        "bg-white/95 rounded-2xl p-6 shadow-soft border border-surface-borderSoft",
         className
       )}
     >

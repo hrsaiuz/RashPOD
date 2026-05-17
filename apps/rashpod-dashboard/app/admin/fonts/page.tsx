@@ -17,7 +17,7 @@ export default function FontLibraryPage() {
         <div className="p-0">
           <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="border-b border-surface-border-soft bg-surface-app text-sm text-brand-muted">
+              <tr className="border-b border-surface-borderSoft bg-surface-app text-sm text-brand-muted">
                 <th className="px-6 py-4 font-medium">Language</th>
                 <th className="px-6 py-4 font-medium">Font Family</th>
                 <th className="px-6 py-4 font-medium">Status</th>
@@ -30,7 +30,7 @@ export default function FontLibraryPage() {
                 { lang: "Russian (RU)", font: "Lora Cyrillic", status: "Active" },
                 { lang: "Uzbek Latin (UZ)", font: "Inter", status: "Active" },
               ].map((row, i) => (
-                <tr key={i} className="border-b border-surface-border-soft last:border-0 hover:bg-surface-app/50 transition-colors">
+                <tr key={i} className="border-b border-surface-borderSoft last:border-0 hover:bg-surface-app/50 transition-colors">
                   <td className="px-6 py-4 font-medium text-brand-ink">{row.lang}</td>
                   <td className="px-6 py-4 text-brand-muted flex items-center gap-2">
                     <Type className="w-4 h-4" /> {row.font}

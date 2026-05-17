@@ -11,7 +11,7 @@ export default function AboutPage() {
   return (
     <div className="relative">
       {/* Hero */}
-      <section className="max-w-[1120px] mx-auto px-6 py-24">
+      <section className="max-w-storefront mx-auto px-6 py-24">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -28,7 +28,7 @@ export default function AboutPage() {
       </section>
 
       {/* Mission */}
-      <section className="max-w-[1120px] mx-auto px-6 py-16">
+      <section className="max-w-storefront mx-auto px-6 py-16">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
           <motion.div
             initial={{ opacity: 0, x: -20 }}
@@ -72,7 +72,7 @@ export default function AboutPage() {
       </section>
 
       {/* Values */}
-      <section className="max-w-[1120px] mx-auto px-6 py-16">
+      <section className="max-w-storefront mx-auto px-6 py-16">
         <motion.h2
           initial={{ opacity: 0 }}
           whileInView={{ opacity: 1 }}
@@ -127,7 +127,7 @@ export default function AboutPage() {
           initial={{ opacity: 0 }}
           whileInView={{ opacity: 1 }}
           viewport={{ once: true }}
-          className="max-w-[1120px] mx-auto px-6"
+          className="max-w-storefront mx-auto px-6"
         >
           <h2 className="text-3xl md:text-4xl font-bold text-brand-ink mb-6 text-center">
             How RashPOD works
@@ -160,7 +160,7 @@ export default function AboutPage() {
       </section>
 
       {/* CTA */}
-      <section className="max-w-[1120px] mx-auto px-6 py-24">
+      <section className="max-w-storefront mx-auto px-6 py-24">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}

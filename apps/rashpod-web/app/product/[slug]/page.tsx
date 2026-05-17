@@ -127,7 +127,7 @@ export default function ProductPage({ params }: { params: Promise<{ slug: string
 
   if (loading) {
     return (
-      <div className="max-w-[1120px] mx-auto px-6 py-10">
+      <div className="max-w-storefront mx-auto px-6 py-10">
         <Skeleton className="h-6 w-48 mb-8" />
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
           <Skeleton className="w-full aspect-[4/5]" />
@@ -143,7 +143,7 @@ export default function ProductPage({ params }: { params: Promise<{ slug: string
 
   if (error || !product) {
     return (
-      <div className="max-w-[1120px] mx-auto px-6 py-20">
+      <div className="max-w-storefront mx-auto px-6 py-20">
         <ErrorState
           title="Product not found"
           description="We couldn't find the product you're looking for."
@@ -166,7 +166,7 @@ export default function ProductPage({ params }: { params: Promise<{ slug: string
   ];
 
   return (
-    <div className="max-w-[1120px] mx-auto px-6 py-10">
+    <div className="max-w-storefront mx-auto px-6 py-10">
       {/* Breadcrumbs */}
       <div className="mb-8">
         <Breadcrumbs items={breadcrumbs} />
@@ -175,7 +175,7 @@ export default function ProductPage({ params }: { params: Promise<{ slug: string
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 mb-16">
         {/* Left: Image gallery */}
         <div>
-          <div className="relative w-full aspect-[4/5] bg-gray-100 rounded-[24px] overflow-hidden mb-4">
+          <div className="relative w-full aspect-[4/5] bg-brand-bg rounded-[28px] overflow-hidden mb-4 shadow-product">
             {product.images && product.images.length > 0 ? (
               <>
                 <Image
@@ -190,7 +190,7 @@ export default function ProductPage({ params }: { params: Promise<{ slug: string
                 {product.images.length > 1 && (
                   <>
                     <button
-                      className="absolute top-1/2 left-4 -translate-y-1/2 w-10 h-10 bg-white/90 rounded-full shadow-sm flex items-center justify-center hover:bg-white transition-colors"
+                      className="absolute top-1/2 left-4 -translate-y-1/2 w-10 h-10 bg-white/90 rounded-full shadow-soft flex items-center justify-center hover:bg-white transition-colors"
                       onClick={() =>
                         setCurrentImageIndex(
                           (currentImageIndex - 1 + product.images.length) % product.images.length
@@ -200,7 +200,7 @@ export default function ProductPage({ params }: { params: Promise<{ slug: string
                       <ChevronLeft className="w-5 h-5 text-brand-ink" />
                     </button>
                     <button
-                      className="absolute top-1/2 right-4 -translate-y-1/2 w-10 h-10 bg-white/90 rounded-full shadow-sm flex items-center justify-center hover:bg-white transition-colors"
+                      className="absolute top-1/2 right-4 -translate-y-1/2 w-10 h-10 bg-white/90 rounded-full shadow-soft flex items-center justify-center hover:bg-white transition-colors"
                       onClick={() =>
                         setCurrentImageIndex((currentImageIndex + 1) % product.images.length)
                       }
@@ -211,7 +211,7 @@ export default function ProductPage({ params }: { params: Promise<{ slug: string
                 )}
               </>
             ) : (
-              <div className="w-full h-full flex items-center justify-center text-gray-400">
+              <div className="w-full h-full flex items-center justify-center text-brand-muted">
                 <Package className="w-20 h-20" />
               </div>
             )}
@@ -246,10 +246,10 @@ export default function ProductPage({ params }: { params: Promise<{ slug: string
           <div className="flex justify-between items-start mb-2">
             <h1 className="text-3xl font-bold text-brand-ink">{product.title}</h1>
             <div className="flex gap-2">
-              <button className="w-10 h-10 rounded-full border border-surface-border-soft flex items-center justify-center hover:bg-surface-app text-brand-ink transition-colors">
+              <button className="w-10 h-10 rounded-full border border-surface-borderSoft flex items-center justify-center hover:bg-surface-app text-brand-ink transition-colors">
                 <Heart className="w-5 h-5" />
               </button>
-              <button className="w-10 h-10 rounded-full border border-surface-border-soft flex items-center justify-center hover:bg-surface-app text-brand-ink transition-colors">
+              <button className="w-10 h-10 rounded-full border border-surface-borderSoft flex items-center justify-center hover:bg-surface-app text-brand-ink transition-colors">
                 <Share2 className="w-5 h-5" />
               </button>
             </div>
@@ -266,7 +266,7 @@ export default function ProductPage({ params }: { params: Promise<{ slug: string
             )}
           </div>
 
-          <div className="flex items-center gap-4 mb-8 pb-8 border-b border-surface-border-soft">
+          <div className="flex items-center gap-4 mb-8 pb-8 border-b border-surface-borderSoft">
             <span className="text-[32px] font-bold text-brand-ink">
               {product.price.toLocaleString()} UZS
             </span>
@@ -311,7 +311,7 @@ export default function ProductPage({ params }: { params: Promise<{ slug: string
           {/* Quantity */}
           <div className="mb-8">
             <FormField label="Quantity">
-              <div className="flex items-center bg-surface-app rounded-full h-14 px-2 w-fit">
+              <div className="flex items-center bg-surface-app rounded-full h-14 px-2 w-fit border border-surface-borderSoft">
                 <button
                   className="w-10 h-10 rounded-full flex items-center justify-center hover:bg-white text-brand-ink text-xl font-semibold"
                   onClick={() => setQuantity(Math.max(1, quantity - 1))}
@@ -334,7 +334,7 @@ export default function ProductPage({ params }: { params: Promise<{ slug: string
             Add To Cart
           </Button>
 
-          <div className="space-y-4 bg-surface-card rounded-[20px] border border-surface-border-soft p-5">
+          <div className="space-y-4 bg-white rounded-[20px] border border-surface-borderSoft p-5 shadow-soft">
             <div className="flex items-start gap-3">
               <Truck className="w-5 h-5 text-brand-blue mt-0.5" />
               <div>
@@ -354,8 +354,8 @@ export default function ProductPage({ params }: { params: Promise<{ slug: string
       </div>
 
       {/* Tabs */}
-      <div className="border-t border-surface-border-soft pt-12 mb-16">
-        <div className="flex gap-8 mb-8 border-b border-surface-border-soft">
+      <div className="border-t border-surface-borderSoft pt-12 mb-16">
+        <div className="flex gap-8 mb-8 border-b border-surface-borderSoft">
           {[
             { id: "description", label: "Description" },
             { id: "shipping", label: "Shipping & Returns" },

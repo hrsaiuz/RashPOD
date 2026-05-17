@@ -116,7 +116,7 @@ export default function AdminCustomersPage() {
           </div>
         </div>
 
-        <div className="inline-flex rounded-full border border-gray-200 bg-white p-1">
+        <div className="inline-flex rounded-full border border-surface-borderSoft bg-white p-1 shadow-soft">
           <button
             onClick={() => setTab("retail")}
             className={`px-4 py-1.5 rounded-full text-sm font-medium ${

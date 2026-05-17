@@ -103,7 +103,7 @@ function LoginInner() {
         setError("");
       }}
       className={`flex-1 rounded-xl px-4 py-2.5 text-sm font-semibold transition ${
-        mode === m ? "bg-brand-blue text-white shadow-sm" : "text-brand-muted hover:text-brand-ink"
+        mode === m ? "bg-brand-blue text-white shadow-soft" : "text-brand-muted hover:text-brand-ink"
       }`}
     >
       {label}

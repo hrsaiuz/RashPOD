@@ -111,7 +111,7 @@ function FilmContent() {
             placeholder="Filter by designer..."
             value={designerFilter}
             onChange={(e) => setDesignerFilter(e.target.value)}
-            className="w-full px-4 py-2 rounded-xl border border-surface-border bg-white text-sm focus:outline-none focus:ring-4 focus:ring-focus"
+            className="w-full rounded-[14px] border border-surface-borderSoft bg-white px-4 py-2 text-sm text-brand-text shadow-xs focus:outline-none focus:ring-4 focus:ring-brand-blue/20 focus:border-brand-blue"
           />
         </FormField>
       </div>
@@ -137,9 +137,10 @@ function FilmContent() {
   );
 
   return (
-    <div className="max-w-[1280px] mx-auto px-6 py-10">
-      <div className="mb-8">
-        <h1 className="text-4xl font-bold text-brand-ink mb-2">Film Catalog</h1>
+    <div className="max-w-storefront mx-auto px-6 py-10">
+      <div className="mb-8 rounded-[32px] border border-white/70 bg-rash-hero px-6 py-10 shadow-soft">
+        <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-brand-peach">DTF / UV-DTF films</p>
+        <h1 className="text-[clamp(32px,5vw,52px)] font-bold leading-[1.08] text-brand-ink mb-3">Film Catalog</h1>
         <p className="text-brand-muted">
           License high-quality designs for DTF/UV-DTF printing
         </p>
@@ -240,7 +241,7 @@ function FilmContent() {
               {films.map((film) => (
                 <Card key={film.id} variant="lift" className="overflow-hidden group">
                   <Link href={`/film/${film.slug}`}>
-                    <div className="relative w-full h-64 bg-gray-100">
+                    <div className="relative w-full h-64 bg-brand-bg rounded-[22px] overflow-hidden">
                       {film.imageUrl ? (
                         <Image
                           src={film.imageUrl}
@@ -250,7 +251,7 @@ function FilmContent() {
                           sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
                         />
                       ) : (
-                        <div className="w-full h-full flex items-center justify-center text-gray-400">
+                        <div className="w-full h-full flex items-center justify-center text-brand-muted">
                           <Film className="w-12 h-12" />
                         </div>
                       )}
@@ -306,7 +307,7 @@ function FilmContent() {
 
 export default function FilmPage() {
   return (
-    <Suspense fallback={<div className="max-w-[1280px] mx-auto px-6 py-10"><Skeleton className="h-96 w-full" /></div>}>
+    <Suspense fallback={<div className="max-w-storefront mx-auto px-6 py-10"><Skeleton className="h-96 w-full" /></div>}>
       <FilmContent />
     </Suspense>
   );

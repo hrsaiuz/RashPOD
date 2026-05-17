@@ -65,14 +65,14 @@ export default function DesignersPage() {
   };
 
   return (
-    <div className="max-w-[1120px] mx-auto px-6 py-10">
+    <div className="max-w-storefront mx-auto px-6 py-10">
       {/* Hero */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="text-center mb-16"
+        className="bg-rash-hero rounded-[32px] px-6 py-14 text-center mb-16 shadow-soft"
       >
-        <div className="w-20 h-20 rounded-full bg-brand-blue/10 flex items-center justify-center mx-auto mb-6">
+        <div className="w-20 h-20 rounded-full bg-white/80 flex items-center justify-center mx-auto mb-6 shadow-soft">
           <Users className="w-10 h-10 text-brand-blue" />
         </div>
         <h1 className="text-4xl md:text-5xl font-bold text-brand-ink mb-4">
@@ -181,7 +181,7 @@ export default function DesignersPage() {
                       {designer.topListings.slice(0, 3).map((listing) => (
                         <div
                           key={listing.id}
-                          className="w-16 h-16 rounded-lg bg-gray-100 overflow-hidden"
+                          className="w-16 h-16 rounded-xl bg-brand-bg overflow-hidden"
                           >
                             {listing.imageUrl ? (
                               <Image

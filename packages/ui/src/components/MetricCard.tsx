@@ -26,7 +26,7 @@ export function MetricCard({ title, value, trend, icon, className }: MetricCardP
     <motion.div
       whileHover={{ y: -2 }}
       className={cn(
-        "bg-surface-card border border-surface-border-soft rounded-2xl p-5 shadow-sm flex flex-col gap-4",
+        "bg-white/95 border border-surface-borderSoft rounded-2xl p-5 shadow-soft flex flex-col gap-4",
         className
       )}
     >

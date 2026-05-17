@@ -38,13 +38,29 @@ export function ProductCategoryBentoCard({
       whileHover={{ y: -4, scale: 1.015 }}
       transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
       className={cn(
-        "relative rounded-[20px] overflow-hidden cursor-pointer",
-        "flex min-h-[200px] md:min-h-[240px]",
-        isBlue ? "bg-brand-blue" : "bg-brand-peach",
+        "relative rounded-category overflow-hidden cursor-pointer shadow-soft",
+        "flex min-h-[210px] md:min-h-[248px]",
+        isBlue ? "bg-brand-blue text-white" : "bg-brand-peach text-brand-ink",
         className
       )}
       onClick={onClick}
     >
+      <div
+        aria-hidden="true"
+        className="absolute inset-0 opacity-[0.18]"
+        style={{
+          backgroundImage:
+            "radial-gradient(circle at 18px 18px, currentColor 1.5px, transparent 1.5px)",
+          backgroundSize: "34px 34px",
+        }}
+      />
+      <div
+        aria-hidden="true"
+        className={cn(
+          "absolute -right-10 -top-10 h-32 w-32 rotate-12 rounded-[28px] border",
+          isBlue ? "border-white/30" : "border-white/35"
+        )}
+      />
       {/* Left: text content */}
       <div className="relative z-10 flex flex-col justify-between p-5 md:p-6 w-[48%] shrink-0">
         <div>
@@ -73,7 +89,7 @@ export function ProductCategoryBentoCard({
                 "inline-flex items-center gap-2 rounded-full px-4 py-2 text-[12px] font-semibold uppercase tracking-wide transition-opacity hover:opacity-90",
                 isBlue
                   ? "bg-brand-peach text-white"
-                  : "bg-white text-brand-ink"
+                  : "bg-white text-brand-ink shadow-xs"
               )}
             >
               Shop now <ArrowRight size={13} />

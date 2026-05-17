@@ -12,11 +12,11 @@ export const Card = React.forwardRef<HTMLDivElement, CardProps>(
   ({ className, variant = "default", children, onClick, onMouseEnter, onMouseLeave, ...props }, ref) => {
     const variants = {
       default: "bg-white shadow-soft border border-surface-borderSoft",
-      flat: "bg-white border border-surface-borderSoft",
+      flat: "bg-white/95 border border-surface-borderSoft",
       lift: "bg-white shadow-lift border border-surface-borderSoft",
     };
 
-    const baseClassName = cn("rounded-2xl p-6", variants[variant], className);
+    const baseClassName = cn("rounded-2xl p-6 text-brand-text", variants[variant], className);
 
     if (variant === "lift") {
       return (

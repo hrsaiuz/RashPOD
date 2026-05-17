@@ -93,7 +93,7 @@ export default function FaqPage() {
               {group.items.map((faq, i) => (
                 <details
                   key={i}
-                  className="group bg-white rounded-2xl px-5 py-4 shadow-sm border border-surface-borderSoft"
+                  className="group bg-white rounded-2xl px-5 py-4 shadow-soft border border-surface-borderSoft"
                 >
                   <summary className="flex items-center justify-between cursor-pointer list-none focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue/30 rounded">
                     <span className="text-[15px] font-semibold text-brand-ink pr-4">{faq.q}</span>

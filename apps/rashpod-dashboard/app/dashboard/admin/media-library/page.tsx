@@ -38,6 +38,13 @@ const CATEGORIES: { value: MediaCategory | "ALL"; label: string }[] = [
   { value: "BRANDING_FAVICON", label: "Favicon" },
 ];
 
+const inputClassName =
+  "mt-1 w-full rounded-[14px] border border-surface-borderSoft bg-white px-3 py-2 text-sm text-brand-text shadow-xs focus:outline-none focus:ring-4 focus:ring-brand-blue/20 focus:border-brand-blue";
+const compactSelectClassName =
+  "rounded-[14px] border border-surface-borderSoft bg-white px-3 py-1.5 text-sm text-brand-text shadow-xs focus:outline-none focus:ring-4 focus:ring-brand-blue/20 focus:border-brand-blue";
+const uploadButtonClassName =
+  "inline-flex w-full items-center justify-center gap-2 rounded-full bg-brand-blue px-4 py-2 text-sm font-semibold text-white shadow-blueGlow hover:bg-[#6F7FDA] cursor-pointer transition-colors";
+
 function formatBytes(b: number) {
   if (b < 1024) return `${b} B`;
   if (b < 1024 * 1024) return `${(b / 1024).toFixed(1)} KB`;
@@ -159,7 +166,7 @@ export default function MediaLibraryPage() {
               <select
                 value={uploadCategory}
                 onChange={(e) => setUploadCategory(e.target.value as MediaCategory)}
-                className="mt-1 w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-blue"
+                className={inputClassName}
               >
                 {CATEGORIES.filter((c) => c.value !== "ALL").map((c) => (
                   <option key={c.value} value={c.value}>
@@ -175,7 +182,7 @@ export default function MediaLibraryPage() {
                 value={uploadTitle}
                 onChange={(e) => setUploadTitle(e.target.value)}
                 placeholder="Hero illustration"
-                className="mt-1 w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-blue"
+                className={inputClassName}
               />
             </div>
             <div className="lg:col-span-1">
@@ -185,13 +192,13 @@ export default function MediaLibraryPage() {
                 value={uploadDescription}
                 onChange={(e) => setUploadDescription(e.target.value)}
                 placeholder="Optional"
-                className="mt-1 w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-blue"
+                className={inputClassName}
               />
             </div>
             <div className="lg:col-span-1 flex items-end">
               <label className="w-full">
                 <input type="file" className="hidden" onChange={handleUpload} disabled={uploading} />
-                <span className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-brand-blue px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-brand-blue/90 cursor-pointer">
+                <span className={uploadButtonClassName}>
                   <Upload size={16} />
                   {uploading ? "Uploading…" : "Upload file"}
                 </span>
@@ -206,7 +213,7 @@ export default function MediaLibraryPage() {
           <select
             value={filter}
             onChange={(e) => setFilter(e.target.value as MediaCategory | "ALL")}
-            className="rounded-md border border-gray-200 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-blue"
+            className={compactSelectClassName}
           >
             {CATEGORIES.map((c) => (
               <option key={c.value} value={c.value}>

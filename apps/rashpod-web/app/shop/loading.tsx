@@ -2,7 +2,7 @@ import { Skeleton, Card } from "@rashpod/ui";
 
 export default function ShopLoading() {
   return (
-    <div className="max-w-[1280px] mx-auto px-6 py-10">
+    <div className="max-w-storefront mx-auto px-6 py-10">
       <div className="mb-8">
         <Skeleton className="h-10 w-32 mb-2" />
         <Skeleton className="h-5 w-64" />

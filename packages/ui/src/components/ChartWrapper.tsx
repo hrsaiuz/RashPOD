@@ -30,7 +30,7 @@ export function ChartWrapper({ data, dataKey, xAxisKey, title, className, color 
   };
 
   return (
-    <div className={cn("bg-surface-card border border-surface-border-soft rounded-2xl p-6 shadow-sm w-full h-[360px] flex flex-col", className)}>
+    <div className={cn("bg-white/95 border border-surface-borderSoft rounded-2xl p-6 shadow-soft w-full h-[360px] flex flex-col", className)}>
       {title && <h3 className="text-lg font-semibold text-brand-ink mb-6">{title}</h3>}
       <div className="flex-1 w-full min-h-0">
         {mounted ? (
@@ -58,7 +58,7 @@ export function ChartWrapper({ data, dataKey, xAxisKey, title, className, color 
             </BarChart>
           </ResponsiveContainer>
         ) : (
-          <div className="h-full w-full rounded-xl bg-surface-border-soft" />
+          <div className="h-full w-full rounded-xl bg-surface-borderSoft" />
         )}
       </div>
     </div>

@@ -38,9 +38,17 @@ export const DashboardShell: React.FC<DashboardShellProps> = ({
   const [mobileSidebarOpen, setMobileSidebarOpen] = React.useState(false);
 
   return (
-    <div className="flex min-h-screen bg-brand-bg">
+    <div className="flex min-h-screen bg-brand-bg text-brand-text">
+      <div
+        aria-hidden="true"
+        className="pointer-events-none fixed inset-0 opacity-60"
+        style={{
+          background:
+            "radial-gradient(circle at 18% 8%, rgba(207, 214, 250, 0.55), transparent 28%), radial-gradient(circle at 88% 18%, rgba(255, 214, 198, 0.5), transparent 24%)",
+        }}
+      />
       {/* Desktop Sidebar */}
-      <div className="hidden md:block">
+      <div className="relative hidden md:block">
         <DashboardSidebar
           role={role}
           links={links}
@@ -66,7 +74,7 @@ export const DashboardShell: React.FC<DashboardShellProps> = ({
         />
       </Drawer>
 
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className="relative flex-1 flex flex-col min-w-0">
         <DashboardTopbar
           user={user}
           onSignOut={onSignOut}
@@ -75,7 +83,7 @@ export const DashboardShell: React.FC<DashboardShellProps> = ({
 
         <main
           id="main-content"
-          className={cn("flex-1 px-4 sm:px-6 md:px-8 py-6 md:py-8", className)}
+          className={cn("flex-1 w-full max-w-dashboard mx-auto px-4 sm:px-6 md:px-8 py-6 md:py-8", className)}
           tabIndex={-1}
         >
           {breadcrumbs && breadcrumbs.length > 0 && (

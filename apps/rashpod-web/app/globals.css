@@ -3,11 +3,61 @@
 @tailwind utilities;
 
 :root {
-  --background: #F0F2FA;
-  --foreground: #1A1D2E;
+  --rash-blue: #788AE0;
+  --rash-blue-secondary: #A3AFE5;
+  --rash-blue-light: #CFD6FA;
+  --rash-peach: #F39E7C;
+  --rash-peach-secondary: #EBB7A2;
+  --rash-peach-light: #FFD6C6;
+  --rash-bg: #F0F2FA;
+  --rash-surface: #FFFFFF;
+  --rash-surface-soft: #F7F8FF;
+  --rash-ink: #0B1020;
+  --rash-text: #20243A;
+  --rash-muted: #6B7280;
+  --rash-subtle: #9CA3AF;
+  --rash-line: #DFE4F6;
+  --rash-line-soft: #EEF0F6;
+  --rash-focus: rgba(120, 138, 224, 0.18);
+  --rash-shadow-soft: 0 4px 12px rgba(16, 24, 40, 0.06);
+  --rash-shadow-product: 0 18px 40px rgba(16, 24, 40, 0.12);
+  --background: var(--rash-bg);
+  --foreground: var(--rash-text);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
 }
 
 body {
   color: var(--foreground);
-  background: var(--background);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.62), rgba(240, 242, 250, 0.88)),
+    var(--background);
+  text-rendering: optimizeLegibility;
+}
+
+::selection {
+  background: var(--rash-blue-light);
+  color: var(--rash-ink);
+}
+
+:focus-visible {
+  outline: 2px solid transparent;
+  box-shadow: 0 0 0 4px var(--rash-focus);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
 }

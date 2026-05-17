@@ -15,7 +15,7 @@ export default function Error({
   }, [error]);
 
   return (
-    <div className="max-w-[1280px] mx-auto px-6 py-20">
+    <div className="max-w-storefront mx-auto px-6 py-20">
       <ErrorState
         title="Something went wrong"
         description="We encountered an unexpected error. Please try again."

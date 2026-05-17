@@ -79,7 +79,7 @@ export default function DesignerProfilePage({ params }: { params: Promise<{ hand
 
   if (loading) {
     return (
-      <div className="max-w-[1120px] mx-auto px-6 py-10">
+      <div className="max-w-storefront mx-auto px-6 py-10">
         <Skeleton className="h-6 w-48 mb-8" />
         <Skeleton className="h-64 w-full mb-8" />
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -93,7 +93,7 @@ export default function DesignerProfilePage({ params }: { params: Promise<{ hand
 
   if (error || !designer) {
     return (
-      <div className="max-w-[1120px] mx-auto px-6 py-20">
+      <div className="max-w-storefront mx-auto px-6 py-20">
         <ErrorState
           title="Designer not found"
           description="We couldn't find the designer you're looking for."
@@ -118,13 +118,13 @@ export default function DesignerProfilePage({ params }: { params: Promise<{ hand
   return (
     <div>
       {/* Breadcrumbs */}
-      <div className="max-w-[1120px] mx-auto px-6 pt-10">
+      <div className="max-w-storefront mx-auto px-6 pt-10">
         <Breadcrumbs items={breadcrumbs} />
       </div>
 
       {/* Cover band */}
       <div
-        className="relative h-64 bg-gradient-to-r from-brand-blue to-brand-peach"
+        className="relative h-64 bg-rash-hero"
         style={
           designer.coverUrl
             ? {
@@ -137,7 +137,7 @@ export default function DesignerProfilePage({ params }: { params: Promise<{ hand
       />
 
       {/* Profile section */}
-      <div className="max-w-[1120px] mx-auto px-6">
+      <div className="max-w-storefront mx-auto px-6">
         <div className="relative -mt-20 mb-8">
           <Card className="p-6">
             <div className="flex flex-col md:flex-row gap-6 items-start">
@@ -197,8 +197,8 @@ export default function DesignerProfilePage({ params }: { params: Promise<{ hand
 
           {listings.length === 0 ? (
             <Card className="p-12 text-center">
-              <div className="w-20 h-20 rounded-full bg-gray-100 flex items-center justify-center mx-auto mb-4">
-                <Package className="w-10 h-10 text-gray-400" />
+              <div className="w-20 h-20 rounded-full bg-brand-bg flex items-center justify-center mx-auto mb-4">
+                <Package className="w-10 h-10 text-brand-muted" />
               </div>
               <h3 className="text-lg font-semibold text-brand-ink mb-2">
                 No listings yet
@@ -239,4 +239,3 @@ export default function DesignerProfilePage({ params }: { params: Promise<{ hand
     </div>
   );
 }
-

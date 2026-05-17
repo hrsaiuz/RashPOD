@@ -2,7 +2,7 @@ import { Skeleton, Card } from "@rashpod/ui";
 
 export default function DesignerLoading() {
   return (
-    <div className="max-w-[1280px] mx-auto px-6 py-10">
+    <div className="max-w-storefront mx-auto px-6 py-10">
       {/* Designer header skeleton */}
       <div className="mb-12">
         <div className="flex items-start gap-6">

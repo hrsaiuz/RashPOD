@@ -26,7 +26,7 @@ export function CategoryTile({ category, title, variant = "blue", imageUrl, clas
     <motion.div
       whileHover={{ y: -4, scale: 1.01 }}
       className={cn(
-        "relative rounded-[24px] p-7 min-h-[240px] flex flex-col items-start justify-between cursor-pointer overflow-hidden shadow-sm",
+        "relative rounded-category p-7 min-h-[240px] flex flex-col items-start justify-between cursor-pointer overflow-hidden shadow-soft",
         isBlue ? "bg-brand-blue" : "bg-brand-peach",
         className
       )}
@@ -36,12 +36,12 @@ export function CategoryTile({ category, title, variant = "blue", imageUrl, clas
         <span className={cn("text-[16px] font-medium", isBlue ? "text-brand-peach" : "text-brand-blue")}>
           {category}
         </span>
-        <h2 className={cn("text-[32px] md:text-[44px] font-bold leading-tight", isBlue ? "text-brand-white" : "text-brand-ink")}>
+        <h2 className={cn("text-[32px] md:text-[44px] font-bold leading-tight", isBlue ? "text-white" : "text-brand-ink")}>
           {title}
         </h2>
         <div className={cn(
           "mt-4 inline-flex items-center justify-center rounded-full px-5 py-2.5 text-sm font-semibold transition-colors",
-          isBlue ? "bg-brand-peach text-brand-white hover:bg-brand-peach-second" : "bg-white text-brand-ink hover:bg-surface-app"
+          isBlue ? "bg-brand-peach text-white hover:bg-[#EA8F6E]" : "bg-white text-brand-ink hover:bg-surface-app"
         )}>
           SHOP NOW <ArrowRight className="ml-2 w-4 h-4" />
         </div>

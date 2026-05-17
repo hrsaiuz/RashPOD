@@ -40,7 +40,7 @@ export default function AdminOverviewPage() {
           <DashboardPanel title="Recent Activity" className="h-[360px] flex flex-col">
             <div className="flex-1 overflow-y-auto p-4">
               {[1, 2, 3, 4, 5].map(i => (
-                <div key={i} className="flex items-center gap-4 py-3 border-b border-surface-border-soft last:border-0">
+                <div key={i} className="flex items-center gap-4 py-3 border-b border-surface-borderSoft last:border-0">
                   <div className="w-10 h-10 rounded-full bg-brand-bg flex-shrink-0" />
                   <div>
                     <p className="text-sm font-semibold text-brand-ink">Order #10{i} placed</p>

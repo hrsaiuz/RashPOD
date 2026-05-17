@@ -111,7 +111,7 @@ export default function RoyaltiesPage() {
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
-                className="text-sm rounded-md border border-gray-200 px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-brand-blue"
+                className="text-sm rounded-input border border-surface-borderSoft px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-brand-blue"
               >
                 <option value="ALL">All</option>
                 {Object.entries(STATUS_LABEL).map(([k, v]) => (
@@ -139,7 +139,7 @@ export default function RoyaltiesPage() {
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
-                <thead className="border-b border-gray-100 text-brand-muted">
+                <thead className="border-b border-surface-borderSoft text-brand-muted">
                   <tr>
                     <th className="text-left py-2 pr-4 font-medium">Date</th>
                     <th className="text-left py-2 pr-4 font-medium">Listing</th>
@@ -151,7 +151,7 @@ export default function RoyaltiesPage() {
                 </thead>
                 <tbody>
                   {filtered.map((e) => (
-                    <tr key={e.id} className="border-b border-gray-50">
+                    <tr key={e.id} className="border-b border-surface-borderSoft/70">
                       <td className="py-2 pr-4">{new Date(e.createdAt).toLocaleDateString()}</td>
                       <td className="py-2 pr-4">
                         <Link href={`/dashboard/designer/listings/${e.listingId}`} className="text-brand-blue hover:underline">

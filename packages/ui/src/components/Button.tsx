@@ -15,12 +15,12 @@ export interface ButtonProps extends Omit<HTMLMotionProps<"button">, "ref" | "ch
 export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
   ({ className, variant = "primaryBlue", size = "md", loading = false, children, disabled, ...props }, ref) => {
     const baseStyles =
-      "inline-flex items-center justify-center gap-2 rounded-pill font-semibold transition-colors focus:outline-none focus:ring-4 focus:ring-brand-blue/20 disabled:opacity-50 disabled:pointer-events-none";
+      "inline-flex items-center justify-center gap-2 rounded-pill font-semibold transition-[background-color,border-color,color,box-shadow,transform] duration-200 focus:outline-none focus:ring-4 focus:ring-brand-blue/20 disabled:opacity-50 disabled:pointer-events-none";
 
     const variants = {
-      primaryBlue: "bg-brand-blue text-white shadow-blueGlow hover:bg-brand-blueSecondary",
-      primaryPeach: "bg-brand-peach text-white shadow-peachGlow hover:bg-brand-peachSecondary",
-      secondary: "border border-brand-blue text-brand-blue hover:bg-brand-blue/5",
+      primaryBlue: "bg-brand-blue text-white shadow-blueGlow hover:bg-[#6F7FDA]",
+      primaryPeach: "bg-brand-peach text-white shadow-peachGlow hover:bg-[#EA8F6E]",
+      secondary: "border border-brand-blue/35 bg-white/70 text-brand-blue hover:bg-brand-blue/5",
       ghost: "text-brand-ink hover:bg-surface-borderSoft",
       danger: "bg-semantic-danger text-white hover:bg-semantic-danger/90",
     };

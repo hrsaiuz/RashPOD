@@ -15,7 +15,7 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
         <input
           ref={ref}
           className={cn(
-            "w-full h-12 px-4 rounded-xl border bg-white text-brand-ink text-sm",
+            "w-full h-12 px-4 rounded-[14px] border bg-white text-brand-text text-sm shadow-xs",
             "transition-colors focus:outline-none focus:ring-4 focus:ring-brand-blue/20 focus:border-brand-blue",
             "disabled:opacity-50 disabled:cursor-not-allowed",
             error ? "border-semantic-danger" : "border-surface-border",

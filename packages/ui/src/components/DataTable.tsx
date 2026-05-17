@@ -67,18 +67,18 @@ export function DataTable<T extends Record<string, any>>({
   // Desktop/Scroll mode
   if (mobileMode === "scroll" || typeof window === "undefined" || window.innerWidth >= 768) {
     return (
-      <div className={cn("overflow-x-auto rounded-2xl border border-surface-borderSoft", className)}>
+      <div className={cn("overflow-x-auto rounded-2xl border border-surface-borderSoft bg-white shadow-soft", className)}>
         <table className="w-full bg-white">
           <caption className="sr-only">{caption}</caption>
           <thead>
-            <tr className="border-b border-surface-borderSoft bg-surface-card">
+            <tr className="border-b border-surface-borderSoft bg-surface-app">
               {columns.map((column) => (
                 <th
                   key={column.key}
                   scope="col"
                   className={cn(
                     "px-6 py-4 text-left text-xs font-semibold text-brand-muted uppercase tracking-wider",
-                    column.sortable && "cursor-pointer select-none hover:bg-surface-borderSoft"
+                    column.sortable && "cursor-pointer select-none hover:bg-brand-blueLight/35"
                   )}
                   onClick={column.sortable ? () => handleSort(column.key) : undefined}
                 >
@@ -100,7 +100,7 @@ export function DataTable<T extends Record<string, any>>({
             {rows.map((row, rowIndex) => (
               <tr
                 key={rowIndex}
-                className="hover:bg-surface-borderSoft transition-colors"
+                className="hover:bg-surface-app transition-colors"
               >
                 {columns.map((column) => (
                   <td

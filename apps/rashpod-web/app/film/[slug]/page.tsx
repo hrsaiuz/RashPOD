@@ -73,7 +73,7 @@ export default function FilmDetailPage({ params }: { params: Promise<{ slug: str
 
   if (loading) {
     return (
-      <div className="max-w-[1120px] mx-auto px-6 py-10">
+      <div className="max-w-storefront mx-auto px-6 py-10">
         <Skeleton className="h-6 w-48 mb-8" />
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
           <Skeleton className="w-full h-96" />
@@ -89,7 +89,7 @@ export default function FilmDetailPage({ params }: { params: Promise<{ slug: str
 
   if (error || !film) {
     return (
-      <div className="max-w-[1120px] mx-auto px-6 py-20">
+      <div className="max-w-storefront mx-auto px-6 py-20">
         <ErrorState
           title="Film not found"
           description="We couldn't find the film you're looking for."
@@ -112,7 +112,7 @@ export default function FilmDetailPage({ params }: { params: Promise<{ slug: str
   ];
 
   return (
-    <div className="max-w-[1120px] mx-auto px-6 py-10">
+    <div className="max-w-storefront mx-auto px-6 py-10">
       {/* Breadcrumbs */}
       <div className="mb-8">
         <Breadcrumbs items={breadcrumbs} />
@@ -121,7 +121,7 @@ export default function FilmDetailPage({ params }: { params: Promise<{ slug: str
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 mb-16">
         {/* Left: Preview image */}
         <div>
-          <div className="relative w-full aspect-[3/4] bg-gray-100 rounded-[24px] overflow-hidden">
+          <div className="relative w-full aspect-[3/4] bg-brand-bg rounded-[28px] overflow-hidden shadow-product">
             {film.previewImageUrl || film.imageUrl ? (
               <Image
                 src={film.previewImageUrl || film.imageUrl!}
@@ -132,7 +132,7 @@ export default function FilmDetailPage({ params }: { params: Promise<{ slug: str
                 priority
               />
             ) : (
-              <div className="w-full h-full flex items-center justify-center text-gray-400">
+              <div className="w-full h-full flex items-center justify-center text-brand-muted">
                 <Film className="w-20 h-20" />
               </div>
             )}
@@ -150,7 +150,7 @@ export default function FilmDetailPage({ params }: { params: Promise<{ slug: str
             by <span className="font-medium">{film.designer.displayName}</span>
           </Link>
 
-          <div className="flex items-center gap-4 mb-8 pb-8 border-b border-surface-border-soft">
+          <div className="flex items-center gap-4 mb-8 pb-8 border-b border-surface-borderSoft">
             <span className="text-[32px] font-bold text-brand-ink">
               {film.licenseRate.toLocaleString()} UZS
             </span>
@@ -203,7 +203,7 @@ export default function FilmDetailPage({ params }: { params: Promise<{ slug: str
       </div>
 
       {/* Description */}
-      <div className="border-t border-surface-border-soft pt-12 mb-16">
+      <div className="border-t border-surface-borderSoft pt-12 mb-16">
         <h2 className="text-2xl font-bold text-brand-ink mb-6">About this film</h2>
         <p className="text-brand-muted leading-relaxed max-w-3xl">{film.description}</p>
       </div>
