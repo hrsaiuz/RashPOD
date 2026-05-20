@@ -1,193 +1,61 @@
-"use client";
+import { SimpleCta, StorePage } from "../storefront-ui";
 
-import { motion } from "framer-motion";
-import { Button, Card, getDashboardUrl } from "@rashpod/ui";
-import { Heart, Users, Zap, Shield } from "lucide-react";
-import Link from "next/link";
+const audience = [
+  { title: "For designers", body: "Upload your artwork, create products, and earn royalties without handling production or delivery.", className: "bg-brand-peach text-black" },
+  { title: "For custom orders", body: "Request custom branded products for your company, team, event, or campaign.", className: "bg-[#313238] text-white" },
+  { title: "Print-Ready Films", body: "Order DTF and UV-DTF films prepared for apparel, stickers, packaging, and small production runs.", className: "bg-brand-bg text-black" },
+  { title: "For customers", body: "Shop original apparel, prints, mugs, postcards, and gifts created by independent designers.", className: "bg-brand-blue text-white" },
+];
 
 export default function AboutPage() {
-  const dashboardUrl = getDashboardUrl();
-
   return (
-    <div className="relative">
-      {/* Hero */}
-      <section className="max-w-storefront mx-auto px-6 py-24">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="max-w-3xl mx-auto text-center"
-        >
-          <h1 className="text-[clamp(36px,5vw,56px)] font-bold leading-[1.1] tracking-tight text-brand-ink mb-6">
-            Empowering creators.<br />Connecting communities.
-          </h1>
-          <p className="text-lg md:text-xl text-brand-muted leading-relaxed">
-            RashPOD is Uzbekistan's first platform that turns digital designs into physical products,
-            enabling designers to earn royalties while customers discover unique, locally-created merchandise.
+    <StorePage>
+      <div className="space-y-12 text-black">
+        <section className="space-y-8">
+          <h1 className="text-[27px] font-bold">About RashPOD</h1>
+          <p className="text-[22px]">RashPOD is a creative print-on-demand platform that turns original designs into real products.</p>
+        </section>
+
+        <section className="space-y-8">
+          <h2 className="text-[22px] font-bold">What is RashPOD?</h2>
+          <p className="text-[17px] leading-8">RashPOD connects independent designers, customers, businesses, and print production services in one platform.</p>
+          <p className="text-[17px] leading-8">
+            Customers can shop original products created by designers. Designers can upload their artwork and earn royalties from every sale. Businesses can request custom branded products for teams, events, and campaigns. Print shops and small production teams can order ready-to-press DTF and UV-DTF films.
           </p>
-        </motion.div>
-      </section>
+        </section>
 
-      {/* Mission */}
-      <section className="max-w-storefront mx-auto px-6 py-16">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
-          <motion.div
-            initial={{ opacity: 0, x: -20 }}
-            whileInView={{ opacity: 1, x: 0 }}
-            viewport={{ once: true }}
-          >
-            <h2 className="text-3xl md:text-4xl font-bold text-brand-ink mb-6">Our mission</h2>
-            <p className="text-brand-muted leading-relaxed mb-4">
-              We believe every designer deserves a platform to monetize their creativity without manufacturing overhead.
-              RashPOD handles production, fulfillment, and sales, so designers can focus on what they do best: creating.
-            </p>
-            <p className="text-brand-muted leading-relaxed">
-              By connecting designers, customers, print shops, and businesses, we're building an ecosystem that
-              celebrates local talent and makes unique merchandise accessible to everyone.
-            </p>
-          </motion.div>
-          <motion.div
-            initial={{ opacity: 0, x: 20 }}
-            whileInView={{ opacity: 1, x: 0 }}
-            viewport={{ once: true }}
-            className="grid grid-cols-2 gap-4"
-          >
-            <Card className="p-6 text-center">
-              <div className="text-4xl font-bold text-brand-blue mb-2">120+</div>
-              <p className="text-sm text-brand-muted">Designers</p>
-            </Card>
-            <Card className="p-6 text-center">
-              <div className="text-4xl font-bold text-brand-peach mb-2">3,500+</div>
-              <p className="text-sm text-brand-muted">Designs sold</p>
-            </Card>
-            <Card className="p-6 text-center">
-              <div className="text-4xl font-bold text-brand-blue mb-2">15+</div>
-              <p className="text-sm text-brand-muted">Cities served</p>
-            </Card>
-            <Card className="p-6 text-center">
-              <div className="text-4xl font-bold text-brand-peach mb-2">98%</div>
-              <p className="text-sm text-brand-muted">Satisfaction</p>
-            </Card>
-          </motion.div>
-        </div>
-      </section>
-
-      {/* Values */}
-      <section className="max-w-storefront mx-auto px-6 py-16">
-        <motion.h2
-          initial={{ opacity: 0 }}
-          whileInView={{ opacity: 1 }}
-          viewport={{ once: true }}
-          className="text-3xl md:text-4xl font-bold text-brand-ink mb-12 text-center"
-        >
-          What we stand for
-        </motion.h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {[
-            {
-              icon: <Heart className="w-8 h-8 text-brand-blue" />,
-              title: "Creator-first",
-              desc: "Designers own their work. We're just the platform.",
-            },
-            {
-              icon: <Users className="w-8 h-8 text-brand-peach" />,
-              title: "Community-driven",
-              desc: "Every stakeholder matters: designers, customers, print shops, businesses.",
-            },
-            {
-              icon: <Zap className="w-8 h-8 text-brand-blue" />,
-              title: "Automation",
-              desc: "Technology handles the grunt work so people can be creative.",
-            },
-            {
-              icon: <Shield className="w-8 h-8 text-brand-peach" />,
-              title: "Rights & trust",
-              desc: "Clear licensing, fair royalties, and transparent processes.",
-            },
-          ].map((value, i) => (
-            <motion.div
-              key={value.title}
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ delay: i * 0.1 }}
-            >
-              <Card variant="lift" className="p-6 h-full">
-                <div className="mb-4">{value.icon}</div>
-                <h3 className="text-lg font-semibold text-brand-ink mb-2">{value.title}</h3>
-                <p className="text-brand-muted text-sm leading-relaxed">{value.desc}</p>
-              </Card>
-            </motion.div>
-          ))}
-        </div>
-      </section>
-
-      {/* How it works */}
-      <section className="bg-gradient-to-r from-brand-blue/10 to-brand-blue/5 py-20">
-        <motion.div
-          initial={{ opacity: 0 }}
-          whileInView={{ opacity: 1 }}
-          viewport={{ once: true }}
-          className="max-w-storefront mx-auto px-6"
-        >
-          <h2 className="text-3xl md:text-4xl font-bold text-brand-ink mb-6 text-center">
-            How RashPOD works
-          </h2>
-          <p className="text-lg text-brand-muted mb-12 text-center max-w-3xl mx-auto">
-            RashPOD is a Print-On-Demand (POD) platform. Designers upload artwork, we apply it to products,
-            customers order, and we print & ship. No inventory, no upfront costs.
+        <section className="space-y-8">
+          <h2 className="text-[22px] font-bold">Our mission</h2>
+          <p className="text-[17px] leading-8">Our mission is to make creative work easier to publish, sell, and produce.</p>
+          <p className="text-[17px] leading-8">
+            We want to help designers turn their ideas into products without managing inventory, printing, packaging, or delivery. At the same time, we want customers to discover unique products that support real creators.
           </p>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <Card className="p-6">
-              <div className="text-2xl font-bold text-brand-blue mb-4">1. Design</div>
-              <p className="text-brand-muted leading-relaxed">
-                Designers upload artwork. Our platform generates mockups and listings automatically.
-              </p>
-            </Card>
-            <Card className="p-6">
-              <div className="text-2xl font-bold text-brand-blue mb-4">2. Sell</div>
-              <p className="text-brand-muted leading-relaxed">
-                Customers browse and purchase products. Designers earn royalties on every sale.
-              </p>
-            </Card>
-            <Card className="p-6">
-              <div className="text-2xl font-bold text-brand-blue mb-4">3. Fulfill</div>
-              <p className="text-brand-muted leading-relaxed">
-                We print on-demand and ship directly to customers. Quality guaranteed.
-              </p>
-            </Card>
+        </section>
+
+        <section className="space-y-8">
+          <h2 className="text-[22px] font-bold">Made for creators, built for production</h2>
+          <p className="text-[17px] leading-8">
+            RashPOD combines creativity with local production. Every product is made on demand, checked for quality, and prepared for delivery after an order is placed.
+          </p>
+          <p className="text-[17px] leading-8">
+            This helps reduce unnecessary stock, supports independent designers, and gives customers access to fresh and original products.
+          </p>
+        </section>
+
+        <section>
+          <h2 className="mb-8 text-[22px] font-bold">Who RashPOD is for</h2>
+          <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
+            {audience.map((item) => (
+              <div key={item.title} className={`min-h-[214px] rounded-[8px] p-6 text-center ${item.className}`}>
+                <h3 className="text-[36px] font-black leading-tight">{item.title}</h3>
+                <p className="mt-10 text-[22px] leading-7">{item.body}</p>
+              </div>
+            ))}
           </div>
-        </motion.div>
-      </section>
+        </section>
 
-      {/* CTA */}
-      <section className="max-w-storefront mx-auto px-6 py-24">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          className="text-center"
-        >
-          <h2 className="text-3xl md:text-4xl font-bold text-brand-ink mb-6">
-            Ready to join RashPOD?
-          </h2>
-          <p className="text-lg text-brand-muted mb-8 max-w-2xl mx-auto">
-            Whether you're a designer looking to monetize your work or a customer seeking unique products,
-            RashPOD is your platform.
-          </p>
-          <div className="flex flex-wrap gap-4 justify-center">
-            <a href={`${dashboardUrl}/auth/register?role=designer`}>
-              <Button variant="primaryPeach" size="lg">
-                Start selling
-              </Button>
-            </a>
-            <Link href="/shop">
-              <Button variant="primaryBlue" size="lg">
-                Browse shop
-              </Button>
-            </Link>
-          </div>
-        </motion.div>
-      </section>
-    </div>
+        <SimpleCta />
+      </div>
+    </StorePage>
   );
 }

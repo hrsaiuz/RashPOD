@@ -1,8 +1,5 @@
-﻿export default function Page() {
-  return (
-    <main style={{ maxWidth: 1120, margin: "0 auto", padding: 24 }}>
-      <h1>Corporate Orders</h1>
-      <p>Submit and manage corporate merchandise requests.</p>
-    </main>
-  );
+import { redirect } from "next/navigation";
+
+export default function CorporatePage() {
+  redirect("/custom-order");
 }

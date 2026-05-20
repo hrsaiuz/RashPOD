@@ -184,6 +184,25 @@ export class MediaService {
     };
   }
 
+  async publicUiAssets(keys?: string[]) {
+    const assets = await this.prisma.mediaAsset.findMany({
+      where: {
+        category: MediaCategory.UI_ASSET,
+        isActive: true,
+        ...(keys?.length ? { key: { in: keys } } : {}),
+      },
+      orderBy: [{ sortOrder: "asc" }, { createdAt: "desc" }],
+    });
+    return assets.map((asset) => ({
+      key: asset.key,
+      title: asset.title,
+      description: asset.description,
+      publicUrl: asset.publicUrl,
+      width: asset.width,
+      height: asset.height,
+    }));
+  }
+
   async updateBrandingTheme(actorId: string, theme: Record<string, unknown>) {
     await this.prisma.platformSetting.upsert({
       where: { key: "branding" },

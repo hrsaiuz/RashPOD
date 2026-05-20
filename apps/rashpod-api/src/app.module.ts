@@ -24,6 +24,7 @@ import { MailerModule } from "./modules/mailer/mailer.module";
 import { EmailTemplatesModule } from "./modules/email-templates/email-templates.module";
 import { MediaModule } from "./modules/media/media.module";
 import { AdminUsersModule } from "./modules/admin-users/admin-users.module";
+import { IntakeModule } from "./modules/intake/intake.module";
 import { HealthController } from "./health.controller";
 
 @Module({
@@ -53,6 +54,7 @@ import { HealthController } from "./health.controller";
     EmailTemplatesModule,
     MediaModule,
     AdminUsersModule,
+    IntakeModule,
   ],
   controllers: [HealthController],
 })

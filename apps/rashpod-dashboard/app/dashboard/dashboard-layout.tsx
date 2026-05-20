@@ -17,6 +17,8 @@ import {
   Ticket,
   Settings,
   Briefcase,
+  ClipboardList,
+  MessageSquare,
   Factory,
   Image as ImageIcon,
   Images,
@@ -61,6 +63,9 @@ const ROLE_LINKS: Record<string, Array<{ href: string; label: string; icon?: any
   admin: [
     { href: "/dashboard/admin", label: "Overview", icon: LayoutDashboard },
     { href: "/dashboard/admin/orders", label: "Orders", icon: Package },
+    { href: "/dashboard/admin/designer-applications", label: "Applications", icon: ClipboardList },
+    { href: "/dashboard/admin/contact-messages", label: "Messages", icon: MessageSquare },
+    { href: "/dashboard/admin/custom-order-requests", label: "Custom Requests", icon: Briefcase },
     { href: "/dashboard/admin/designers", label: "Designers", icon: Users },
     { href: "/dashboard/admin/customers", label: "Customers", icon: Users },
     { href: "/dashboard/admin/base-products", label: "Base Products", icon: Boxes },

@@ -40,6 +40,7 @@ export const permissions = {
   "media:manage": ["ADMIN", "SUPER_ADMIN", "OPERATIONS_MANAGER"],
   "branding:manage": ["ADMIN", "SUPER_ADMIN"],
   "user:manage": ["ADMIN", "SUPER_ADMIN"],
+  "intake:manage": ["ADMIN", "SUPER_ADMIN", "OPERATIONS_MANAGER", "SUPPORT_STAFF"],
 } as const;
 
 export type PermissionKey = keyof typeof permissions;

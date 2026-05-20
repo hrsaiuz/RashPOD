@@ -1,130 +1,83 @@
 "use client";
 
-import Link from "next/link";
-import { motion } from "framer-motion";
-import { ChevronDown, Mail, MessageCircle } from "lucide-react";
-import { Button, Card } from "@rashpod/ui";
+import { ChevronDown } from "lucide-react";
+import { StorePage } from "../storefront-ui";
 
-const FAQS = [
+const groups = [
   {
-    section: "For designers",
+    title: "Shopping",
     items: [
-      {
-        q: "How do royalties work?",
-        a: "Designers earn a royalty on every product sold featuring their design. The default rate is 15% of net profit and is paid out monthly to your bank or Click wallet. The exact rate is visible on every listing in your dashboard.",
-      },
-      {
-        q: "Do product approval and film-sale approval differ?",
-        a: "Yes. Approval for product sales does not automatically grant DTF/UV-DTF film-sale rights — you must opt in to film sales explicitly per design, and the moderation team reviews film readiness separately.",
-      },
-      {
-        q: "What file types do you accept?",
-        a: "PNG, JPEG, SVG, and AI files. For best results, upload high-resolution files (≥300 DPI) with transparent backgrounds where appropriate.",
-      },
-      {
-        q: "How long does approval take?",
-        a: "Most submissions are reviewed within 24–48 hours. You'll get email + dashboard notifications when your design is approved, needs changes, or is rejected.",
-      },
+      ["What can I buy on RashPOD?", "You can shop products such as T-shirts, hoodies, mugs, posters, postcards, hats, and other printed items created by independent designers."],
+      ["Are RashPOD products ready-made?", "Most products are made on demand after your order is confirmed."],
+      ["Can I choose size and color?", "Available sizes and colors depend on the product template and listing settings."],
     ],
   },
   {
-    section: "For customers",
+    title: "Delivery",
     items: [
-      {
-        q: "How long does shipping take?",
-        a: "Standard shipping within Uzbekistan takes 3–7 business days via Yandex or UzPost. Pickup from our Tashkent studio is also available.",
-      },
-      {
-        q: "What is your return policy?",
-        a: "We accept returns within 14 days for defective or damaged items. Because every product is printed on demand, change-of-mind returns are not accepted.",
-      },
-      {
-        q: "Can I customize the size and color?",
-        a: "Yes — every product detail page lets you pick from the size, color and quantity options the designer has enabled for that listing.",
-      },
-      {
-        q: "How are payments handled?",
-        a: "We accept Click and bank cards. Payments are processed securely; we never store full card numbers on our servers.",
-      },
+      ["How long does delivery take?", "Delivery time includes production time and courier delivery time. Exact estimates depend on destination and provider."],
+      ["Can I choose a delivery time?", "When available, delivery options are shown at checkout."],
+      ["Do you offer free shipping?", "Free shipping can be available when admin delivery settings enable it."],
     ],
   },
   {
-    section: "For print shops",
+    title: "Returns",
     items: [
-      {
-        q: "How does DTF/UV-DTF film licensing work?",
-        a: "Print shops can purchase ready-to-print films from designers who have opted in to film sales. Each purchase grants a single-use commercial license for the film you receive.",
-      },
-      {
-        q: "Can I bid on corporate jobs?",
-        a: "Yes — verified print shops can submit bids on corporate merchandise requests posted by clients. The corporate dashboard lets you track every bid and contract.",
-      },
+      ["Can I return my order?", "Defective or damaged items can be reviewed for return or replacement."],
+      ["Can I exchange the size?", "Because products are made on demand, exchanges depend on the issue and product condition."],
+    ],
+  },
+  {
+    title: "Designers",
+    items: [
+      ["How can I become a designer on RashPOD?", "Apply through the designer application page and submit your profile and portfolio for review."],
+      ["Do designers need to handle printing or delivery?", "No. RashPOD handles production, packaging, and delivery after orders are placed."],
+    ],
+  },
+  {
+    title: "Custom Orders",
+    items: [
+      ["Can my company order custom products?", "Yes. Submit a custom order brief and our team will review production requirements."],
+      ["How do I submit a custom request?", "Use the Custom order page and include product type, quantity, deadline, and design files if available."],
     ],
   },
 ];
 
 export default function FaqPage() {
   return (
-    <div className="max-w-[840px] mx-auto px-6 py-14">
-      <motion.div
-        initial={{ opacity: 0, y: 14 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.28 }}
-        className="text-center mb-10"
-      >
-        <p className="text-[11px] uppercase tracking-[0.12em] font-semibold text-brand-blue mb-2">
-          Help center
-        </p>
-        <h1 className="text-3xl md:text-4xl font-bold text-brand-ink mb-3">
-          Frequently asked questions
-        </h1>
-        <p className="text-[15px] text-brand-muted max-w-[560px] mx-auto">
-          Answers to the most common questions about selling, buying and licensing on RashPOD.
-        </p>
-      </motion.div>
+    <StorePage>
+      <div className="grid gap-12 lg:grid-cols-[640px_1fr]">
+        <div>
+          <h1 className="text-[28px] font-bold text-black">Frequently Asked Questions</h1>
+          <p className="mt-7 text-[22px] text-black">Find answers about shopping, delivery, designers, custom orders, and print services.</p>
 
-      <div className="space-y-10">
-        {FAQS.map((group) => (
-          <div key={group.section}>
-            <h2 className="text-[11px] uppercase tracking-[0.12em] font-semibold text-brand-peach mb-3">
-              {group.section}
-            </h2>
-            <div className="space-y-3">
-              {group.items.map((faq, i) => (
-                <details
-                  key={i}
-                  className="group bg-white rounded-2xl px-5 py-4 shadow-soft border border-surface-borderSoft"
-                >
-                  <summary className="flex items-center justify-between cursor-pointer list-none focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue/30 rounded">
-                    <span className="text-[15px] font-semibold text-brand-ink pr-4">{faq.q}</span>
-                    <ChevronDown
-                      className="w-4 h-4 text-brand-muted group-open:rotate-180 transition-transform shrink-0"
-                      aria-hidden="true"
-                    />
-                  </summary>
-                  <p className="mt-3 text-[14px] text-brand-muted leading-relaxed">{faq.a}</p>
-                </details>
-              ))}
-            </div>
+          <div className="mt-20 space-y-10">
+            {groups.map((group) => (
+              <section key={group.title}>
+                <h2 className="mb-6 text-[28px] font-bold text-black">{group.title}</h2>
+                <div>
+                  {group.items.map(([q, a], index) => (
+                    <details key={q} className="group overflow-hidden bg-brand-bg first:rounded-t-[7px] last:rounded-b-[7px]" open={index === 0 && group.title === "Shopping"}>
+                      <summary className="flex min-h-[52px] cursor-pointer list-none items-center justify-between px-5 text-[16px] font-medium text-black">
+                        {q}
+                        <ChevronDown className="transition-transform group-open:rotate-180" size={20} />
+                      </summary>
+                      <div className="bg-[#344054] px-5 py-5 text-[17px] leading-8 text-white">{a}</div>
+                    </details>
+                  ))}
+                </div>
+              </section>
+            ))}
           </div>
-        ))}
-      </div>
-
-      <Card variant="flat" className="!p-6 mt-12 text-center bg-brand-blueLight/40">
-        <div className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-white">
-          <MessageCircle className="w-5 h-5 text-brand-blue" aria-hidden="true" />
         </div>
-        <h3 className="text-lg font-semibold text-brand-ink mb-1">Still have questions?</h3>
-        <p className="text-[14px] text-brand-muted mb-4">
-          Our team typically replies within one business day.
-        </p>
-        <Link href="/contact">
-          <Button variant="primaryBlue" size="md">
-            <Mail size={16} className="mr-2" aria-hidden="true" />
-            Contact support
-          </Button>
-        </Link>
-      </Card>
-    </div>
+        <div className="relative hidden min-h-[960px] overflow-hidden lg:block">
+          <div className="absolute right-0 top-32 h-[360px] w-[360px] rotate-45 bg-brand-peach" />
+          <div className="absolute right-56 top-52 h-44 w-44 rounded-full border-[12px] border-brand-blue" />
+          <div className="absolute right-52 top-[620px] h-[360px] w-16 rotate-45 bg-brand-blue" />
+          <div className="absolute right-4 bottom-0 h-72 w-72 rounded-full bg-brand-blue" />
+          <div className="absolute bottom-28 right-44 h-40 w-40 rounded-full bg-brand-peach" />
+        </div>
+      </div>
+    </StorePage>
   );
 }

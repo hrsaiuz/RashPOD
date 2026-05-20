@@ -29,19 +29,19 @@ export const PublicFooter: React.FC<PublicFooterProps> = ({
   ],
   designerLinks = [
     { href: "/designers", label: "Designer Directory" },
-    { href: "/auth/register", label: "Start Selling" },
+    { href: "/sell-on-rashpod", label: "Start Selling" },
     { href: "/docs/guidelines", label: "Design Guidelines" },
     { href: "/docs/royalties", label: "Royalties" },
   ],
   companyLinks = [
     { href: "/about", label: "About Us" },
     { href: "/contact", label: "Contact" },
-    { href: "/careers", label: "Careers" },
-    { href: "/blog", label: "Blog" },
+    { href: "/faq", label: "FAQ" },
+    { href: "/legal/shipping-returns", label: "Shipping & Returns" },
   ],
   termsUrl = "/legal/terms",
   privacyUrl = "/legal/privacy",
-  cookiesUrl = "/legal/cookies",
+  cookiesUrl = "/legal/shipping-returns",
   className,
 }) => {
   return (
@@ -77,7 +77,7 @@ export const PublicFooter: React.FC<PublicFooterProps> = ({
           <span>© 2026 RashPOD, All rights reserved.</span>
           <Link href={termsUrl} className="hover:text-brand-blue">Terms</Link>
           <Link href={privacyUrl} className="hover:text-brand-blue">Privacy</Link>
-          <Link href={cookiesUrl} className="hover:text-brand-blue">Cookies</Link>
+          <Link href={cookiesUrl} className="hover:text-brand-blue">Shipping & Returns</Link>
         </div>
 
         <div className="pointer-events-none mx-auto mt-[68px] max-w-[1207px] overflow-hidden">

@@ -1,314 +1,62 @@
-"use client";
-
-import { Suspense, useState, useEffect } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import Image from "next/image";
-import {
-  Card,
-  Button,
-  Select,
-  FormField,
-  Skeleton,
-  EmptyState,
-  ErrorState,
-  Drawer,
-  getApiBase,
-  getDashboardUrl,
-} from "@rashpod/ui";
-import { Filter, X, Film } from "lucide-react";
+import { Search, Star } from "lucide-react";
+import { StorePage } from "../storefront-ui";
 
-interface FilmListing {
-  id: string;
-  slug: string;
-  title: string;
-  dimensions: string;
-  licenseRate: number;
-  imageUrl?: string;
-  designer: {
-    displayName: string;
-    handle: string;
-  };
-  allowFilmSales: boolean;
-}
-
-function FilmContent() {
-  const router = useRouter();
-  const searchParams = useSearchParams();
-  const apiBase = getApiBase();
-  const dashboardUrl = getDashboardUrl();
-
-  const [films, setFilms] = useState<FilmListing[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(false);
-  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
-
-  const [designerFilter, setDesignerFilter] = useState("");
-  const [sizeFilter, setSizeFilter] = useState("");
-  const [sort, setSort] = useState("newest");
-
-  useEffect(() => {
-    const designerParam = searchParams.get("designer");
-    const sizeParam = searchParams.get("size");
-    const sortParam = searchParams.get("sort");
-
-    if (designerParam) setDesignerFilter(designerParam);
-    if (sizeParam) setSizeFilter(sizeParam);
-    if (sortParam) setSort(sortParam);
-  }, []);
-
-  const fetchFilms = async () => {
-    setLoading(true);
-    setError(false);
-
-    try {
-      const params = new URLSearchParams();
-      if (designerFilter) params.set("designer", designerFilter);
-      if (sizeFilter) params.set("size", sizeFilter);
-      if (sort) params.set("sort", sort);
-
-      const res = await fetch(`${apiBase}/shop/films?${params.toString()}`, {
-        next: { revalidate: 60 },
-      });
-
-      if (!res.ok) throw new Error("Failed to fetch");
-
-      const data = await res.json();
-      setFilms(data.items || data);
-      setLoading(false);
-    } catch (err) {
-      setError(true);
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchFilms();
-
-    const params = new URLSearchParams();
-    if (designerFilter) params.set("designer", designerFilter);
-    if (sizeFilter) params.set("size", sizeFilter);
-    if (sort !== "newest") params.set("sort", sort);
-
-    const newUrl = params.toString() ? `/film?${params.toString()}` : "/film";
-    router.replace(newUrl, { scroll: false });
-  }, [designerFilter, sizeFilter, sort]);
-
-  const clearFilters = () => {
-    setDesignerFilter("");
-    setSizeFilter("");
-    setSort("newest");
-  };
-
-  const hasActiveFilters = designerFilter || sizeFilter;
-
-  const SidebarContent = () => (
-    <div className="space-y-6">
-      <div>
-        <FormField label="Designer">
-          <input
-            type="text"
-            placeholder="Filter by designer..."
-            value={designerFilter}
-            onChange={(e) => setDesignerFilter(e.target.value)}
-            className="w-full rounded-[14px] border border-surface-borderSoft bg-white px-4 py-2 text-sm text-brand-text shadow-xs focus:outline-none focus:ring-4 focus:ring-brand-blue/20 focus:border-brand-blue"
-          />
-        </FormField>
-      </div>
-
-      <div>
-        <FormField label="Size">
-          <Select value={sizeFilter} onChange={(e) => setSizeFilter(e.target.value)}>
-            <option value="">All sizes</option>
-            <option value="A4">A4</option>
-            <option value="A3">A3</option>
-            <option value="30x40">30x40 cm</option>
-            <option value="40x50">40x50 cm</option>
-          </Select>
-        </FormField>
-      </div>
-
-      {hasActiveFilters && (
-        <Button variant="ghost" size="md" className="w-full" onClick={clearFilters}>
-          Clear filters
-        </Button>
-      )}
-    </div>
-  );
-
-  return (
-    <div className="max-w-storefront mx-auto px-6 py-10">
-      <div className="mb-8 rounded-[32px] border border-white/70 bg-rash-hero px-6 py-10 shadow-soft">
-        <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-brand-peach">DTF / UV-DTF films</p>
-        <h1 className="text-[clamp(32px,5vw,52px)] font-bold leading-[1.08] text-brand-ink mb-3">Film Catalog</h1>
-        <p className="text-brand-muted">
-          License high-quality designs for DTF/UV-DTF printing
-        </p>
-      </div>
-
-      <div className="flex flex-col lg:flex-row gap-8">
-        {/* Sidebar - Desktop */}
-        <aside className="hidden lg:block w-64 flex-shrink-0">
-          <div className="sticky top-24">
-            <Card className="p-6">
-              <SidebarContent />
-            </Card>
-          </div>
-        </aside>
-
-        {/* Mobile filter button */}
-        <div className="lg:hidden flex items-center justify-between gap-4 mb-4">
-          <Button
-            variant="secondary"
-            size="md"
-            onClick={() => setMobileFiltersOpen(true)}
-            className="flex items-center gap-2"
-          >
-            <Filter className="w-4 h-4" />
-            Filters {hasActiveFilters && "(active)"}
-          </Button>
-
-          <FormField label="">
-            <Select value={sort} onChange={(e) => setSort(e.target.value)}>
-              <option value="newest">Newest</option>
-              <option value="popular">Most Popular</option>
-              <option value="price_asc">Price: Low to High</option>
-              <option value="price_desc">Price: High to Low</option>
-            </Select>
-          </FormField>
-        </div>
-
-        {/* Main content */}
-        <div className="flex-1">
-          {/* Sort - Desktop */}
-          <div className="hidden lg:flex items-center justify-between mb-6">
-            <p className="text-sm text-brand-muted">
-              {films.length} {films.length === 1 ? "film" : "films"} available
-            </p>
-            <FormField label="">
-              <Select value={sort} onChange={(e) => setSort(e.target.value)}>
-                <option value="newest">Newest</option>
-                <option value="popular">Most Popular</option>
-                <option value="price_asc">Price: Low to High</option>
-                <option value="price_desc">Price: High to Low</option>
-              </Select>
-            </FormField>
-          </div>
-
-          {/* Films grid */}
-          {loading && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-              {[...Array(9)].map((_, i) => (
-                <Card key={i} className="overflow-hidden">
-                  <Skeleton className="w-full h-64" />
-                  <div className="p-4 space-y-2">
-                    <Skeleton className="h-4 w-3/4" />
-                    <Skeleton className="h-4 w-1/2" />
-                  </div>
-                </Card>
-              ))}
-            </div>
-          )}
-
-          {error && (
-            <ErrorState
-              title="Failed to load films"
-              description="We couldn't load the film catalog. Please try again."
-              retry={
-                <Button variant="primaryBlue" size="md" onClick={fetchFilms}>
-                  Retry
-                </Button>
-              }
-            />
-          )}
-
-          {!loading && !error && films.length === 0 && (
-            <EmptyState
-              title="No films found"
-              description="Try adjusting your filters or check back later for new films."
-              action={
-                hasActiveFilters ? (
-                  <Button variant="primaryBlue" size="md" onClick={clearFilters}>
-                    Clear filters
-                  </Button>
-                ) : undefined
-              }
-            />
-          )}
-
-          {!loading && !error && films.length > 0 && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-              {films.map((film) => (
-                <Card key={film.id} variant="lift" className="overflow-hidden group">
-                  <Link href={`/film/${film.slug}`}>
-                    <div className="relative w-full h-64 bg-brand-bg rounded-[22px] overflow-hidden">
-                      {film.imageUrl ? (
-                        <Image
-                          src={film.imageUrl}
-                          alt={film.title}
-                          fill
-                          className="object-cover group-hover:scale-105 transition-transform"
-                          sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-                        />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center text-brand-muted">
-                          <Film className="w-12 h-12" />
-                        </div>
-                      )}
-                      {!film.allowFilmSales && (
-                        <div className="absolute top-2 right-2 bg-black/70 text-white text-xs px-2 py-1 rounded">
-                          Not available
-                        </div>
-                      )}
-                    </div>
-                    <div className="p-4">
-                      <h3 className="font-semibold text-brand-ink mb-1 line-clamp-2">
-                        {film.title}
-                      </h3>
-                      <p className="text-sm text-brand-muted mb-2">
-                        by {film.designer.displayName}
-                      </p>
-                      <p className="text-sm text-brand-muted mb-2">{film.dimensions}</p>
-                      <p className="text-lg font-bold text-brand-blue">
-                        {film.licenseRate.toLocaleString()} UZS / license
-                      </p>
-                    </div>
-                  </Link>
-                </Card>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Mobile filters drawer */}
-      <Drawer open={mobileFiltersOpen} onClose={() => setMobileFiltersOpen(false)} side="left">
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-xl font-bold text-brand-ink">Filters</h2>
-          <button onClick={() => setMobileFiltersOpen(false)}>
-            <X className="w-5 h-5 text-brand-muted" />
-          </button>
-        </div>
-        <SidebarContent />
-        <div className="mt-6">
-          <Button
-            variant="primaryBlue"
-            size="md"
-            className="w-full"
-            onClick={() => setMobileFiltersOpen(false)}
-          >
-            Apply filters
-          </Button>
-        </div>
-      </Drawer>
-    </div>
-  );
-}
+const cards = [
+  "Beautiful Samarkand",
+  "Kuch birlikda",
+  "Yuliy Rajabiy",
+  "Beautiful Samarkand",
+  "Kuch birlikda",
+  "Yuliy Rajabiy",
+];
 
 export default function FilmPage() {
   return (
-    <Suspense fallback={<div className="max-w-storefront mx-auto px-6 py-10"><Skeleton className="h-96 w-full" /></div>}>
-      <FilmContent />
-    </Suspense>
+    <StorePage>
+      <div className="grid gap-7 lg:grid-cols-[310px_1fr]">
+        <aside className="rounded-[12px] bg-brand-bg p-5">
+          <h1 className="mb-8 text-[18px] font-black uppercase text-black">Filters</h1>
+          <div className="mb-8 flex items-center gap-3 text-[#8E8E94]">
+            <Search size={16} />
+            <span className="text-[12px] uppercase">Search</span>
+          </div>
+          <div className="mb-12 inline-flex rounded-[10px] border border-brand-blue">
+            <button className="rounded-[8px] bg-brand-blue px-4 py-2 text-sm text-white">DTF</button>
+            <button className="px-4 py-2 text-sm text-black">UV DTF</button>
+          </div>
+          {["Design category", "Size", "Price", "Color Type", "Rate", "Designer", "Tags"].map((label) => (
+            <div key={label} className="border-b border-brand-blueLight py-5">
+              <h2 className="text-[16px] font-black uppercase text-black">{label}</h2>
+              {label === "Rate" ? (
+                <div className="mt-4 flex gap-3 text-brand-peach">
+                  {[1, 2, 3, 4, 5].map((n) => <Star key={n} size={20} fill={n < 3 ? "currentColor" : "none"} />)}
+                </div>
+              ) : null}
+            </div>
+          ))}
+        </aside>
+        <section className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+          {cards.map((title, index) => (
+            <Link key={`${title}-${index}`} href="/film/sample" className="rounded-[12px] bg-brand-bg p-6">
+              <div className="relative aspect-square overflow-hidden rounded-[28px] bg-white">
+                <span className="absolute left-5 top-5 rounded-[8px] bg-[#D66BCD] px-3 py-2 text-[10px] text-white">Best Seller</span>
+                <div className={`grid h-full place-items-center ${index % 3 === 1 ? "bg-[#101214]" : "bg-[#F7F7FA]"}`}>
+                  <div className={`h-36 w-44 rounded-[30px] ${index % 3 === 1 ? "bg-black text-white" : "bg-white text-[#1E2B6E]"} grid place-items-center text-center text-lg font-bold shadow-soft`}>
+                    {title}
+                  </div>
+                </div>
+              </div>
+              <h2 className="mt-5 text-[20px] font-black text-black">CLASSIC Black T-Shirt</h2>
+              <p className="mt-1 text-[12px] text-[#8E8E94]">Designed by Shuwan</p>
+              <div className="mt-6 flex items-center justify-between">
+                <p className="text-[20px] font-black text-black">20$</p>
+                <span className="rounded-[10px] bg-brand-peach px-6 py-3 text-[14px] font-bold text-white">See Product</span>
+              </div>
+            </Link>
+          ))}
+        </section>
+      </div>
+    </StorePage>
   );
 }

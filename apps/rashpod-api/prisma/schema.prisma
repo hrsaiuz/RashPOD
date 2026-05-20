@@ -622,6 +622,15 @@ enum MediaCategory {
   MOCKUP_TEMPLATE
 }
 
+enum IntakeStatus {
+  NEW
+  IN_REVIEW
+  CONTACTED
+  APPROVED
+  REJECTED
+  ARCHIVED
+}
+
 model MediaAsset {
   id           String        @id @default(uuid())
   key          String        @unique
@@ -644,4 +653,73 @@ model MediaAsset {
 
   @@index([category, isActive])
   @@index([category, sortOrder])
+}
+
+model DesignerApplication {
+  id                 String       @id @default(uuid())
+  firstName          String
+  lastName           String
+  email              String
+  phoneCountryCode   String?
+  phoneNumber        String?
+  telegramUsername   String?
+  passwordProvided   Boolean      @default(false)
+  displayName        String?
+  country            String?
+  city               String?
+  designCategories   Json?
+  shortBio           String?
+  portfolioFiles     Json?
+  identityFiles      Json?
+  selfieFiles        Json?
+  confirmations      Json?
+  status             IntakeStatus @default(NEW)
+  reviewNotes        String?
+  submittedAt        DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
+
+  @@index([status, submittedAt])
+  @@index([email])
+}
+
+model ContactMessage {
+  id          String       @id @default(uuid())
+  firstName   String
+  lastName    String?
+  email       String
+  phoneNumber String?
+  subject     String
+  message     String
+  status      IntakeStatus @default(NEW)
+  reviewNotes String?
+  submittedAt DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  @@index([status, submittedAt])
+  @@index([email])
+}
+
+model CustomOrderRequest {
+  id                  String       @id @default(uuid())
+  fullName            String
+  companyEventName    String?
+  email               String
+  phoneCountryCode    String?
+  phoneNumber         String?
+  details             String?
+  estimatedBudget     String?
+  preferredDelivery   String?
+  productNeed         String?
+  quantity            String?
+  deadline            DateTime?
+  hasDesign           String?
+  designTypes         String?
+  uploadedFiles       Json?
+  status              IntakeStatus @default(NEW)
+  reviewNotes         String?
+  submittedAt         DateTime     @default(now())
+  updatedAt           DateTime     @updatedAt
+
+  @@index([status, submittedAt])
+  @@index([email])
 }

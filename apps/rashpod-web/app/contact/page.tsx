@@ -1,166 +1,102 @@
 "use client";
 
-import { useState } from "react";
-import { motion } from "framer-motion";
+import { FormEvent, useState } from "react";
 import { Mail, MapPin, Phone, Send } from "lucide-react";
-import { Button, Card, FormField, Input, Select, Textarea } from "@rashpod/ui";
+import { StorePage, UnderlineInput } from "../storefront-ui";
+
+const contacts = [
+  ["Designer Support", "For designer applications, portfolio review, royalties, and product approvals.", "+998 50 27 XX XX", "RASHPOD_DESIGNERS", "bg-brand-peach text-black"],
+  ["Custom Orders", "For companies, teams, events, and branded product requests.", "+998 50 27 XX XX", "RASHPOD_CUSTOM", "bg-[#313238] text-white"],
+  ["Print-Ready Films", "For DTF films, UV-DTF films, file requirements, and production questions.", "+998 50 27 XX XX", "RASHPOD_FILMS", "bg-brand-bg text-black"],
+  ["Customer Support", "For questions about orders, delivery, returns, or product details.", "+998 50 27 XX XX", "RASHPOD_CUSTOMER", "bg-brand-blue text-white"],
+];
 
 export default function ContactPage() {
   const [status, setStatus] = useState<"idle" | "submitting" | "sent">("idle");
-  const [form, setForm] = useState({
-    name: "",
-    email: "",
-    topic: "general",
-    message: "",
-  });
+  const [form, setForm] = useState({ firstName: "", lastName: "", email: "", phoneNumber: "", subject: "Order support", message: "" });
 
-  const onSubmit = (e: React.FormEvent) => {
+  async function submit(e: FormEvent) {
     e.preventDefault();
     setStatus("submitting");
-    // TODO: POST /contact/messages once the backend endpoint exists.
-    setTimeout(() => setStatus("sent"), 600);
-  };
+    const res = await fetch("/api/proxy/intake/contact-messages", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(form),
+    });
+    setStatus(res.ok ? "sent" : "idle");
+  }
 
   return (
-    <div className="max-w-[1100px] mx-auto px-6 py-14">
-      <motion.div
-        initial={{ opacity: 0, y: 14 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.28 }}
-        className="text-center mb-10"
-      >
-        <p className="text-[11px] uppercase tracking-[0.12em] font-semibold text-brand-peach mb-2">
-          Get in touch
-        </p>
-        <h1 className="text-3xl md:text-4xl font-bold text-brand-ink mb-3">We&rsquo;d love to hear from you</h1>
-        <p className="text-[15px] text-brand-muted max-w-[560px] mx-auto">
-          Whether you&rsquo;re a designer, customer, print shop or corporate client — drop us a line.
-        </p>
-      </motion.div>
+    <StorePage>
+      <h1 className="text-[27px] font-bold text-black">Contact Us</h1>
+      <p className="mt-7 text-[22px] text-black">Have a question, project request, or partnership idea? Get in touch with the RashPOD team.</p>
+      <section className="mt-12 space-y-7 text-black">
+        <h2 className="text-[22px] font-bold">What is RashPOD?</h2>
+        <p className="text-[16px] leading-8">RashPOD connects independent designers, customers, businesses, and print production services in one platform.</p>
+        <p className="text-[16px] leading-8">Customers can shop original products created by designers. Designers can upload their artwork and earn royalties from every sale. Businesses can request custom branded products for teams, events, and campaigns. Print shops and small production teams can order ready-to-press DTF and UV-DTF films.</p>
+      </section>
 
-      <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-6">
-        <Card variant="flat" className="!p-6">
+      <div className="mt-12 grid gap-5 md:grid-cols-2 xl:grid-cols-4">
+        {contacts.map(([title, body, phone, handle, className]) => (
+          <div key={title} className={`min-h-[258px] rounded-[8px] p-5 text-center ${className}`}>
+            <h3 className="text-[32px] font-black leading-tight">{title}</h3>
+            <p className="mt-8 text-[18px] leading-6">{body}</p>
+            <p className="mt-10 text-[28px]">{phone}</p>
+            <p className="mt-10 flex items-center justify-center gap-1 text-[18px]"><Send size={21} /> {handle}</p>
+          </div>
+        ))}
+      </div>
+
+      <section className="mt-12 grid overflow-hidden rounded-[32px] border border-[#2E3038] bg-brand-bg lg:grid-cols-[520px_1fr]">
+        <div className="relative min-h-[520px] overflow-hidden bg-brand-blueLight p-12">
+          <h2 className="text-[34px] font-bold text-black">Contact Information</h2>
+          <p className="mt-7 text-[22px] text-[#555760]">Say something to start a live chat!</p>
+          <div className="mt-32 space-y-16 text-[20px] text-[#20243A]">
+            <p className="flex items-center gap-10"><Phone /> +1012 3456 789</p>
+            <p className="flex items-center gap-10"><Mail /> demo@gmail.com</p>
+            <p className="flex items-center gap-10"><MapPin /> 132 Dartmouth Street Boston,<br /> Massachusetts 02156 United States</p>
+          </div>
+          <div className="absolute -bottom-24 right-0 h-52 w-52 rounded-full bg-brand-peachLight" />
+          <div className="absolute bottom-16 right-24 h-36 w-36 rounded-full bg-brand-peach" />
+        </div>
+        <form onSubmit={submit} className="space-y-10 p-12">
           {status === "sent" ? (
-            <div className="text-center py-12">
-              <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-semantic-successBg text-semantic-success">
-                <Send className="w-5 h-5" aria-hidden="true" />
-              </div>
-              <h2 className="text-xl font-semibold text-brand-ink mb-1">Message sent</h2>
-              <p className="text-[14px] text-brand-muted">
-                Thanks {form.name || "for reaching out"} — we&rsquo;ll get back to you shortly.
-              </p>
+            <div className="rounded-[24px] bg-white p-10 text-center">
+              <h2 className="text-2xl font-bold text-black">Message sent</h2>
+              <p className="mt-3 text-brand-muted">We’ll review your message and get back to you.</p>
             </div>
           ) : (
-            <form onSubmit={onSubmit} className="space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <FormField label="Name">
-                  <Input
-                    required
-                    value={form.name}
-                    onChange={(e) => setForm({ ...form, name: e.target.value })}
-                    placeholder="Your full name"
-                  />
-                </FormField>
-                <FormField label="Email">
-                  <Input
-                    required
-                    type="email"
-                    value={form.email}
-                    onChange={(e) => setForm({ ...form, email: e.target.value })}
-                    placeholder="you@example.com"
-                  />
-                </FormField>
+            <>
+              <div className="grid gap-10 md:grid-cols-2">
+                <UnderlineInput label="First Name" required value={form.firstName} onChange={(e) => setForm({ ...form, firstName: e.target.value })} />
+                <UnderlineInput label="Last name" value={form.lastName} onChange={(e) => setForm({ ...form, lastName: e.target.value })} />
+                <UnderlineInput label="Email" type="email" required value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+                <UnderlineInput label="Phone Number" value={form.phoneNumber} onChange={(e) => setForm({ ...form, phoneNumber: e.target.value })} />
               </div>
-
-              <FormField label="Topic">
-                <Select
-                  value={form.topic}
-                  onChange={(e) => setForm({ ...form, topic: e.target.value })}
-                >
-                  <option value="general">General question</option>
-                  <option value="designer">Designer onboarding</option>
-                  <option value="order">Order or delivery issue</option>
-                  <option value="film">DTF / UV-DTF films</option>
-                  <option value="corporate">Corporate merchandise</option>
-                  <option value="press">Press &amp; partnerships</option>
-                </Select>
-              </FormField>
-
-              <FormField label="Message">
-                <Textarea
-                  required
-                  rows={6}
-                  value={form.message}
-                  onChange={(e) => setForm({ ...form, message: e.target.value })}
-                  placeholder="Tell us a bit about what you need…"
-                />
-              </FormField>
-
-              <div>
-                <Button
-                  type="submit"
-                  variant="primaryPeach"
-                  size="md"
-                  disabled={status === "submitting"}
-                >
-                  <Send size={16} className="mr-2" aria-hidden="true" />
-                  {status === "submitting" ? "Sending…" : "Send message"}
-                </Button>
+              <fieldset>
+                <legend className="mb-4 text-[16px] font-bold text-[#07172D]">Select Subject?</legend>
+                <div className="flex flex-wrap gap-x-8 gap-y-4 text-[14px] text-[#344054]">
+                  {["Order support", "Custom project", "DTF / UV-DTF films", "Designer application", "Partnership", "Other"].map((subject) => (
+                    <label key={subject} className="flex items-center gap-2">
+                      <input type="radio" name="subject" checked={form.subject === subject} onChange={() => setForm({ ...form, subject })} />
+                      {subject}
+                    </label>
+                  ))}
+                </div>
+              </fieldset>
+              <label className="block">
+                <span className="mb-3 block text-[15px] text-[#8E8E94]">Message</span>
+                <textarea required rows={6} placeholder="Write your message.." value={form.message} onChange={(e) => setForm({ ...form, message: e.target.value })} className="w-full rounded-[18px] border border-[#5F6067] bg-transparent px-4 py-4 outline-none" />
+              </label>
+              <div className="flex justify-end">
+                <button disabled={status === "submitting"} className="h-[64px] min-w-[220px] rounded-[18px] bg-brand-peach px-8 text-[22px] font-bold text-white">
+                  {status === "submitting" ? "Sending..." : "Send Message"}
+                </button>
               </div>
-            </form>
+            </>
           )}
-        </Card>
-
-        <div className="space-y-3">
-          <Card variant="flat" className="!p-5">
-            <div className="flex items-start gap-3">
-              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-brand-blueLight text-brand-blue">
-                <Mail size={18} aria-hidden="true" />
-              </div>
-              <div>
-                <h3 className="text-sm font-semibold text-brand-ink mb-1">Email</h3>
-                <a
-                  href="mailto:hello@rashpod.uz"
-                  className="text-[13px] text-brand-muted hover:text-brand-blue"
-                >
-                  hello@rashpod.uz
-                </a>
-              </div>
-            </div>
-          </Card>
-
-          <Card variant="flat" className="!p-5">
-            <div className="flex items-start gap-3">
-              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-brand-peachLight text-brand-peach">
-                <Phone size={18} aria-hidden="true" />
-              </div>
-              <div>
-                <h3 className="text-sm font-semibold text-brand-ink mb-1">Phone</h3>
-                <a
-                  href="tel:+998000000000"
-                  className="text-[13px] text-brand-muted hover:text-brand-blue"
-                >
-                  +998 00 000 0000
-                </a>
-                <p className="text-[12px] text-brand-muted mt-0.5">Mon–Fri · 09:00–18:00</p>
-              </div>
-            </div>
-          </Card>
-
-          <Card variant="flat" className="!p-5">
-            <div className="flex items-start gap-3">
-              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-brand-blueLight text-brand-blue">
-                <MapPin size={18} aria-hidden="true" />
-              </div>
-              <div>
-                <h3 className="text-sm font-semibold text-brand-ink mb-1">Studio</h3>
-                <p className="text-[13px] text-brand-muted">Tashkent, Uzbekistan</p>
-                <p className="text-[12px] text-brand-muted mt-0.5">Visits by appointment only.</p>
-              </div>
-            </div>
-          </Card>
-        </div>
-      </div>
-    </div>
+        </form>
+      </section>
+    </StorePage>
   );
 }

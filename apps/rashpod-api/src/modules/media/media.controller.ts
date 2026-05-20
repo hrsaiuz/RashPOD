@@ -76,3 +76,17 @@ export class PublicBrandingController {
     return this.service.branding();
   }
 }
+
+@Controller("media")
+export class PublicMediaController {
+  constructor(private readonly service: MediaService) {}
+
+  @Get("ui-assets")
+  uiAssets(@Query("keys") keys?: string) {
+    const parsed = keys
+      ?.split(",")
+      .map((key) => key.trim())
+      .filter(Boolean);
+    return this.service.publicUiAssets(parsed);
+  }
+}

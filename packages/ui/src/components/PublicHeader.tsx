@@ -38,8 +38,8 @@ export const PublicHeader: React.FC<PublicHeaderProps> = ({
   const navLinks = [
     { href: shopUrl, label: "Shop" },
     { href: `${shopUrl}#categories`, label: "Categories" },
-    { href: finalStartSellingUrl, label: "Sell on RashPOD" },
-    { href: "/corporate", label: "Custom order" },
+    { href: "/sell-on-rashpod", label: "Sell on RashPOD" },
+    { href: "/custom-order", label: "Custom order" },
     { href: "/business", label: "Start Your Business", hasChevron: true },
     { href: aboutUrl, label: "About Us" },
   ];
