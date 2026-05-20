@@ -173,34 +173,11 @@ export default function DesignerProfilePage({ params }: { params: Promise<{ hand
 }
 
 function DesignerPortraitFrame({ name, imageUrl }: { name: string; imageUrl?: string }) {
+  const frameUrl = "https://storage.googleapis.com/rashpod-assets/media/ui_asset/1779312255419-Group-1000001848.svg";
+
   return (
-    <div className="relative h-[395px] w-[350px] overflow-hidden rounded-[16px] bg-brand-peach p-[28px]">
-      <div className="absolute inset-[8px] opacity-90" aria-hidden="true">
-        {Array.from({ length: 44 }).map((_, index) => (
-          <span
-            key={index}
-            className="absolute h-[22px] w-[22px] rotate-45 bg-brand-blue"
-            style={{
-              left: `${(index % 11) * 30}px`,
-              top: `${Math.floor(index / 11) * 92}px`,
-            }}
-          />
-        ))}
-      </div>
-      <div className="relative h-full w-full overflow-hidden border border-brand-blueLight bg-[#EEF1FA]">
-        <div className="absolute inset-0" aria-hidden="true">
-          {Array.from({ length: 10 }).map((_, index) => (
-            <span
-              key={index}
-              className="absolute h-[190px] w-[92px] origin-bottom rounded-t-full bg-brand-blueLight/70"
-              style={{
-                left: `${index * 38 - 45}px`,
-                top: "-22px",
-                transform: `rotate(${index % 2 === 0 ? 33 : -33}deg)`,
-              }}
-            />
-          ))}
-        </div>
+    <div className="relative h-[395px] w-[350px] overflow-hidden rounded-[16px]">
+      <div className="absolute inset-[28px] overflow-hidden bg-[#EEF1FA]">
         {imageUrl ? (
           <Image src={imageUrl} alt={name} fill sizes="350px" className="z-10 object-cover object-bottom grayscale" priority />
         ) : (
@@ -209,6 +186,8 @@ function DesignerPortraitFrame({ name, imageUrl }: { name: string; imageUrl?: st
           </div>
         )}
       </div>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={frameUrl} alt="" aria-hidden="true" className="pointer-events-none absolute inset-0 z-20 h-full w-full object-contain" />
     </div>
   );
 }
