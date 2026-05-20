@@ -88,8 +88,11 @@ export async function uploadToSignedUrl(url: string, file: File, headers?: Recor
 
 export type DesignStatus =
   | "DRAFT"
+  | "PENDING_MODERATION"
   | "SUBMITTED"
   | "NEEDS_FIX"
+  | "APPROVED_LOCAL"
+  | "APPROVED_GLOBAL"
   | "APPROVED"
   | "REJECTED"
   | "SUSPENDED"
@@ -108,6 +111,62 @@ export interface Design {
   status: DesignStatus;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface ModerationQueueDesign extends Design {
+  designer?: {
+    id: string;
+    email: string;
+    displayName?: string | null;
+  };
+  versions?: Array<{
+    id: string;
+    fileKey: string;
+    widthPx?: number | null;
+    heightPx?: number | null;
+    dpi?: number | null;
+    hasTransparency?: boolean | null;
+    createdAt: string;
+  }>;
+}
+
+export interface ModerationAudit {
+  id: string;
+  designId: string;
+  moderatorId: string;
+  decision: "REJECT" | "APPROVE_LOCAL" | "APPROVE_GLOBAL";
+  predefinedReasons?: string[] | null;
+  customReason?: string | null;
+  notes?: string | null;
+  beforeStatus: DesignStatus;
+  afterStatus: DesignStatus;
+  createdAt: string;
+}
+
+export interface DesignProductSelection {
+  id: string;
+  designId: string;
+  pipeline: "LOCAL" | "GLOBAL_PRINTFUL";
+  placement: string;
+  status: string;
+  errorMessage?: string | null;
+  localBaseProduct?: unknown;
+  printfulProductTemplate?: unknown;
+  placementPreset?: unknown;
+  mockupAssets?: unknown[];
+}
+
+export interface DesignWorkflowDetail extends Design {
+  designer?: {
+    id: string;
+    email: string;
+    displayName?: string | null;
+    handle?: string | null;
+  };
+  versions?: ModerationQueueDesign["versions"];
+  moderationAudits?: ModerationAudit[];
+  productSelections?: DesignProductSelection[];
+  listings?: Listing[];
 }
 
 export interface Listing {

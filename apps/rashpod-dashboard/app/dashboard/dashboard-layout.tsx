@@ -74,6 +74,7 @@ const ROLE_LINKS: Record<string, Array<{ href: string; label: string; icon?: any
     { href: "/dashboard/admin/base-products", label: "Base Products", icon: Boxes },
     { href: "/dashboard/admin/mockup-templates", label: "Mockup Templates", icon: Images },
     { href: "/dashboard/admin/print-areas", label: "Print Areas", icon: Layers },
+    { href: "/dashboard/admin/pipeline-config", label: "Pipeline Config", icon: Layers },
     { href: "/dashboard/admin/listings", label: "Listings", icon: Tag },
     { href: "/dashboard/admin/media-library", label: "Media Library", icon: Images },
     { href: "/dashboard/admin/branding", label: "Branding", icon: Palette },

@@ -28,8 +28,11 @@ enum DesignerStatus {
 
 enum DesignStatus {
   DRAFT
+  PENDING_MODERATION
   SUBMITTED
   NEEDS_FIX
+  APPROVED_LOCAL
+  APPROVED_GLOBAL
   APPROVED
   REJECTED
   SUSPENDED
@@ -67,10 +70,166 @@ enum ListingType {
 enum ListingStatus {
   DRAFT
   READY_FOR_REVIEW
+  READY_TO_PUBLISH
   PUBLISHED
+  UNPUBLISHED
+  FAILED
   ARCHIVED
   REJECTED
   SUSPENDED
+}
+
+enum PipelineType {
+  LOCAL
+  GLOBAL_PRINTFUL
+}
+
+enum ProviderType {
+  RASHPOD
+  PRINTFUL
+  DIRECT_MARKETPLACE
+}
+
+enum ModerationPipelineDecision {
+  REJECT
+  APPROVE_LOCAL
+  APPROVE_GLOBAL
+}
+
+enum RejectionReasonCode {
+  COPYRIGHT_RISK
+  OFFENSIVE_CONTENT
+  POLITICAL_SENSITIVE_CONTENT
+  LOW_IMAGE_RESOLUTION
+  POOR_IMAGE_QUALITY
+  WRONG_FILE_FORMAT
+  TRANSPARENCY_OR_BACKGROUND_ISSUE
+  NOT_SUITABLE_FOR_PRODUCTION
+  DUPLICATE_OR_SPAM
+  MARKETPLACE_COMPLIANCE_RISK
+  OTHER
+}
+
+enum LocalProductType {
+  T_SHIRT
+  LONG_SLEEVE_T_SHIRT
+  HOODIE
+  SWEATSHIRT
+  MUG
+  CAP
+  TOTE_BAG
+  POSTER
+  STICKER
+  DTF_FILM
+  UV_DTF_FILM
+  OTHER
+}
+
+enum NecklineType {
+  CREW_NECK
+  V_NECK
+  POLO
+  HOODIE
+  NONE
+}
+
+enum SleeveType {
+  SHORT
+  LONG
+  SLEEVELESS
+  NONE
+}
+
+enum LocalProductionMethod {
+  DTF
+  UV_DTF
+  DTG
+  SUBLIMATION
+  EMBROIDERY
+  OTHER
+}
+
+enum PlacementKind {
+  FRONT
+  BACK
+  LEFT_CHEST
+  RIGHT_CHEST
+  LEFT_SLEEVE
+  RIGHT_SLEEVE
+  FULL_WRAP
+  OTHER
+}
+
+enum PlacementAlignment {
+  CENTER
+  TOP_CENTER
+  LEFT_CHEST
+  CUSTOM
+}
+
+enum PlacementUnits {
+  CM
+  INCH
+  PX
+}
+
+enum DesignProductSelectionStatus {
+  SELECTED
+  MOCKUP_PENDING
+  MOCKUP_GENERATING
+  MOCKUP_READY
+  MOCKUP_FAILED
+  LISTING_DRAFT
+  READY_TO_PUBLISH
+  PUBLISHED
+  FAILED
+}
+
+enum MockupAssetType {
+  MAIN
+  SECONDARY
+  DETAIL
+  LIFESTYLE
+  PRINT_AREA_PREVIEW
+}
+
+enum MockupAssetStatus {
+  PENDING
+  GENERATED
+  FAILED
+}
+
+enum MarketplaceKind {
+  RASHPOD_LOCAL
+  LOCAL_MARKETPLACE
+  ETSY
+  AMAZON
+  EBAY
+  SHOPIFY
+  WOOCOMMERCE
+}
+
+enum MarketplacePublicationStatus {
+  NOT_SELECTED
+  DRAFT
+  QUEUED
+  PUBLISHING
+  PUBLISHED
+  FAILED
+  NEEDS_REVIEW
+}
+
+enum PrintfulMappingStatus {
+  PENDING
+  READY
+  FAILED
+}
+
+enum IntegrationLogStatus {
+  PENDING
+  SUCCESS
+  FAILED
+  SKIPPED
 }
 
 enum OrderStatus {
@@ -229,7 +388,26 @@ model DesignAsset {
   designerId  String
   title       String
   description String?
+  tags        Json?
+  categoryId  String?
+  originalFileUrl String?
+  processedFileUrl String?
+  transparentFileUrl String?
+  previewUrl  String?
+  widthPx     Int?
+  heightPx    Int?
+  dpi         Int?
+  fileType    String?
+  fileSize    Int?
   status      DesignStatus @default(DRAFT)
+  moderationDecision String?
+  moderationStatus String?
+  moderatedById String?
+  moderatedAt DateTime?
+  rejectionReasons Json?
+  customRejectionReason String?
+  copyrightRiskStatus String?
+  contentSafetyStatus String?
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
 
@@ -237,7 +415,11 @@ model DesignAsset {
   versions         DesignVersion[]
   commercialRights CommercialRights?
   moderationCases  DesignModerationCase[]
+  moderationAudits ModerationAudit[]
   placements       MockupPlacement[]
+  productSelections DesignProductSelection[]
+  mockupAssets     MockupAsset[]
+  printfulFileMappings PrintfulFileMapping[]
   listings         CommerceListing[]
 }
 
@@ -268,6 +450,24 @@ model DesignModerationCase {
   designAsset   DesignAsset   @relation(fields: [designAssetId], references: [id])
   designVersion DesignVersion? @relation(fields: [designVersionId], references: [id])
   reviewer      User?         @relation("ReviewerCases", fields: [reviewerId], references: [id])
+}
+
+model ModerationAudit {
+  id              String                     @id @default(uuid())
+  designId        String
+  moderatorId     String
+  decision        ModerationPipelineDecision
+  predefinedReasons Json?
+  customReason    String?
+  notes           String?
+  beforeStatus    DesignStatus
+  afterStatus     DesignStatus
+  createdAt       DateTime                   @default(now())
+
+  design DesignAsset @relation(fields: [designId], references: [id], onDelete: Cascade)
+
+  @@index([designId, createdAt])
+  @@index([moderatorId])
 }
 
 model FileAsset {
@@ -339,19 +539,31 @@ model BaseProduct {
   id              String   @id @default(uuid())
   productTypeId   String
   name            String
+  slug            String?
+  localProductType LocalProductType?
+  neckline        NecklineType?
+  sleeveType      SleeveType?
   skuPrefix       String
   isActive        Boolean  @default(true)
   baseCost        Decimal? @db.Decimal(10, 2)
   defaultPrice    Decimal? @db.Decimal(10, 2)
+  currency        String   @default("UZS")
   imageUrl        String?
   description     String?
+  baseImageUrls   Json?
+  mockupSceneImages Json?
+  printableAreas  Json?
   availableColors Json?
   availableSizes  Json?
+  localProductionMethod LocalProductionMethod?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
   productType     ProductType      @relation(fields: [productTypeId], references: [id], onDelete: Restrict)
   mockupTemplates MockupTemplate[]
+  placementPresets PlacementPreset[]
+  productSelections DesignProductSelection[]
+  listings CommerceListing[]
 }
 
 model MockupTemplate {
@@ -375,10 +587,16 @@ model PrintArea {
   id               String   @id @default(uuid())
   mockupTemplateId String
   name             String
+  placement        PlacementKind?
+  widthCm          Float?
+  heightCm         Float?
   x                Int
   y                Int
   width            Int
   height           Int
+  safeZonePx       Int?
+  defaultPresetId  String?
+  isActive         Boolean @default(true)
   safeX            Int
   safeY            Int
   safeWidth        Int
@@ -393,6 +611,63 @@ model PrintArea {
 
   mockupTemplate MockupTemplate @relation(fields: [mockupTemplateId], references: [id])
   placements     MockupPlacement[]
+}
+
+model PrintfulProductTemplate {
+  id                       String       @id @default(uuid())
+  rashpodProductType        String
+  displayName               String
+  provider                  ProviderType @default(PRINTFUL)
+  printfulCatalogProductId  String
+  printfulProductName       String
+  printfulVariantIds        Json
+  allowedColorVariantIds    Json?
+  allowedSizeVariantIds     Json?
+  allowedPlacements         Json
+  allowedTechniques         Json
+  defaultTechnique          String
+  defaultPlacement          String
+  printfulStoreId           String?
+  defaultRetailPrice        Decimal? @db.Decimal(10, 2)
+  estimatedBaseCost         Decimal? @db.Decimal(10, 2)
+  currency                  String   @default("USD")
+  active                    Boolean  @default(true)
+  metadataJson              Json?
+  createdAt                 DateTime @default(now())
+  updatedAt                 DateTime @updatedAt
+
+  placementPresets PlacementPreset[]
+  productSelections DesignProductSelection[]
+  listings CommerceListing[]
+
+  @@unique([provider, printfulCatalogProductId, displayName])
+}
+
+model PlacementPreset {
+  id                      String             @id @default(uuid())
+  name                    String
+  pipeline                PipelineType
+  productTemplateId       String?
+  localBaseProductId      String?
+  placement               PlacementKind
+  defaultWidthCm          Float?
+  defaultHeightCm         Float?
+  defaultWidthIn          Float?
+  defaultHeightIn         Float?
+  defaultX                Float?
+  defaultY                Float?
+  defaultScale            Float              @default(1)
+  alignment               PlacementAlignment @default(CENTER)
+  units                   PlacementUnits     @default(CM)
+  active                  Boolean            @default(true)
+  createdAt               DateTime           @default(now())
+  updatedAt               DateTime           @updatedAt
+
+  printfulProductTemplate PrintfulProductTemplate? @relation(fields: [productTemplateId], references: [id])
+  localBaseProduct        BaseProduct?             @relation(fields: [localBaseProductId], references: [id])
+  productSelections       DesignProductSelection[]
+
+  @@index([pipeline, active])
 }
 
 model FilmSaleSettings {
@@ -460,17 +735,90 @@ model GeneratedAsset {
   sourcePlacement MockupPlacement @relation(fields: [sourcePlacementId], references: [id])
 }
 
+model DesignProductSelection {
+  id                         String                       @id @default(uuid())
+  designId                   String
+  pipeline                   PipelineType
+  localBaseProductId          String?
+  printfulProductTemplateId   String?
+  placementPresetId           String
+  placement                   PlacementKind
+  technique                   String?
+  width                       Float?
+  height                      Float?
+  x                           Float?
+  y                           Float?
+  top                         Float?
+  left                        Float?
+  scale                       Float                        @default(1)
+  rotation                    Float                        @default(0)
+  units                       PlacementUnits               @default(CM)
+  positionHash                String
+  targetMarketplaces          Json?
+  selectedByModeratorId       String
+  status                      DesignProductSelectionStatus @default(SELECTED)
+  errorMessage                String?
+  createdAt                   DateTime                     @default(now())
+  updatedAt                   DateTime                     @updatedAt
+
+  design                  DesignAsset              @relation(fields: [designId], references: [id], onDelete: Cascade)
+  localBaseProduct        BaseProduct?             @relation(fields: [localBaseProductId], references: [id])
+  printfulProductTemplate PrintfulProductTemplate? @relation(fields: [printfulProductTemplateId], references: [id])
+  placementPreset         PlacementPreset          @relation(fields: [placementPresetId], references: [id])
+  mockupAssets            MockupAsset[]
+  productListing          CommerceListing?
+
+  @@unique([designId, pipeline, positionHash])
+  @@index([designId, pipeline])
+  @@index([status])
+}
+
+model MockupAsset {
+  id                       String            @id @default(uuid())
+  designId                 String
+  designProductSelectionId String
+  pipeline                 PipelineType
+  provider                 ProviderType
+  imageUrl                 String?
+  thumbnailUrl             String?
+  mockupType               MockupAssetType
+  providerMockupId         String?
+  providerTaskId           String?
+  status                   MockupAssetStatus @default(PENDING)
+  metadataJson             Json?
+  createdAt                DateTime          @default(now())
+
+  design           DesignAsset            @relation(fields: [designId], references: [id], onDelete: Cascade)
+  productSelection DesignProductSelection @relation(fields: [designProductSelectionId], references: [id], onDelete: Cascade)
+
+  @@index([designId, pipeline])
+  @@index([designProductSelectionId, status])
+}
+
 model CommerceListing {
   id             String       @id @default(uuid())
   type           ListingType
   status         ListingStatus @default(DRAFT)
   designerId     String
   designAssetId  String
+  pipeline       PipelineType?
   title          String
   description    String?
+  tags           Json?
+  categoryId     String?
+  productType    String?
+  localBaseProductId String?
+  printfulProductTemplateId String?
+  designProductSelectionId String? @unique
+  mockupAssetIds Json?
   slug           String       @unique
   price          Decimal      @db.Decimal(10, 2)
   currency       String       @default("UZS")
+  cost           Decimal?     @db.Decimal(10, 2)
+  marketplaceFeeEstimate Decimal? @db.Decimal(10, 2)
+  rashpodCommission Decimal? @db.Decimal(10, 2)
+  designerRoyalty Decimal? @db.Decimal(10, 2)
+  seoMetadata    Json?
   imagesJson     Json?
   metadataJson   Json?
   publishedAt    DateTime?
@@ -479,9 +827,69 @@ model CommerceListing {
 
   designer    User       @relation("ListingDesigner", fields: [designerId], references: [id])
   designAsset DesignAsset @relation(fields: [designAssetId], references: [id])
+  localBaseProduct BaseProduct? @relation(fields: [localBaseProductId], references: [id])
+  printfulProductTemplate PrintfulProductTemplate? @relation(fields: [printfulProductTemplateId], references: [id])
+  designProductSelection DesignProductSelection? @relation(fields: [designProductSelectionId], references: [id])
+  marketplacePublications MarketplacePublication[]
   cartItems   CartItem[]
   orderItems  OrderItem[]
   royaltyLedgerEntries RoyaltyLedgerEntry[]
+}
+
+model MarketplacePublication {
+  id                         String                       @id @default(uuid())
+  productListingId           String
+  marketplace                MarketplaceKind
+  provider                   ProviderType
+  providerStoreId            String?
+  providerSyncProductId      String?
+  providerExternalListingId  String?
+  status                     MarketplacePublicationStatus @default(DRAFT)
+  errorMessage               String?
+  lastSyncedAt               DateTime?
+  metadataJson               Json?
+  createdAt                  DateTime                     @default(now())
+  updatedAt                  DateTime                     @updatedAt
+
+  productListing CommerceListing @relation(fields: [productListingId], references: [id], onDelete: Cascade)
+
+  @@unique([productListingId, marketplace])
+  @@index([marketplace, status])
+}
+
+model PrintfulFileMapping {
+  id              String                @id @default(uuid())
+  designId        String
+  printfulFileId  String?
+  originalUrl     String?
+  printfulUrl     String?
+  status          PrintfulMappingStatus @default(PENDING)
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
+
+  design DesignAsset @relation(fields: [designId], references: [id], onDelete: Cascade)
+
+  @@unique([designId, printfulFileId])
+  @@index([designId, status])
+}
+
+model IntegrationLog {
+  id                         String               @id @default(uuid())
+  designId                   String?
+  productListingId           String?
+  marketplacePublicationId   String?
+  action                     String
+  requestId                  String?
+  status                     IntegrationLogStatus
+  errorCode                  String?
+  errorMessage               String?
+  responseSummaryJson        Json?
+  createdAt                  DateTime             @default(now())
+
+  @@index([designId, createdAt])
+  @@index([productListingId, createdAt])
+  @@index([marketplacePublicationId, createdAt])
+  @@index([action, status])
 }
 
 model Cart {

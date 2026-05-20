@@ -26,6 +26,8 @@ import { MediaModule } from "./modules/media/media.module";
 import { AdminUsersModule } from "./modules/admin-users/admin-users.module";
 import { IntakeModule } from "./modules/intake/intake.module";
 import { CurrencyModule } from "./modules/currency/currency.module";
+import { DesignWorkflowModule } from "./modules/design-workflow/design-workflow.module";
+import { PrintfulModule } from "./modules/printful/printful.module";
 import { HealthController } from "./health.controller";
 
 @Module({
@@ -57,6 +59,8 @@ import { HealthController } from "./health.controller";
     AdminUsersModule,
     CurrencyModule,
     IntakeModule,
+    DesignWorkflowModule,
+    PrintfulModule,
   ],
   controllers: [HealthController],
 })

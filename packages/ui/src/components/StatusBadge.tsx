@@ -14,7 +14,10 @@ const STATUS_MAP: Record<string, StatusMeta> = {
   // Design / listing lifecycle
   draft: { label: "Draft", variant: "gray" },
   submitted: { label: "Submitted", variant: "blue" },
+  pending_moderation: { label: "Pending moderation", variant: "blue" },
   needs_fix: { label: "Needs fix", variant: "yellow" },
+  approved_local: { label: "Approved local", variant: "green" },
+  approved_global: { label: "Approved global", variant: "green" },
   approved: { label: "Approved", variant: "green" },
   rejected: { label: "Rejected", variant: "red" },
   suspended: { label: "Suspended", variant: "red" },
@@ -40,6 +43,13 @@ const STATUS_MAP: Record<string, StatusMeta> = {
   cancelled: { label: "Cancelled", variant: "red" },
   refunded: { label: "Refunded", variant: "yellow" },
   failed: { label: "Failed", variant: "red" },
+  mockup_pending: { label: "Mockup pending", variant: "gray" },
+  mockup_generating: { label: "Generating mockup", variant: "blue" },
+  mockup_ready: { label: "Mockup ready", variant: "green" },
+  mockup_failed: { label: "Mockup failed", variant: "red" },
+  listing_draft: { label: "Listing draft", variant: "gray" },
+  unpublished: { label: "Unpublished", variant: "gray" },
+  needs_review: { label: "Needs review", variant: "yellow" },
 };
 
 export interface StatusBadgeProps {

@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
-import { BaseProduct, Prisma } from "@prisma/client";
+import { BaseProduct, PipelineType, PlacementAlignment, PlacementKind, PlacementUnits, Prisma, ProviderType } from "@prisma/client";
 import { AuditService } from "../audit/audit.service";
 import { PrismaService } from "../../prisma/prisma.service";
 import { CreateProductTypeDto } from "./dto/create-product-type.dto";
@@ -14,12 +14,19 @@ import { UpdateProductTypeDto } from "./dto/update-product-type.dto";
 import { UpdateBaseProductDto } from "./dto/update-base-product.dto";
 import { UpdateMockupTemplateDto } from "./dto/update-mockup-template.dto";
 import { UpdatePrintAreaDto } from "./dto/update-print-area.dto";
+import { CreatePlacementPresetDto } from "./dto/create-placement-preset.dto";
+import { UpdatePlacementPresetDto } from "./dto/update-placement-preset.dto";
+import { CreatePrintfulProductTemplateDto } from "./dto/create-printful-product-template.dto";
+import { UpdatePrintfulProductTemplateDto } from "./dto/update-printful-product-template.dto";
+import { UpdatePrintfulSettingsDto } from "./dto/update-printful-settings.dto";
+import { JobDispatcherService } from "../worker-jobs/job-dispatcher.service";
 
 @Injectable()
 export class AdminConfigService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    private readonly jobs?: JobDispatcherService,
   ) {}
 
   listProductTypes() {
@@ -383,5 +390,158 @@ export class AdminConfigService {
     });
     await this.audit.log({ actorId, action: "delivery-setting.update", entityType: "DeliverySetting", entityId: item.id });
     return item;
+  }
+
+  listPlacementPresets() {
+    return this.prisma.placementPreset.findMany({
+      orderBy: { createdAt: "desc" },
+      include: { localBaseProduct: true, printfulProductTemplate: true },
+    });
+  }
+
+  async createPlacementPreset(actorId: string, dto: CreatePlacementPresetDto) {
+    this.assertPresetTarget(dto.pipeline, dto.localBaseProductId, dto.productTemplateId);
+    const item = await this.prisma.placementPreset.create({
+      data: {
+        name: dto.name,
+        pipeline: dto.pipeline as PipelineType,
+        productTemplateId: dto.productTemplateId,
+        localBaseProductId: dto.localBaseProductId,
+        placement: this.normalizeEnum(dto.placement, PlacementKind, "placement") as PlacementKind,
+        defaultWidthCm: dto.defaultWidthCm,
+        defaultHeightCm: dto.defaultHeightCm,
+        defaultWidthIn: dto.defaultWidthIn,
+        defaultHeightIn: dto.defaultHeightIn,
+        defaultX: dto.defaultX,
+        defaultY: dto.defaultY,
+        defaultScale: dto.defaultScale ?? 1,
+        alignment: this.normalizeEnum(dto.alignment ?? "CENTER", PlacementAlignment, "alignment") as PlacementAlignment,
+        units: this.normalizeEnum(dto.units ?? "CM", PlacementUnits, "units") as PlacementUnits,
+        active: dto.active ?? true,
+      },
+    });
+    await this.audit.log({ actorId, action: "placement-preset.create", entityType: "PlacementPreset", entityId: item.id });
+    return item;
+  }
+
+  async updatePlacementPreset(actorId: string, id: string, dto: UpdatePlacementPresetDto) {
+    const item = await this.prisma.placementPreset.update({
+      where: { id },
+      data: {
+        name: dto.name,
+        productTemplateId: dto.productTemplateId,
+        localBaseProductId: dto.localBaseProductId,
+        placement: dto.placement ? (this.normalizeEnum(dto.placement, PlacementKind, "placement") as PlacementKind) : undefined,
+        defaultWidthCm: dto.defaultWidthCm,
+        defaultHeightCm: dto.defaultHeightCm,
+        defaultWidthIn: dto.defaultWidthIn,
+        defaultHeightIn: dto.defaultHeightIn,
+        defaultX: dto.defaultX,
+        defaultY: dto.defaultY,
+        defaultScale: dto.defaultScale,
+        alignment: dto.alignment ? (this.normalizeEnum(dto.alignment, PlacementAlignment, "alignment") as PlacementAlignment) : undefined,
+        units: dto.units ? (this.normalizeEnum(dto.units, PlacementUnits, "units") as PlacementUnits) : undefined,
+        active: dto.active,
+      },
+    });
+    await this.audit.log({ actorId, action: "placement-preset.update", entityType: "PlacementPreset", entityId: item.id });
+    return item;
+  }
+
+  listPrintfulProductTemplates() {
+    return this.prisma.printfulProductTemplate.findMany({ orderBy: { createdAt: "desc" } });
+  }
+
+  async createPrintfulProductTemplate(actorId: string, dto: CreatePrintfulProductTemplateDto) {
+    const item = await this.prisma.printfulProductTemplate.create({ data: this.printfulTemplateData(dto) });
+    await this.audit.log({ actorId, action: "printful-template.create", entityType: "PrintfulProductTemplate", entityId: item.id });
+    return item;
+  }
+
+  async updatePrintfulProductTemplate(actorId: string, id: string, dto: UpdatePrintfulProductTemplateDto) {
+    const item = await this.prisma.printfulProductTemplate.update({ where: { id }, data: this.printfulTemplateData(dto, true) });
+    await this.audit.log({ actorId, action: "printful-template.update", entityType: "PrintfulProductTemplate", entityId: item.id });
+    return item;
+  }
+
+  async syncPrintfulCatalog(actorId: string) {
+    if (!this.jobs) throw new BadRequestException("Worker job dispatcher is not configured");
+    const job = await this.jobs.enqueue("SYNC_PRINTFUL_CATALOG", { requestedBy: actorId });
+    await this.audit.log({ actorId, action: "printful-catalog.sync", entityType: "PrintfulProductTemplate", entityId: job.jobId });
+    return job;
+  }
+
+  async getPrintfulSettings() {
+    const setting = await this.prisma.platformSetting.findUnique({ where: { key: "integrations.printful" } });
+    const value = this.objectValue(setting?.value);
+    return {
+      enabled: Boolean(value.enabled),
+      defaultStoreId: value.defaultStoreId ?? process.env.PRINTFUL_STORE_ID ?? null,
+      connectedMarketplaces: Array.isArray(value.connectedMarketplaces) ? value.connectedMarketplaces : [],
+      autoPublishTrusted: Boolean(value.autoPublishTrusted),
+      allowGlobalWithoutLocal: Boolean(value.allowGlobalWithoutLocal),
+      tokenConfigured: Boolean(process.env.PRINTFUL_API_TOKEN),
+      apiBaseUrl: process.env.PRINTFUL_API_BASE_URL || "https://api.printful.com",
+    };
+  }
+
+  async updatePrintfulSettings(actorId: string, dto: UpdatePrintfulSettingsDto) {
+    const value = {
+      enabled: dto.enabled ?? false,
+      defaultStoreId: dto.defaultStoreId,
+      connectedMarketplaces: dto.connectedMarketplaces ?? [],
+      autoPublishTrusted: dto.autoPublishTrusted ?? false,
+      allowGlobalWithoutLocal: dto.allowGlobalWithoutLocal ?? false,
+    };
+    const item = await this.prisma.platformSetting.upsert({
+      where: { key: "integrations.printful" },
+      create: { key: "integrations.printful", value },
+      update: { value },
+    });
+    await this.prisma.platformSetting.upsert({
+      where: { key: "pipeline.allowGlobalWithoutLocal" },
+      create: { key: "pipeline.allowGlobalWithoutLocal", value: value.allowGlobalWithoutLocal },
+      update: { value: value.allowGlobalWithoutLocal },
+    });
+    await this.audit.log({ actorId, action: "printful-settings.update", entityType: "PlatformSetting", entityId: item.key });
+    return this.getPrintfulSettings();
+  }
+
+  private assertPresetTarget(pipeline: string, localBaseProductId?: string, productTemplateId?: string) {
+    if (pipeline === PipelineType.LOCAL && !localBaseProductId) throw new BadRequestException("Local placement preset requires localBaseProductId");
+    if (pipeline === PipelineType.GLOBAL_PRINTFUL && !productTemplateId) throw new BadRequestException("Printful placement preset requires productTemplateId");
+  }
+
+  private normalizeEnum(value: string, enumObject: Record<string, string>, field: string) {
+    const normalized = value.trim().toUpperCase().replace(/[-\s]+/g, "_");
+    if (!(normalized in enumObject)) throw new BadRequestException(`Invalid ${field}`);
+    return normalized;
+  }
+
+  private printfulTemplateData(dto: CreatePrintfulProductTemplateDto | UpdatePrintfulProductTemplateDto, partial = false) {
+    return {
+      rashpodProductType: dto.rashpodProductType,
+      displayName: dto.displayName,
+      provider: partial ? undefined : ProviderType.PRINTFUL,
+      printfulCatalogProductId: dto.printfulCatalogProductId,
+      printfulProductName: dto.printfulProductName,
+      printfulVariantIds: dto.printfulVariantIds,
+      allowedColorVariantIds: dto.allowedColorVariantIds,
+      allowedSizeVariantIds: dto.allowedSizeVariantIds,
+      allowedPlacements: dto.allowedPlacements,
+      allowedTechniques: dto.allowedTechniques,
+      defaultTechnique: dto.defaultTechnique,
+      defaultPlacement: dto.defaultPlacement,
+      printfulStoreId: dto.printfulStoreId,
+      defaultRetailPrice: dto.defaultRetailPrice == null ? (partial ? undefined : null) : new Prisma.Decimal(dto.defaultRetailPrice),
+      estimatedBaseCost: dto.estimatedBaseCost == null ? (partial ? undefined : null) : new Prisma.Decimal(dto.estimatedBaseCost),
+      currency: dto.currency,
+      active: dto.active,
+      metadataJson: dto.metadataJson as Prisma.InputJsonValue | undefined,
+    };
+  }
+
+  private objectValue(value: Prisma.JsonValue | undefined) {
+    return value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
   }
 }

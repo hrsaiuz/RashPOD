@@ -16,6 +16,11 @@ import { UpdateProductTypeDto } from "./dto/update-product-type.dto";
 import { UpdateBaseProductDto } from "./dto/update-base-product.dto";
 import { UpdateMockupTemplateDto } from "./dto/update-mockup-template.dto";
 import { UpdatePrintAreaDto } from "./dto/update-print-area.dto";
+import { CreatePlacementPresetDto } from "./dto/create-placement-preset.dto";
+import { UpdatePlacementPresetDto } from "./dto/update-placement-preset.dto";
+import { CreatePrintfulProductTemplateDto } from "./dto/create-printful-product-template.dto";
+import { UpdatePrintfulProductTemplateDto } from "./dto/update-printful-product-template.dto";
+import { UpdatePrintfulSettingsDto } from "./dto/update-printful-settings.dto";
 
 @Controller("admin")
 @UseGuards(JwtAuthGuard, PermissionGuard)
@@ -182,5 +187,59 @@ export class AdminConfigController {
   @RequirePermission("delivery-settings:manage")
   updateDeliverySetting(@CurrentUser() user: RequestUser, @Param("id") id: string, @Body() dto: UpdateDeliverySettingDto) {
     return this.service.updateDeliverySetting(user.sub, id, dto);
+  }
+
+  @Get("placement-presets")
+  @RequirePermission("mockup-template:manage")
+  listPlacementPresets() {
+    return this.service.listPlacementPresets();
+  }
+
+  @Post("placement-presets")
+  @RequirePermission("mockup-template:manage")
+  createPlacementPreset(@CurrentUser() user: RequestUser, @Body() dto: CreatePlacementPresetDto) {
+    return this.service.createPlacementPreset(user.sub, dto);
+  }
+
+  @Patch("placement-presets/:id")
+  @RequirePermission("mockup-template:manage")
+  updatePlacementPreset(@CurrentUser() user: RequestUser, @Param("id") id: string, @Body() dto: UpdatePlacementPresetDto) {
+    return this.service.updatePlacementPreset(user.sub, id, dto);
+  }
+
+  @Get("printful/product-templates")
+  @RequirePermission("printful-template:manage")
+  listPrintfulProductTemplates() {
+    return this.service.listPrintfulProductTemplates();
+  }
+
+  @Post("printful/product-templates")
+  @RequirePermission("printful-template:manage")
+  createPrintfulProductTemplate(@CurrentUser() user: RequestUser, @Body() dto: CreatePrintfulProductTemplateDto) {
+    return this.service.createPrintfulProductTemplate(user.sub, dto);
+  }
+
+  @Post("printful/product-templates/sync-catalog")
+  @RequirePermission("printful-catalog:sync")
+  syncPrintfulCatalog(@CurrentUser() user: RequestUser) {
+    return this.service.syncPrintfulCatalog(user.sub);
+  }
+
+  @Patch("printful/product-templates/:id")
+  @RequirePermission("printful-template:manage")
+  updatePrintfulProductTemplate(@CurrentUser() user: RequestUser, @Param("id") id: string, @Body() dto: UpdatePrintfulProductTemplateDto) {
+    return this.service.updatePrintfulProductTemplate(user.sub, id, dto);
+  }
+
+  @Get("integrations/printful/settings")
+  @RequirePermission("printful-template:manage")
+  getPrintfulSettings() {
+    return this.service.getPrintfulSettings();
+  }
+
+  @Patch("integrations/printful/settings")
+  @RequirePermission("printful-settings:manage")
+  updatePrintfulSettings(@CurrentUser() user: RequestUser, @Body() dto: UpdatePrintfulSettingsDto) {
+    return this.service.updatePrintfulSettings(user.sub, dto);
   }
 }

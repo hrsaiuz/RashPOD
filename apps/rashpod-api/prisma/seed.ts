@@ -1,4 +1,19 @@
-import { PrismaClient, UserRole, DesignStatus, ListingStatus, ListingType } from "@prisma/client";
+import {
+  LocalProductionMethod,
+  LocalProductType,
+  NecklineType,
+  PipelineType,
+  PlacementAlignment,
+  PlacementKind,
+  PlacementUnits,
+  PrismaClient,
+  ProviderType,
+  SleeveType,
+  UserRole,
+  DesignStatus,
+  ListingStatus,
+  ListingType,
+} from "@prisma/client";
 import * as bcrypt from "bcryptjs";
 
 const prisma = new PrismaClient();
@@ -56,6 +71,7 @@ async function seedUsers() {
 async function seedProductTypes() {
   const items = [
     { name: "T-shirt", slug: "t-shirt", category: "Clothes", productionMethod: "DTF", supportsFilmSale: false },
+    { name: "Long sleeve crew neck T-shirt", slug: "long-sleeve-crew-neck-t-shirt", category: "Clothes", productionMethod: "DTF", supportsFilmSale: false },
     { name: "Hoodie", slug: "hoodie", category: "Clothes", productionMethod: "DTF", supportsFilmSale: false },
     { name: "Mug", slug: "mug", category: "Ceramics", productionMethod: "Sublimation", supportsFilmSale: false },
     { name: "Poster", slug: "poster", category: "Prints", productionMethod: "UV", supportsFilmSale: false },
@@ -282,6 +298,314 @@ async function seedBaseProductsAndMockups() {
   }
 }
 
+async function upsertLocalPipelineProduct(input: {
+  productTypeSlug: string;
+  name: string;
+  slug: string;
+  skuPrefix: string;
+  localProductType: LocalProductType;
+  neckline: NecklineType;
+  sleeveType: SleeveType;
+  productionMethod: LocalProductionMethod;
+  baseCost: string;
+  defaultPrice: string;
+  colors: string[];
+  sizes: string[];
+  templateName: string;
+  templateSlug: string;
+  areas: Array<{ name: string; placement: PlacementKind; x: number; y: number; width: number; height: number; widthCm: number; heightCm: number }>;
+}) {
+  const productType = await prisma.productType.findUnique({ where: { slug: input.productTypeSlug } });
+  if (!productType) return null;
+
+  let baseProduct = await prisma.baseProduct.findFirst({ where: { slug: input.slug } });
+  if (!baseProduct) {
+    baseProduct = await prisma.baseProduct.create({
+      data: {
+        productTypeId: productType.id,
+        name: input.name,
+        slug: input.slug,
+        skuPrefix: input.skuPrefix,
+        localProductType: input.localProductType,
+        neckline: input.neckline,
+        sleeveType: input.sleeveType,
+        localProductionMethod: input.productionMethod,
+        baseCost: input.baseCost,
+        defaultPrice: input.defaultPrice,
+        currency: "UZS",
+        imageUrl: `https://picsum.photos/seed/${input.templateSlug}/900/900`,
+        baseImageUrls: [`mockup-templates/local/${input.templateSlug}/front-base.png`],
+        mockupSceneImages: [
+          `mockup-templates/local/${input.templateSlug}/main.png`,
+          `mockup-templates/local/${input.templateSlug}/lifestyle.png`,
+        ],
+        availableColors: input.colors,
+        availableSizes: input.sizes,
+        description: `${input.name} for RashPOD local production in Uzbekistan.`,
+      },
+    });
+  } else {
+    baseProduct = await prisma.baseProduct.update({
+      where: { id: baseProduct.id },
+      data: {
+        productTypeId: productType.id,
+        name: input.name,
+        skuPrefix: input.skuPrefix,
+        localProductType: input.localProductType,
+        neckline: input.neckline,
+        sleeveType: input.sleeveType,
+        localProductionMethod: input.productionMethod,
+        baseCost: input.baseCost,
+        defaultPrice: input.defaultPrice,
+        currency: "UZS",
+        availableColors: input.colors,
+        availableSizes: input.sizes,
+      },
+    });
+  }
+
+  let template = await prisma.mockupTemplate.findFirst({ where: { baseProductId: baseProduct.id, name: input.templateName } });
+  if (!template) {
+    template = await prisma.mockupTemplate.create({
+      data: {
+        baseProductId: baseProduct.id,
+        name: input.templateName,
+        baseImageKey: `mockup-templates/local/${input.templateSlug}/front-base.png`,
+        lifestyleImageKey: `mockup-templates/local/${input.templateSlug}/lifestyle.png`,
+        closeupImageKey: `mockup-templates/local/${input.templateSlug}/detail.png`,
+        sortOrder: 0,
+      },
+    });
+  }
+
+  for (const area of input.areas) {
+    const existing = await prisma.printArea.findFirst({ where: { mockupTemplateId: template.id, name: area.name } });
+    const data = {
+      mockupTemplateId: template.id,
+      name: area.name,
+      placement: area.placement,
+      widthCm: area.widthCm,
+      heightCm: area.heightCm,
+      x: area.x,
+      y: area.y,
+      width: area.width,
+      height: area.height,
+      safeX: area.x + 20,
+      safeY: area.y + 20,
+      safeWidth: area.width - 40,
+      safeHeight: area.height - 40,
+      safeZonePx: 20,
+      allowMove: true,
+      allowResize: true,
+      allowRotate: area.placement !== PlacementKind.FULL_WRAP,
+      isActive: true,
+    };
+    if (existing) await prisma.printArea.update({ where: { id: existing.id }, data });
+    else await prisma.printArea.create({ data });
+  }
+
+  return baseProduct;
+}
+
+async function seedPipelineTemplates() {
+  const classicTee = await upsertLocalPipelineProduct({
+    productTypeSlug: "t-shirt",
+    name: "Classic short sleeve crew neck T-shirt",
+    slug: "classic-short-sleeve-crew-neck-t-shirt",
+    skuPrefix: "LCST",
+    localProductType: LocalProductType.T_SHIRT,
+    neckline: NecklineType.CREW_NECK,
+    sleeveType: SleeveType.SHORT,
+    productionMethod: LocalProductionMethod.DTF,
+    baseCost: "65000",
+    defaultPrice: "159000",
+    colors: ["white", "black", "gray"],
+    sizes: ["S", "M", "L", "XL"],
+    templateName: "Front and back",
+    templateSlug: "classic-crew-tee",
+    areas: [
+      { name: "T-shirt front", placement: PlacementKind.FRONT, x: 300, y: 260, width: 520, height: 620, widthCm: 30, heightCm: 36 },
+      { name: "T-shirt back", placement: PlacementKind.BACK, x: 300, y: 250, width: 540, height: 650, widthCm: 32, heightCm: 38 },
+    ],
+  });
+
+  const longSleeve = await upsertLocalPipelineProduct({
+    productTypeSlug: "long-sleeve-crew-neck-t-shirt",
+    name: "Long sleeve crew neck T-shirt",
+    slug: "long-sleeve-crew-neck-t-shirt",
+    skuPrefix: "LCLT",
+    localProductType: LocalProductType.LONG_SLEEVE_T_SHIRT,
+    neckline: NecklineType.CREW_NECK,
+    sleeveType: SleeveType.LONG,
+    productionMethod: LocalProductionMethod.DTF,
+    baseCost: "85000",
+    defaultPrice: "199000",
+    colors: ["white", "black", "navy"],
+    sizes: ["S", "M", "L", "XL"],
+    templateName: "Front and back",
+    templateSlug: "long-sleeve-crew-tee",
+    areas: [
+      { name: "Long sleeve front", placement: PlacementKind.FRONT, x: 300, y: 270, width: 520, height: 620, widthCm: 30, heightCm: 36 },
+      { name: "Long sleeve back", placement: PlacementKind.BACK, x: 300, y: 260, width: 540, height: 650, widthCm: 32, heightCm: 38 },
+    ],
+  });
+
+  const mug = await upsertLocalPipelineProduct({
+    productTypeSlug: "mug",
+    name: "Ceramic mug",
+    slug: "ceramic-mug",
+    skuPrefix: "LCMG",
+    localProductType: LocalProductType.MUG,
+    neckline: NecklineType.NONE,
+    sleeveType: SleeveType.NONE,
+    productionMethod: LocalProductionMethod.SUBLIMATION,
+    baseCost: "28000",
+    defaultPrice: "79000",
+    colors: ["white"],
+    sizes: ["330ml"],
+    templateName: "Mug wrap",
+    templateSlug: "ceramic-mug",
+    areas: [{ name: "Mug center", placement: PlacementKind.FULL_WRAP, x: 220, y: 290, width: 760, height: 330, widthCm: 20, heightCm: 8.5 }],
+  });
+
+  const presets = [
+    { name: "Center chest", product: classicTee, placement: PlacementKind.FRONT, widthCm: 24, heightCm: 24, alignment: PlacementAlignment.CENTER },
+    { name: "Large front", product: classicTee, placement: PlacementKind.FRONT, widthCm: 30, heightCm: 34, alignment: PlacementAlignment.TOP_CENTER },
+    { name: "Back center", product: classicTee, placement: PlacementKind.BACK, widthCm: 30, heightCm: 34, alignment: PlacementAlignment.CENTER },
+    { name: "Center chest", product: longSleeve, placement: PlacementKind.FRONT, widthCm: 24, heightCm: 24, alignment: PlacementAlignment.CENTER },
+    { name: "Mug center", product: mug, placement: PlacementKind.FULL_WRAP, widthCm: 10, heightCm: 7, alignment: PlacementAlignment.CENTER },
+  ];
+
+  for (const preset of presets) {
+    if (!preset.product) continue;
+    const existing = await prisma.placementPreset.findFirst({
+      where: { pipeline: PipelineType.LOCAL, localBaseProductId: preset.product.id, name: preset.name, placement: preset.placement },
+    });
+    const data = {
+      name: preset.name,
+      pipeline: PipelineType.LOCAL,
+      localBaseProductId: preset.product.id,
+      placement: preset.placement,
+      defaultWidthCm: preset.widthCm,
+      defaultHeightCm: preset.heightCm,
+      defaultScale: 1,
+      alignment: preset.alignment,
+      units: PlacementUnits.CM,
+      active: true,
+    };
+    if (existing) await prisma.placementPreset.update({ where: { id: existing.id }, data });
+    else await prisma.placementPreset.create({ data });
+  }
+
+  const printfulTemplates = [
+    {
+      rashpodProductType: "classic_crew_neck_tshirt",
+      displayName: "Printful classic T-shirt",
+      printfulCatalogProductId: "dev-printful-classic-tee",
+      printfulProductName: "Printful placeholder classic T-shirt",
+      variants: ["dev-tee-black-s", "dev-tee-black-m", "dev-tee-white-m"],
+      placement: "front",
+      technique: "dtg",
+      price: "24.00",
+      cost: "12.00",
+    },
+    {
+      rashpodProductType: "long_sleeve_crew_neck_tshirt",
+      displayName: "Printful long sleeve crew neck T-shirt",
+      printfulCatalogProductId: "dev-printful-long-sleeve-tee",
+      printfulProductName: "Printful placeholder long sleeve T-shirt",
+      variants: ["dev-ls-black-s", "dev-ls-black-m", "dev-ls-white-m"],
+      placement: "front",
+      technique: "dtg",
+      price: "32.00",
+      cost: "17.00",
+    },
+    {
+      rashpodProductType: "hoodie",
+      displayName: "Printful hoodie",
+      printfulCatalogProductId: "dev-printful-hoodie",
+      printfulProductName: "Printful placeholder hoodie",
+      variants: ["dev-hoodie-black-m", "dev-hoodie-black-l"],
+      placement: "front",
+      technique: "dtg",
+      price: "48.00",
+      cost: "25.00",
+    },
+    {
+      rashpodProductType: "mug",
+      displayName: "Printful mug",
+      printfulCatalogProductId: "dev-printful-mug",
+      printfulProductName: "Printful placeholder mug",
+      variants: ["dev-mug-white-11oz"],
+      placement: "default",
+      technique: "sublimation",
+      price: "18.00",
+      cost: "8.00",
+    },
+  ];
+
+  for (const item of printfulTemplates) {
+    const template = await prisma.printfulProductTemplate.upsert({
+      where: {
+        provider_printfulCatalogProductId_displayName: {
+          provider: ProviderType.PRINTFUL,
+          printfulCatalogProductId: item.printfulCatalogProductId,
+          displayName: item.displayName,
+        },
+      },
+      create: {
+        rashpodProductType: item.rashpodProductType,
+        displayName: item.displayName,
+        provider: ProviderType.PRINTFUL,
+        printfulCatalogProductId: item.printfulCatalogProductId,
+        printfulProductName: item.printfulProductName,
+        printfulVariantIds: item.variants,
+        allowedColorVariantIds: item.variants,
+        allowedSizeVariantIds: item.variants,
+        allowedPlacements: [item.placement],
+        allowedTechniques: [item.technique],
+        defaultTechnique: item.technique,
+        defaultPlacement: item.placement,
+        defaultRetailPrice: item.price,
+        estimatedBaseCost: item.cost,
+        active: true,
+        metadataJson: { devPlaceholder: true },
+      },
+      update: {
+        rashpodProductType: item.rashpodProductType,
+        printfulProductName: item.printfulProductName,
+        printfulVariantIds: item.variants,
+        allowedPlacements: [item.placement],
+        allowedTechniques: [item.technique],
+        defaultTechnique: item.technique,
+        defaultPlacement: item.placement,
+        defaultRetailPrice: item.price,
+        estimatedBaseCost: item.cost,
+        active: true,
+        metadataJson: { devPlaceholder: true },
+      },
+    });
+
+    const existingPreset = await prisma.placementPreset.findFirst({
+      where: { pipeline: PipelineType.GLOBAL_PRINTFUL, productTemplateId: template.id, name: "Center front" },
+    });
+    const presetData = {
+      name: "Center front",
+      pipeline: PipelineType.GLOBAL_PRINTFUL,
+      productTemplateId: template.id,
+      placement: PlacementKind.FRONT,
+      defaultWidthIn: item.rashpodProductType === "mug" ? 3.5 : 10,
+      defaultHeightIn: item.rashpodProductType === "mug" ? 3 : 12,
+      defaultScale: 1,
+      alignment: PlacementAlignment.CENTER,
+      units: PlacementUnits.INCH,
+      active: true,
+    };
+    if (existingPreset) await prisma.placementPreset.update({ where: { id: existingPreset.id }, data: presetData });
+    else await prisma.placementPreset.create({ data: presetData });
+  }
+}
+
 async function main() {
   await seedUsers();
   await seedProductTypes();
@@ -290,6 +614,7 @@ async function main() {
   await seedFilmSettings();
   await seedDeliverySettings();
   await seedBaseProductsAndMockups();
+  await seedPipelineTemplates();
   await seedSampleListings();
   console.log("Seed completed.");
 }

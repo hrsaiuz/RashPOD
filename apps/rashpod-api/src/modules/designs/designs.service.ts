@@ -39,20 +39,35 @@ export class DesignsService {
     });
   }
 
+  async getOwn(designerId: string, designId: string) {
+    const design = await this.prisma.designAsset.findUnique({
+      where: { id: designId },
+      include: {
+        versions: { orderBy: { createdAt: "desc" }, take: 5 },
+        moderationAudits: { orderBy: { createdAt: "desc" }, take: 10 },
+        productSelections: { include: { mockupAssets: true, localBaseProduct: true, printfulProductTemplate: true, placementPreset: true } },
+        listings: { include: { marketplacePublications: true } },
+      },
+    });
+    if (!design) throw new NotFoundException("Design not found");
+    if (design.designerId !== designerId) throw new ForbiddenException("Not your design");
+    return design;
+  }
+
   async submit(designerId: string, designId: string) {
     const design = await this.prisma.designAsset.findUnique({ where: { id: designId } });
     if (!design) throw new NotFoundException("Design not found");
     if (design.designerId !== designerId) throw new ForbiddenException("Not your design");
     const updated = await this.prisma.designAsset.update({
       where: { id: designId },
-      data: { status: DesignStatus.SUBMITTED },
+      data: { status: DesignStatus.PENDING_MODERATION, moderationStatus: "PENDING" },
     });
     await this.audit.log({
       actorId: designerId,
       action: "design.submit",
       entityType: "DesignAsset",
       entityId: designId,
-      metadata: { from: design.status, to: DesignStatus.SUBMITTED },
+      metadata: { from: design.status, to: DesignStatus.PENDING_MODERATION },
     });
     return updated;
   }

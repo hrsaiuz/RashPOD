@@ -1,6 +1,6 @@
 "use client";
 
-import { ChangeEvent, useEffect, useRef, useState } from "react";
+import { ChangeEvent, useEffect, useRef, useState, type ReactNode } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -11,7 +11,7 @@ import {
   Skeleton,
   StatusBadge,
 } from "@rashpod/ui";
-import { ArrowLeft, Send, Upload as UploadIcon, ShieldCheck } from "lucide-react";
+import { ArrowLeft, Boxes, Globe2, Image as ImageIcon, Send, ShieldCheck, ShoppingBag, Upload as UploadIcon } from "lucide-react";
 import { useAuth } from "../../../../auth/auth-provider";
 import DashboardLayout from "../../../dashboard-layout";
 import {
@@ -19,24 +19,32 @@ import {
   uploadToSignedUrl,
   type CommercialRights,
   type Design,
+  type DesignWorkflowDetail,
   type UploadUrlResponse,
 } from "../../../../../lib/api";
 
 const STATUS_TIMELINE: Design["status"][] = [
   "DRAFT",
-  "SUBMITTED",
-  "APPROVED",
+  "PENDING_MODERATION",
+  "APPROVED_LOCAL",
+  "APPROVED_GLOBAL",
   "READY_FOR_MOCKUP",
   "READY_TO_PUBLISH",
   "PUBLISHED",
 ];
+
+type ListingWithPublications = NonNullable<DesignWorkflowDetail["listings"]>[number] & {
+  marketplacePublications?: Array<{ id: string; marketplace: string; status: string; errorMessage?: string | null }>;
+};
+
+type DesignerDesignDetail = DesignWorkflowDetail & { listings?: ListingWithPublications[] };
 
 export default function DesignDetailPage() {
   const router = useRouter();
   const params = useParams();
   const { user, isLoading: authLoading } = useAuth();
   const id = String(params.id);
-  const [design, setDesign] = useState<Design | null>(null);
+  const [design, setDesign] = useState<DesignerDesignDetail | null>(null);
   const [rights, setRights] = useState<CommercialRights | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -57,17 +65,12 @@ export default function DesignDetailPage() {
     setLoading(true);
     setError("");
     try {
-      const [designs, r] = await Promise.all([
-        api.get<Design[]>("/designs"),
+      const [d, r] = await Promise.all([
+        api.get<DesignerDesignDetail>(`/designer/designs/${id}`),
         api.get<CommercialRights | null>(`/designs/${id}/commercial-rights`).catch(() => null),
       ]);
-      const found = designs.find((d) => d.id === id);
-      if (!found) {
-        setError("Design not found or you do not have access.");
-      } else {
-        setDesign(found);
-        setRights(r);
-      }
+      setDesign(d);
+      setRights(r);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load design");
     } finally {
@@ -78,7 +81,7 @@ export default function DesignDetailPage() {
   async function submitForReview() {
     setAction("submitting");
     try {
-      await api.post(`/designs/${id}/submit`);
+      await api.post(`/designer/designs/${id}/submit-for-moderation`);
       await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Submit failed");
@@ -103,7 +106,7 @@ export default function DesignDetailPage() {
         uploadedSizeBytes: f.size,
         uploadedMimeType: f.type,
       });
-      await api.post(`/designs/${id}/versions`, {
+      await api.post(`/designer/designs/${id}/versions`, {
         fileId: upload.fileId,
         widthPx: 0,
         heightPx: 0,
@@ -148,7 +151,7 @@ export default function DesignDetailPage() {
               <h2 className="text-lg font-semibold text-brand-ink mb-4">Lifecycle</h2>
               <ol className="flex flex-wrap gap-2">
                 {STATUS_TIMELINE.map((step) => {
-                  const reached = STATUS_TIMELINE.indexOf(design.status) >= STATUS_TIMELINE.indexOf(step);
+                  const reached = statusRank(design.status) >= statusRank(step);
                   return (
                     <li
                       key={step}
@@ -203,6 +206,8 @@ export default function DesignDetailPage() {
               </div>
             </Card>
 
+            <PipelineOverview design={design} />
+
             <Card>
               <h2 className="text-lg font-semibold text-brand-ink mb-4">Commercial rights</h2>
               {rights ? (
@@ -232,4 +237,111 @@ function RightsRow({ label, on }: { label: string; on: boolean }) {
       </span>
     </li>
   );
+}
+
+function PipelineOverview({ design }: { design: DesignerDesignDetail }) {
+  const selections = design.productSelections ?? [];
+  const listings = design.listings ?? [];
+  const mockups = selections.flatMap((selection) => Array.isArray(selection.mockupAssets) ? selection.mockupAssets : []);
+  const publications = listings.flatMap((listing) => listing.marketplacePublications ?? []);
+
+  return (
+    <Card>
+      <div className="mb-4 flex items-center gap-2">
+        <Boxes size={18} className="text-brand-blue" />
+        <h2 className="text-lg font-semibold text-brand-ink">Product Pipeline</h2>
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <PipelineMetric icon={<Boxes size={18} />} label="Selections" value={selections.length} />
+        <PipelineMetric icon={<ImageIcon size={18} />} label="Mockups" value={mockups.length} />
+        <PipelineMetric icon={<ShoppingBag size={18} />} label="Listings" value={listings.length} />
+        <PipelineMetric icon={<Globe2 size={18} />} label="Publications" value={publications.length} />
+      </div>
+
+      {selections.length ? (
+        <div className="mt-5 space-y-3">
+          {selections.map((selection) => (
+            <div key={selection.id} className="rounded-xl border border-surface-borderSoft p-4">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <p className="font-semibold text-brand-ink">{selection.pipeline === "LOCAL" ? objectName(selection.localBaseProduct, "Local product") : objectName(selection.printfulProductTemplate, "Printful product")}</p>
+                  <p className="mt-1 text-sm text-brand-muted">{selection.pipeline.replace(/_/g, " ")} · {selection.placement}</p>
+                </div>
+                <StatusBadge status={selection.status} />
+              </div>
+              {selection.errorMessage ? <p className="mt-3 text-sm text-semantic-danger">{selection.errorMessage}</p> : null}
+              {Array.isArray(selection.mockupAssets) && selection.mockupAssets.length ? (
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {selection.mockupAssets.map((asset) => {
+                    const row = asset as { id?: string; mockupType?: string; status?: string };
+                    return <StatusChip key={row.id ?? row.mockupType} label={row.mockupType ?? "Mockup"} status={row.status ?? "PENDING"} />;
+                  })}
+                </div>
+              ) : null}
+            </div>
+          ))}
+        </div>
+      ) : (
+        <EmptyState title="No product selections yet" description="Approved products and mockup progress will appear after moderation." />
+      )}
+
+      {listings.length ? (
+        <div className="mt-5 space-y-3">
+          <h3 className="text-sm font-semibold uppercase text-brand-muted">Listings</h3>
+          {listings.map((listing) => (
+            <div key={listing.id} className="rounded-xl border border-surface-borderSoft p-4">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <p className="font-semibold text-brand-ink">{listing.title}</p>
+                  <p className="mt-1 text-sm text-brand-muted">{listing.price} {listing.currency}</p>
+                </div>
+                <StatusBadge status={listing.status} />
+              </div>
+              {listing.marketplacePublications?.length ? (
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {listing.marketplacePublications.map((publication) => <StatusChip key={publication.id} label={publication.marketplace} status={publication.status} />)}
+                </div>
+              ) : null}
+            </div>
+          ))}
+        </div>
+      ) : null}
+    </Card>
+  );
+}
+
+function PipelineMetric({ icon, label, value }: { icon: ReactNode; label: string; value: number }) {
+  return (
+    <div className="rounded-xl border border-surface-borderSoft p-4">
+      <div className="mb-2 text-brand-blue">{icon}</div>
+      <p className="text-2xl font-bold text-brand-ink tabular-nums">{value}</p>
+      <p className="text-xs font-medium uppercase text-brand-muted">{label}</p>
+    </div>
+  );
+}
+
+function StatusChip({ label, status }: { label: string; status: string }) {
+  return (
+    <span className="inline-flex min-h-8 items-center gap-2 rounded-pill border border-surface-borderSoft px-3 text-xs font-semibold text-brand-ink">
+      <span className="text-brand-muted">{label.replace(/_/g, " ")}</span>
+      <StatusBadge status={status} />
+    </span>
+  );
+}
+
+function objectName(value: unknown, fallback: string) {
+  if (value && typeof value === "object") {
+    const item = value as { name?: unknown; displayName?: unknown };
+    if (typeof item.name === "string") return item.name;
+    if (typeof item.displayName === "string") return item.displayName;
+  }
+  return fallback;
+}
+
+function statusRank(status: string) {
+  if (status === "SUBMITTED") return statusRank("PENDING_MODERATION");
+  if (status === "APPROVED") return statusRank("APPROVED_LOCAL");
+  const index = STATUS_TIMELINE.indexOf(status as Design["status"]);
+  return index === -1 ? 0 : index;
 }

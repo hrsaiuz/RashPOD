@@ -13,7 +13,7 @@ export class ModerationService {
 
   async reviewQueue() {
     return this.prisma.designAsset.findMany({
-      where: { status: DesignStatus.SUBMITTED },
+      where: { status: { in: [DesignStatus.SUBMITTED, DesignStatus.PENDING_MODERATION] } },
       orderBy: { updatedAt: "asc" },
     });
   }
