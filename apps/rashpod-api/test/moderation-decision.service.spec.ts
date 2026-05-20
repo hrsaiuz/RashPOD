@@ -1,6 +1,7 @@
 import { BadRequestException } from "@nestjs/common";
 import { DesignStatus } from "@prisma/client";
 import { DesignWorkflowService } from "../src/modules/design-workflow/design-workflow.service";
+import { MarketplaceComplianceService } from "../src/modules/design-workflow/marketplace-compliance.service";
 import { PlacementCalculationService } from "../src/modules/design-workflow/placement-calculation.service";
 
 function createService(prismaOverrides: any = {}) {
@@ -11,7 +12,7 @@ function createService(prismaOverrides: any = {}) {
   };
   const audit = { log: jest.fn() } as any;
   const jobs = { enqueue: jest.fn() } as any;
-  return { service: new DesignWorkflowService(prisma, audit, jobs, new PlacementCalculationService()), prisma, audit, jobs };
+  return { service: new DesignWorkflowService(prisma, audit, jobs, new PlacementCalculationService(), new MarketplaceComplianceService()), prisma, audit, jobs };
 }
 
 describe("DesignWorkflowService moderation validation", () => {

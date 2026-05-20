@@ -453,13 +453,13 @@ export class AdminConfigService {
   }
 
   async createPrintfulProductTemplate(actorId: string, dto: CreatePrintfulProductTemplateDto) {
-    const item = await this.prisma.printfulProductTemplate.create({ data: this.printfulTemplateData(dto) });
+    const item = await this.prisma.printfulProductTemplate.create({ data: this.createPrintfulTemplateData(dto) });
     await this.audit.log({ actorId, action: "printful-template.create", entityType: "PrintfulProductTemplate", entityId: item.id });
     return item;
   }
 
   async updatePrintfulProductTemplate(actorId: string, id: string, dto: UpdatePrintfulProductTemplateDto) {
-    const item = await this.prisma.printfulProductTemplate.update({ where: { id }, data: this.printfulTemplateData(dto, true) });
+    const item = await this.prisma.printfulProductTemplate.update({ where: { id }, data: this.updatePrintfulTemplateData(dto) });
     await this.audit.log({ actorId, action: "printful-template.update", entityType: "PrintfulProductTemplate", entityId: item.id });
     return item;
   }
@@ -518,23 +518,45 @@ export class AdminConfigService {
     return normalized;
   }
 
-  private printfulTemplateData(dto: CreatePrintfulProductTemplateDto | UpdatePrintfulProductTemplateDto, partial = false) {
+  private createPrintfulTemplateData(dto: CreatePrintfulProductTemplateDto): Prisma.PrintfulProductTemplateCreateInput {
     return {
       rashpodProductType: dto.rashpodProductType,
       displayName: dto.displayName,
-      provider: partial ? undefined : ProviderType.PRINTFUL,
+      provider: ProviderType.PRINTFUL,
       printfulCatalogProductId: dto.printfulCatalogProductId,
       printfulProductName: dto.printfulProductName,
-      printfulVariantIds: dto.printfulVariantIds,
-      allowedColorVariantIds: dto.allowedColorVariantIds,
-      allowedSizeVariantIds: dto.allowedSizeVariantIds,
-      allowedPlacements: dto.allowedPlacements,
-      allowedTechniques: dto.allowedTechniques,
+      printfulVariantIds: dto.printfulVariantIds as Prisma.InputJsonValue,
+      allowedColorVariantIds: dto.allowedColorVariantIds as Prisma.InputJsonValue | undefined,
+      allowedSizeVariantIds: dto.allowedSizeVariantIds as Prisma.InputJsonValue | undefined,
+      allowedPlacements: dto.allowedPlacements as Prisma.InputJsonValue,
+      allowedTechniques: dto.allowedTechniques as Prisma.InputJsonValue,
       defaultTechnique: dto.defaultTechnique,
       defaultPlacement: dto.defaultPlacement,
       printfulStoreId: dto.printfulStoreId,
-      defaultRetailPrice: dto.defaultRetailPrice == null ? (partial ? undefined : null) : new Prisma.Decimal(dto.defaultRetailPrice),
-      estimatedBaseCost: dto.estimatedBaseCost == null ? (partial ? undefined : null) : new Prisma.Decimal(dto.estimatedBaseCost),
+      defaultRetailPrice: dto.defaultRetailPrice == null ? null : new Prisma.Decimal(dto.defaultRetailPrice),
+      estimatedBaseCost: dto.estimatedBaseCost == null ? null : new Prisma.Decimal(dto.estimatedBaseCost),
+      currency: dto.currency ?? "USD",
+      active: dto.active,
+      metadataJson: dto.metadataJson as Prisma.InputJsonValue | undefined,
+    };
+  }
+
+  private updatePrintfulTemplateData(dto: UpdatePrintfulProductTemplateDto): Prisma.PrintfulProductTemplateUpdateInput {
+    return {
+      rashpodProductType: dto.rashpodProductType,
+      displayName: dto.displayName,
+      printfulCatalogProductId: dto.printfulCatalogProductId,
+      printfulProductName: dto.printfulProductName,
+      printfulVariantIds: dto.printfulVariantIds as Prisma.InputJsonValue | undefined,
+      allowedColorVariantIds: dto.allowedColorVariantIds as Prisma.InputJsonValue | undefined,
+      allowedSizeVariantIds: dto.allowedSizeVariantIds as Prisma.InputJsonValue | undefined,
+      allowedPlacements: dto.allowedPlacements as Prisma.InputJsonValue | undefined,
+      allowedTechniques: dto.allowedTechniques as Prisma.InputJsonValue | undefined,
+      defaultTechnique: dto.defaultTechnique,
+      defaultPlacement: dto.defaultPlacement,
+      printfulStoreId: dto.printfulStoreId,
+      defaultRetailPrice: dto.defaultRetailPrice == null ? undefined : new Prisma.Decimal(dto.defaultRetailPrice),
+      estimatedBaseCost: dto.estimatedBaseCost == null ? undefined : new Prisma.Decimal(dto.estimatedBaseCost),
       currency: dto.currency,
       active: dto.active,
       metadataJson: dto.metadataJson as Prisma.InputJsonValue | undefined,
