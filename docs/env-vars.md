@@ -27,9 +27,14 @@ EMAIL_VERIFICATION_SECRET=
 GCP_PROJECT_ID=
 GCP_REGION=
 GCS_BUCKET_ASSETS=
+GCS_BUCKET_PUBLIC=
 GCS_BUCKET_PRIVATE=
 GCS_SIGNED_URL_EXPIRES_SECONDS=900
 ```
+
+`GCS_BUCKET_PUBLIC` and `GCS_BUCKET_PRIVATE` may point to the same bucket when using path prefixes. Production must set
+`GCP_PROJECT_ID` and at least `GCS_BUCKET_ASSETS` so signed upload URLs are minted against Google Cloud Storage, not local
+development fallbacks.
 
 ## Queue / Worker
 ```env

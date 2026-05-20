@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
+import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
 import { MediaCategory, Prisma } from "@prisma/client";
 import { PrismaService } from "../../prisma/prisma.service";
 import { AuditService } from "../audit/audit.service";
@@ -43,10 +43,17 @@ export class MediaService {
       mimeType: dto.mimeType,
       sizeBytes: dto.sizeBytes,
     });
-    return { objectKey, ...signed };
+    return { objectKey, url: signed.uploadUrl, ...signed };
   }
 
   async completeUpload(actorId: string, dto: CompleteMediaUploadDto) {
+    const objectMetadata = await this.storage.getPublicObjectMetadata(dto.objectKey);
+    if (!objectMetadata) throw new BadRequestException("Uploaded media object was not found in Google Cloud Storage");
+    if (objectMetadata.sizeBytes !== dto.sizeBytes) throw new BadRequestException("Uploaded media size does not match");
+    if (objectMetadata.mimeType && objectMetadata.mimeType !== dto.mimeType) {
+      throw new BadRequestException("Uploaded media type does not match");
+    }
+
     const publicUrl = this.storage.buildPublicUrl(dto.objectKey);
     const bucket = this.storage.getPublicBucketName();
     const baseKey = dto.key ? slugify(dto.key) : slugify(dto.title) || `${dto.category.toLowerCase()}-${Date.now()}`;
@@ -74,8 +81,8 @@ export class MediaService {
         bucket,
         objectKey: dto.objectKey,
         publicUrl,
-        mimeType: dto.mimeType,
-        sizeBytes: dto.sizeBytes,
+        mimeType: objectMetadata.mimeType || dto.mimeType,
+        sizeBytes: objectMetadata.sizeBytes,
         width: dto.width,
         height: dto.height,
         uploaderId: actorId,

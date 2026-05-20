@@ -18,7 +18,7 @@ export class FilesService {
     const file = await this.prisma.fileAsset.create({
       data: {
         ownerId,
-        bucket: process.env.GCS_BUCKET_PRIVATE || "rashpod-assets-private",
+        bucket: this.storage.getPrivateBucketName(),
         objectKey,
         mimeType: dto.mimeType,
         sizeBytes: dto.sizeBytes,
@@ -31,7 +31,7 @@ export class FilesService {
       mimeType: dto.mimeType,
       sizeBytes: dto.sizeBytes,
     });
-    return { fileId: file.id, ...signed };
+    return { fileId: file.id, url: signed.uploadUrl, ...signed };
   }
 
   async completeUpload(ownerId: string, dto: CompleteUploadDto) {

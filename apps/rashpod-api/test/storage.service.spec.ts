@@ -2,8 +2,11 @@ import { StorageService } from "../src/modules/files/storage.service";
 
 describe("StorageService", () => {
   afterEach(() => {
+    delete process.env.NODE_ENV;
     delete process.env.GCP_PROJECT_ID;
+    delete process.env.GCS_BUCKET_ASSETS;
     delete process.env.GCS_BUCKET_PRIVATE;
+    delete process.env.GCS_BUCKET_PUBLIC;
   });
 
   it("returns local fallback upload URL when GCS client is not configured", async () => {
@@ -15,6 +18,30 @@ describe("StorageService", () => {
     });
     expect(result.method).toBe("PUT");
     expect(result.uploadUrl).toContain("storage.local/upload/");
+  });
+
+  it("throws in production when GCS is not configured", async () => {
+    process.env.NODE_ENV = "production";
+    const service = new StorageService();
+
+    await expect(
+      service.createPresignedUploadUrl({
+        objectKey: "design-originals/u1/a.png",
+        mimeType: "image/png",
+        sizeBytes: 100,
+      }),
+    ).rejects.toThrow("Google Cloud Storage is not configured");
+  });
+
+  it("uses shared asset bucket env vars for public and private buckets", () => {
+    process.env.GCP_PROJECT_ID = "p1";
+    process.env.GCS_BUCKET_ASSETS = "rashpod-assets";
+
+    const service = new StorageService();
+
+    expect(service.getPrivateBucketName()).toBe("rashpod-assets");
+    expect(service.getPublicBucketName()).toBe("rashpod-assets");
+    expect(service.buildPublicUrl("media/logo.png")).toBe("https://storage.googleapis.com/rashpod-assets/media/logo.png");
   });
 
   it("uses configured storage client for metadata and read URL", async () => {

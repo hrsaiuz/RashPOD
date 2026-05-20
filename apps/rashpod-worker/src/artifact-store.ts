@@ -42,8 +42,11 @@ class GcsArtifactStore implements ArtifactStore {
 }
 
 export function createArtifactStore(baseDir = path.resolve(process.cwd(), "worker-artifacts")): ArtifactStore {
-  const projectId = process.env.GCP_PROJECT_ID;
-  const bucket = process.env.GCS_BUCKET_ASSETS;
+  const projectId = process.env.GCP_PROJECT_ID || process.env.GOOGLE_CLOUD_PROJECT || process.env.GCLOUD_PROJECT;
+  const bucket = process.env.GCS_BUCKET_ASSETS || process.env.GCS_BUCKET_NAME;
   if (projectId && bucket) return new GcsArtifactStore(projectId, bucket);
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("Google Cloud Storage is not configured for worker artifacts");
+  }
   return new LocalArtifactStore(baseDir);
 }

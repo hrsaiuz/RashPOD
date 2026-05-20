@@ -33,6 +33,11 @@ rashpod-private-staging
 rashpod-private-production
 ```
 
+Current production uses `gs://rashpod-assets` for public branding/media assets and `gs://rashpod-private-production` for
+designer originals and private generated files. Configure bucket CORS from `gcs-cors.json` on both buckets so the dashboard
+can PUT directly to signed URLs. Only the public assets bucket should grant public object read access because branding/media
+database records store `https://storage.googleapis.com/...` public URLs.
+
 ## Secrets
 Store in Secret Manager:
 - Database URL.
