@@ -1,7 +1,7 @@
 import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
+import { getServerApiUrl, isApiUrlConfigurationError } from "../../../../lib/server-api-url";
 
-const API_URL = process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || "http://localhost:3002";
 const COOKIE = "rashpod_jwt";
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ path: string[] }> }) {
@@ -35,7 +35,6 @@ async function handleRequest(req: NextRequest, params: { path: string[] }, metho
   const apiPath = params.path.join("/");
   const url = new URL(req.url);
   const search = url.search;
-  const targetUrl = `${API_URL}/${apiPath}${search}`;
 
   const headers: HeadersInit = {
     Authorization: `Bearer ${token}`,
@@ -48,6 +47,7 @@ async function handleRequest(req: NextRequest, params: { path: string[] }, metho
   }
 
   try {
+    const targetUrl = `${getServerApiUrl()}/${apiPath}${search}`;
     const apiRes = await fetch(targetUrl, {
       method,
       headers,
@@ -70,9 +70,16 @@ async function handleRequest(req: NextRequest, params: { path: string[] }, metho
       },
     });
   } catch (error) {
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Proxy request failed" },
-      { status: 500 }
-    );
+    if (isApiUrlConfigurationError(error)) {
+      console.error("Dashboard API proxy is not configured", { method, path: `/${apiPath}` });
+      return NextResponse.json({ error: "API proxy is not configured" }, { status: 503 });
+    }
+
+    console.error("Dashboard API proxy request failed", {
+      method,
+      path: `/${apiPath}`,
+      message: error instanceof Error ? error.message : "Unknown proxy error",
+    });
+    return NextResponse.json({ error: "API proxy unavailable" }, { status: 502 });
   }
 }

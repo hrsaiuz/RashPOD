@@ -1,14 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getServerApiUrl, isApiUrlConfigurationError } from "../../../../lib/server-api-url";
 
-const API_URL = process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || "http://localhost:3002";
 const TOKEN_COOKIE = "rashpod_jwt";
 const MAX_AGE = 60 * 60 * 24 * 7; // 7 days
 
 export async function POST(req: NextRequest) {
   try {
     const { email, password } = (await req.json()) as { email: string; password: string };
+    const apiUrl = getServerApiUrl();
 
-    const loginRes = await fetch(`${API_URL}/auth/login`, {
+    const loginRes = await fetch(`${apiUrl}/auth/login`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email, password }),
@@ -24,7 +25,7 @@ export async function POST(req: NextRequest) {
 
     const { accessToken } = (await loginRes.json()) as { accessToken: string };
 
-    const meRes = await fetch(`${API_URL}/auth/me`, {
+    const meRes = await fetch(`${apiUrl}/auth/me`, {
       headers: { Authorization: `Bearer ${accessToken}` },
     });
 
@@ -41,9 +42,14 @@ export async function POST(req: NextRequest) {
 
     return res;
   } catch (error) {
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Login failed" },
-      { status: 500 }
-    );
+    if (isApiUrlConfigurationError(error)) {
+      console.error("Dashboard login API is not configured");
+      return NextResponse.json({ error: "Login service is not configured" }, { status: 503 });
+    }
+
+    console.error("Dashboard login request failed", {
+      message: error instanceof Error ? error.message : "Unknown login error",
+    });
+    return NextResponse.json({ error: "Login service unavailable" }, { status: 502 });
   }
 }

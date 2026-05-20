@@ -1,6 +1,6 @@
 "use client";
 
-import { ReactNode, useMemo } from "react";
+import { ReactNode, useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "../auth/auth-provider";
 import { DashboardShell, DashboardLink, BreadcrumbItem } from "@rashpod/ui";
@@ -115,10 +115,34 @@ const ROLE_LABELS: Record<string, string> = {
   "super-admin": "Super Admin",
 };
 
+interface PublicBranding {
+  dashboardLogoUrl: string | null;
+  theme?: { storeName?: string };
+}
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || process.env.API_URL;
+
 export default function DashboardLayout({ children, role }: { children: ReactNode; role: string }) {
   const pathname = usePathname();
   const router = useRouter();
   const { user, clearSession } = useAuth();
+  const [branding, setBranding] = useState<PublicBranding | null>(null);
+
+  useEffect(() => {
+    if (!API_URL) return;
+
+    const controller = new AbortController();
+    fetch(`${API_URL}/branding`, { signal: controller.signal })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => setBranding(data))
+      .catch((error) => {
+        if (error instanceof Error && error.name !== "AbortError") {
+          console.error("Dashboard branding fetch failed", { message: error.message });
+        }
+      });
+
+    return () => controller.abort();
+  }, []);
 
   const links: DashboardLink[] = useMemo(() => {
     return (ROLE_LINKS[role] ?? []).map((l) => ({
@@ -177,6 +201,8 @@ export default function DashboardLayout({ children, role }: { children: ReactNod
       }}
       onSignOut={handleSignOut}
       breadcrumbs={breadcrumbs}
+      sidebarLogoUrl={branding?.dashboardLogoUrl ?? null}
+      brandName={branding?.theme?.storeName || "RashPOD"}
     >
       {impersonating && (
         <div className="mb-4 rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3 flex items-center justify-between gap-3">

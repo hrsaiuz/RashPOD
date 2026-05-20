@@ -17,6 +17,12 @@ const ROLE_PRIORITY = [
 ];
 
 const WEB_URL = process.env.NEXT_PUBLIC_WEB_URL || "https://rashpod.uz";
+const API_URL = process.env.NEXT_PUBLIC_API_URL || process.env.API_URL;
+
+interface PublicBranding {
+  loginLogoUrl: string | null;
+  theme?: { storeName?: string };
+}
 
 const ROLE_ROUTES: Record<string, string> = {
   SUPER_ADMIN: "/dashboard/super-admin",
@@ -50,12 +56,29 @@ function LoginForm() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
+  const [branding, setBranding] = useState<PublicBranding | null>(null);
 
   useEffect(() => {
     if (searchParams.get("registered") === "1") {
       setSuccessMessage("Account created! Please sign in.");
     }
   }, [searchParams]);
+
+  useEffect(() => {
+    if (!API_URL) return;
+
+    const controller = new AbortController();
+    fetch(`${API_URL}/branding`, { signal: controller.signal })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => setBranding(data))
+      .catch((error) => {
+        if (error instanceof Error && error.name !== "AbortError") {
+          console.error("Login branding fetch failed", { message: error.message });
+        }
+      });
+
+    return () => controller.abort();
+  }, []);
 
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -91,6 +114,12 @@ function LoginForm() {
 
   return (
     <main style={{ maxWidth: 440, margin: "48px auto", padding: 24, background: "white", borderRadius: 20, border: "1px solid #E5E7EB" }}>
+      {branding?.loginLogoUrl && (
+        <div style={{ display: "flex", justifyContent: "center", marginBottom: 20 }}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={branding.loginLogoUrl} alt={branding.theme?.storeName || "RashPOD"} style={{ maxWidth: 260, maxHeight: 80, objectFit: "contain" }} />
+        </div>
+      )}
       <h1 style={{ marginTop: 0, color: "#1A1D2E" }}>Dashboard Login</h1>
       <p style={{ color: "#6B7280", marginTop: 0, fontSize: 14 }}>Sign in to access your dashboard.</p>
       {successMessage && (

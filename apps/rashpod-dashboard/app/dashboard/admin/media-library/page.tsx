@@ -10,6 +10,7 @@ type MediaCategory =
   | "BRANDING_LOGO_WEB"
   | "BRANDING_LOGO_DASHBOARD"
   | "BRANDING_LOGO_LOGIN"
+  | "BRANDING_LOGO_FOOTER"
   | "BRANDING_FAVICON"
   | "BASE_PRODUCT_IMAGE"
   | "MOCKUP_TEMPLATE";
@@ -35,6 +36,7 @@ const CATEGORIES: { value: MediaCategory | "ALL"; label: string }[] = [
   { value: "BRANDING_LOGO_WEB", label: "Storefront logo" },
   { value: "BRANDING_LOGO_DASHBOARD", label: "Dashboard logo" },
   { value: "BRANDING_LOGO_LOGIN", label: "Login logo" },
+  { value: "BRANDING_LOGO_FOOTER", label: "Footer large logo" },
   { value: "BRANDING_FAVICON", label: "Favicon" },
 ];
 

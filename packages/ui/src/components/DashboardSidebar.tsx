@@ -25,6 +25,8 @@ export interface DashboardSidebarProps {
   accent?: "blue" | "peach" | "green" | "ink";
   /** Called after a nav item is clicked — used to close the mobile drawer. */
   onNavigate?: () => void;
+  logoUrl?: string | null;
+  brandName?: string;
 }
 
 const ACCENT_BY_ROLE: Record<string, NonNullable<DashboardSidebarProps["accent"]>> = {
@@ -83,6 +85,8 @@ export const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
   className,
   accent,
   onNavigate,
+  logoUrl,
+  brandName = "RashPOD",
 }) => {
   const resolvedAccent: NonNullable<DashboardSidebarProps["accent"]> =
     accent ?? ACCENT_BY_ROLE[role.toLowerCase()] ?? "blue";
@@ -99,10 +103,17 @@ export const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
       <div className="p-6">
         <div className="mb-8 flex items-center gap-3">
           <Link href="/" className="flex items-center gap-2 text-2xl font-bold text-brand-blue tracking-tight focus:outline-none focus:ring-2 focus:ring-brand-blue/30 rounded">
-            <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-brand-blue text-base text-white shadow-blueGlow">
-              R
-            </span>
-            <span>RashPOD</span>
+            {logoUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={logoUrl} alt={brandName} className="max-h-10 w-auto max-w-[172px] object-contain" />
+            ) : (
+              <>
+                <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-brand-blue text-base text-white shadow-blueGlow">
+                  R
+                </span>
+                <span>{brandName}</span>
+              </>
+            )}
           </Link>
         </div>
 

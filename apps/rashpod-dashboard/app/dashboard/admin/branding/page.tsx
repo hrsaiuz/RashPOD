@@ -5,7 +5,7 @@ import { Button, Card, Skeleton } from "@rashpod/ui";
 import { Upload, Image as ImageIcon } from "lucide-react";
 import DashboardLayout from "../../dashboard-layout";
 
-type SlotKey = "storefrontLogoUrl" | "dashboardLogoUrl" | "loginLogoUrl" | "faviconUrl";
+type SlotKey = "storefrontLogoUrl" | "dashboardLogoUrl" | "loginLogoUrl" | "footerLogoUrl" | "faviconUrl";
 type ThemeImageUrlKey = "homeHeroImageUrl" | "homeDesignerSectionImageUrl";
 type ThemeImageAltKey = "homeHeroImageAlt" | "homeDesignerSectionImageAlt";
 
@@ -24,6 +24,7 @@ interface Branding {
   storefrontLogoUrl: string | null;
   dashboardLogoUrl: string | null;
   loginLogoUrl: string | null;
+  footerLogoUrl: string | null;
   faviconUrl: string | null;
   homeHeroImageUrl?: string | null;
   homeHeroImageAlt?: string | null;
@@ -53,6 +54,13 @@ const SLOTS: { key: SlotKey; category: string; title: string; description: strin
     title: "Login form logo",
     description: "Shown above the dashboard login form. Recommended: centered logo, 320×80px.",
     aspect: "aspect-[4/1]",
+  },
+  {
+    key: "footerLogoUrl",
+    category: "BRANDING_LOGO_FOOTER",
+    title: "Footer large logo",
+    description: "Shown as the oversized brand mark in the public site footer. Recommended: SVG or PNG, 1200×240px.",
+    aspect: "aspect-[5/1]",
   },
   {
     key: "faviconUrl",

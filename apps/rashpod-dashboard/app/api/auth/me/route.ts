@@ -1,10 +1,8 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
-import * as jose from "jose";
+import { getServerApiUrl, isApiUrlConfigurationError } from "../../../../lib/server-api-url";
 
-const API_URL = process.env.API_URL || process.env.NEXT_PUBLIC_API_URL || "http://localhost:3002";
 const COOKIE = "rashpod_jwt";
-const JWT_SECRET = process.env.JWT_SECRET || "change-me-in-production";
 
 export async function GET() {
   const store = await cookies();
@@ -12,7 +10,7 @@ export async function GET() {
   if (!token) return NextResponse.json({ error: "unauthenticated" }, { status: 401 });
 
   try {
-    const meRes = await fetch(`${API_URL}/auth/me`, {
+    const meRes = await fetch(`${getServerApiUrl()}/auth/me`, {
       headers: { Authorization: `Bearer ${token}` },
     });
     if (!meRes.ok) {
@@ -20,7 +18,12 @@ export async function GET() {
     }
     const user = await meRes.json();
     return NextResponse.json({ user });
-  } catch {
+  } catch (error) {
+    if (isApiUrlConfigurationError(error)) {
+      console.error("Dashboard session API is not configured");
+      return NextResponse.json({ error: "Session service is not configured" }, { status: 503 });
+    }
+
     return NextResponse.json({ error: "invalid_token" }, { status: 401 });
   }
 }

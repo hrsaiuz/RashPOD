@@ -11,6 +11,7 @@ const BRANDING_SINGLETON_CATEGORIES = new Set<MediaCategory>([
   MediaCategory.BRANDING_LOGO_WEB,
   MediaCategory.BRANDING_LOGO_DASHBOARD,
   MediaCategory.BRANDING_LOGO_LOGIN,
+  MediaCategory.BRANDING_LOGO_FOOTER,
   MediaCategory.BRANDING_FAVICON,
 ]);
 
@@ -165,6 +166,7 @@ export class MediaService {
             MediaCategory.BRANDING_LOGO_WEB,
             MediaCategory.BRANDING_LOGO_DASHBOARD,
             MediaCategory.BRANDING_LOGO_LOGIN,
+            MediaCategory.BRANDING_LOGO_FOOTER,
             MediaCategory.BRANDING_FAVICON,
           ],
         },
@@ -182,6 +184,7 @@ export class MediaService {
       storefrontLogoUrl: pick(MediaCategory.BRANDING_LOGO_WEB),
       dashboardLogoUrl: pick(MediaCategory.BRANDING_LOGO_DASHBOARD),
       loginLogoUrl: pick(MediaCategory.BRANDING_LOGO_LOGIN),
+      footerLogoUrl: pick(MediaCategory.BRANDING_LOGO_FOOTER),
       faviconUrl: pick(MediaCategory.BRANDING_FAVICON),
       homeHeroImageUrl: themeString("homeHeroImageUrl"),
       homeHeroImageAlt: themeString("homeHeroImageAlt"),

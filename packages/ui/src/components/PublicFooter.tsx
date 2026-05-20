@@ -17,6 +17,8 @@ export interface PublicFooterProps {
   termsUrl?: string;
   privacyUrl?: string;
   cookiesUrl?: string;
+  logoUrl?: string | null;
+  brandName?: string;
   className?: string;
 }
 
@@ -42,6 +44,8 @@ export const PublicFooter: React.FC<PublicFooterProps> = ({
   termsUrl = "/legal/terms",
   privacyUrl = "/legal/privacy",
   cookiesUrl = "/legal/shipping-returns",
+  logoUrl,
+  brandName = "RashPOD",
   className,
 }) => {
   return (
@@ -81,9 +85,14 @@ export const PublicFooter: React.FC<PublicFooterProps> = ({
         </div>
 
         <div className="pointer-events-none mx-auto mt-[68px] max-w-[1207px] overflow-hidden">
-          <p className="select-none text-center text-[clamp(102px,15.3vw,209px)] font-black lowercase leading-[0.75] tracking-[-0.09em] text-brand-peach">
-            rashpod
-          </p>
+          {logoUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={logoUrl} alt={`${brandName} footer logo`} className="mx-auto h-auto max-h-[180px] w-auto max-w-full select-none object-contain" />
+          ) : (
+            <p className="select-none text-center text-[clamp(102px,15.3vw,209px)] font-black lowercase leading-[0.75] tracking-[-0.09em] text-brand-peach">
+              {brandName}
+            </p>
+          )}
         </div>
       </div>
     </footer>

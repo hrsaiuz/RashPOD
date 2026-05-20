@@ -22,6 +22,8 @@ export interface DashboardShellProps {
   className?: string;
   /** Override the sidebar accent colour (otherwise derived from role). */
   sidebarAccent?: "blue" | "peach" | "green" | "ink";
+  sidebarLogoUrl?: string | null;
+  brandName?: string;
 }
 
 export const DashboardShell: React.FC<DashboardShellProps> = ({
@@ -34,6 +36,8 @@ export const DashboardShell: React.FC<DashboardShellProps> = ({
   children,
   className,
   sidebarAccent,
+  sidebarLogoUrl,
+  brandName,
 }) => {
   const [mobileSidebarOpen, setMobileSidebarOpen] = React.useState(false);
 
@@ -54,6 +58,8 @@ export const DashboardShell: React.FC<DashboardShellProps> = ({
           links={links}
           activePath={activePath}
           accent={sidebarAccent}
+          logoUrl={sidebarLogoUrl}
+          brandName={brandName}
         />
       </div>
 
@@ -69,6 +75,8 @@ export const DashboardShell: React.FC<DashboardShellProps> = ({
           links={links}
           activePath={activePath}
           accent={sidebarAccent}
+          logoUrl={sidebarLogoUrl}
+          brandName={brandName}
           onNavigate={() => setMobileSidebarOpen(false)}
           className="!w-full !border-r-0"
         />

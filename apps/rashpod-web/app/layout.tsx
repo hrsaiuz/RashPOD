@@ -31,13 +31,14 @@ const inter = Inter({
 
 async function getBranding(): Promise<{
   storefrontLogoUrl: string | null;
+  footerLogoUrl: string | null;
   faviconUrl: string | null;
   theme: { storeName?: string; storeTagline?: string };
 } | null> {
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || process.env.API_URL;
   if (!apiUrl) return null;
   try {
-    const res = await fetch(`${apiUrl}/branding`, { next: { revalidate: 60 } });
+    const res = await fetch(`${apiUrl}/branding`, { cache: "no-store" });
     if (!res.ok) return null;
     return await res.json();
   } catch {
@@ -81,7 +82,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
             <main id="main-content" className="min-h-screen bg-brand-bg">
               {children}
             </main>
-            <PublicFooter />
+            <PublicFooter logoUrl={branding?.footerLogoUrl ?? null} brandName={brandName} />
           </CartProvider>
         </MotionProvider>
       </body>

@@ -28,10 +28,32 @@ const inter = Inter({
   display: "swap",
 });
 
-export const metadata: Metadata = {
-  title: { default: "RashPOD Dashboard", template: "%s | RashPOD Dashboard" },
-  description: "RashPOD operations and designer dashboard",
-};
+async function getBranding(): Promise<{
+  faviconUrl: string | null;
+  theme?: { storeName?: string };
+} | null> {
+  const apiUrl = process.env.API_URL || process.env.NEXT_PUBLIC_API_URL;
+  if (!apiUrl) return null;
+
+  try {
+    const res = await fetch(`${apiUrl}/branding`, { cache: "no-store" });
+    if (!res.ok) return null;
+    return await res.json();
+  } catch {
+    return null;
+  }
+}
+
+export async function generateMetadata(): Promise<Metadata> {
+  const branding = await getBranding();
+  const name = branding?.theme?.storeName || "RashPOD";
+
+  return {
+    title: { default: `${name} Dashboard`, template: `%s | ${name} Dashboard` },
+    description: "RashPOD operations and designer dashboard",
+    icons: branding?.faviconUrl ? [{ rel: "icon", url: branding.faviconUrl }] : undefined,
+  };
+}
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
