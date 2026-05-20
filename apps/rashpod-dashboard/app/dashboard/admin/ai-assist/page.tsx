@@ -3,6 +3,8 @@
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "../../../auth/auth-provider";
+import { Button, Card, ErrorState, Input } from "@rashpod/ui";
+import DashboardLayout from "../../dashboard-layout";
 
 export default function AdminAiAssistPage() {
   const router = useRouter();
@@ -39,28 +41,24 @@ export default function AdminAiAssistPage() {
   };
 
   return (
-    <main style={{ padding: 24, maxWidth: 980 }}>
-      <h1 style={{ marginBottom: 8 }}>AI Assist</h1>
-      <p style={{ marginTop: 0, color: "#6B7280" }}>
-        Draft generator for listings. Human approval is always required.
-        {user ? ` Signed in as ${user.email} (${user.role}).` : ""}
-      </p>
-      <form onSubmit={run} style={{ display: "flex", gap: 10, marginBottom: 16 }}>
-        <input
-          value={prompt}
-          onChange={(e) => setPrompt(e.target.value)}
-          style={{ flex: 1, padding: "10px 12px", borderRadius: 12, border: "1px solid #D1D5DB" }}
-        />
-        <button style={{ padding: "10px 16px", borderRadius: 999, border: "none", background: "#788AE0", color: "white" }}>
-          {loading ? "Generating..." : "Generate"}
-        </button>
-      </form>
-      {error ? <p style={{ color: "#B42318" }}>{error}</p> : null}
-      {result ? (
-        <pre style={{ background: "white", border: "1px solid #E5E7EB", borderRadius: 12, padding: 12, overflowX: "auto" }}>
-          {JSON.stringify(result, null, 2)}
-        </pre>
-      ) : null}
-    </main>
+    <DashboardLayout role="admin">
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-3xl font-bold text-brand-ink">AI Assist</h1>
+          <p className="text-brand-muted mt-1">
+            Draft generator for listings. Human approval is always required.
+            {user ? ` Signed in as ${user.email} (${user.role}).` : ""}
+          </p>
+        </div>
+        <Card>
+          <form onSubmit={run} className="flex flex-col md:flex-row gap-3">
+            <Input value={prompt} onChange={(e) => setPrompt(e.target.value)} />
+            <Button variant="primaryBlue" loading={loading}>Generate</Button>
+          </form>
+        </Card>
+        {error ? <ErrorState title="AI request failed" description={error} /> : null}
+        {result ? <Card><pre className="m-0 overflow-x-auto rounded-xl bg-surface-subtle p-4 text-xs text-brand-ink">{JSON.stringify(result, null, 2)}</pre></Card> : null}
+      </div>
+    </DashboardLayout>
   );
 }

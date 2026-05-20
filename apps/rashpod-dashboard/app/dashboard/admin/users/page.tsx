@@ -1,8 +1,5 @@
+import AdminPlaceholder from "../admin-placeholder";
+
 export default function Page() {
-  return (
-    <main style={{ maxWidth: 1120, margin: "0 auto", padding: 24 }}>
-      <h1>Users</h1>
-      <p>Manage all platform users.</p>
-    </main>
-  );
+  return <AdminPlaceholder title="Users" description="Manage all platform users." />;
 }

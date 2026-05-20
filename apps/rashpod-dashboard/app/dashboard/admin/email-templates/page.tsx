@@ -1,8 +1,5 @@
+import AdminPlaceholder from "../admin-placeholder";
+
 export default function Page() {
-  return (
-    <main style={{ maxWidth: 1120, margin: "0 auto", padding: 24 }}>
-      <h1>Email Templates</h1>
-      <p>Manage ZeptoMail templates.</p>
-    </main>
-  );
+  return <AdminPlaceholder title="Email Templates" description="Manage ZeptoMail templates." />;
 }

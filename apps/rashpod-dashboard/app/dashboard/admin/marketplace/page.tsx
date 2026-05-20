@@ -3,6 +3,8 @@
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "../../../auth/auth-provider";
+import { Button, Card, ErrorState, Select } from "@rashpod/ui";
+import DashboardLayout from "../../dashboard-layout";
 
 export default function AdminMarketplacePage() {
   const router = useRouter();
@@ -35,36 +37,39 @@ export default function AdminMarketplacePage() {
   };
 
   return (
-    <main style={{ padding: 24, maxWidth: 1100 }}>
-      <h1 style={{ marginBottom: 8 }}>Marketplace Export</h1>
-      <p style={{ marginTop: 0, color: "#6B7280" }}>
-        Generate marketplace-ready listing payloads for manual channel publishing.
-        {user ? ` Signed in as ${user.email} (${user.role}).` : ""}
-      </p>
-      <form onSubmit={exportNow} style={{ display: "flex", gap: 10, marginBottom: 16 }}>
-        <select
+    <DashboardLayout role="admin">
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-3xl font-bold text-brand-ink">Marketplace Export</h1>
+          <p className="text-brand-muted mt-1">
+            Generate marketplace-ready listing payloads for manual channel publishing.
+            {user ? ` Signed in as ${user.email} (${user.role}).` : ""}
+          </p>
+        </div>
+        <Card>
+          <form onSubmit={exportNow} className="flex flex-wrap gap-3">
+            <Select
           value={type}
           onChange={(e) => setType(e.target.value as any)}
-          style={{ padding: "10px 12px", borderRadius: 12, border: "1px solid #D1D5DB" }}
         >
           <option value="">ALL</option>
           <option value="PRODUCT">PRODUCT</option>
           <option value="FILM">FILM</option>
-        </select>
-        <button style={{ padding: "10px 16px", borderRadius: 999, border: "none", background: "#788AE0", color: "white" }}>
-          {loading ? "Exporting..." : "Export"}
-        </button>
-      </form>
+            </Select>
+            <Button variant="primaryBlue" disabled={loading}>{loading ? "Exporting..." : "Export"}</Button>
+          </form>
+        </Card>
 
-      {error ? <p style={{ color: "#B42318" }}>{error}</p> : null}
-      {data ? (
-        <div style={{ background: "white", border: "1px solid #E5E7EB", borderRadius: 16, padding: 12 }}>
-          <p style={{ marginTop: 0 }}>
-            Exported <strong>{data.total}</strong> item(s) at {data.exportedAt}
-          </p>
-          <pre style={{ margin: 0, overflowX: "auto" }}>{JSON.stringify(data.items.slice(0, 20), null, 2)}</pre>
-        </div>
-      ) : null}
-    </main>
+        {error ? <ErrorState title="Export failed" description={error} /> : null}
+        {data ? (
+          <Card>
+            <p className="text-sm text-brand-ink mb-3">
+              Exported <strong>{data.total}</strong> item(s) at {data.exportedAt}
+            </p>
+            <pre className="m-0 overflow-x-auto rounded-xl bg-surface-subtle p-4 text-xs text-brand-ink">{JSON.stringify(data.items.slice(0, 20), null, 2)}</pre>
+          </Card>
+        ) : null}
+      </div>
+    </DashboardLayout>
   );
 }

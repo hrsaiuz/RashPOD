@@ -1,8 +1,5 @@
+import AdminPlaceholder from "../admin-placeholder";
+
 export default function Page() {
-  return (
-    <main style={{ maxWidth: 1120, margin: "0 auto", padding: 24 }}>
-      <h1>Reports</h1>
-      <p>Sales, royalties, and production reporting.</p>
-    </main>
-  );
+  return <AdminPlaceholder title="Reports" description="Sales, royalties, and production reporting." />;
 }

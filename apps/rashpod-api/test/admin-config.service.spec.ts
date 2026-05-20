@@ -81,4 +81,48 @@ describe("AdminConfigService catalog CRUD parity", () => {
       expect.objectContaining({ action: "base-product.delete", entityType: "BaseProduct", entityId: "bp_1" }),
     );
   });
+
+  it("normalizes base product JSON arrays for list responses", async () => {
+    const prisma: any = {
+      baseProduct: {
+        findMany: jest.fn().mockResolvedValue([
+          {
+            id: "bp_1",
+            productTypeId: "pt_1",
+            name: "T-Shirt",
+            skuPrefix: "TSH",
+            isActive: true,
+            baseCost: null,
+            defaultPrice: null,
+            imageUrl: null,
+            description: null,
+            availableColors: ["white", 123, "black"],
+            availableSizes: null,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+            productType: { id: "pt_1", name: "Apparel", slug: "apparel", category: "wearables" },
+          },
+        ]),
+      },
+    };
+    const service = new AdminConfigService(prisma, { log: jest.fn() } as any);
+
+    const rows = await service.listBaseProducts();
+
+    expect(rows[0].availableColors).toEqual(["white", "black"]);
+    expect(rows[0].availableSizes).toEqual([]);
+  });
+
+  it("blocks deleting product types that are used by base products", async () => {
+    const prisma: any = {
+      baseProduct: { count: jest.fn().mockResolvedValue(1) },
+      productType: { delete: jest.fn() },
+    };
+    const service = new AdminConfigService(prisma, { log: jest.fn() } as any);
+
+    await expect(service.deleteProductType("admin_1", "pt_1")).rejects.toThrow(
+      "Product type is used by base products and cannot be deleted",
+    );
+    expect(prisma.productType.delete).not.toHaveBeenCalled();
+  });
 });

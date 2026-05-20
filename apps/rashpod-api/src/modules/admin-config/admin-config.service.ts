@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
-import { Prisma } from "@prisma/client";
+import { BaseProduct, Prisma } from "@prisma/client";
 import { AuditService } from "../audit/audit.service";
 import { PrismaService } from "../../prisma/prisma.service";
 import { CreateProductTypeDto } from "./dto/create-product-type.dto";
@@ -24,6 +24,24 @@ export class AdminConfigService {
 
   listProductTypes() {
     return this.prisma.productType.findMany({ orderBy: { createdAt: "desc" } });
+  }
+
+  private jsonStringArray(value: Prisma.JsonValue | null | undefined): string[] {
+    if (!Array.isArray(value)) return [];
+    return value.filter((item): item is string => typeof item === "string");
+  }
+
+  private serializeBaseProduct<T extends BaseProduct & { productType?: unknown }>(item: T) {
+    return {
+      ...item,
+      availableColors: this.jsonStringArray(item.availableColors),
+      availableSizes: this.jsonStringArray(item.availableSizes),
+    };
+  }
+
+  private async assertProductTypeExists(productTypeId: string) {
+    const exists = await this.prisma.productType.findUnique({ where: { id: productTypeId }, select: { id: true } });
+    if (!exists) throw new BadRequestException("Product type not found for base product");
   }
 
   async createProductType(actorId: string, dto: CreateProductTypeDto) {
@@ -68,6 +86,10 @@ export class AdminConfigService {
   }
 
   async deleteProductType(actorId: string, id: string) {
+    const baseProducts = await this.prisma.baseProduct.count({ where: { productTypeId: id } });
+    if (baseProducts > 0) {
+      throw new BadRequestException("Product type is used by base products and cannot be deleted");
+    }
     const item = await this.prisma.productType.delete({ where: { id } });
     await this.audit.log({ actorId, action: "product-type.delete", entityType: "ProductType", entityId: item.id });
     return item;
@@ -95,14 +117,16 @@ export class AdminConfigService {
     return rule;
   }
 
-  listBaseProducts() {
-    return this.prisma.baseProduct.findMany({
+  async listBaseProducts() {
+    const items = await this.prisma.baseProduct.findMany({
       orderBy: { createdAt: "desc" },
       include: { productType: { select: { id: true, name: true, slug: true, category: true } } },
     });
+    return items.map((item) => this.serializeBaseProduct(item));
   }
 
   async createBaseProduct(actorId: string, dto: CreateBaseProductDto) {
+    await this.assertProductTypeExists(dto.productTypeId);
     const item = await this.prisma.baseProduct.create({
       data: {
         productTypeId: dto.productTypeId,
@@ -116,7 +140,7 @@ export class AdminConfigService {
       },
     });
     await this.audit.log({ actorId, action: "base-product.create", entityType: "BaseProduct", entityId: item.id });
-    return item;
+    return this.serializeBaseProduct(item);
   }
 
   async getBaseProduct(id: string) {
@@ -128,10 +152,11 @@ export class AdminConfigService {
       },
     });
     if (!item) throw new NotFoundException("Base product not found");
-    return item;
+    return this.serializeBaseProduct(item);
   }
 
   async updateBaseProduct(actorId: string, id: string, dto: UpdateBaseProductDto) {
+    if (dto.productTypeId) await this.assertProductTypeExists(dto.productTypeId);
     const item = await this.prisma.baseProduct.update({
       where: { id },
       data: {
@@ -146,7 +171,7 @@ export class AdminConfigService {
       },
     });
     await this.audit.log({ actorId, action: "base-product.update", entityType: "BaseProduct", entityId: item.id });
-    return item;
+    return this.serializeBaseProduct(item);
   }
 
   async deleteBaseProduct(actorId: string, id: string) {

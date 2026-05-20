@@ -20,6 +20,12 @@ enum UserRole {
   CORPORATE_CLIENT
 }
 
+enum DesignerStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+}
+
 enum DesignStatus {
   DRAFT
   SUBMITTED
@@ -121,6 +127,60 @@ enum CommercialOfferStatus {
   REJECTED
 }
 
+enum ExchangeRateSource {
+  MANUAL
+  SYSTEM
+}
+
+enum LedgerEntryType {
+  SALE
+  ROYALTY
+  BONUS
+  PAYOUT
+  ADJUSTMENT
+  REFUND
+}
+
+enum LedgerEntryStatus {
+  PENDING
+  POSTED
+  VOID
+}
+
+enum RoyaltyLedgerStatus {
+  CALCULATED
+  ACKNOWLEDGED
+  PAIDOUT
+  CANCELLED
+}
+
+enum PayoutStatus {
+  REQUESTED
+  PROCESSING
+  CONFIRMED
+  FAILED
+  CANCELLED
+}
+
+enum PayoutMethod {
+  CLICK_WALLET
+  BANK_ACCOUNT
+  MANUAL
+}
+
+enum BonusType {
+  MANUAL
+  GROUP
+  PERFORMANCE
+  CAMPAIGN
+}
+
+enum BonusStatus {
+  DRAFT
+  APPLIED
+  CANCELLED
+}
+
 model User {
   id           String   @id @default(uuid())
   email        String   @unique
@@ -132,6 +192,7 @@ model User {
   handle       String?  @unique
   socialLinks  Json?
   role         UserRole
+  designerStatus DesignerStatus @default(ACTIVE)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
@@ -143,6 +204,12 @@ model User {
   corporateRequests CorporateRequest[] @relation("CorporateClientRequests")
   designerBids DesignerBid[] @relation("BidDesigner")
   preferences  UserPreferences?
+  ledgerEntries LedgerEntry[] @relation("DesignerLedgerEntries")
+  royaltyLedgerEntries RoyaltyLedgerEntry[] @relation("DesignerRoyaltyLedgerEntries")
+  payouts      Payout[] @relation("DesignerPayouts")
+  bonuses      DesignerBonus[] @relation("DesignerBonuses")
+  createdBonuses DesignerBonus[] @relation("BonusCreator")
+  createdGroupBonuses GroupBonus[] @relation("GroupBonusCreator")
 }
 
 model UserPreferences {
@@ -265,6 +332,7 @@ model RoyaltyRule {
   metadataJson Json?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+  royaltyLedgerEntries RoyaltyLedgerEntry[]
 }
 
 model BaseProduct {
@@ -282,7 +350,7 @@ model BaseProduct {
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
-  productType     ProductType      @relation(fields: [productTypeId], references: [id])
+  productType     ProductType      @relation(fields: [productTypeId], references: [id], onDelete: Restrict)
   mockupTemplates MockupTemplate[]
 }
 
@@ -413,6 +481,7 @@ model CommerceListing {
   designAsset DesignAsset @relation(fields: [designAssetId], references: [id])
   cartItems   CartItem[]
   orderItems  OrderItem[]
+  royaltyLedgerEntries RoyaltyLedgerEntry[]
 }
 
 model Cart {
@@ -456,6 +525,8 @@ model Order {
   items         OrderItem[]
   payments      PaymentTransaction[]
   productionJobs ProductionJob[]
+  ledgerEntries LedgerEntry[]
+  royaltyLedgerEntries RoyaltyLedgerEntry[]
 }
 
 model OrderItem {
@@ -470,6 +541,8 @@ model OrderItem {
 
   order       Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
   listing     CommerceListing @relation(fields: [listingId], references: [id])
+  ledgerEntries LedgerEntry[]
+  royaltyLedgerEntries RoyaltyLedgerEntry[]
 }
 
 model PaymentTransaction {
@@ -486,6 +559,173 @@ model PaymentTransaction {
   updatedAt         DateTime      @updatedAt
 
   order             Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  ledgerEntries     LedgerEntry[]
+}
+
+model CurrencyConfig {
+  code              String   @id
+  name              String
+  symbol            String
+  decimalPlaces     Int      @default(2)
+  isActive          Boolean  @default(true)
+  isPrimary         Boolean  @default(false)
+  exchangeRateToUzs Decimal  @db.Decimal(18, 6)
+  metadataJson      Json?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
+
+model ExchangeRate {
+  id           String             @id @default(uuid())
+  fromCurrency String
+  toCurrency   String             @default("UZS")
+  rate         Decimal            @db.Decimal(18, 6)
+  source       ExchangeRateSource @default(MANUAL)
+  effectiveAt  DateTime
+  createdAt    DateTime           @default(now())
+
+  @@index([fromCurrency, toCurrency, effectiveAt])
+}
+
+model LedgerEntry {
+  id                   String            @id @default(uuid())
+  type                 LedgerEntryType
+  status               LedgerEntryStatus @default(POSTED)
+  designerId           String?
+  orderId              String?
+  orderItemId          String?
+  paymentTransactionId String?
+  amount               Decimal           @db.Decimal(12, 2)
+  currency             String            @default("UZS")
+  amountUzs            Decimal           @db.Decimal(12, 2)
+  description          String?
+  metadataJson         Json?
+  postedAt             DateTime?
+  createdAt            DateTime          @default(now())
+
+  designer           User?               @relation("DesignerLedgerEntries", fields: [designerId], references: [id])
+  order              Order?              @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  orderItem          OrderItem?          @relation(fields: [orderItemId], references: [id], onDelete: SetNull)
+  paymentTransaction PaymentTransaction? @relation(fields: [paymentTransactionId], references: [id], onDelete: SetNull)
+  payoutLines        PayoutLedgerEntry[]
+  bonus              DesignerBonus?
+
+  @@index([designerId, createdAt])
+  @@index([type, status])
+}
+
+model RoyaltyLedgerEntry {
+  id             String              @id @default(uuid())
+  designerId     String
+  orderId        String
+  orderItemId    String
+  listingId      String
+  royaltyRuleId  String?
+  royaltyRate    Decimal             @db.Decimal(10, 4)
+  amount         Decimal             @db.Decimal(12, 2)
+  currency       String              @default("UZS")
+  amountUzs      Decimal             @db.Decimal(12, 2)
+  status         RoyaltyLedgerStatus @default(CALCULATED)
+  metadataJson   Json?
+  createdAt      DateTime            @default(now())
+  acknowledgedAt DateTime?
+  paidOutAt      DateTime?
+  payoutId       String?
+
+  designer    User            @relation("DesignerRoyaltyLedgerEntries", fields: [designerId], references: [id])
+  order       Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  orderItem   OrderItem       @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
+  listing     CommerceListing @relation(fields: [listingId], references: [id])
+  royaltyRule RoyaltyRule?    @relation(fields: [royaltyRuleId], references: [id], onDelete: SetNull)
+  payout      Payout?         @relation(fields: [payoutId], references: [id], onDelete: SetNull)
+
+  @@unique([orderItemId, designerId])
+  @@index([designerId, status])
+  @@index([orderId])
+}
+
+model Payout {
+  id            String       @id @default(uuid())
+  designerId    String
+  amount        Decimal      @db.Decimal(12, 2)
+  currency      String       @default("UZS")
+  amountUzs     Decimal      @db.Decimal(12, 2)
+  method        PayoutMethod @default(MANUAL)
+  status        PayoutStatus @default(REQUESTED)
+  reference     String?
+  failureReason String?
+  metadataJson  Json?
+  requestedAt   DateTime     @default(now())
+  processingAt  DateTime?
+  confirmedAt   DateTime?
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  designer       User                 @relation("DesignerPayouts", fields: [designerId], references: [id])
+  royaltyEntries RoyaltyLedgerEntry[]
+  ledgerEntries  PayoutLedgerEntry[]
+
+  @@index([designerId, status])
+}
+
+model PayoutLedgerEntry {
+  id            String   @id @default(uuid())
+  payoutId      String
+  ledgerEntryId String
+  amount        Decimal  @db.Decimal(12, 2)
+  currency      String   @default("UZS")
+  amountUzs     Decimal  @db.Decimal(12, 2)
+  createdAt     DateTime @default(now())
+
+  payout      Payout      @relation(fields: [payoutId], references: [id], onDelete: Cascade)
+  ledgerEntry LedgerEntry @relation(fields: [ledgerEntryId], references: [id], onDelete: Cascade)
+
+  @@unique([payoutId, ledgerEntryId])
+}
+
+model DesignerBonus {
+  id            String      @id @default(uuid())
+  designerId    String
+  groupBonusId  String?
+  ledgerEntryId String?     @unique
+  createdById   String?
+  type          BonusType   @default(MANUAL)
+  status        BonusStatus @default(APPLIED)
+  amount        Decimal     @db.Decimal(12, 2)
+  currency      String      @default("UZS")
+  amountUzs     Decimal     @db.Decimal(12, 2)
+  reason        String
+  metadataJson  Json?
+  createdAt     DateTime    @default(now())
+  appliedAt     DateTime?
+  cancelledAt   DateTime?
+
+  designer    User         @relation("DesignerBonuses", fields: [designerId], references: [id])
+  createdBy   User?        @relation("BonusCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  groupBonus  GroupBonus?  @relation(fields: [groupBonusId], references: [id], onDelete: SetNull)
+  ledgerEntry LedgerEntry? @relation(fields: [ledgerEntryId], references: [id], onDelete: SetNull)
+
+  @@index([designerId, status])
+  @@index([groupBonusId])
+}
+
+model GroupBonus {
+  id                   String      @id @default(uuid())
+  name                 String
+  type                 BonusType   @default(GROUP)
+  status               BonusStatus @default(DRAFT)
+  amountPerDesigner    Decimal     @db.Decimal(12, 2)
+  currency             String      @default("UZS")
+  amountPerDesignerUzs Decimal     @db.Decimal(12, 2)
+  reason               String
+  criteriaJson         Json?
+  createdById          String?
+  createdAt            DateTime    @default(now())
+  appliedAt            DateTime?
+  cancelledAt          DateTime?
+
+  createdBy User?           @relation("GroupBonusCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  bonuses   DesignerBonus[]
 }
 
 model ProductionJob {

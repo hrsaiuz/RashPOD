@@ -2,6 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { useAuth } from "../../../auth/auth-provider";
+import { Button, Card, EmptyState, StatusBadge } from "@rashpod/ui";
+import { Briefcase } from "lucide-react";
+import DashboardLayout from "../../dashboard-layout";
 
 type Req = { id: string; title: string; status: string };
 type Bid = { id: string; designerId: string; proposal: string; status: string; designFee: string };
@@ -52,41 +55,47 @@ export default function AdminCorporatePage() {
   };
 
   return (
-    <main style={{ padding: 24 }}>
-      <h1>Admin Corporate Workflow</h1>
-      <h2>Requests</h2>
-      <ul>
-        {requests.map((r) => (
-          <li key={r.id}>
-            <button
-              onClick={() => {
-                setSelectedReq(r.id);
-                void loadBids(r.id);
-              }}
-            >
-              Open
-            </button>{" "}
-            {r.title} · {r.status}
-          </li>
-        ))}
-      </ul>
-      {selectedReq ? (
-        <>
-          <h2>Bids for request {selectedReq}</h2>
-          <ul>
-            {bids.map((b) => (
-              <li key={b.id}>
-                <input type="radio" name="selectedBid" checked={selectedBid === b.id} onChange={() => setSelectedBid(b.id)} />{" "}
-                {b.proposal} · {b.designFee} · {b.status}{" "}
-                <button onClick={() => selectBid(b.id)}>Select Bid</button>
-              </li>
-            ))}
-          </ul>
-          <button onClick={createOffer} disabled={!selectedBid}>
-            Create and send offer
-          </button>
-        </>
-      ) : null}
-    </main>
+    <DashboardLayout role="admin">
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-3xl font-bold text-brand-ink">Corporate Workflow</h1>
+          <p className="text-brand-muted mt-1">Review corporate requests, select designer bids, and send commercial offers.</p>
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+          <Card>
+            <h2 className="text-lg font-semibold text-brand-ink mb-4">Requests</h2>
+            {requests.length === 0 ? (
+              <EmptyState icon={<Briefcase className="text-brand-peach" size={32} />} title="No corporate requests" description="Incoming corporate requests will appear here." />
+            ) : (
+              <div className="space-y-3">
+                {requests.map((request) => (
+                  <button key={request.id} className={`w-full rounded-2xl border px-4 py-3 text-left transition ${selectedReq === request.id ? "border-brand-blue bg-brand-blue/5" : "border-surface-borderSoft bg-white hover:border-brand-blue/40"}`} onClick={() => { setSelectedReq(request.id); void loadBids(request.id); }}>
+                    <div className="flex items-center justify-between gap-3"><span className="font-semibold text-brand-ink">{request.title}</span><StatusBadge status={request.status} /></div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </Card>
+          <Card>
+            <h2 className="text-lg font-semibold text-brand-ink mb-4">Bids</h2>
+            {!selectedReq ? (
+              <p className="text-sm text-brand-muted">Select a request to review designer bids.</p>
+            ) : bids.length === 0 ? (
+              <EmptyState title="No bids yet" description="Designer bids for the selected corporate request will appear here." />
+            ) : (
+              <div className="space-y-3">
+                {bids.map((bid) => (
+                  <label key={bid.id} className="block rounded-2xl border border-surface-borderSoft p-4">
+                    <div className="flex items-start gap-3"><input className="mt-1" type="radio" name="selectedBid" checked={selectedBid === bid.id} onChange={() => setSelectedBid(bid.id)} /><div className="min-w-0 flex-1"><p className="text-sm font-semibold text-brand-ink">{bid.proposal}</p><p className="text-xs text-brand-muted mt-1">{Number(bid.designFee).toLocaleString()} UZS</p></div><StatusBadge status={bid.status} /></div>
+                    <Button size="sm" variant="secondary" className="mt-3" onClick={() => selectBid(bid.id)}>Select bid</Button>
+                  </label>
+                ))}
+                <Button variant="primaryBlue" onClick={createOffer} disabled={!selectedBid}>Create and send offer</Button>
+              </div>
+            )}
+          </Card>
+        </div>
+      </div>
+    </DashboardLayout>
   );
 }

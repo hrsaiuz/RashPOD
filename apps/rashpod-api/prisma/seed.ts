@@ -94,6 +94,29 @@ async function seedRoyaltyDefault() {
   }
 }
 
+async function seedCurrencies() {
+  await prisma.currencyConfig.upsert({
+    where: { code: "UZS" },
+    create: {
+      code: "UZS",
+      name: "Uzbekistani Som",
+      symbol: "so'm",
+      decimalPlaces: 2,
+      isActive: true,
+      isPrimary: true,
+      exchangeRateToUzs: 1,
+    },
+    update: {
+      name: "Uzbekistani Som",
+      symbol: "so'm",
+      decimalPlaces: 2,
+      isActive: true,
+      isPrimary: true,
+      exchangeRateToUzs: 1,
+    },
+  });
+}
+
 async function seedFilmSettings() {
   const current = await prisma.filmSaleSettings.findFirst();
   if (!current) {
@@ -262,6 +285,7 @@ async function seedBaseProductsAndMockups() {
 async function main() {
   await seedUsers();
   await seedProductTypes();
+  await seedCurrencies();
   await seedRoyaltyDefault();
   await seedFilmSettings();
   await seedDeliverySettings();

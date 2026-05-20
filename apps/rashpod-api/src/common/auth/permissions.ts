@@ -13,6 +13,8 @@ export const permissions = {
   "royalty-rule:manage": ["ADMIN", "SUPER_ADMIN", "OPERATIONS_MANAGER"],
   "film-settings:manage": ["ADMIN", "SUPER_ADMIN", "OPERATIONS_MANAGER"],
   "delivery-settings:manage": ["ADMIN", "SUPER_ADMIN", "OPERATIONS_MANAGER"],
+  "currency:manage": ["ADMIN", "SUPER_ADMIN", "OPERATIONS_MANAGER", "FINANCE_STAFF"],
+  "finance:manage": ["ADMIN", "SUPER_ADMIN", "FINANCE_STAFF"],
   "worker-jobs:manage": ["ADMIN", "SUPER_ADMIN", "OPERATIONS_MANAGER"],
   "file:upload-own": ["DESIGNER", "ADMIN", "SUPER_ADMIN"],
   "listing:manage-own": ["DESIGNER", "ADMIN", "SUPER_ADMIN"],

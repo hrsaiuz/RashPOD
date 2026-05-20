@@ -1,8 +1,5 @@
+import AdminPlaceholder from "../admin-placeholder";
+
 export default function Page() {
-  return (
-    <main style={{ maxWidth: 1120, margin: "0 auto", padding: 24 }}>
-      <h1>Print Areas</h1>
-      <p>Manage print/safe zones.</p>
-    </main>
-  );
+  return <AdminPlaceholder title="Print Areas" description="Manage print and safe zones." />;
 }

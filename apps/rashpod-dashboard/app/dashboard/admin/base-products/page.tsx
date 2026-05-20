@@ -24,6 +24,18 @@ interface BaseProduct {
   productType?: { id: string; name: string };
 }
 
+function normalizeStringArray(value: unknown): string[] {
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
+}
+
+function normalizeBaseProduct(item: BaseProduct): BaseProduct {
+  return {
+    ...item,
+    availableColors: normalizeStringArray(item.availableColors),
+    availableSizes: normalizeStringArray(item.availableSizes),
+  };
+}
+
 export default function AdminBaseProductsPage() {
   const [items, setItems] = useState<BaseProduct[]>([]);
   const [productTypes, setProductTypes] = useState<ProductType[]>([]);
@@ -58,7 +70,7 @@ export default function AdminBaseProductsPage() {
       if (!bpRes.ok) throw new Error(`Failed to load base products (${bpRes.status})`);
       const bp = (await bpRes.json()) as BaseProduct[];
       const pt = ptRes.ok ? ((await ptRes.json()) as ProductType[]) : [];
-      setItems(Array.isArray(bp) ? bp : []);
+      setItems(Array.isArray(bp) ? bp.map(normalizeBaseProduct) : []);
       setProductTypes(Array.isArray(pt) ? pt.filter((p) => p.isActive) : []);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load");
@@ -201,7 +213,13 @@ export default function AdminBaseProductsPage() {
           </Button>
         </div>
 
-        {error && <p className="text-sm text-red-600">{error}</p>}
+        {error && (
+          <ErrorState
+            title="Could not load base products"
+            description={error}
+            retry={<Button variant="primaryBlue" onClick={load}>Retry</Button>}
+          />
+        )}
 
         {loading ? (
           <Skeleton className="h-64" />
