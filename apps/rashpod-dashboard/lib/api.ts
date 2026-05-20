@@ -169,6 +169,13 @@ export interface DesignWorkflowDetail extends Design {
   listings?: Listing[];
 }
 
+export interface MarketplacePublicationSummary {
+  id: string;
+  marketplace: string;
+  status: string;
+  errorMessage?: string | null;
+}
+
 export interface Listing {
   id: string;
   type: ListingType;
@@ -182,6 +189,7 @@ export interface Listing {
   currency: string;
   imagesJson?: unknown;
   metadataJson?: unknown;
+  marketplacePublications?: MarketplacePublicationSummary[];
   publishedAt?: string | null;
   createdAt: string;
   updatedAt: string;

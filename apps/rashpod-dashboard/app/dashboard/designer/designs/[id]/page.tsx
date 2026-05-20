@@ -33,11 +33,7 @@ const STATUS_TIMELINE: Design["status"][] = [
   "PUBLISHED",
 ];
 
-type ListingWithPublications = NonNullable<DesignWorkflowDetail["listings"]>[number] & {
-  marketplacePublications?: Array<{ id: string; marketplace: string; status: string; errorMessage?: string | null }>;
-};
-
-type DesignerDesignDetail = DesignWorkflowDetail & { listings?: ListingWithPublications[] };
+type DesignerDesignDetail = DesignWorkflowDetail;
 
 export default function DesignDetailPage() {
   const router = useRouter();
