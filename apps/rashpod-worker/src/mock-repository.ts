@@ -13,7 +13,7 @@ export class InMemoryWorkerRepository implements WorkerRepository {
 
   async updateGeneratedAsset(
     id: string,
-    data: Partial<Pick<GeneratedAssetRecord, "status" | "fileKey" | "errorMessage" | "widthPx" | "heightPx">>,
+    data: Partial<Pick<GeneratedAssetRecord, "status" | "fileKey" | "objectKey" | "contentType" | "format" | "errorMessage" | "widthPx" | "heightPx">>,
   ): Promise<GeneratedAssetRecord> {
     const current = this.store.get(id);
     if (!current) {

@@ -28,14 +28,34 @@ export class JobDispatcherService {
   ) {}
 
   async enqueue(jobType: JobType, payload: Record<string, unknown>) {
+    const idempotencyKey = this.idempotencyKeyFor(jobType, payload);
+    if (idempotencyKey) {
+      const existing = await this.prisma.workerJob.findUnique({ where: { idempotencyKey } });
+      if (existing) {
+        return { accepted: true, jobId: existing.id, jobType: existing.type, status: existing.status, idempotent: true };
+      }
+    }
     const job = await this.prisma.workerJob.create({
       data: {
         type: jobType,
+        idempotencyKey,
         payloadJson: payload as Prisma.InputJsonValue,
         nextRunAt: new Date(),
       },
     });
     return { accepted: true, jobId: job.id, jobType: job.type, status: job.status };
+  }
+
+  private idempotencyKeyFor(jobType: JobType, payload: Record<string, unknown>) {
+    if (jobType === "GENERATE_LOCAL_MOCKUPS" || jobType === "GENERATE_PRINTFUL_MOCKUPS") {
+      const selectionId = payload.designProductSelectionId;
+      if (typeof selectionId === "string" && selectionId.length > 0) return `${jobType}:${selectionId}`;
+    }
+    if (jobType === "GENERATE_LISTING_IMAGE_PACK" || jobType === "GENERATE_FILM_PREVIEW" || jobType === "GENERATE_PRODUCTION_FILE") {
+      const generatedAssetId = payload.generatedAssetId;
+      if (typeof generatedAssetId === "string" && generatedAssetId.length > 0) return `${jobType}:${generatedAssetId}`;
+    }
+    return undefined;
   }
 
   async list(filters: ListWorkerJobsDto) {

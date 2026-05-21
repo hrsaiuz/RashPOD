@@ -7,6 +7,10 @@
     "packages/*"
   ],
   "scripts": {
+    "db:up": "docker compose up -d postgres",
+    "db:down": "docker compose down",
+    "db:logs": "docker compose logs -f postgres",
+    "db:status": "docker compose ps postgres",
     "dev:api": "npm run start:dev -w @rashpod/api",
     "dev:web": "npm run dev -w @rashpod/web",
     "dev:dashboard": "npm run dev -w @rashpod/dashboard",

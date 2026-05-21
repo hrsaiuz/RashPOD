@@ -7,12 +7,16 @@ APP_ENV=local
 APP_URL=http://localhost:3000
 DASHBOARD_URL=http://localhost:3001
 API_URL=http://localhost:3002
+NEXT_PUBLIC_API_URL=http://localhost:3002
 ```
 
 ## Database
 ```env
-DATABASE_URL=postgresql://user:password@localhost:5432/rashpod
+DATABASE_URL=postgresql://postgres:postgres@localhost:5432/rashpod
 ```
+
+For local development, `docker-compose.yml` starts PostgreSQL with `POSTGRES_USER=postgres`,
+`POSTGRES_PASSWORD=postgres`, `POSTGRES_DB=rashpod`, and host port `5432`.
 
 ## Auth
 ```env
@@ -25,7 +29,9 @@ EMAIL_VERIFICATION_SECRET=
 ## Google Cloud
 ```env
 GCP_PROJECT_ID=
+GCS_PROJECT_ID=
 GCP_REGION=
+GCS_BUCKET_NAME=
 GCS_BUCKET_ASSETS=
 GCS_BUCKET_PUBLIC=
 GCS_BUCKET_PRIVATE=
@@ -36,13 +42,18 @@ GCS_SIGNED_URL_EXPIRES_SECONDS=900
 `GCP_PROJECT_ID` and at least `GCS_BUCKET_ASSETS` so signed upload URLs are minted against Google Cloud Storage, not local
 development fallbacks.
 
+Leave GCS project and bucket values empty in local development unless you are testing real Google Cloud Storage. The API
+uses signed local placeholder URLs and the worker writes local artifacts when `NODE_ENV` is not `production`.
+
 ## Queue / Worker
 ```env
-QUEUE_PROVIDER=cloud_tasks
+QUEUE_PROVIDER=local
 GCP_TASKS_QUEUE=
 GCP_TASKS_LOCATION=
 WORKER_SECRET=
 ```
+
+The current local worker polls the database-backed `WorkerJob` table. Cloud Tasks variables are for deployed environments.
 
 ## ZeptoMail
 ```env

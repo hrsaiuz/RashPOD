@@ -1,5 +1,21 @@
 import { ForbiddenException } from "@nestjs/common";
+import { AssetPurpose } from "@prisma/client";
 import { FilesService } from "../src/modules/files/files.service";
+
+function storageMock(overrides: Record<string, unknown> = {}) {
+  return {
+    isCloudStorageConfigured: jest.fn().mockReturnValue(false),
+    getPrivateBucketName: jest.fn().mockReturnValue("private-bucket"),
+    getPublicBucketName: jest.fn().mockReturnValue("public-bucket"),
+    buildPublicUrl: jest.fn((objectKey: string) => `https://storage.googleapis.com/public-bucket/${objectKey}`),
+    createPresignedUploadUrl: jest.fn().mockResolvedValue({ method: "PUT", uploadUrl: "https://signed", headers: {} }),
+    createPublicPresignedUploadUrl: jest.fn().mockResolvedValue({ method: "PUT", uploadUrl: "https://public-signed", headers: {}, publicUrl: "https://public" }),
+    getAssetObjectMetadata: jest.fn().mockResolvedValue(null),
+    getObjectMetadata: jest.fn().mockResolvedValue(null),
+    createSignedReadUrl: jest.fn().mockResolvedValue("https://signed-read"),
+    ...overrides,
+  };
+}
 
 describe("FilesService completeUpload", () => {
   it("uses storage metadata when available", async () => {
@@ -17,12 +33,12 @@ describe("FilesService completeUpload", () => {
         update: jest.fn().mockResolvedValue({ id: "f1", uploadStatus: "READY" }),
       },
     };
-    const storage: any = {
-      getObjectMetadata: jest.fn().mockResolvedValue({
+    const storage: any = storageMock({
+      getAssetObjectMetadata: jest.fn().mockResolvedValue({
         sizeBytes: 100,
         mimeType: "image/png",
       }),
-    };
+    });
     const service = new FilesService(prisma, storage);
 
     await service.completeUpload("u1", {
@@ -33,9 +49,36 @@ describe("FilesService completeUpload", () => {
 
     expect(prisma.fileAsset.update).toHaveBeenCalledWith(
       expect.objectContaining({
-        data: expect.objectContaining({ uploadStatus: "READY", sizeBytes: 100, mimeType: "image/png" }),
+        data: expect.objectContaining({ uploadStatus: "READY", status: "READY", sizeBytes: 100, mimeType: "image/png" }),
       }),
     );
+  });
+
+  it("uses public asset metadata for public generated assets", async () => {
+    const prisma: any = {
+      fileAsset: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: "f-public",
+          ownerId: "u1",
+          objectKey: "listing-images/listing-1/f-public.png",
+          sizeBytes: 100,
+          mimeType: "image/png",
+          checksum: undefined,
+          uploadStatus: "PENDING",
+          isPublic: true,
+        }),
+        update: jest.fn().mockResolvedValue({ id: "f-public", uploadStatus: "READY" }),
+      },
+    };
+    const storage: any = storageMock({
+      getAssetObjectMetadata: jest.fn().mockResolvedValue({ sizeBytes: 100, mimeType: "image/png" }),
+    });
+    const service = new FilesService(prisma, storage);
+
+    await service.completeUpload("u1", { fileId: "f-public", uploadedSizeBytes: 1, uploadedMimeType: "application/octet-stream" });
+
+    expect(storage.getAssetObjectMetadata).toHaveBeenCalledWith({ objectKey: "listing-images/listing-1/f-public.png", bucketKind: "public" });
+    expect(prisma.fileAsset.update).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ uploadStatus: "READY", status: "READY" }) }));
   });
 
   it("falls back to client metadata when storage metadata unavailable", async () => {
@@ -53,9 +96,7 @@ describe("FilesService completeUpload", () => {
         update: jest.fn().mockResolvedValue({ id: "f2", uploadStatus: "READY" }),
       },
     };
-    const storage: any = {
-      getObjectMetadata: jest.fn().mockResolvedValue(null),
-    };
+    const storage: any = storageMock();
     const service = new FilesService(prisma, storage);
 
     await service.completeUpload("u1", {
@@ -80,7 +121,7 @@ describe("FilesService completeUpload", () => {
         }),
       },
     };
-    const service = new FilesService(prisma, { getObjectMetadata: jest.fn() } as any);
+    const service = new FilesService(prisma, storageMock() as any);
 
     await expect(
       service.completeUpload("u-other", {
@@ -105,9 +146,7 @@ describe("FilesService completeUpload", () => {
         update: jest.fn(),
       },
     };
-    const storage: any = {
-      getObjectMetadata: jest.fn(),
-    };
+    const storage: any = storageMock({ getAssetObjectMetadata: jest.fn() });
     const service = new FilesService(prisma, storage);
 
     const result = await service.completeUpload("u1", {
@@ -118,7 +157,7 @@ describe("FilesService completeUpload", () => {
 
     expect(result.uploadStatus).toBe("READY");
     expect(prisma.fileAsset.update).not.toHaveBeenCalled();
-    expect(storage.getObjectMetadata).not.toHaveBeenCalled();
+    expect(storage.getAssetObjectMetadata).not.toHaveBeenCalled();
   });
 
   it("marks file as FAILED when metadata verification fails", async () => {
@@ -136,12 +175,12 @@ describe("FilesService completeUpload", () => {
         update: jest.fn().mockResolvedValue({ id: "f5", uploadStatus: "FAILED" }),
       },
     };
-    const storage: any = {
-      getObjectMetadata: jest.fn().mockResolvedValue({
+    const storage: any = storageMock({
+      getAssetObjectMetadata: jest.fn().mockResolvedValue({
         sizeBytes: 99,
         mimeType: "image/png",
       }),
-    };
+    });
     const service = new FilesService(prisma, storage);
 
     await expect(
@@ -154,7 +193,7 @@ describe("FilesService completeUpload", () => {
 
     expect(prisma.fileAsset.update).toHaveBeenCalledWith({
       where: { id: "f5" },
-      data: { uploadStatus: "FAILED" },
+      data: { uploadStatus: "FAILED", status: "FAILED", failureReason: "Uploaded size does not match requested size" },
     });
   });
 
@@ -171,13 +210,103 @@ describe("FilesService completeUpload", () => {
         }),
       },
     };
-    const storage: any = {
-      createSignedReadUrl: jest.fn().mockResolvedValue("https://signed"),
-    };
+    const storage: any = storageMock({ createSignedReadUrl: jest.fn().mockResolvedValue("https://signed") });
     const service = new FilesService(prisma, storage);
     const result = await service.getSignedReadUrl("u1", "f6");
     expect(result.url).toBe("https://signed");
     expect(storage.createSignedReadUrl).toHaveBeenCalledWith({ objectKey: "design-originals/u1/file6.png", expiresSeconds: 1200 });
     process.env.GCS_SIGNED_URL_EXPIRES_SECONDS = previous;
+  });
+
+  it("creates deterministic upload records with explicit asset purpose", async () => {
+    const prisma: any = {
+      fileAsset: {
+        create: jest.fn(async ({ data }) => ({ ...data, id: data.id })),
+      },
+    };
+    const storage: any = storageMock();
+    const audit: any = { log: jest.fn() };
+    const service = new FilesService(prisma, storage, audit);
+
+    const result = await service.createUploadUrl("designer-1", {
+      purpose: AssetPurpose.DESIGN_ORIGINAL,
+      filename: "art.png",
+      mimeType: "image/png",
+      sizeBytes: 200,
+      designId: "design-1",
+    });
+
+    expect(result.fileId).toBeTruthy();
+    expect(prisma.fileAsset.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          purpose: "DESIGN_ORIGINAL",
+          status: "PENDING_UPLOAD",
+          objectKey: expect.stringMatching(/^designers\/designer-1\/designs\/design-1\/original\/.+\.png$/),
+          accessPolicy: "PRIVATE_SIGNED_URL",
+        }),
+      }),
+    );
+    expect(audit.log).toHaveBeenCalledWith(expect.objectContaining({ action: "asset.upload-url.created" }));
+  });
+
+  it("rejects uploads that violate the purpose policy", async () => {
+    const prisma: any = { fileAsset: { create: jest.fn() } };
+    const service = new FilesService(prisma, storageMock() as any);
+
+    await expect(
+      service.createUploadUrl("designer-1", {
+        purpose: AssetPurpose.DESIGN_ORIGINAL,
+        filename: "notes.txt",
+        mimeType: "text/plain",
+        sizeBytes: 10,
+      }),
+    ).rejects.toBeInstanceOf(Error);
+    expect(prisma.fileAsset.create).not.toHaveBeenCalled();
+  });
+
+  it("rejects uploads that exceed the purpose size policy", async () => {
+    const prisma: any = { fileAsset: { create: jest.fn() } };
+    const service = new FilesService(prisma, storageMock() as any);
+
+    await expect(
+      service.createUploadUrl("designer-1", {
+        purpose: AssetPurpose.LISTING_IMAGE,
+        filename: "listing.png",
+        mimeType: "image/png",
+        sizeBytes: 20_000_001,
+      }),
+    ).rejects.toThrow("size limit");
+    expect(prisma.fileAsset.create).not.toHaveBeenCalled();
+  });
+
+  it("requires storage verification when cloud storage is configured", async () => {
+    const prisma: any = {
+      fileAsset: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: "f-cloud",
+          ownerId: "u1",
+          objectKey: "designers/u1/designs/d1/original/f-cloud.png",
+          sizeBytes: 100,
+          mimeType: "image/png",
+          checksum: undefined,
+          uploadStatus: "PENDING",
+          isPublic: false,
+        }),
+        update: jest.fn().mockResolvedValue({ id: "f-cloud", uploadStatus: "FAILED" }),
+      },
+    };
+    const storage: any = storageMock({
+      isCloudStorageConfigured: jest.fn().mockReturnValue(true),
+      getAssetObjectMetadata: jest.fn().mockResolvedValue(null),
+    });
+    const service = new FilesService(prisma, storage);
+
+    await expect(service.completeUpload("u1", { fileId: "f-cloud", uploadedSizeBytes: 100, uploadedMimeType: "image/png" })).rejects.toBeInstanceOf(ForbiddenException);
+
+    expect(prisma.fileAsset.update).toHaveBeenCalledWith({
+      where: { id: "f-cloud" },
+      data: { uploadStatus: "FAILED", status: "FAILED", failureReason: "Uploaded object metadata is unavailable in storage" },
+    });
   });
 });

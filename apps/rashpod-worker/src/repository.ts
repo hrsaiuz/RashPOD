@@ -1,9 +1,12 @@
-export type AssetStatus = "PENDING" | "PROCESSING" | "READY" | "FAILED";
+export type AssetStatus = "PENDING" | "UPLOADED" | "VERIFYING" | "PROCESSING" | "READY" | "FAILED" | "EXPIRED" | "REPLACED" | "ARCHIVED";
 
 export interface GeneratedAssetRecord {
   id: string;
   status: AssetStatus;
   fileKey?: string;
+  objectKey?: string;
+  contentType?: string;
+  format?: string;
   errorMessage?: string;
   widthPx?: number;
   heightPx?: number;
@@ -57,7 +60,9 @@ export interface PipelineSelectionRecord {
 export interface MockupAssetRecord {
   id: string;
   mockupType: "MAIN" | "SECONDARY" | "DETAIL" | "LIFESTYLE" | "PRINT_AREA_PREVIEW";
-  status: "PENDING" | "GENERATED" | "FAILED";
+  status: "PENDING" | "PROCESSING" | "GENERATED" | "READY" | "FAILED" | "REPLACED" | "ARCHIVED";
+  imageUrl?: string | null;
+  objectKey?: string | null;
 }
 
 export type MarketplacePublicationStatus = "NOT_SELECTED" | "DRAFT" | "QUEUED" | "PUBLISHING" | "PUBLISHED" | "FAILED" | "NEEDS_REVIEW";
@@ -81,14 +86,29 @@ export interface WorkerRepository {
   getGeneratedAsset(id: string): Promise<GeneratedAssetRecord | null>;
   updateGeneratedAsset(
     id: string,
-    data: Partial<Pick<GeneratedAssetRecord, "status" | "fileKey" | "errorMessage" | "widthPx" | "heightPx">>,
+    data: Partial<Pick<GeneratedAssetRecord, "status" | "fileKey" | "objectKey" | "contentType" | "format" | "errorMessage" | "widthPx" | "heightPx">>,
   ): Promise<GeneratedAssetRecord>;
   getPipelineSelection?(id: string): Promise<PipelineSelectionRecord | null>;
   updatePipelineSelection?(id: string, data: { status?: PipelineSelectionStatus; errorMessage?: string | null }): Promise<PipelineSelectionRecord>;
   listMockupAssets?(selectionId: string): Promise<MockupAssetRecord[]>;
   updateMockupAsset?(
     id: string,
-    data: { status?: "PENDING" | "GENERATED" | "FAILED"; imageUrl?: string | null; thumbnailUrl?: string | null; providerTaskId?: string | null; metadataJson?: unknown },
+    data: {
+      status?: "PENDING" | "PROCESSING" | "GENERATED" | "READY" | "FAILED" | "REPLACED" | "ARCHIVED";
+      imageUrl?: string | null;
+      thumbnailUrl?: string | null;
+      objectKey?: string | null;
+      contentType?: string | null;
+      format?: string | null;
+      widthPx?: number | null;
+      heightPx?: number | null;
+      dpi?: number | null;
+      placementSnapshotJson?: unknown;
+      renderJobId?: string | null;
+      failureReason?: string | null;
+      providerTaskId?: string | null;
+      metadataJson?: unknown;
+    },
   ): Promise<MockupAssetRecord>;
   createListingDraftForSelection?(selectionId: string): Promise<{ id: string; status: string } | null>;
   getMarketplacePublication?(id: string): Promise<MarketplacePublicationRecord | null>;

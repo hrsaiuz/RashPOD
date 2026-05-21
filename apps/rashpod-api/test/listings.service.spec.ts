@@ -5,6 +5,19 @@ import { ListingsService } from "../src/modules/listings/listings.service";
 describe("ListingsService lifecycle", () => {
   const user = { sub: "designer-1", email: "d@rashpod.uz", role: UserRole.DESIGNER };
   const admin = { sub: "admin-1", email: "a@rashpod.uz", role: UserRole.ADMIN };
+  const readyMockup = (id: string, mockupType: string) => ({
+    id,
+    mockupType,
+    status: "GENERATED",
+    imageUrl: `mockups/${id}.png`,
+    objectKey: `mockups/${id}.png`,
+    archivedAt: null,
+    placementSnapshotJson: { placement: "FRONT" },
+    contentType: "image/png",
+    format: "png",
+    widthPx: 2000,
+    heightPx: 2000,
+  });
 
   it("gets own listing by id", async () => {
     const listing = { id: "lst-1", designerId: "designer-1" };
@@ -102,6 +115,9 @@ describe("ListingsService lifecycle", () => {
       cost: new Prisma.Decimal(60000),
       publishedAt: null,
       metadataJson: null,
+      imagesJson: ["https://cdn.example/listing.png"],
+      designProductSelectionId: null,
+      designProductSelection: null,
     };
     const prisma: any = {
       commerceListing: {
@@ -122,6 +138,110 @@ describe("ListingsService lifecycle", () => {
       data: expect.objectContaining({ designerRoyalty: new Prisma.Decimal(10000) }),
     }));
     expect(audit.log).toHaveBeenCalledWith(expect.objectContaining({ action: "listing.admin-status.update" }));
+  });
+
+  it("blocks publication when listing assets are not ready", async () => {
+    const listing = {
+      id: "lst-blocked",
+      type: ListingType.PRODUCT,
+      status: ListingStatus.DRAFT,
+      designerId: "designer-1",
+      price: new Prisma.Decimal(100000),
+      cost: null,
+      publishedAt: null,
+      metadataJson: null,
+      imagesJson: [],
+      designProductSelectionId: "sel-1",
+      designProductSelection: { mockupAssets: [{ id: "m1", status: "PENDING", imageUrl: null, objectKey: null, archivedAt: null }] },
+    };
+    const prisma: any = {
+      commerceListing: {
+        findUnique: jest.fn().mockResolvedValue(listing),
+        update: jest.fn(),
+      },
+    };
+    const audit: any = { log: jest.fn().mockResolvedValue(undefined) };
+    const service = new ListingsService(prisma, audit);
+
+    await expect(service.publish(user as any, "lst-blocked")).rejects.toBeInstanceOf(ForbiddenException);
+
+    expect(prisma.commerceListing.update).not.toHaveBeenCalled();
+    expect(audit.log).toHaveBeenCalledWith(expect.objectContaining({ action: "listing.publication.blocked", entityId: "lst-blocked" }));
+  });
+
+  it("blocks product publication without a ready main image", async () => {
+    const listing = {
+      id: "lst-no-main",
+      type: ListingType.PRODUCT,
+      status: ListingStatus.DRAFT,
+      designerId: "designer-1",
+      price: new Prisma.Decimal(100000),
+      cost: null,
+      publishedAt: null,
+      metadataJson: null,
+      imagesJson: ["mockups/secondary.png", "mockups/detail.png"],
+      designProductSelectionId: "sel-1",
+      designProductSelection: { mockupAssets: [readyMockup("secondary", "LIFESTYLE"), readyMockup("detail", "DETAIL")] },
+    };
+    const prisma: any = { commerceListing: { findUnique: jest.fn().mockResolvedValue(listing), update: jest.fn() } };
+    const audit: any = { log: jest.fn().mockResolvedValue(undefined) };
+    const service = new ListingsService(prisma, audit);
+
+    await expect(service.publish(user as any, "lst-no-main")).rejects.toThrow("ready main image");
+
+    expect(prisma.commerceListing.update).not.toHaveBeenCalled();
+    expect(audit.log).toHaveBeenCalledWith(expect.objectContaining({ action: "listing.publication.blocked" }));
+  });
+
+  it("blocks product publication when render metadata is missing", async () => {
+    const main = { ...readyMockup("main", "MAIN"), placementSnapshotJson: null };
+    const listing = {
+      id: "lst-no-metadata",
+      type: ListingType.PRODUCT,
+      status: ListingStatus.DRAFT,
+      designerId: "designer-1",
+      price: new Prisma.Decimal(100000),
+      cost: null,
+      publishedAt: null,
+      metadataJson: null,
+      imagesJson: ["mockups/main.png", "mockups/lifestyle.png", "mockups/detail.png"],
+      designProductSelectionId: "sel-1",
+      designProductSelection: { mockupAssets: [main, readyMockup("lifestyle", "LIFESTYLE"), readyMockup("detail", "DETAIL")] },
+    };
+    const prisma: any = { commerceListing: { findUnique: jest.fn().mockResolvedValue(listing), update: jest.fn() } };
+    const service = new ListingsService(prisma, { log: jest.fn().mockResolvedValue(undefined) } as any);
+
+    await expect(service.publish(user as any, "lst-no-metadata")).rejects.toThrow("render metadata");
+  });
+
+  it("publishes product listings with a complete ready image pack", async () => {
+    const listing = {
+      id: "lst-ready",
+      type: ListingType.PRODUCT,
+      status: ListingStatus.DRAFT,
+      designerId: "designer-1",
+      price: new Prisma.Decimal(100000),
+      cost: null,
+      publishedAt: null,
+      metadataJson: null,
+      imagesJson: ["mockups/main.png", "mockups/lifestyle.png", "mockups/detail.png"],
+      designProductSelectionId: "sel-1",
+      designProductSelection: { mockupAssets: [readyMockup("main", "MAIN"), readyMockup("lifestyle", "LIFESTYLE"), readyMockup("detail", "DETAIL")] },
+    };
+    const prisma: any = {
+      commerceListing: {
+        findUnique: jest.fn().mockResolvedValue(listing),
+        update: jest.fn().mockResolvedValue({ ...listing, status: ListingStatus.PUBLISHED }),
+      },
+    };
+    const audit: any = { log: jest.fn().mockResolvedValue(undefined) };
+    const service = new ListingsService(prisma, audit);
+
+    const result = await service.publish(user as any, "lst-ready");
+
+    expect(result.status).toBe(ListingStatus.PUBLISHED);
+    expect(prisma.commerceListing.update).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ status: ListingStatus.PUBLISHED }) }));
+    expect(audit.log).toHaveBeenCalledWith(expect.objectContaining({ action: "listing.publish" }));
   });
 
   it("throws not found when listing is missing", async () => {
@@ -168,5 +288,32 @@ describe("ListingsService lifecycle", () => {
         where: expect.objectContaining({ designerId: "designer-7", status: ListingStatus.PUBLISHED }),
       }),
     );
+  });
+
+  it("loads a published product page DTO with listing images", async () => {
+    const publishedAt = new Date();
+    const prisma: any = {
+      commerceListing: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: "listing-public",
+          slug: "listing-public",
+          title: "Public Tee",
+          description: null,
+          price: 100000,
+          currency: "UZS",
+          type: ListingType.PRODUCT,
+          publishedAt,
+          imagesJson: ["mockups/main.png", "mockups/lifestyle.png", "mockups/detail.png"],
+          designerId: "designer-1",
+          designer: { id: "designer-1", displayName: "Alice Art" },
+        }),
+      },
+    };
+    const service = new ListingsService(prisma, { log: jest.fn() } as any);
+
+    const result = await service.shopBySlug("listing-public");
+
+    expect(result?.imageUrl).toBe("mockups/main.png");
+    expect(result?.images).toEqual(["mockups/main.png", "mockups/lifestyle.png", "mockups/detail.png"]);
   });
 });

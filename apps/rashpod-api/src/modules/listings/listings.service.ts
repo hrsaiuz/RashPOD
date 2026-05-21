@@ -128,6 +128,7 @@ export class ListingsService {
       user.role === UserRole.SUPER_ADMIN ||
       user.role === UserRole.OPERATIONS_MANAGER;
     if (!isAdmin && listing.designerId !== user.sub) throw new ForbiddenException("Not allowed");
+    await this.assertListingPublishable(id, user.sub, "listing.publish");
     const updated = await this.prisma.commerceListing.update({
       where: { id },
       data: { status: ListingStatus.PUBLISHED, publishedAt: new Date() },
@@ -162,6 +163,9 @@ export class ListingsService {
     const listing = await this.prisma.commerceListing.findUnique({ where: { id } });
     if (!listing) throw new NotFoundException("Listing not found");
     if (!this.isAdminRole(user.role)) throw new ForbiddenException("Not allowed");
+    if (status === ListingStatus.PUBLISHED) {
+      await this.assertListingPublishable(id, user.sub, "listing.admin-status.update");
+    }
     const royalty = status === ListingStatus.PUBLISHED ? await this.calculateRoyalty(listing.price, listing.cost) : null;
     const updated = await this.prisma.commerceListing.update({
       where: { id },
@@ -351,6 +355,64 @@ export class ListingsService {
     const filmSettings = await this.prisma.filmSaleSettings.findFirst();
     if (filmSettings?.minimumOrderPrice && price < Number(filmSettings.minimumOrderPrice)) {
       throw new ForbiddenException(`Film listing price must be at least ${Number(filmSettings.minimumOrderPrice)}`);
+    }
+  }
+
+  private async assertListingPublishable(listingId: string, actorId: string, sourceAction: string) {
+    const listing = await this.prisma.commerceListing.findUnique({
+      where: { id: listingId },
+      include: { designProductSelection: { include: { mockupAssets: true } } },
+    });
+    if (!listing) throw new NotFoundException("Listing not found");
+
+    const imageUrls = Array.isArray(listing.imagesJson)
+      ? (listing.imagesJson as unknown[]).filter((item): item is string => typeof item === "string" && item.length > 0)
+      : [];
+    const readyMockups = listing.designProductSelection?.mockupAssets.filter(
+      (asset) =>
+        (asset.status === "GENERATED" || asset.status === "READY") &&
+        !asset.archivedAt &&
+        Boolean(asset.imageUrl || asset.objectKey),
+    ) ?? [];
+    const readyTypes = new Set(readyMockups.map((asset) => asset.mockupType));
+
+    const reasons: string[] = [];
+    if (imageUrls.length === 0 && readyMockups.length === 0) {
+      reasons.push("Listing has no ready public images");
+    }
+    if (listing.type === ListingType.PRODUCT && listing.designProductSelectionId) {
+      if (!readyTypes.has("MAIN")) {
+        reasons.push("Product listing requires a ready main image");
+      }
+      if (!(readyTypes.has("LIFESTYLE") || readyTypes.has("SECONDARY"))) {
+        reasons.push("Product listing requires a ready secondary or lifestyle image");
+      }
+      if (!readyTypes.has("DETAIL")) {
+        reasons.push("Product listing requires a ready detail image");
+      }
+      const missingMetadata = readyMockups.filter(
+        (asset) => !asset.placementSnapshotJson || !asset.contentType || !asset.format || !asset.widthPx || !asset.heightPx,
+      );
+      if (missingMetadata.length > 0) {
+        reasons.push("Product listing images require placement snapshot and render metadata");
+      }
+    }
+
+    if (reasons.length > 0) {
+      await this.audit.log({
+        actorId,
+        action: "listing.publication.blocked",
+        entityType: "CommerceListing",
+        entityId: listing.id,
+        metadata: {
+          sourceAction,
+          reasons,
+          imageCount: imageUrls.length,
+          readyMockupCount: readyMockups.length,
+          designProductSelectionId: listing.designProductSelectionId,
+        },
+      });
+      throw new ForbiddenException(reasons.join("; "));
     }
   }
 

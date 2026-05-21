@@ -42,7 +42,7 @@ class GcsArtifactStore implements ArtifactStore {
 }
 
 export function createArtifactStore(baseDir = path.resolve(process.cwd(), "worker-artifacts")): ArtifactStore {
-  const projectId = process.env.GCP_PROJECT_ID || process.env.GOOGLE_CLOUD_PROJECT || process.env.GCLOUD_PROJECT;
+  const projectId = process.env.GCP_PROJECT_ID || process.env.GCS_PROJECT_ID || process.env.GOOGLE_CLOUD_PROJECT || process.env.GCLOUD_PROJECT;
   const bucket = process.env.GCS_BUCKET_ASSETS || process.env.GCS_BUCKET_NAME;
   if (projectId && bucket) return new GcsArtifactStore(projectId, bucket);
   if (process.env.NODE_ENV === "production") {

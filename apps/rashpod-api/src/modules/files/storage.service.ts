@@ -13,7 +13,7 @@ export class StorageService {
   private readonly publicBucketName: string;
 
   constructor() {
-    this.projectId = firstPresent(process.env.GCP_PROJECT_ID, process.env.GOOGLE_CLOUD_PROJECT, process.env.GCLOUD_PROJECT);
+    this.projectId = firstPresent(process.env.GCP_PROJECT_ID, process.env.GCS_PROJECT_ID, process.env.GOOGLE_CLOUD_PROJECT, process.env.GCLOUD_PROJECT);
     const sharedBucket = firstPresent(process.env.GCS_BUCKET_ASSETS, process.env.GCS_BUCKET_NAME);
     this.bucketName = firstPresent(process.env.GCS_BUCKET_PRIVATE, sharedBucket, "rashpod-assets-private")!;
     this.publicBucketName = firstPresent(process.env.GCS_BUCKET_PUBLIC, sharedBucket, "rashpod-assets-public")!;
@@ -38,6 +38,10 @@ export class StorageService {
 
   getPublicBucketName() {
     return this.publicBucketName;
+  }
+
+  isCloudStorageConfigured() {
+    return Boolean(this.projectId);
   }
 
   getPrivateBucketName() {
@@ -94,6 +98,7 @@ export class StorageService {
     return {
       sizeBytes: Number(metadata.size),
       mimeType: metadata.contentType || "",
+      checksumMd5Base64: metadata.md5Hash || undefined,
     };
   }
 
@@ -138,6 +143,11 @@ export class StorageService {
       mimeType: metadata.contentType || "",
       checksumMd5Base64: metadata.md5Hash || undefined,
     };
+  }
+
+  async getAssetObjectMetadata(input: { objectKey: string; bucketKind: "private" | "public" }) {
+    if (input.bucketKind === "public") return this.getPublicObjectMetadata(input.objectKey);
+    return this.getObjectMetadata({ objectKey: input.objectKey });
   }
 
   async createSignedReadUrl(input: { objectKey: string; expiresSeconds: number }) {

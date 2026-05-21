@@ -50,9 +50,47 @@ enum ModerationDecision {
 
 enum GeneratedAssetStatus {
   PENDING
+  UPLOADED
+  VERIFYING
   PROCESSING
   READY
   FAILED
+  EXPIRED
+  REPLACED
+  ARCHIVED
+}
+
+enum AssetPurpose {
+  DESIGN_ORIGINAL
+  DESIGN_NORMALIZED
+  MOCKUP_IMAGE
+  LISTING_IMAGE
+  PRODUCTION_FILE
+  TEMPLATE_IMAGE
+  PRINT_AREA_PREVIEW
+}
+
+enum AssetStorageProvider {
+  GCS
+  LOCAL_DEV
+}
+
+enum AssetAccessPolicy {
+  PRIVATE_SIGNED_URL
+  PUBLIC_READ
+  INTERNAL_ONLY
+}
+
+enum AssetLifecycleStatus {
+  PENDING_UPLOAD
+  UPLOADED
+  VERIFYING
+  READY
+  PROCESSING
+  FAILED
+  EXPIRED
+  REPLACED
+  ARCHIVED
 }
 
 enum WorkerJobStatus {
@@ -195,8 +233,12 @@ enum MockupAssetType {
 
 enum MockupAssetStatus {
   PENDING
+  PROCESSING
   GENERATED
+  READY
   FAILED
+  REPLACED
+  ARCHIVED
 }
 
 enum MarketplaceKind {
@@ -471,17 +513,45 @@ model ModerationAudit {
 }
 
 model FileAsset {
-  id           String   @id @default(uuid())
-  ownerId      String
-  bucket       String
-  objectKey    String   @unique
-  mimeType     String
-  sizeBytes    Int
-  isPublic     Boolean  @default(false)
-  uploadStatus String
-  checksum     String?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id                 String               @id @default(uuid())
+  ownerId            String
+  purpose            AssetPurpose         @default(DESIGN_ORIGINAL)
+  storageProvider    AssetStorageProvider @default(GCS)
+  accessPolicy       AssetAccessPolicy    @default(PRIVATE_SIGNED_URL)
+  bucket             String
+  objectKey          String               @unique
+  publicUrl          String?
+  mimeType           String
+  fileExtension      String?
+  sizeBytes          Int
+  widthPx            Int?
+  heightPx           Int?
+  dpi                Int?
+  isPublic           Boolean              @default(false)
+  uploadStatus       String
+  status             AssetLifecycleStatus @default(PENDING_UPLOAD)
+  checksum           String?
+  hashSha256         String?
+  sourceAssetId      String?
+  designId           String?
+  designVersionId    String?
+  listingId          String?
+  mockupTemplateId   String?
+  baseProductId      String?
+  printAreaId        String?
+  placementSnapshot  Json?
+  failureReason      String?
+  uploadExpiresAt    DateTime?
+  uploadedAt         DateTime?
+  verifiedAt         DateTime?
+  replacedByAssetId  String?
+  archivedAt         DateTime?
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+
+  @@index([ownerId, purpose, status])
+  @@index([designId])
+  @@index([listingId])
 }
 
 model CommercialRights {
@@ -726,9 +796,20 @@ model GeneratedAsset {
   type              String
   status            GeneratedAssetStatus @default(PENDING)
   fileKey           String?
+  objectKey         String?
+  contentType       String?
+  format            String?
   widthPx           Int?
   heightPx          Int?
+  dpi               Int?
+  checksum          String?
+  sourceAssetId     String?
+  placementSnapshot Json?
+  renderJobId       String?
   errorMessage      String?
+  failureReason     String?
+  replacedByAssetId String?
+  archivedAt        DateTime?
   createdAt         DateTime             @default(now())
   updatedAt         DateTime             @updatedAt
 
@@ -780,20 +861,34 @@ model MockupAsset {
   designProductSelectionId String
   pipeline                 PipelineType
   provider                 ProviderType
+  objectKey                String?
+  contentType              String?
+  format                   String?
   imageUrl                 String?
   thumbnailUrl             String?
   mockupType               MockupAssetType
   providerMockupId         String?
   providerTaskId           String?
   status                   MockupAssetStatus @default(PENDING)
+  widthPx                  Int?
+  heightPx                 Int?
+  dpi                      Int?
+  checksum                 String?
+  placementSnapshotJson    Json?
+  renderJobId              String?
+  failureReason            String?
+  replacedById             String?
+  archivedAt               DateTime?
   metadataJson             Json?
   createdAt                DateTime          @default(now())
+  updatedAt                DateTime          @updatedAt
 
   design           DesignAsset            @relation(fields: [designId], references: [id], onDelete: Cascade)
   productSelection DesignProductSelection @relation(fields: [designProductSelectionId], references: [id], onDelete: Cascade)
 
   @@index([designId, pipeline])
   @@index([designProductSelectionId, status])
+  @@index([renderJobId])
 }
 
 model CommerceListing {
@@ -1207,6 +1302,7 @@ model WorkerJob {
   id          String          @id @default(uuid())
   type        String
   status      WorkerJobStatus @default(PENDING)
+  idempotencyKey String?      @unique
   payloadJson Json
   attempts    Int             @default(0)
   maxAttempts Int             @default(3)
@@ -1217,6 +1313,9 @@ model WorkerJob {
   completedAt DateTime?
   createdAt   DateTime        @default(now())
   updatedAt   DateTime        @updatedAt
+
+  @@index([type, status, nextRunAt])
+  @@index([status, nextRunAt])
 }
 
 model AuditLog {

@@ -37,9 +37,9 @@ export class WorkerDispatcher {
       case "GENERATE_PRODUCT_MOCKUPS":
         return this.mockupHandler.handlePreview(job.payload as { placementId: string; generatedAssetId: string });
       case "GENERATE_LOCAL_MOCKUPS":
-        return this.pipelineMockupHandler.handleLocalMockups(job.payload as { designProductSelectionId: string });
+        return this.pipelineMockupHandler.handleLocalMockups({ ...(job.payload as { designProductSelectionId: string }), workerJobId: job.id });
       case "GENERATE_PRINTFUL_MOCKUPS":
-        return this.pipelineMockupHandler.handlePrintfulMockups(job.payload as { designProductSelectionId: string });
+        return this.pipelineMockupHandler.handlePrintfulMockups({ ...(job.payload as { designProductSelectionId: string }), workerJobId: job.id });
       case "PUBLISH_MARKETPLACE_LISTING":
         return this.marketplacePublicationHandler.handlePublish(job.payload as { marketplacePublicationId: string });
       case "SYNC_PRINTFUL_CATALOG":

@@ -13,11 +13,11 @@ export class PipelineMockupJobHandler {
     private readonly renderer: PipelineMockupRendererPort = new SharpRenderer(),
   ) {}
 
-  async handleLocalMockups(input: { designProductSelectionId: string }) {
-    return this.generateMockups(input.designProductSelectionId, "LOCAL_MOCKUP_GENERATION_FAILED");
+  async handleLocalMockups(input: { designProductSelectionId: string; workerJobId?: string }) {
+    return this.generateMockups(input.designProductSelectionId, "LOCAL_MOCKUP_GENERATION_FAILED", undefined, input.workerJobId);
   }
 
-  async handlePrintfulMockups(input: { designProductSelectionId: string }) {
+  async handlePrintfulMockups(input: { designProductSelectionId: string; workerJobId?: string }) {
     const repo = this.pipelineRepo();
     const selection = await repo.getPipelineSelection(input.designProductSelectionId);
     if (!selection) throw new Error("Selection not found");
@@ -35,10 +35,10 @@ export class PipelineMockupJobHandler {
       return { failed: true, errorCode: "PRINTFUL_API_TOKEN_MISSING" };
     }
 
-    return this.generateMockups(input.designProductSelectionId, "PRINTFUL_MOCKUP_FAILED", "printful-dev-task");
+    return this.generateMockups(input.designProductSelectionId, "PRINTFUL_MOCKUP_FAILED", "printful-dev-task", input.workerJobId);
   }
 
-  private async generateMockups(selectionId: string, failureCode: string, providerTaskId?: string) {
+  private async generateMockups(selectionId: string, failureCode: string, providerTaskId?: string, renderJobId?: string) {
     const repo = this.pipelineRepo();
     const selection = await repo.getPipelineSelection(selectionId);
     if (!selection) throw new Error("Selection not found");
@@ -49,21 +49,55 @@ export class PipelineMockupJobHandler {
     let failed = false;
 
     for (const asset of assets) {
+      if ((asset.status === "GENERATED" || asset.status === "READY") && (asset.objectKey || asset.imageUrl)) {
+        results.push(asset);
+        continue;
+      }
       try {
+        await repo.updateMockupAsset(asset.id, { status: "PROCESSING", renderJobId, failureReason: null });
         const rendered = await this.renderAsset(selection, asset);
+        const placementSnapshot = {
+          designProductSelectionId: selection.id,
+          pipeline: selection.pipeline,
+          placement: selection.placement,
+          width: selection.width,
+          height: selection.height,
+          x: selection.x,
+          y: selection.y,
+          top: selection.top,
+          left: selection.left,
+          scale: selection.scale,
+          rotation: selection.rotation,
+          units: selection.units,
+          placementConfigJson: selection.placementConfigJson ?? null,
+          sourceDesignVersionId: selection.latestDesignVersion?.id ?? null,
+          sourceFileKey: selection.latestDesignVersion?.fileKey ?? null,
+        };
         const updated = await repo.updateMockupAsset(asset.id, {
           status: "GENERATED",
           imageUrl: rendered.fileKey,
           thumbnailUrl: rendered.fileKey,
+          objectKey: rendered.objectKey,
+          contentType: rendered.contentType,
+          format: rendered.format,
+          widthPx: rendered.widthPx,
+          heightPx: rendered.heightPx,
+          dpi: selection.latestDesignVersion?.dpi ?? null,
+          placementSnapshotJson: placementSnapshot,
+          renderJobId,
+          failureReason: null,
           providerTaskId,
-          metadataJson: { widthPx: rendered.widthPx, heightPx: rendered.heightPx },
+          metadataJson: { widthPx: rendered.widthPx, heightPx: rendered.heightPx, contentType: rendered.contentType, format: rendered.format, objectKey: rendered.objectKey, placementSnapshot },
         });
         results.push(updated);
       } catch (error) {
         failed = true;
+        const failureReason = error instanceof Error ? error.message : failureCode;
         const updated = await repo.updateMockupAsset(asset.id, {
           status: "FAILED",
-          metadataJson: { errorMessage: error instanceof Error ? error.message : failureCode },
+          renderJobId,
+          failureReason,
+          metadataJson: { errorMessage: failureReason },
         });
         results.push(updated);
       }

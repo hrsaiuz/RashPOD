@@ -21,6 +21,9 @@ export class MockupJobHandler {
       return await this.repo.updateGeneratedAsset(input.generatedAssetId, {
         status: "READY",
         fileKey: rendered.fileKey,
+        objectKey: rendered.objectKey,
+        contentType: rendered.contentType,
+        format: rendered.format,
         widthPx: rendered.widthPx,
         heightPx: rendered.heightPx,
       });
@@ -42,6 +45,9 @@ export class MockupJobHandler {
         const updated = await this.repo.updateGeneratedAsset(id, {
           status: "READY",
           fileKey: rendered.fileKey,
+          objectKey: rendered.objectKey,
+          contentType: rendered.contentType,
+          format: rendered.format,
           widthPx: rendered.widthPx,
           heightPx: rendered.heightPx,
         });
@@ -64,6 +70,9 @@ export class MockupJobHandler {
       return await this.repo.updateGeneratedAsset(input.generatedAssetId, {
         status: "READY",
         fileKey: rendered.fileKey,
+        objectKey: rendered.objectKey,
+        contentType: rendered.contentType,
+        format: rendered.format,
         widthPx: rendered.widthPx,
         heightPx: rendered.heightPx,
       });
@@ -82,6 +91,9 @@ export class MockupJobHandler {
       return await this.repo.updateGeneratedAsset(input.generatedAssetId, {
         status: "READY",
         fileKey: rendered.fileKey,
+        objectKey: rendered.objectKey,
+        contentType: rendered.contentType,
+        format: rendered.format,
         widthPx: rendered.widthPx,
         heightPx: rendered.heightPx,
       });

@@ -4,16 +4,20 @@ import { MockupJobHandler } from "./mockup-handler";
 describe("MockupJobHandler", () => {
   const fakeRenderer = {
     async renderPreview(placementId: string) {
-      return { fileKey: `generated-mockups/${placementId}/preview-test.png`, widthPx: 2000, heightPx: 2000 };
+      const fileKey = `generated-mockups/${placementId}/preview-test.png`;
+      return { fileKey, objectKey: fileKey, contentType: "image/png", format: "png", widthPx: 2000, heightPx: 2000 };
     },
     async renderListingVariant(placementId: string, variant: "main" | "lifestyle" | "closeup") {
-      return { fileKey: `listing-images/${placementId}/${variant}-test.png`, widthPx: 2000, heightPx: 2000 };
+      const fileKey = `listing-images/${placementId}/${variant}-test.png`;
+      return { fileKey, objectKey: fileKey, contentType: "image/png", format: "png", widthPx: 2000, heightPx: 2000 };
     },
     async renderFilmPreview(placementId: string) {
-      return { fileKey: `film-previews/${placementId}/film-preview-test.png`, widthPx: 2000, heightPx: 2000 };
+      const fileKey = `film-previews/${placementId}/film-preview-test.png`;
+      return { fileKey, objectKey: fileKey, contentType: "image/png", format: "png", widthPx: 2000, heightPx: 2000 };
     },
     async renderProductionFile(placementId: string) {
-      return { fileKey: `production-files/${placementId}/print-ready-test.png`, widthPx: 3000, heightPx: 3000 };
+      const fileKey = `production-files/${placementId}/print-ready-test.png`;
+      return { fileKey, objectKey: fileKey, contentType: "image/png", format: "png", widthPx: 3000, heightPx: 3000 };
     },
   };
 

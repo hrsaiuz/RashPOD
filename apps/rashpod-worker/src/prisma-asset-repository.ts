@@ -12,6 +12,9 @@ export class PrismaAssetRepository implements WorkerRepository {
       id: row.id,
       status: row.status,
       fileKey: row.fileKey ?? undefined,
+      objectKey: row.objectKey ?? undefined,
+      contentType: row.contentType ?? undefined,
+      format: row.format ?? undefined,
       errorMessage: row.errorMessage ?? undefined,
       widthPx: row.widthPx ?? undefined,
       heightPx: row.heightPx ?? undefined,
@@ -20,13 +23,16 @@ export class PrismaAssetRepository implements WorkerRepository {
 
   async updateGeneratedAsset(
     id: string,
-    data: Partial<Pick<GeneratedAssetRecord, "status" | "fileKey" | "errorMessage" | "widthPx" | "heightPx">>,
+    data: Partial<Pick<GeneratedAssetRecord, "status" | "fileKey" | "objectKey" | "contentType" | "format" | "errorMessage" | "widthPx" | "heightPx">>,
   ): Promise<GeneratedAssetRecord> {
     const row = await this.prisma.generatedAsset.update({
       where: { id },
       data: {
         status: data.status as GeneratedAssetStatus | undefined,
         fileKey: data.fileKey,
+        objectKey: data.objectKey,
+        contentType: data.contentType,
+        format: data.format,
         errorMessage: data.errorMessage,
         widthPx: data.widthPx,
         heightPx: data.heightPx,
@@ -36,6 +42,9 @@ export class PrismaAssetRepository implements WorkerRepository {
       id: row.id,
       status: row.status,
       fileKey: row.fileKey ?? undefined,
+      objectKey: row.objectKey ?? undefined,
+      contentType: row.contentType ?? undefined,
+      format: row.format ?? undefined,
       errorMessage: row.errorMessage ?? undefined,
       widthPx: row.widthPx ?? undefined,
       heightPx: row.heightPx ?? undefined,
@@ -118,12 +127,27 @@ export class PrismaAssetRepository implements WorkerRepository {
       where: { designProductSelectionId: selectionId },
       orderBy: { createdAt: "asc" },
     });
-    return rows.map((row) => ({ id: row.id, mockupType: row.mockupType, status: row.status }));
+    return rows.map((row) => ({ id: row.id, mockupType: row.mockupType, status: row.status, imageUrl: row.imageUrl, objectKey: row.objectKey }));
   }
 
   async updateMockupAsset(
     id: string,
-    data: { status?: "PENDING" | "GENERATED" | "FAILED"; imageUrl?: string | null; thumbnailUrl?: string | null; providerTaskId?: string | null; metadataJson?: unknown },
+    data: {
+      status?: "PENDING" | "PROCESSING" | "GENERATED" | "READY" | "FAILED" | "REPLACED" | "ARCHIVED";
+      imageUrl?: string | null;
+      thumbnailUrl?: string | null;
+      objectKey?: string | null;
+      contentType?: string | null;
+      format?: string | null;
+      widthPx?: number | null;
+      heightPx?: number | null;
+      dpi?: number | null;
+      placementSnapshotJson?: unknown;
+      renderJobId?: string | null;
+      failureReason?: string | null;
+      providerTaskId?: string | null;
+      metadataJson?: unknown;
+    },
   ): Promise<MockupAssetRecord> {
     const row = await this.prisma.mockupAsset.update({
       where: { id },
@@ -131,11 +155,20 @@ export class PrismaAssetRepository implements WorkerRepository {
         status: data.status,
         imageUrl: data.imageUrl,
         thumbnailUrl: data.thumbnailUrl,
+        objectKey: data.objectKey,
+        contentType: data.contentType,
+        format: data.format,
+        widthPx: data.widthPx,
+        heightPx: data.heightPx,
+        dpi: data.dpi,
+        placementSnapshotJson: data.placementSnapshotJson as Prisma.InputJsonValue | undefined,
+        renderJobId: data.renderJobId,
+        failureReason: data.failureReason,
         providerTaskId: data.providerTaskId,
         metadataJson: data.metadataJson as Prisma.InputJsonValue | undefined,
       },
     });
-    return { id: row.id, mockupType: row.mockupType, status: row.status };
+    return { id: row.id, mockupType: row.mockupType, status: row.status, imageUrl: row.imageUrl, objectKey: row.objectKey };
   }
 
   async createListingDraftForSelection(selectionId: string) {
@@ -175,9 +208,17 @@ export class PrismaAssetRepository implements WorkerRepository {
         localBaseProductId: selection.localBaseProductId,
         printfulProductTemplateId: selection.printfulProductTemplateId,
         designProductSelectionId: selection.id,
-        mockupAssetIds: selection.mockupAssets.filter((asset) => asset.status === "GENERATED").map((asset) => asset.id),
-        imagesJson: selection.mockupAssets.filter((asset) => asset.status === "GENERATED").map((asset) => asset.imageUrl).filter(Boolean),
-        metadataJson: royalty.rule ? { royaltyRuleId: royalty.rule.id, royaltyBasis: royalty.rule.basis, royaltyValue: royalty.rule.value.toString() } : undefined,
+        mockupAssetIds: selection.mockupAssets.filter((asset) => asset.status === "GENERATED" || asset.status === "READY").map((asset) => asset.id),
+        imagesJson: selection.mockupAssets
+          .filter((asset) => asset.status === "GENERATED" || asset.status === "READY")
+          .map((asset) => asset.imageUrl)
+          .filter(Boolean),
+        metadataJson: {
+          ...(royalty.rule ? { royaltyRuleId: royalty.rule.id, royaltyBasis: royalty.rule.basis, royaltyValue: royalty.rule.value.toString() } : {}),
+          renderAssets: selection.mockupAssets
+            .filter((asset) => asset.status === "GENERATED" || asset.status === "READY")
+            .map((asset) => ({ id: asset.id, objectKey: asset.objectKey, contentType: asset.contentType, widthPx: asset.widthPx, heightPx: asset.heightPx, mockupType: asset.mockupType })),
+        },
       },
     });
 

@@ -187,7 +187,7 @@ steps:
       - --set-secrets=DATABASE_URL=DATABASE_URL:latest
       - --set-env-vars=NODE_ENV=production,GCP_PROJECT_ID=${_PROJECT},GCS_BUCKET_ASSETS=${_GCS_BUCKET_ASSETS},GCS_BUCKET_PUBLIC=${_GCS_BUCKET_ASSETS},GCS_BUCKET_PRIVATE=${_GCS_BUCKET_PRIVATE}
       - --add-cloudsql-instances=rashpod-production:us-central1:rashpod-db
-    waitFor: [push-worker]
+    waitFor: [push-worker, migrate-db]
 
   - id: deploy-web
     name: gcr.io/google.com/cloudsdktool/cloud-sdk

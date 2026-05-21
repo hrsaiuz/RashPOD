@@ -4,6 +4,9 @@ import { ArtifactStore, createArtifactStore } from "./artifact-store";
 
 export interface RenderedFile {
   fileKey: string;
+  objectKey: string;
+  contentType: string;
+  format: string;
   widthPx: number;
   heightPx: number;
 }
@@ -89,11 +92,10 @@ export class SharpRenderer {
         <text x="140" y="${heightPx - 100}" font-family="Arial, sans-serif" font-size="24" fill="#667085">${templateInfo}</text>
         <text x="140" y="${heightPx - 62}" font-family="Arial, sans-serif" font-size="22" fill="#98A2B3">${designInfo}</text>
       </svg>`;
-    const ts = new Date().toISOString().replace(/[:.]/g, "-");
-    const relKey = `pipeline-mockups/${context.id}/${variant}-${ts}.png`;
+    const relKey = `pipeline-mockups/${context.id}/${variant}.png`;
     const buffer = await sharp(Buffer.from(svg)).png().toBuffer();
     const fileKey = await this.store.putBuffer(relKey, buffer, "image/png");
-    return { fileKey, widthPx, heightPx };
+    return { fileKey, objectKey: fileKey, contentType: "image/png", format: "png", widthPx, heightPx };
   }
 
   async renderFilmPreview(placementId: string): Promise<RenderedFile> {
@@ -121,8 +123,7 @@ export class SharpRenderer {
     heightPx: number,
     background: { r: number; g: number; b: number; alpha: number },
   ) {
-    const ts = new Date().toISOString().replace(/[:.]/g, "-");
-    const relKey = `${folder}/${prefix}-${ts}.png`;
+    const relKey = `${folder}/${prefix}.png`;
     const buffer = await sharp({
       create: {
         width: widthPx,
@@ -134,7 +135,7 @@ export class SharpRenderer {
       .png()
       .toBuffer();
     const fileKey = await this.store.putBuffer(relKey, buffer, "image/png");
-    return { fileKey, widthPx, heightPx };
+    return { fileKey, objectKey: fileKey, contentType: "image/png", format: "png", widthPx, heightPx };
   }
 }
 
