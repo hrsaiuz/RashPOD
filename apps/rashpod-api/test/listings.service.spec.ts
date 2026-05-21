@@ -1,5 +1,5 @@
 import { ForbiddenException, NotFoundException } from "@nestjs/common";
-import { ListingStatus, ListingType, UserRole } from "@prisma/client";
+import { ListingStatus, ListingType, Prisma, UserRole } from "@prisma/client";
 import { ListingsService } from "../src/modules/listings/listings.service";
 
 describe("ListingsService lifecycle", () => {
@@ -90,6 +90,38 @@ describe("ListingsService lifecycle", () => {
 
     expect(prisma.commerceListing.update).toHaveBeenCalled();
     expect(audit.log).toHaveBeenCalledWith(expect.objectContaining({ action: "listing.update" }));
+  });
+
+  it("applies active royalty rules when a moderator publishes a listing", async () => {
+    const listing = {
+      id: "lst-royalty",
+      type: ListingType.PRODUCT,
+      status: ListingStatus.DRAFT,
+      designerId: "designer-2",
+      price: new Prisma.Decimal(100000),
+      cost: new Prisma.Decimal(60000),
+      publishedAt: null,
+      metadataJson: null,
+    };
+    const prisma: any = {
+      commerceListing: {
+        findUnique: jest.fn().mockResolvedValue(listing),
+        update: jest.fn().mockResolvedValue({ ...listing, status: ListingStatus.PUBLISHED }),
+      },
+      royaltyRule: {
+        findFirst: jest.fn().mockResolvedValue({ id: "rule-1", basis: "NET_PROFIT_PERCENT", value: new Prisma.Decimal(25), scope: "DEFAULT" }),
+      },
+    };
+    const audit: any = { log: jest.fn().mockResolvedValue(undefined) };
+    const service = new ListingsService(prisma, audit);
+
+    await service.adminSetStatus({ sub: "mod-1", email: "m@rashpod.uz", role: UserRole.MODERATOR } as any, "lst-royalty", ListingStatus.PUBLISHED);
+
+    expect(prisma.commerceListing.update).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: "lst-royalty" },
+      data: expect.objectContaining({ designerRoyalty: new Prisma.Decimal(10000) }),
+    }));
+    expect(audit.log).toHaveBeenCalledWith(expect.objectContaining({ action: "listing.admin-status.update" }));
   });
 
   it("throws not found when listing is missing", async () => {

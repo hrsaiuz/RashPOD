@@ -13,8 +13,9 @@ function createRepo(): WorkerRepository & { selection: any; assets: any[]; listi
     },
     assets: [
       { id: "asset_1", mockupType: "MAIN", status: "PENDING" },
-      { id: "asset_2", mockupType: "SECONDARY", status: "PENDING" },
-      { id: "asset_3", mockupType: "PRINT_AREA_PREVIEW", status: "PENDING" },
+      { id: "asset_2", mockupType: "LIFESTYLE", status: "PENDING" },
+      { id: "asset_3", mockupType: "DETAIL", status: "PENDING" },
+      { id: "asset_4", mockupType: "PRINT_AREA_PREVIEW", status: "PENDING" },
     ],
     listingCalls: 0,
     async getGeneratedAsset() {
@@ -49,6 +50,7 @@ function createRepo(): WorkerRepository & { selection: any; assets: any[]; listi
 const renderer = {
   renderListingVariant: jest.fn(async (_selectionId: string, variant: string) => ({ fileKey: `mockups/${variant}.png`, widthPx: 2000, heightPx: 2000 })),
   renderPreview: jest.fn(async () => ({ fileKey: "mockups/preview.png", widthPx: 2000, heightPx: 2000 })),
+  renderPipelineMockup: jest.fn(async (_context: any, variant: string) => ({ fileKey: `mockups/${variant}.png`, widthPx: 2000, heightPx: 2000 })),
 };
 
 describe("PipelineMockupJobHandler", () => {
@@ -68,6 +70,10 @@ describe("PipelineMockupJobHandler", () => {
     expect(repo.selection.status).toBe("MOCKUP_READY");
     expect(repo.assets.every((asset) => asset.status === "GENERATED")).toBe(true);
     expect(repo.listingCalls).toBe(1);
+    expect(renderer.renderPipelineMockup).toHaveBeenCalledWith(expect.objectContaining({ id: "sel_1" }), "main");
+    expect(renderer.renderPipelineMockup).toHaveBeenCalledWith(expect.objectContaining({ id: "sel_1" }), "lifestyle");
+    expect(renderer.renderPipelineMockup).toHaveBeenCalledWith(expect.objectContaining({ id: "sel_1" }), "closeup");
+    expect(renderer.renderPipelineMockup).toHaveBeenCalledWith(expect.objectContaining({ id: "sel_1" }), "preview");
   });
 
   it("marks Printful mockups failed when Printful is disabled", async () => {

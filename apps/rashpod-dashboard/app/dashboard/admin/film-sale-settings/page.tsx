@@ -1,5 +1,5 @@
-import AdminPlaceholder from "../admin-placeholder";
+import { FilmSaleSettingsScreen } from "../admin-operating-screens";
 
-export default function Page() {
-  return <AdminPlaceholder title="Film Sale Settings" description="Configure film sale policies." />;
+export default function AdminFilmSaleSettingsPage() {
+  return <FilmSaleSettingsScreen />;
 }

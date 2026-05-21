@@ -26,6 +26,15 @@ export interface PrintableAreaBounds {
   heightCm?: number | null;
   widthIn?: number | null;
   heightIn?: number | null;
+  safeX?: number | null;
+  safeY?: number | null;
+  safeWidth?: number | null;
+  safeHeight?: number | null;
+  allowMove?: boolean | null;
+  allowResize?: boolean | null;
+  allowRotate?: boolean | null;
+  minScale?: number | null;
+  maxScale?: number | null;
 }
 
 export interface NormalizedPosition {
@@ -91,6 +100,36 @@ export class PlacementCalculationService {
     if (x < 0 || y < 0) throw new BadRequestException("POSITION_OUTSIDE_PRINT_AREA");
     if (areaWidth != null && x + width > areaWidth) throw new BadRequestException("POSITION_OUTSIDE_PRINT_AREA");
     if (areaHeight != null && y + height > areaHeight) throw new BadRequestException("POSITION_OUTSIDE_PRINT_AREA");
+    return true;
+  }
+
+  validatePrintAreaConstraints(position: NormalizedPosition, bounds: PrintableAreaBounds, units: "CM" | "INCH" | "PX") {
+    this.validatePositionWithinArea(position, bounds, units);
+    const scale = position.scale ?? 1;
+    const rotation = position.rotation ?? 0;
+
+    if (bounds.minScale != null && scale < bounds.minScale) throw new BadRequestException("INVALID_PLACEMENT: scale is below print area minimum");
+    if (bounds.maxScale != null && scale > bounds.maxScale) throw new BadRequestException("INVALID_PLACEMENT: scale is above print area maximum");
+    if (bounds.allowRotate === false && rotation !== 0) throw new BadRequestException("INVALID_PLACEMENT: rotation is not allowed for this print area");
+
+    const width = position.width ?? 0;
+    const height = position.height ?? 0;
+    const x = position.x ?? position.left ?? 0;
+    const y = position.y ?? position.top ?? 0;
+    const areaWidth = units === "CM" ? bounds.widthCm : units === "INCH" ? bounds.widthIn : bounds.widthPx;
+    const areaHeight = units === "CM" ? bounds.heightCm : units === "INCH" ? bounds.heightIn : bounds.heightPx;
+
+    if (bounds.allowMove === false && (x !== 0 || y !== 0)) throw new BadRequestException("INVALID_PLACEMENT: moving is not allowed for this print area");
+    if (bounds.allowResize === false && areaWidth != null && areaHeight != null && (width !== areaWidth || height !== areaHeight)) {
+      throw new BadRequestException("INVALID_PLACEMENT: resizing is not allowed for this print area");
+    }
+
+    if (units === "PX" && bounds.safeX != null && bounds.safeY != null && bounds.safeWidth != null && bounds.safeHeight != null) {
+      if (x < bounds.safeX || y < bounds.safeY || x + width > bounds.safeX + bounds.safeWidth || y + height > bounds.safeY + bounds.safeHeight) {
+        throw new BadRequestException("POSITION_OUTSIDE_SAFE_ZONE");
+      }
+    }
+
     return true;
   }
 

@@ -1,5 +1,5 @@
-import AdminPlaceholder from "../admin-placeholder";
+import { ProductTypesScreen } from "../admin-operating-screens";
 
-export default function Page() {
-  return <AdminPlaceholder title="Product Types" description="Configure supported product types." />;
+export default function AdminProductTypesPage() {
+  return <ProductTypesScreen />;
 }

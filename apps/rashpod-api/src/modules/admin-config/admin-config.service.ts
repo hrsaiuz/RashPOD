@@ -4,6 +4,7 @@ import { AuditService } from "../audit/audit.service";
 import { PrismaService } from "../../prisma/prisma.service";
 import { CreateProductTypeDto } from "./dto/create-product-type.dto";
 import { CreateRoyaltyRuleDto } from "./dto/create-royalty-rule.dto";
+import { UpdateRoyaltyRuleDto } from "./dto/update-royalty-rule.dto";
 import { CreateBaseProductDto } from "./dto/create-base-product.dto";
 import { CreateMockupTemplateDto } from "./dto/create-mockup-template.dto";
 import { CreatePrintAreaDto } from "./dto/create-print-area.dto";
@@ -59,6 +60,14 @@ export class AdminConfigService {
         category: dto.category,
         productionMethod: dto.productionMethod,
         supportsFilmSale: dto.supportsFilmSale ?? false,
+        isActive: dto.isActive ?? true,
+        availableForDesigners: dto.availableForDesigners ?? true,
+        availableInShop: dto.availableInShop ?? true,
+        availableForCorporate: dto.availableForCorporate ?? true,
+        availableForMarketplace: dto.availableForMarketplace ?? false,
+        requiresMockup: dto.requiresMockup ?? true,
+        baseCost: dto.baseCost == null ? null : new Prisma.Decimal(dto.baseCost),
+        defaultMargin: dto.defaultMargin == null ? null : new Prisma.Decimal(dto.defaultMargin),
       },
     });
     await this.audit.log({
@@ -86,6 +95,14 @@ export class AdminConfigService {
         category: dto.category,
         productionMethod: dto.productionMethod,
         supportsFilmSale: dto.supportsFilmSale,
+        isActive: dto.isActive,
+        availableForDesigners: dto.availableForDesigners,
+        availableInShop: dto.availableInShop,
+        availableForCorporate: dto.availableForCorporate,
+        availableForMarketplace: dto.availableForMarketplace,
+        requiresMockup: dto.requiresMockup,
+        baseCost: dto.baseCost == null ? undefined : new Prisma.Decimal(dto.baseCost),
+        defaultMargin: dto.defaultMargin == null ? undefined : new Prisma.Decimal(dto.defaultMargin),
       },
     });
     await this.audit.log({ actorId, action: "product-type.update", entityType: "ProductType", entityId: item.id });
@@ -121,6 +138,27 @@ export class AdminConfigService {
       entityType: "RoyaltyRule",
       entityId: rule.id,
     });
+    return rule;
+  }
+
+  async updateRoyaltyRule(actorId: string, id: string, dto: UpdateRoyaltyRuleDto) {
+    const rule = await this.prisma.royaltyRule.update({
+      where: { id },
+      data: {
+        scope: dto.scope,
+        basis: dto.basis,
+        value: dto.value == null ? undefined : new Prisma.Decimal(dto.value),
+        isActive: dto.isActive,
+        effectiveAt: dto.effectiveAt ? new Date(dto.effectiveAt) : undefined,
+      },
+    });
+    await this.audit.log({ actorId, action: "royalty-rule.update", entityType: "RoyaltyRule", entityId: rule.id });
+    return rule;
+  }
+
+  async deleteRoyaltyRule(actorId: string, id: string) {
+    const rule = await this.prisma.royaltyRule.delete({ where: { id } });
+    await this.audit.log({ actorId, action: "royalty-rule.delete", entityType: "RoyaltyRule", entityId: rule.id });
     return rule;
   }
 

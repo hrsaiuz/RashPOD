@@ -1,5 +1,5 @@
-import AdminPlaceholder from "../admin-placeholder";
+import { AdminListingsReviewScreen } from "../admin-operating-screens";
 
-export default function Page() {
-  return <AdminPlaceholder title="Listings" description="Review and manage listings." />;
+export default function AdminListingsPage() {
+  return <AdminListingsReviewScreen />;
 }

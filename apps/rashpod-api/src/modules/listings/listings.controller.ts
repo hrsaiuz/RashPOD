@@ -1,5 +1,5 @@
 import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from "@nestjs/common";
-import { ListingType } from "@prisma/client";
+import { ListingStatus, ListingType } from "@prisma/client";
 import { CurrentUser, RequestUser } from "../../common/auth/current-user.decorator";
 import { JwtAuthGuard } from "../../common/auth/jwt-auth.guard";
 import { PermissionGuard } from "../../common/auth/permission.guard";
@@ -67,6 +67,33 @@ export class ListingsController {
   @RequirePermission("listing:manage-own")
   patchFilm(@CurrentUser() user: RequestUser, @Param("id") id: string, @Body() dto: UpdateListingDto) {
     return this.listings.patch(user, id, dto, ListingType.FILM);
+  }
+
+  @Get("admin/listings")
+  @UseGuards(JwtAuthGuard, PermissionGuard)
+  @RequirePermission("listing:publish")
+  adminList(
+    @Query("status") status?: ListingStatus,
+    @Query("type") type?: ListingType,
+    @Query("q") q?: string,
+    @Query("limit") limit?: string,
+  ) {
+    const parsed = limit ? Number(limit) : undefined;
+    return this.listings.adminList({ status, type, q, limit: Number.isFinite(parsed) ? parsed : undefined });
+  }
+
+  @Patch("admin/listings/:id")
+  @UseGuards(JwtAuthGuard, PermissionGuard)
+  @RequirePermission("listing:publish")
+  adminPatch(@CurrentUser() user: RequestUser, @Param("id") id: string, @Body() dto: UpdateListingDto) {
+    return this.listings.patch(user, id, dto);
+  }
+
+  @Post("admin/listings/:id/status")
+  @UseGuards(JwtAuthGuard, PermissionGuard)
+  @RequirePermission("listing:publish")
+  adminSetStatus(@CurrentUser() user: RequestUser, @Param("id") id: string, @Body("status") status: ListingStatus) {
+    return this.listings.adminSetStatus(user, id, status);
   }
 
   @Get("shop/listings")

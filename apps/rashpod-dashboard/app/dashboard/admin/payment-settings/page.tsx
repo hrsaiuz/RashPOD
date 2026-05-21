@@ -1,5 +1,5 @@
-import AdminPlaceholder from "../admin-placeholder";
+import { PaymentSettingsScreen } from "../admin-operating-screens";
 
-export default function Page() {
-  return <AdminPlaceholder title="Payment Settings" description="Click payment integration settings." />;
+export default function AdminPaymentSettingsPage() {
+  return <PaymentSettingsScreen />;
 }

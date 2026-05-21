@@ -80,7 +80,7 @@ export class PipelineMockupJobHandler {
   }
 
   private async renderAsset(selection: PipelineSelectionRecord, asset: MockupAssetRecord) {
-    const variant = asset.mockupType === "MAIN" ? "main" : asset.mockupType === "SECONDARY" || asset.mockupType === "LIFESTYLE" ? "lifestyle" : "preview";
+    const variant = asset.mockupType === "MAIN" ? "main" : asset.mockupType === "DETAIL" ? "closeup" : asset.mockupType === "SECONDARY" || asset.mockupType === "LIFESTYLE" ? "lifestyle" : "preview";
     if (this.renderer.renderPipelineMockup) return this.renderer.renderPipelineMockup(selection, variant);
     if (variant === "main") return this.renderer.renderListingVariant(selection.id, "main");
     if (variant === "lifestyle") return this.renderer.renderListingVariant(selection.id, "lifestyle");

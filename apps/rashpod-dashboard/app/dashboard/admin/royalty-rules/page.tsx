@@ -1,5 +1,5 @@
-import AdminPlaceholder from "../admin-placeholder";
+import { RoyaltyRulesScreen } from "../admin-operating-screens";
 
-export default function Page() {
-  return <AdminPlaceholder title="Royalty Rules" description="Configure royalty policies." />;
+export default function AdminRoyaltyRulesPage() {
+  return <RoyaltyRulesScreen />;
 }

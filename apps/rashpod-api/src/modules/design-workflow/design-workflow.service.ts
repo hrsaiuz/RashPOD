@@ -150,7 +150,7 @@ export class DesignWorkflowService {
     });
 
     const pendingSelections = await this.prisma.designProductSelection.findMany({
-      where: { designId: design.id, status: DesignProductSelectionStatus.MOCKUP_PENDING },
+      where: { designId: design.id, pipeline: PipelineType.LOCAL, status: DesignProductSelectionStatus.MOCKUP_PENDING },
     });
     for (const selection of pendingSelections) {
       await this.jobs.enqueue(selection.pipeline === PipelineType.LOCAL ? "GENERATE_LOCAL_MOCKUPS" : "GENERATE_PRINTFUL_MOCKUPS", {
@@ -266,21 +266,61 @@ export class DesignWorkflowService {
     const [baseProduct, preset] = await Promise.all([
       tx.baseProduct.findUnique({
         where: { id: selection.localBaseProductId },
-        include: { mockupTemplates: { include: { printAreas: true } } },
+        include: { productType: true, mockupTemplates: { include: { printAreas: true } } },
       }),
       tx.placementPreset.findUnique({ where: { id: selection.placementPresetId } }),
     ]);
     if (!baseProduct || !baseProduct.isActive) throw new BadRequestException("PRODUCT_SELECTION_REQUIRED: local base product is not active");
+    if (!baseProduct.productType.isActive) throw new BadRequestException("PRODUCT_SELECTION_REQUIRED: product type is not active");
     if (!preset || !preset.active || preset.pipeline !== PipelineType.LOCAL) throw new BadRequestException("INVALID_PLACEMENT: placement preset is not active for local pipeline");
     if (preset.localBaseProductId && preset.localBaseProductId !== baseProduct.id) throw new BadRequestException("INVALID_PLACEMENT: preset does not belong to local product");
 
     const placement = this.normalizePlacement(selection.placement);
-    const area = baseProduct.mockupTemplates.flatMap((template) => template.printAreas).find((item) => item.isActive && item.placement === placement);
-    if (!area) throw new BadRequestException("INVALID_PLACEMENT: printable area not found for local product");
+    const selectedTemplate = selection.mockupTemplateId
+      ? baseProduct.mockupTemplates.find((template) => template.id === selection.mockupTemplateId)
+      : baseProduct.mockupTemplates.find((template) => template.isActive && template.printAreas.some((item) => item.isActive && item.placement === placement));
+    if (!selectedTemplate || !selectedTemplate.isActive) throw new BadRequestException("INVALID_PLACEMENT: mockup template is not active for local product");
 
-    const position = this.placementCalculation.calculateLocalPosition(selection.position);
-    this.placementCalculation.validatePositionWithinArea(position, { widthCm: area.widthCm, heightCm: area.heightCm, widthPx: area.width, heightPx: area.height }, "CM");
-    const positionHash = this.selectionHash({ pipeline: PipelineType.LOCAL, localBaseProductId: baseProduct.id, presetId: preset.id, placement, position });
+    const area = selection.printAreaId
+      ? selectedTemplate.printAreas.find((item) => item.id === selection.printAreaId)
+      : selectedTemplate.printAreas.find((item) => item.isActive && item.placement === placement);
+    if (!area) throw new BadRequestException("INVALID_PLACEMENT: printable area not found for local product");
+    if (!area.isActive) throw new BadRequestException("INVALID_PLACEMENT: printable area is not active");
+    if (area.placement !== placement) throw new BadRequestException("INVALID_PLACEMENT: printable area placement does not match selection");
+
+    const unit = selection.unit === "PX" ? PlacementUnits.PX : PlacementUnits.CM;
+    const anchor = selection.anchor ?? "TOP_LEFT";
+    const position = unit === PlacementUnits.PX
+      ? {
+          width: selection.position.widthPx,
+          height: selection.position.heightPx,
+          x: selection.position.xPx,
+          y: selection.position.yPx,
+          scale: selection.position.scale ?? 1,
+          rotation: selection.position.rotation ?? 0,
+        }
+      : this.placementCalculation.calculateLocalPosition(selection.position);
+    this.placementCalculation.validatePrintAreaConstraints(
+      position,
+      {
+        widthCm: area.widthCm,
+        heightCm: area.heightCm,
+        widthPx: area.width,
+        heightPx: area.height,
+        safeX: area.safeX,
+        safeY: area.safeY,
+        safeWidth: area.safeWidth,
+        safeHeight: area.safeHeight,
+        allowMove: area.allowMove,
+        allowResize: area.allowResize,
+        allowRotate: area.allowRotate,
+        minScale: area.minScale,
+        maxScale: area.maxScale,
+      },
+      unit === PlacementUnits.PX ? "PX" : "CM",
+    );
+    const placementConfig = this.localPlacementConfig({ template: selectedTemplate, area, preset, unit, anchor, position });
+    const positionHash = this.selectionHash({ pipeline: PipelineType.LOCAL, localBaseProductId: baseProduct.id, presetId: preset.id, placement, placementConfig });
 
     const row = await tx.designProductSelection.upsert({
       where: { designId_pipeline_positionHash: { designId, pipeline: PipelineType.LOCAL, positionHash } },
@@ -296,8 +336,9 @@ export class DesignWorkflowService {
         y: position.y,
         scale: position.scale,
         rotation: position.rotation,
-        units: PlacementUnits.CM,
+        units: unit,
         positionHash,
+        placementConfigJson: placementConfig as Prisma.InputJsonValue,
         selectedByModeratorId: moderatorId,
         status: DesignProductSelectionStatus.MOCKUP_PENDING,
       },
@@ -309,6 +350,8 @@ export class DesignWorkflowService {
         y: position.y,
         scale: position.scale,
         rotation: position.rotation,
+        units: unit,
+        placementConfigJson: placementConfig as Prisma.InputJsonValue,
         selectedByModeratorId: moderatorId,
         status: DesignProductSelectionStatus.MOCKUP_PENDING,
         errorMessage: null,
@@ -358,7 +401,7 @@ export class DesignWorkflowService {
         positionHash,
         targetMarketplaces: marketplaces as Prisma.InputJsonValue,
         selectedByModeratorId: moderatorId,
-        status: DesignProductSelectionStatus.MOCKUP_PENDING,
+        status: DesignProductSelectionStatus.SELECTED,
       },
       update: {
         placementPresetId: preset.id,
@@ -370,16 +413,14 @@ export class DesignWorkflowService {
         scale: position.scale,
         targetMarketplaces: marketplaces as Prisma.InputJsonValue,
         selectedByModeratorId: moderatorId,
-        status: DesignProductSelectionStatus.MOCKUP_PENDING,
+        status: DesignProductSelectionStatus.SELECTED,
         errorMessage: null,
       },
     });
-
-    await this.ensurePendingMockupAssets(tx, designId, row.id, PipelineType.GLOBAL_PRINTFUL, ProviderType.PRINTFUL);
   }
 
   private async ensurePendingMockupAssets(tx: Prisma.TransactionClient, designId: string, selectionId: string, pipeline: PipelineType, provider: ProviderType) {
-    for (const mockupType of [MockupAssetType.MAIN, MockupAssetType.SECONDARY, MockupAssetType.PRINT_AREA_PREVIEW]) {
+    for (const mockupType of [MockupAssetType.MAIN, MockupAssetType.LIFESTYLE, MockupAssetType.DETAIL, MockupAssetType.PRINT_AREA_PREVIEW]) {
       const existing = await tx.mockupAsset.findFirst({ where: { designProductSelectionId: selectionId, mockupType } });
       if (!existing) {
         await tx.mockupAsset.create({
@@ -447,5 +488,63 @@ export class DesignWorkflowService {
 
   private selectionHash(input: unknown) {
     return createHash("sha256").update(JSON.stringify(input)).digest("hex").slice(0, 32);
+  }
+
+  private localPlacementConfig(input: {
+    template: { id: string; name: string; baseImageKey: string; lifestyleImageKey: string | null; closeupImageKey: string | null };
+    area: {
+      id: string;
+      name: string;
+      placement: PlacementKind | null;
+      x: number;
+      y: number;
+      width: number;
+      height: number;
+      widthCm: number | null;
+      heightCm: number | null;
+      safeX: number;
+      safeY: number;
+      safeWidth: number;
+      safeHeight: number;
+      allowMove: boolean;
+      allowResize: boolean;
+      allowRotate: boolean;
+      minScale: number;
+      maxScale: number;
+    };
+    preset: { id: string; name: string; alignment: unknown };
+    unit: PlacementUnits;
+    anchor: string;
+    position: { width?: number; height?: number; x?: number; y?: number; scale: number; rotation: number };
+  }) {
+    return {
+      version: 1,
+      mockupTemplate: {
+        id: input.template.id,
+        name: input.template.name,
+        baseImageKey: input.template.baseImageKey,
+        lifestyleImageKey: input.template.lifestyleImageKey,
+        closeupImageKey: input.template.closeupImageKey,
+      },
+      printArea: {
+        id: input.area.id,
+        name: input.area.name,
+        placement: input.area.placement,
+        x: input.area.x,
+        y: input.area.y,
+        width: input.area.width,
+        height: input.area.height,
+        widthCm: input.area.widthCm,
+        heightCm: input.area.heightCm,
+        safeX: input.area.safeX,
+        safeY: input.area.safeY,
+        safeWidth: input.area.safeWidth,
+        safeHeight: input.area.safeHeight,
+      },
+      placementPreset: { id: input.preset.id, name: input.preset.name, alignment: input.preset.alignment },
+      unit: input.unit,
+      anchor: input.anchor,
+      position: input.position,
+    };
   }
 }

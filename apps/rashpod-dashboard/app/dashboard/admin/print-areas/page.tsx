@@ -1,5 +1,5 @@
-import AdminPlaceholder from "../admin-placeholder";
+import { PrintAreasScreen } from "../admin-operating-screens";
 
-export default function Page() {
-  return <AdminPlaceholder title="Print Areas" description="Manage print and safe zones." />;
+export default function AdminPrintAreasPage() {
+  return <PrintAreasScreen />;
 }

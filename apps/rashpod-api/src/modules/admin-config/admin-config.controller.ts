@@ -6,6 +6,7 @@ import { RequirePermission } from "../../common/auth/permission.decorator";
 import { AdminConfigService } from "./admin-config.service";
 import { CreateProductTypeDto } from "./dto/create-product-type.dto";
 import { CreateRoyaltyRuleDto } from "./dto/create-royalty-rule.dto";
+import { UpdateRoyaltyRuleDto } from "./dto/update-royalty-rule.dto";
 import { CreateBaseProductDto } from "./dto/create-base-product.dto";
 import { CreateMockupTemplateDto } from "./dto/create-mockup-template.dto";
 import { CreatePrintAreaDto } from "./dto/create-print-area.dto";
@@ -67,6 +68,18 @@ export class AdminConfigController {
   @RequirePermission("royalty-rule:manage")
   createRoyaltyRule(@CurrentUser() user: RequestUser, @Body() dto: CreateRoyaltyRuleDto) {
     return this.service.createRoyaltyRule(user.sub, dto);
+  }
+
+  @Patch("royalty-rules/:id")
+  @RequirePermission("royalty-rule:manage")
+  updateRoyaltyRule(@CurrentUser() user: RequestUser, @Param("id") id: string, @Body() dto: UpdateRoyaltyRuleDto) {
+    return this.service.updateRoyaltyRule(user.sub, id, dto);
+  }
+
+  @Delete("royalty-rules/:id")
+  @RequirePermission("royalty-rule:manage")
+  deleteRoyaltyRule(@CurrentUser() user: RequestUser, @Param("id") id: string) {
+    return this.service.deleteRoyaltyRule(user.sub, id);
   }
 
   @Get("base-products")

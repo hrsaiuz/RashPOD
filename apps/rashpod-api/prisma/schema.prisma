@@ -754,6 +754,7 @@ model DesignProductSelection {
   rotation                    Float                        @default(0)
   units                       PlacementUnits               @default(CM)
   positionHash                String
+  placementConfigJson          Json?
   targetMarketplaces          Json?
   selectedByModeratorId       String
   status                      DesignProductSelectionStatus @default(SELECTED)

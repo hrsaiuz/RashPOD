@@ -2,6 +2,7 @@ import { Body, Controller, Get, Headers, Param, Post, UseGuards } from "@nestjs/
 import { JwtAuthGuard } from "../../common/auth/jwt-auth.guard";
 import { PermissionGuard } from "../../common/auth/permission.guard";
 import { RequirePermission } from "../../common/auth/permission.decorator";
+import { CurrentUser, RequestUser } from "../../common/auth/current-user.decorator";
 import { CreateClickPaymentDto } from "./dto/create-click-payment.dto";
 import { ClickWebhookDto } from "./dto/click-webhook.dto";
 import { PaymentsService } from "./payments.service";
@@ -25,6 +26,20 @@ export class PaymentsController {
   ) {
     this.payments.verifyClickWebhookSignature(payload, signature, timestamp);
     return this.payments.clickWebhook(payload);
+  }
+
+  @Get("admin/click/settings")
+  @UseGuards(JwtAuthGuard, PermissionGuard)
+  @RequirePermission("admin-settings:manage")
+  getClickSettings() {
+    return this.payments.getClickSettings();
+  }
+
+  @Post("admin/click/settings")
+  @UseGuards(JwtAuthGuard, PermissionGuard)
+  @RequirePermission("admin-settings:manage")
+  updateClickSettings(@CurrentUser() user: RequestUser, @Body() body: Record<string, unknown>) {
+    return this.payments.updateClickSettings(user.sub, body);
   }
 
   @Get(":id")

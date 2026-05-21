@@ -20,4 +20,24 @@ describe("PlacementCalculationService", () => {
       service.validatePositionWithinArea({ width: 6, height: 6, x: 5, y: 0, scale: 1, rotation: 0 }, { widthCm: 10, heightCm: 10 }, "CM"),
     ).toThrow(BadRequestException);
   });
+
+  it("rejects pixel placements outside the safe zone", () => {
+    expect(() =>
+      service.validatePrintAreaConstraints(
+        { width: 200, height: 200, x: 20, y: 40, scale: 1, rotation: 0 },
+        { widthPx: 500, heightPx: 500, safeX: 50, safeY: 50, safeWidth: 300, safeHeight: 300, minScale: 0.5, maxScale: 2, allowRotate: false },
+        "PX",
+      ),
+    ).toThrow("POSITION_OUTSIDE_SAFE_ZONE");
+  });
+
+  it("enforces print area transform constraints", () => {
+    expect(() =>
+      service.validatePrintAreaConstraints(
+        { width: 10, height: 10, x: 0, y: 0, scale: 1, rotation: 15 },
+        { widthCm: 10, heightCm: 10, minScale: 0.5, maxScale: 2, allowRotate: false },
+        "CM",
+      ),
+    ).toThrow("rotation is not allowed");
+  });
 });

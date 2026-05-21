@@ -27,6 +27,18 @@ export interface PipelineSelectionRecord {
   status: PipelineSelectionStatus;
   errorMessage?: string;
   design?: { id: string; title: string; designerId: string };
+  latestDesignVersion?: { id: string; fileKey: string; widthPx?: number | null; heightPx?: number | null; dpi?: number | null; hasTransparency?: boolean | null } | null;
+  placement?: string;
+  width?: number | null;
+  height?: number | null;
+  x?: number | null;
+  y?: number | null;
+  top?: number | null;
+  left?: number | null;
+  scale?: number | null;
+  rotation?: number | null;
+  units?: "CM" | "INCH" | "PX";
+  placementConfigJson?: unknown;
   localBaseProduct?: { id: string; name: string; imageUrl?: string; defaultPrice?: unknown; baseCost?: unknown; currency?: string } | null;
   printfulProductTemplate?: {
     id: string;

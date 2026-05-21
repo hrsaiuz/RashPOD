@@ -12,11 +12,27 @@ export class ModerationPositionDto {
 
   @IsNumber()
   @IsOptional()
+  widthPx?: number;
+
+  @IsNumber()
+  @IsOptional()
+  heightPx?: number;
+
+  @IsNumber()
+  @IsOptional()
   xCm?: number;
 
   @IsNumber()
   @IsOptional()
   yCm?: number;
+
+  @IsNumber()
+  @IsOptional()
+  xPx?: number;
+
+  @IsNumber()
+  @IsOptional()
+  yPx?: number;
 
   @IsNumber()
   @IsOptional()
@@ -48,10 +64,26 @@ export class LocalSelectionDto {
   localBaseProductId!: string;
 
   @IsString()
+  @IsOptional()
+  mockupTemplateId?: string;
+
+  @IsString()
+  @IsOptional()
+  printAreaId?: string;
+
+  @IsString()
   placementPresetId!: string;
 
   @IsString()
   placement!: string;
+
+  @IsIn(["CM", "PX"])
+  @IsOptional()
+  unit?: "CM" | "PX";
+
+  @IsIn(["TOP_LEFT", "CENTER"])
+  @IsOptional()
+  anchor?: "TOP_LEFT" | "CENTER";
 
   @ValidateNested()
   @Type(() => ModerationPositionDto)

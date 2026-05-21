@@ -1,0 +1,1 @@
+ALTER TABLE "DesignProductSelection" ADD COLUMN IF NOT EXISTS "placementConfigJson" JSONB;

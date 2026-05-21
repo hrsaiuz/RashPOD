@@ -153,7 +153,7 @@ export interface DesignProductSelection {
   localBaseProduct?: unknown;
   printfulProductTemplate?: unknown;
   placementPreset?: unknown;
-  mockupAssets?: unknown[];
+  mockupAssets?: Array<{ id: string; mockupType: string; status: string; imageUrl?: string | null; thumbnailUrl?: string | null; metadataJson?: unknown }>;
 }
 
 export interface DesignWorkflowDetail extends Design {

@@ -1,5 +1,5 @@
-import AdminPlaceholder from "../admin-placeholder";
+import { AuditLogsScreen } from "../admin-operating-screens";
 
-export default function Page() {
-  return <AdminPlaceholder title="Audit Logs" description="Review sensitive action logs." />;
+export default function AdminAuditLogsPage() {
+  return <AuditLogsScreen />;
 }

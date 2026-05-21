@@ -45,7 +45,7 @@ export class PrismaAssetRepository implements WorkerRepository {
   async getPipelineSelection(id: string): Promise<PipelineSelectionRecord | null> {
     const row = await this.prisma.designProductSelection.findUnique({
       where: { id },
-      include: { design: true, localBaseProduct: true, printfulProductTemplate: true },
+      include: { design: { include: { versions: { orderBy: { createdAt: "desc" }, take: 1 } } }, localBaseProduct: true, printfulProductTemplate: true },
     });
     if (!row) return null;
     return {
@@ -55,7 +55,28 @@ export class PrismaAssetRepository implements WorkerRepository {
       status: row.status,
       errorMessage: row.errorMessage ?? undefined,
       targetMarketplaces: row.targetMarketplaces,
+      placement: row.placement,
+      width: row.width,
+      height: row.height,
+      x: row.x,
+      y: row.y,
+      top: row.top,
+      left: row.left,
+      scale: row.scale,
+      rotation: row.rotation,
+      units: row.units,
+      placementConfigJson: row.placementConfigJson,
       design: { id: row.design.id, title: row.design.title, designerId: row.design.designerId },
+      latestDesignVersion: row.design.versions[0]
+        ? {
+            id: row.design.versions[0].id,
+            fileKey: row.design.versions[0].fileKey,
+            widthPx: row.design.versions[0].widthPx,
+            heightPx: row.design.versions[0].heightPx,
+            dpi: row.design.versions[0].dpi,
+            hasTransparency: row.design.versions[0].hasTransparency,
+          }
+        : null,
       localBaseProduct: row.localBaseProduct
         ? {
             id: row.localBaseProduct.id,
@@ -136,6 +157,7 @@ export class PrismaAssetRepository implements WorkerRepository {
       .replace(/(^-|-$)/g, "");
     const price = isLocal ? (selection.localBaseProduct?.defaultPrice ?? new Prisma.Decimal(0)) : (selection.printfulProductTemplate?.defaultRetailPrice ?? new Prisma.Decimal(0));
     const cost = isLocal ? selection.localBaseProduct?.baseCost : selection.printfulProductTemplate?.estimatedBaseCost;
+    const royalty = await this.calculateRoyalty(price, cost ?? null);
 
     const listing = await this.prisma.commerceListing.create({
       data: {
@@ -149,11 +171,13 @@ export class PrismaAssetRepository implements WorkerRepository {
         price,
         currency: isLocal ? selection.localBaseProduct?.currency ?? "UZS" : selection.printfulProductTemplate?.currency ?? "USD",
         cost,
+        designerRoyalty: royalty.amount,
         localBaseProductId: selection.localBaseProductId,
         printfulProductTemplateId: selection.printfulProductTemplateId,
         designProductSelectionId: selection.id,
-        mockupAssetIds: selection.mockupAssets.map((asset) => asset.id),
-        imagesJson: selection.mockupAssets.map((asset) => asset.imageUrl).filter(Boolean),
+        mockupAssetIds: selection.mockupAssets.filter((asset) => asset.status === "GENERATED").map((asset) => asset.id),
+        imagesJson: selection.mockupAssets.filter((asset) => asset.status === "GENERATED").map((asset) => asset.imageUrl).filter(Boolean),
+        metadataJson: royalty.rule ? { royaltyRuleId: royalty.rule.id, royaltyBasis: royalty.rule.basis, royaltyValue: royalty.rule.value.toString() } : undefined,
       },
     });
 
@@ -266,5 +290,20 @@ export class PrismaAssetRepository implements WorkerRepository {
     if (pipeline === PipelineType.LOCAL) return [MarketplaceKind.RASHPOD_LOCAL];
     if (!Array.isArray(targetMarketplaces)) return [];
     return targetMarketplaces.filter((item): item is MarketplaceKind => typeof item === "string" && item in MarketplaceKind);
+  }
+
+  private async calculateRoyalty(price: Prisma.Decimal | number, cost: Prisma.Decimal | number | null) {
+    const rule = await this.prisma.royaltyRule.findFirst({
+      where: { isActive: true, effectiveAt: { lte: new Date() } },
+      orderBy: [{ scope: "asc" }, { effectiveAt: "desc" }],
+    });
+    if (!rule) return { amount: undefined, rule: null };
+
+    const priceDecimal = new Prisma.Decimal(price);
+    const costDecimal = cost == null ? new Prisma.Decimal(0) : new Prisma.Decimal(cost);
+    const rate = new Prisma.Decimal(rule.value);
+    const basisAmount = rule.basis === "NET_PROFIT_PERCENT" && priceDecimal.gt(costDecimal) ? priceDecimal.minus(costDecimal) : priceDecimal;
+    const amount = rule.basis === "FIXED_AMOUNT" ? rate : basisAmount.mul(rate).div(100);
+    return { amount: amount.toDecimalPlaces(2), rule };
   }
 }

@@ -69,6 +69,46 @@ export class PaymentsService {
     };
   }
 
+  async getClickSettings() {
+    const setting = await this.prisma.platformSetting.findUnique({ where: { key: "click.payment.settings" } });
+    return setting?.value ?? {
+      enabled: false,
+      mode: "TEST",
+      merchantId: "",
+      serviceId: "",
+      secretName: "",
+      returnUrl: "",
+      webhookPath: "/payments/click/webhook",
+      allowedUseCases: ["PRODUCT_ORDER", "FILM_ORDER"],
+    };
+  }
+
+  async updateClickSettings(actorId: string, dto: Record<string, unknown>) {
+    const value = {
+      enabled: Boolean(dto.enabled),
+      mode: dto.mode === "PRODUCTION" ? "PRODUCTION" : "TEST",
+      merchantId: typeof dto.merchantId === "string" ? dto.merchantId : "",
+      serviceId: typeof dto.serviceId === "string" ? dto.serviceId : "",
+      secretName: typeof dto.secretName === "string" ? dto.secretName : "",
+      returnUrl: typeof dto.returnUrl === "string" ? dto.returnUrl : "",
+      webhookPath: typeof dto.webhookPath === "string" ? dto.webhookPath : "/payments/click/webhook",
+      allowedUseCases: Array.isArray(dto.allowedUseCases) ? dto.allowedUseCases.filter((item) => typeof item === "string") : [],
+    };
+    const item = await this.prisma.platformSetting.upsert({
+      where: { key: "click.payment.settings" },
+      create: { key: "click.payment.settings", value: value as Prisma.InputJsonValue },
+      update: { value: value as Prisma.InputJsonValue },
+    });
+    await this.audit.log({
+      actorId,
+      action: "payment-settings.click.update",
+      entityType: "PlatformSetting",
+      entityId: item.key,
+      metadata: { enabled: value.enabled, mode: value.mode, merchantId: value.merchantId, serviceId: value.serviceId, secretName: value.secretName },
+    });
+    return item.value;
+  }
+
   async clickWebhook(payload: { paymentId: string; status: "PAID" | "FAILED"; providerRef?: string; raw?: Record<string, unknown> }) {
     const webhookIdempotencyKey = payload.providerRef ? `click:webhook:${payload.providerRef}` : null;
     if (webhookIdempotencyKey) {

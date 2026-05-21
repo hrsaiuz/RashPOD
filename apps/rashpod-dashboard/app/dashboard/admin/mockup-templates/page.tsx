@@ -1,5 +1,5 @@
-import AdminPlaceholder from "../admin-placeholder";
+import { MockupTemplatesScreen } from "../admin-operating-screens";
 
-export default function Page() {
-  return <AdminPlaceholder title="Mockup Templates" description="Manage mockup templates and assets." />;
+export default function AdminMockupTemplatesPage() {
+  return <MockupTemplatesScreen />;
 }

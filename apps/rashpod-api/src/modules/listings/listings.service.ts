@@ -1,5 +1,5 @@
 import { ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
-import { ListingStatus, ListingType, UserRole } from "@prisma/client";
+import { ListingStatus, ListingType, Prisma, UserRole } from "@prisma/client";
 import { PrismaService } from "../../prisma/prisma.service";
 import { AuditService } from "../audit/audit.service";
 import { RequestUser } from "../../common/auth/current-user.decorator";
@@ -39,6 +39,7 @@ export class ListingsService {
 
     const baseSlug = dto.title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
     const slug = `${baseSlug}-${Date.now()}`;
+    const royalty = await this.calculateRoyalty(dto.price, null);
     const listing = await this.prisma.commerceListing.create({
       data: {
         type: dto.type,
@@ -48,6 +49,8 @@ export class ListingsService {
         description: dto.description,
         slug,
         price: dto.price,
+        designerRoyalty: royalty.amount,
+        metadataJson: royalty.rule ? { royaltyRuleId: royalty.rule.id, royaltyBasis: royalty.rule.basis, royaltyValue: royalty.rule.value.toString() } : undefined,
       },
     });
     await this.audit.log({
@@ -61,6 +64,24 @@ export class ListingsService {
 
   listOwn(userId: string) {
     return this.prisma.commerceListing.findMany({ where: { designerId: userId }, orderBy: { createdAt: "desc" } });
+  }
+
+  adminList(filters: { status?: ListingStatus; type?: ListingType; q?: string; limit?: number }) {
+    const take = Math.min(Math.max(filters.limit ?? 100, 1), 200);
+    return this.prisma.commerceListing.findMany({
+      where: {
+        ...(filters.status ? { status: filters.status } : {}),
+        ...(filters.type ? { type: filters.type } : {}),
+        ...(filters.q ? { title: { contains: filters.q, mode: "insensitive" } } : {}),
+      },
+      orderBy: { updatedAt: "desc" },
+      take,
+      include: {
+        designer: { select: { id: true, email: true, displayName: true, handle: true } },
+        designAsset: { select: { id: true, title: true, status: true } },
+        marketplacePublications: { orderBy: { createdAt: "desc" }, take: 5 },
+      },
+    });
   }
 
   async byId(user: RequestUser, id: string) {
@@ -133,6 +154,29 @@ export class ListingsService {
       action: "listing.archive",
       entityType: "CommerceListing",
       entityId: id,
+    });
+    return updated;
+  }
+
+  async adminSetStatus(user: RequestUser, id: string, status: ListingStatus) {
+    const listing = await this.prisma.commerceListing.findUnique({ where: { id } });
+    if (!listing) throw new NotFoundException("Listing not found");
+    if (!this.isAdminRole(user.role)) throw new ForbiddenException("Not allowed");
+    const royalty = status === ListingStatus.PUBLISHED ? await this.calculateRoyalty(listing.price, listing.cost) : null;
+    const updated = await this.prisma.commerceListing.update({
+      where: { id },
+      data: {
+        status,
+        publishedAt: status === ListingStatus.PUBLISHED ? new Date() : listing.publishedAt,
+        ...(royalty ? { designerRoyalty: royalty.amount, metadataJson: this.mergeListingMetadata(listing.metadataJson, royalty) } : {}),
+      },
+    });
+    await this.audit.log({
+      actorId: user.sub,
+      action: "listing.admin-status.update",
+      entityType: "CommerceListing",
+      entityId: id,
+      metadata: { beforeStatus: listing.status, afterStatus: status },
     });
     return updated;
   }
@@ -294,7 +338,7 @@ export class ListingsService {
   }
 
   private isAdminRole(role: string) {
-    return role === UserRole.ADMIN || role === UserRole.SUPER_ADMIN || role === UserRole.OPERATIONS_MANAGER;
+    return role === UserRole.MODERATOR || role === UserRole.ADMIN || role === UserRole.SUPER_ADMIN || role === UserRole.OPERATIONS_MANAGER;
   }
 
   private assertOwnershipOrAdmin(user: RequestUser, designerId: string) {
@@ -316,5 +360,34 @@ export class ListingsService {
       .replace(/[^a-z0-9]+/g, "-")
       .replace(/(^-|-$)/g, "");
     return slug || fallbackId;
+  }
+
+  private async calculateRoyalty(price: Prisma.Decimal | number, cost: Prisma.Decimal | number | null) {
+    const rule = await this.prisma.royaltyRule.findFirst({
+      where: { isActive: true, effectiveAt: { lte: new Date() } },
+      orderBy: [{ scope: "asc" }, { effectiveAt: "desc" }],
+    });
+    if (!rule) return { amount: undefined, rule: null };
+
+    const priceDecimal = new Prisma.Decimal(price);
+    const costDecimal = cost == null ? new Prisma.Decimal(0) : new Prisma.Decimal(cost);
+    const rate = new Prisma.Decimal(rule.value);
+    const amount = rule.basis === "FIXED_AMOUNT"
+      ? rate
+      : rule.basis === "NET_PROFIT_PERCENT"
+        ? Prisma.Decimal.max(priceDecimal.minus(costDecimal), 0).mul(rate).div(100)
+        : priceDecimal.mul(rate).div(100);
+
+    return { amount: amount.toDecimalPlaces(2), rule };
+  }
+
+  private mergeListingMetadata(metadata: Prisma.JsonValue | null, royalty: Awaited<ReturnType<ListingsService["calculateRoyalty"]>>) {
+    const base = metadata && typeof metadata === "object" && !Array.isArray(metadata) ? metadata : {};
+    return {
+      ...base,
+      royaltyRuleId: royalty.rule?.id,
+      royaltyBasis: royalty.rule?.basis,
+      royaltyValue: royalty.rule?.value.toString(),
+    } as Prisma.InputJsonValue;
   }
 }
