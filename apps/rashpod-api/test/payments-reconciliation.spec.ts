@@ -1,4 +1,4 @@
-import { PaymentStatus, ProductionJobStatus } from "@prisma/client";
+import { PaymentStatus } from "@prisma/client";
 import { PaymentsService } from "../src/modules/payments/payments.service";
 import { ForbiddenException } from "@nestjs/common";
 import { createHmac } from "crypto";
@@ -23,7 +23,7 @@ describe("PaymentsService reconciliation", () => {
     );
   });
 
-  it("marks order paid and moves production jobs on paid webhook", async () => {
+  it("marks payment paid and hands paid orders to production", async () => {
     const payment = { id: "p2", orderId: "o2", status: PaymentStatus.PENDING, idempotencyKey: null };
     const prisma: any = {
       paymentTransaction: {
@@ -31,19 +31,14 @@ describe("PaymentsService reconciliation", () => {
         findUnique: jest.fn().mockResolvedValue(payment),
         update: jest.fn().mockResolvedValue({ ...payment, status: PaymentStatus.PAID }),
       },
-      order: { update: jest.fn().mockResolvedValue({ id: "o2" }) },
-      productionJob: { updateMany: jest.fn().mockResolvedValue({ count: 1 }) },
     };
     const audit = { log: jest.fn().mockResolvedValue(undefined) } as any;
-    const service = new PaymentsService(prisma, audit);
+    const orders = { confirmPaid: jest.fn().mockResolvedValue({ id: "o2" }) } as any;
+    const service = new PaymentsService(prisma, audit, orders);
 
     await service.clickWebhook({ paymentId: "p2", status: "PAID", providerRef: "ref-22" });
 
-    expect(prisma.order.update).toHaveBeenCalledWith({ where: { id: "o2" }, data: { status: "PAID" } });
-    expect(prisma.productionJob.updateMany).toHaveBeenCalledWith({
-      where: { orderId: "o2", status: ProductionJobStatus.ORDERED },
-      data: { status: ProductionJobStatus.FILE_CHECK },
-    });
+    expect(orders.confirmPaid).toHaveBeenCalledWith(undefined, "o2", "ref-22");
   });
 
   it("ignores conflicting terminal transition and logs conflict", async () => {
@@ -85,6 +80,16 @@ describe("PaymentsService reconciliation", () => {
         entityId: "p-existing",
       }),
     );
+  });
+
+  it("blocks Click payment creation when settings are disabled", async () => {
+    const prisma: any = {
+      order: { findUnique: jest.fn().mockResolvedValue({ id: "o4", customerId: "cust-1", status: "PENDING_PAYMENT", payments: [], total: 100, currency: "UZS" }) },
+      platformSetting: { findUnique: jest.fn().mockResolvedValue({ valueJson: { enabled: false } }) },
+    };
+    const service = new PaymentsService(prisma, { log: jest.fn() } as any);
+
+    await expect(service.createClickPayment("o4", "cust-1")).rejects.toBeInstanceOf(ForbiddenException);
   });
 
   it("verifies click webhook signature when secret is configured", async () => {

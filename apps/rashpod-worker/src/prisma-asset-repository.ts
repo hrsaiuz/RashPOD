@@ -1,6 +1,6 @@
-import { DesignProductSelectionStatus, GeneratedAssetStatus, IntegrationLogStatus, ListingStatus, ListingType, MarketplaceKind, MarketplacePublicationStatus, PipelineType, Prisma, ProviderType } from "@prisma/client";
+import { DesignProductSelectionStatus, GeneratedAssetStatus, IntegrationLogStatus, ListingStatus, ListingType, MarketplaceKind, MarketplacePublicationStatus, PipelineType, Prisma, ProductionJobStatus, ProviderType } from "@prisma/client";
 import { getPrismaClient } from "./db";
-import { GeneratedAssetRecord, MarketplacePublicationRecord, MockupAssetRecord, PipelineSelectionRecord, PipelineSelectionStatus, WorkerRepository } from "./repository";
+import { GeneratedAssetRecord, MarketplacePublicationRecord, MockupAssetRecord, PipelineSelectionRecord, PipelineSelectionStatus, ProductionJobRecord, WorkerRepository } from "./repository";
 
 export class PrismaAssetRepository implements WorkerRepository {
   private readonly prisma = getPrismaClient();
@@ -38,6 +38,18 @@ export class PrismaAssetRepository implements WorkerRepository {
         heightPx: data.heightPx,
       },
     });
+    if (data.status === "READY") {
+      await this.prisma.productionJob.updateMany({
+        where: { productionFileAssetId: id },
+        data: { productionFileStatus: "READY", productionFileObjectKey: data.objectKey, status: ProductionJobStatus.READY_FOR_PRINT, failureReason: null },
+      });
+    }
+    if (data.status === "FAILED") {
+      await this.prisma.productionJob.updateMany({
+        where: { productionFileAssetId: id },
+        data: { productionFileStatus: "FAILED", failureReason: data.errorMessage, status: ProductionJobStatus.WAITING_FOR_FILE },
+      });
+    }
     return {
       id: row.id,
       status: row.status,
@@ -49,6 +61,44 @@ export class PrismaAssetRepository implements WorkerRepository {
       widthPx: row.widthPx ?? undefined,
       heightPx: row.heightPx ?? undefined,
     };
+  }
+
+  async getProductionJob(id: string): Promise<ProductionJobRecord | null> {
+    const row = await this.prisma.productionJob.findUnique({ where: { id } });
+    if (!row) return null;
+    return {
+      id: row.id,
+      orderId: row.orderId,
+      orderItemId: row.orderItemId,
+      status: row.status,
+      queueType: row.queueType,
+      productionFileStatus: row.productionFileStatus,
+      productionFileObjectKey: row.productionFileObjectKey,
+      productionFileUrl: row.productionFileUrl,
+      productSnapshotJson: row.productSnapshotJson,
+      assetSnapshotJson: row.assetSnapshotJson,
+      selectedOptionsJson: row.selectedOptionsJson,
+      notes: row.notes,
+    };
+  }
+
+  async updateProductionJob(
+    id: string,
+    data: { productionFileStatus?: string | null; productionFileObjectKey?: string | null; productionFileUrl?: string | null; status?: string; failureReason?: string | null },
+  ): Promise<ProductionJobRecord> {
+    await this.prisma.productionJob.update({
+      where: { id },
+      data: {
+        productionFileStatus: data.productionFileStatus,
+        productionFileObjectKey: data.productionFileObjectKey,
+        productionFileUrl: data.productionFileUrl,
+        status: data.status as ProductionJobStatus | undefined,
+        failureReason: data.failureReason,
+      },
+    });
+    const updated = await this.getProductionJob(id);
+    if (!updated) throw new Error(`Production job ${id} not found`);
+    return updated;
   }
 
   async getPipelineSelection(id: string): Promise<PipelineSelectionRecord | null> {

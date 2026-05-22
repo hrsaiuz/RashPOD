@@ -47,6 +47,8 @@ Store in Secret Manager:
 - Click credentials.
 - Yandex credentials.
 - UzPost credentials.
+- Printful API token and webhook secret.
+- Printify API token and webhook secret.
 - Worker secret.
 
 ## CI/CD
@@ -76,8 +78,8 @@ Future:
 ```text
 /api/delivery/yandex/webhook
 /api/delivery/uzpost/webhook
-/api/marketplace/printify/webhook
-/api/marketplace/printful/webhook
+/api/webhooks/pod/printify
+/api/webhooks/pod/printful
 ```
 
 ## Production Checklist

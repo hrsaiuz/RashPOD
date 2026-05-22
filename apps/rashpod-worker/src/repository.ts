@@ -26,7 +26,7 @@ export type PipelineSelectionStatus =
 export interface PipelineSelectionRecord {
   id: string;
   designId: string;
-  pipeline: "LOCAL" | "GLOBAL_PRINTFUL";
+  pipeline: "LOCAL" | "GLOBAL_PRINTFUL" | "GLOBAL_POD";
   status: PipelineSelectionStatus;
   errorMessage?: string;
   design?: { id: string; title: string; designerId: string };
@@ -70,16 +70,31 @@ export type MarketplacePublicationStatus = "NOT_SELECTED" | "DRAFT" | "QUEUED" |
 export interface MarketplacePublicationRecord {
   id: string;
   marketplace: string;
-  provider: "RASHPOD" | "PRINTFUL" | "DIRECT_MARKETPLACE";
+  provider: "RASHPOD" | "PRINTFUL" | "PRINTIFY" | "DIRECT_MARKETPLACE";
   status: MarketplacePublicationStatus;
   productListing: {
     id: string;
     status: string;
     title: string;
-    pipeline?: "LOCAL" | "GLOBAL_PRINTFUL" | null;
+    pipeline?: "LOCAL" | "GLOBAL_PRINTFUL" | "GLOBAL_POD" | null;
     mockupAssetIds?: unknown;
     designProductSelectionId?: string | null;
   };
+}
+
+export interface ProductionJobRecord {
+  id: string;
+  orderId: string;
+  orderItemId?: string | null;
+  status?: string;
+  queueType: string;
+  productionFileStatus?: string | null;
+  productionFileObjectKey?: string | null;
+  productionFileUrl?: string | null;
+  productSnapshotJson?: unknown;
+  assetSnapshotJson?: unknown;
+  selectedOptionsJson?: unknown;
+  notes?: string | null;
 }
 
 export interface WorkerRepository {
@@ -88,6 +103,11 @@ export interface WorkerRepository {
     id: string,
     data: Partial<Pick<GeneratedAssetRecord, "status" | "fileKey" | "objectKey" | "contentType" | "format" | "errorMessage" | "widthPx" | "heightPx">>,
   ): Promise<GeneratedAssetRecord>;
+  getProductionJob?(id: string): Promise<ProductionJobRecord | null>;
+  updateProductionJob?(
+    id: string,
+    data: { productionFileStatus?: string | null; productionFileObjectKey?: string | null; productionFileUrl?: string | null; status?: string; failureReason?: string | null },
+  ): Promise<ProductionJobRecord>;
   getPipelineSelection?(id: string): Promise<PipelineSelectionRecord | null>;
   updatePipelineSelection?(id: string, data: { status?: PipelineSelectionStatus; errorMessage?: string | null }): Promise<PipelineSelectionRecord>;
   listMockupAssets?(selectionId: string): Promise<MockupAssetRecord[]>;

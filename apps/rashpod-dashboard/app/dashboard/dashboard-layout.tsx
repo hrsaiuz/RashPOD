@@ -28,6 +28,8 @@ import {
   Boxes,
   Layers,
   Film,
+  User,
+  CloudCog,
 } from "lucide-react";
 
 const ROLE_LINKS: Record<string, Array<{ href: string; label: string; icon?: any; group?: string }>> = {
@@ -39,9 +41,15 @@ const ROLE_LINKS: Record<string, Array<{ href: string; label: string; icon?: any
     { href: "/dashboard/designer/film-rights", label: "Film Rights", icon: Film },
     { href: "/dashboard/designer/corporate-bids", label: "Corporate Bids", icon: Briefcase },
     { href: "/dashboard/designer/royalties", label: "Royalties", icon: DollarSign },
+    { href: "/dashboard/designer/support", label: "Support", icon: LifeBuoy },
     { href: "/dashboard/designer/settings", label: "Settings", icon: Settings },
   ],
-  customer: [],
+  customer: [
+    { href: "/dashboard/customer", label: "Overview", icon: LayoutDashboard },
+    { href: "/dashboard/customer/orders", label: "Orders", icon: Package },
+    { href: "/dashboard/customer/profile", label: "Profile", icon: User },
+    { href: "/dashboard/customer/support", label: "Support", icon: LifeBuoy },
+  ],
   production: [
     { href: "/dashboard/production", label: "Overview", icon: LayoutDashboard },
     { href: "/dashboard/production/jobs", label: "Production Queue", icon: Factory },
@@ -63,6 +71,7 @@ const ROLE_LINKS: Record<string, Array<{ href: string; label: string; icon?: any
   admin: [
     { href: "/dashboard/admin", label: "Overview", icon: LayoutDashboard },
     { href: "/dashboard/admin/orders", label: "Orders", icon: Package, group: "Operations" },
+    { href: "/dashboard/admin/external-sales", label: "External Sales", icon: ClipboardList, group: "Operations" },
     { href: "/dashboard/admin/production", label: "Production", icon: Factory, group: "Operations" },
     { href: "/dashboard/admin/worker-jobs", label: "Worker Jobs", icon: Settings, group: "Operations" },
     { href: "/dashboard/admin/delivery-settings", label: "Delivery", icon: Package, group: "Operations" },
@@ -71,6 +80,7 @@ const ROLE_LINKS: Record<string, Array<{ href: string; label: string; icon?: any
     { href: "/dashboard/admin/mockup-templates", label: "Mockup Templates", icon: Images, group: "Catalog" },
     { href: "/dashboard/admin/print-areas", label: "Print Areas", icon: Layers, group: "Catalog" },
     { href: "/dashboard/admin/pipeline-config", label: "Pipeline Config", icon: Layers, group: "Catalog" },
+    { href: "/dashboard/admin/pod", label: "Global POD", icon: CloudCog, group: "Catalog" },
     { href: "/dashboard/admin/listings", label: "Listings", icon: Tag, group: "Catalog" },
     { href: "/dashboard/admin/media-library", label: "Media Library", icon: Images, group: "Catalog" },
     { href: "/dashboard/admin/branding", label: "Branding", icon: Palette, group: "Catalog" },

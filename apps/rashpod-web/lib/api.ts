@@ -41,6 +41,15 @@ export const api = {
   delete: <T>(path: string, init?: RequestInit) => request<T>("DELETE", path, undefined, init),
 };
 
+export async function uploadToSignedUrl(url: string, file: File, headers?: Record<string, string>) {
+  const res = await fetch(url, {
+    method: "PUT",
+    body: file,
+    headers: { "Content-Type": file.type || "application/octet-stream", ...(headers ?? {}) },
+  });
+  if (!res.ok) throw new ApiError(`Direct upload failed (${res.status})`, res.status, undefined);
+}
+
 export type SessionUser = { id: string; email: string; role: string; displayName?: string };
 export type Order = {
   id: string;

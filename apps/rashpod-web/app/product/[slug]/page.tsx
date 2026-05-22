@@ -157,6 +157,8 @@ export default function ProductPage({ params }: { params: Promise<{ slug: string
       designerName: product!.designer.displayName,
       size: selectedSize,
       color: selectedColor,
+      material: "cotton",
+      printSide: "front",
       quantity,
     });
   }

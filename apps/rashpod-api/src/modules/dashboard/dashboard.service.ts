@@ -101,7 +101,7 @@ export class DashboardService {
       orderId: it.orderId,
       orderStatus: it.order.status,
       listingId: it.listingId,
-      listingTitle: it.listing.title,
+      listingTitle: it.listing?.title ?? it.listingTitle ?? "Custom film order",
       quantity: it.quantity,
       unitPrice: this.decimal(it.unitPrice),
       totalPrice: this.decimal(it.totalPrice),
@@ -161,12 +161,16 @@ export class DashboardService {
   }
 
   async productionOverview() {
-    const [total, ordered, printing, qc, packing, recent] = await Promise.all([
+    const [total, queued, printing, qc, packing, blocked, fileFailures, readyForPickup, readyForDelivery, recent] = await Promise.all([
       this.prisma.productionJob.count(),
-      this.prisma.productionJob.count({ where: { status: "ORDERED" } }),
-      this.prisma.productionJob.count({ where: { status: "PRINTING" } }),
-      this.prisma.productionJob.count({ where: { status: "QC" } }),
+      this.prisma.productionJob.count({ where: { status: { in: ["ORDERED", "WAITING_FOR_FILE", "FILE_GENERATING"] } } }),
+      this.prisma.productionJob.count({ where: { status: { in: ["IN_PRODUCTION", "PRINTING"] } } }),
+      this.prisma.productionJob.count({ where: { status: { in: ["QUALITY_CHECK", "QC", "QC_FAILED", "REPRINT_REQUIRED"] } } }),
       this.prisma.productionJob.count({ where: { status: "PACKING" } }),
+      this.prisma.productionJob.count({ where: { OR: [{ status: "BLOCKED" }, { blockerReason: { not: null } }] } }),
+      this.prisma.productionJob.count({ where: { productionFileStatus: { in: ["FAILED", "MISSING_SOURCE"] } } }),
+      this.prisma.productionJob.count({ where: { status: "READY_FOR_PICKUP" } }),
+      this.prisma.productionJob.count({ where: { status: "READY_FOR_DELIVERY" } }),
       this.prisma.productionJob.findMany({
         orderBy: { updatedAt: "desc" },
         take: 10,
@@ -178,7 +182,7 @@ export class DashboardService {
         },
       }),
     ]);
-    return { total, ordered, printing, qc, packing, recent };
+    return { total, ordered: queued, queued, printing, qc, packing, blocked, fileFailures, readyForPickup, readyForDelivery, recent };
   }
 
   async adminOverview() {

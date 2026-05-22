@@ -90,6 +90,7 @@
 /dashboard/admin/base-products
 /dashboard/admin/mockup-templates
 /dashboard/admin/print-areas
+/dashboard/admin/pod
 /dashboard/admin/listings
 /dashboard/admin/orders
 /dashboard/admin/production

@@ -25,13 +25,13 @@ export class CommercialRightsController {
 
   @Post("enable-film-sales")
   @RequirePermission("rights:enable-film-own")
-  enableFilm(@Param("id") id: string, @CurrentUser() user: RequestUser) {
-    return this.service.enableFilmSales(id, user);
+  enableFilm(@Param("id") id: string, @CurrentUser() user: RequestUser, @Body("reason") reason?: string) {
+    return this.service.enableFilmSales(id, user, reason);
   }
 
   @Post("disable-film-sales")
   @RequirePermission("rights:disable-film-own")
-  disableFilm(@Param("id") id: string, @CurrentUser() user: RequestUser) {
-    return this.service.disableFilmSales(id, user);
+  disableFilm(@Param("id") id: string, @CurrentUser() user: RequestUser, @Body("reason") reason?: string) {
+    return this.service.disableFilmSales(id, user, reason);
   }
 }

@@ -84,6 +84,25 @@ export async function uploadToSignedUrl(url: string, file: File, headers?: Recor
   }
 }
 
+/** Upload a file directly to GCS with progress callbacks. */
+export async function uploadToSignedUrlWithProgress(url: string, file: File, headers?: Record<string, string>, onProgress?: (percent: number) => void) {
+  return new Promise<void>((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("PUT", url);
+    xhr.setRequestHeader("Content-Type", file.type || "application/octet-stream");
+    for (const [key, value] of Object.entries(headers ?? {})) xhr.setRequestHeader(key, value);
+    xhr.upload.onprogress = (event) => {
+      if (event.lengthComputable && onProgress) onProgress(Math.round((event.loaded / event.total) * 100));
+    };
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) resolve();
+      else reject(new ApiError(`Direct upload failed (${xhr.status})`, xhr.status));
+    };
+    xhr.onerror = () => reject(new ApiError("Direct upload failed", xhr.status || 0));
+    xhr.send(file);
+  });
+}
+
 // ---------- DTO types (matching API contracts) ----------
 
 export type DesignStatus =

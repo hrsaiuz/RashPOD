@@ -19,6 +19,10 @@ describe("MockupJobHandler", () => {
       const fileKey = `production-files/${placementId}/print-ready-test.png`;
       return { fileKey, objectKey: fileKey, contentType: "image/png", format: "png", widthPx: 3000, heightPx: 3000 };
     },
+    async renderFilmProductionFile(input: { productionJobId: string }) {
+      const fileKey = `film-production-files/${input.productionJobId}/print-ready.png`;
+      return { fileKey, objectKey: fileKey, contentType: "image/png", format: "png", widthPx: 1200, heightPx: 1600 };
+    },
   };
 
   it("transitions preview asset from pending to ready", async () => {
@@ -68,5 +72,32 @@ describe("MockupJobHandler", () => {
     expect(result.fileKey).toContain("production-files/p-prod/");
     expect(result.widthPx).toBe(3000);
     expect(result.heightPx).toBe(3000);
+  });
+
+  it("generates a film production file directly from production job context", async () => {
+    const productionJob = {
+      id: "job-film-1",
+      orderId: "order-1",
+      orderItemId: "item-1",
+      queueType: "DTF",
+      productionFileStatus: "QUEUED",
+      productSnapshotJson: { filmWidthCm: 30, filmHeightCm: 40, quantity: 2 },
+    };
+    const repo: any = {
+      async getProductionJob(id: string) {
+        return id === productionJob.id ? productionJob : null;
+      },
+      async updateProductionJob(_id: string, data: Record<string, unknown>) {
+        Object.assign(productionJob, data);
+        return productionJob;
+      },
+    };
+    const handler = new MockupJobHandler(repo, fakeRenderer);
+
+    const result = await handler.handleProductionFile({ productionJobId: "job-film-1" });
+
+    expect(result.productionFileStatus).toBe("READY");
+    expect(result.productionFileObjectKey).toContain("film-production-files/job-film-1/");
+    expect(result.status).toBe("READY_FOR_PRINT");
   });
 });

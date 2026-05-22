@@ -20,6 +20,8 @@ import { DeliveryModule } from "./modules/delivery/delivery.module";
 import { AdminOpsModule } from "./modules/admin-ops/admin-ops.module";
 import { AiModule } from "./modules/ai/ai.module";
 import { MarketplaceModule } from "./modules/marketplace/marketplace.module";
+import { PodModule } from "./modules/pod/pod.module";
+import { ExternalSalesModule } from "./modules/external-sales/external-sales.module";
 import { MailerModule } from "./modules/mailer/mailer.module";
 import { EmailTemplatesModule } from "./modules/email-templates/email-templates.module";
 import { MediaModule } from "./modules/media/media.module";
@@ -28,6 +30,9 @@ import { IntakeModule } from "./modules/intake/intake.module";
 import { CurrencyModule } from "./modules/currency/currency.module";
 import { DesignWorkflowModule } from "./modules/design-workflow/design-workflow.module";
 import { PrintfulModule } from "./modules/printful/printful.module";
+import { FinanceModule } from "./modules/finance/finance.module";
+import { SelfServiceModule } from "./modules/self-service/self-service.module";
+import { FilmModule } from "./modules/film/film.module";
 import { HealthController } from "./health.controller";
 
 @Module({
@@ -53,11 +58,16 @@ import { HealthController } from "./health.controller";
     AdminConfigModule,
     AdminOpsModule,
     MarketplaceModule,
+    PodModule,
+    ExternalSalesModule,
     MailerModule,
     EmailTemplatesModule,
     MediaModule,
     AdminUsersModule,
     CurrencyModule,
+    FinanceModule,
+    SelfServiceModule,
+    FilmModule,
     IntakeModule,
     DesignWorkflowModule,
     PrintfulModule,

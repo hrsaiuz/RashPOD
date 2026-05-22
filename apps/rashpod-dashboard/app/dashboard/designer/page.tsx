@@ -1,186 +1,22 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { EmptyState, ErrorState, KpiTile, Skeleton, StatusBadge } from "@rashpod/ui";
+import { DollarSign, Image as ImageIcon, LifeBuoy, Tag, Upload } from "lucide-react";
 import { useAuth } from "../../auth/auth-provider";
 import DashboardLayout from "../dashboard-layout";
-import { KpiTile, DataTable, DataTableColumn, EmptyState, ErrorState, Skeleton, Card, Button, StatusBadge } from "@rashpod/ui";
-import { DollarSign, Tag, Search, Upload, TrendingUp } from "lucide-react";
-import Link from "next/link";
 
-interface DesignerKpis {
-  lifetimeEarnings: number;
-  monthEarnings: number;
-  listingsLive: number;
-  inModeration: number;
-  designsUploaded: number;
-  soldItems: number;
-}
+type Activity = { id: string; type: string; label: string; status: string; updatedAt: string };
+type DesignerDashboard = { uploadedDesigns: number; pendingModeration: number; rejectedDesigns: number; publishedListings: number; totalSales: number; pendingRoyalties: number; payableRoyalties: number; paidPayouts: number; recentActivity: Activity[] };
 
-interface RoyaltyEntry {
-  id: string;
-  listingId: string;
-  listingTitle: string;
-  royalty: number;
-  totalPrice: number;
-  orderStatus: string;
-  createdAt: string;
-}
-
-function uzs(value: number) {
-  return new Intl.NumberFormat("en-US", { style: "currency", currency: "UZS", maximumFractionDigits: 0 }).format(value || 0);
-}
+type Earnings = { pending: number; earned: number; payable: number; paid: number; currentPayableBalance: number };
 
 export default function DesignerOverview() {
-  const router = useRouter();
-  const { user, isLoading: authLoading } = useAuth();
-  const [kpis, setKpis] = useState<DesignerKpis | null>(null);
-  const [recentRoyalties, setRecentRoyalties] = useState<RoyaltyEntry[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-
-  useEffect(() => {
-    if (authLoading) return;
-    if (!user) {
-      router.push("/auth/login?next=/dashboard/designer");
-      return;
-    }
-
-    const load = async () => {
-      setLoading(true);
-      setError("");
-      try {
-        const [overview, royalties] = await Promise.all([
-          fetch("/api/proxy/dashboard/designer").then((r) => (r.ok ? r.json() : null)),
-          fetch("/api/proxy/dashboard/designer/royalties?limit=5").then((r) => (r.ok ? r.json() : [])) as Promise<RoyaltyEntry[]>,
-        ]);
-        const status: Record<string, number> = overview?.designStatus ?? {};
-        const inModeration = (status.SUBMITTED ?? 0) + (status.NEEDS_FIX ?? 0);
-        setKpis({
-          lifetimeEarnings: overview?.lifetimeEarnings ?? 0,
-          monthEarnings: overview?.monthEarnings ?? 0,
-          listingsLive: overview?.listings ?? 0,
-          inModeration,
-          designsUploaded: overview?.designs ?? 0,
-          soldItems: overview?.soldItems ?? 0,
-        });
-        setRecentRoyalties(Array.isArray(royalties) ? royalties : []);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to load data");
-      } finally {
-        setLoading(false);
-      }
-    };
-    void load();
-  }, [user, authLoading, router]);
-
-  const royaltyColumns: DataTableColumn<RoyaltyEntry>[] = [
-    { key: "listingTitle", header: "Listing", sortable: true },
-    {
-      key: "royalty",
-      header: "Royalty",
-      render: (val) => <span className="tabular-nums font-medium text-brand-ink">{uzs(Number(val))}</span>,
-    },
-    {
-      key: "orderStatus",
-      header: "Status",
-      render: (val) => <StatusBadge status={String(val)} />,
-    },
-    {
-      key: "createdAt",
-      header: "Date",
-      render: (val) => new Date(val).toLocaleDateString(),
-    },
-  ];
-
-  return (
-    <DashboardLayout role="designer">
-      <div className="space-y-8">
-        <div>
-          <h1 className="text-3xl font-bold text-brand-ink mb-2">Designer Dashboard</h1>
-          <p className="text-brand-muted">Track your designs, listings, and earnings.</p>
-        </div>
-
-        {error && (
-          <ErrorState
-            title="Failed to load dashboard"
-            description={error}
-            retry={
-              <Button onClick={() => window.location.reload()} variant="primaryBlue">
-                Retry
-              </Button>
-            }
-          />
-        )}
-
-        {!error && (
-          <>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              {loading ? (
-                <>
-                  <Skeleton className="h-32" />
-                  <Skeleton className="h-32" />
-                  <Skeleton className="h-32" />
-                  <Skeleton className="h-32" />
-                </>
-              ) : kpis ? (
-                <>
-                  <KpiTile
-                    label="Lifetime earnings"
-                    value={uzs(kpis.lifetimeEarnings)}
-                    icon={<DollarSign size={24} />}
-                  />
-                  <KpiTile
-                    label="This month"
-                    value={uzs(kpis.monthEarnings)}
-                    icon={<TrendingUp size={24} />}
-                  />
-                  <KpiTile label="Listings Live" value={kpis.listingsLive} icon={<Tag size={24} />} />
-                  <KpiTile label="In Moderation" value={kpis.inModeration} icon={<Search size={24} />} />
-                </>
-              ) : null}
-            </div>
-
-            <Card>
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-xl font-semibold text-brand-ink">Recent Royalties</h2>
-                <Link href="/dashboard/designer/royalties">
-                  <Button variant="ghost" size="sm">View All</Button>
-                </Link>
-              </div>
-              <DataTable
-                columns={royaltyColumns}
-                rows={recentRoyalties}
-                loading={loading}
-                mobileMode="cards"
-                emptyState={
-                  <EmptyState
-                    title="No royalties yet"
-                    description="Start selling designs to earn royalties."
-                  />
-                }
-              />
-            </Card>
-
-            <Card>
-              <div className="flex items-start gap-4">
-                <div className="p-3 bg-brand-peachLight rounded-xl">
-                  <Upload className="text-brand-peach" size={24} />
-                </div>
-                <div className="flex-1">
-                  <h3 className="text-lg font-semibold text-brand-ink mb-2">Upload New Design</h3>
-                  <p className="text-sm text-brand-muted mb-4">
-                    Create a new design and list it for sale on RashPOD marketplace.
-                  </p>
-                  <Link href="/dashboard/designer/designs/new">
-                    <Button variant="primaryBlue">Upload Design</Button>
-                  </Link>
-                </div>
-              </div>
-            </Card>
-          </>
-        )}
-      </div>
-    </DashboardLayout>
-  );
+  const router = useRouter(); const { user, isLoading: authLoading } = useAuth(); const [overview, setOverview] = useState<DesignerDashboard | null>(null); const [earnings, setEarnings] = useState<Earnings | null>(null); const [loading, setLoading] = useState(true); const [error, setError] = useState("");
+  useEffect(() => { if (authLoading) return; if (!user) { router.push("/auth/login?next=/dashboard/designer"); return; } const load = async () => { setLoading(true); setError(""); try { const [dashboardRes, earningsRes] = await Promise.all([fetch("/api/proxy/designer/dashboard"), fetch("/api/proxy/designer/earnings")]); if (!dashboardRes.ok) throw new Error(`Server error (${dashboardRes.status})`); setOverview(await dashboardRes.json()); setEarnings(earningsRes.ok ? await earningsRes.json() : null); } catch (err) { setError(err instanceof Error ? err.message : "Failed to load designer dashboard."); } finally { setLoading(false); } }; void load(); }, [user, authLoading, router]);
+  return <DashboardLayout role="designer"><div className="mb-6 flex flex-wrap items-center justify-between gap-3"><div><h1 className="text-2xl font-bold text-brand-ink">Designer Dashboard</h1><p className="text-sm text-brand-muted">Track designs, listings, moderation, sales, and payouts.</p></div><div className="flex flex-wrap gap-2"><Link href="/dashboard/designer/designs/new" className="inline-flex min-h-11 items-center gap-2 rounded-pill bg-brand-blue px-4 py-2 text-sm font-semibold text-white"><Upload size={16} /> Upload design</Link><Link href="/dashboard/designer/support" className="inline-flex min-h-11 items-center gap-2 rounded-pill border border-brand-line bg-white px-4 py-2 text-sm font-semibold text-brand-ink"><LifeBuoy size={16} /> Support</Link></div></div>{error ? <ErrorState title="Could not load dashboard" description={error} /> : null}{loading ? <Skeleton className="h-64" /> : null}{overview ? <><div className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4"><KpiTile label="Uploaded designs" value={overview.uploadedDesigns} icon={<ImageIcon size={22} />} /><KpiTile label="Pending moderation" value={overview.pendingModeration} icon={<ImageIcon size={22} />} /><KpiTile label="Published listings" value={overview.publishedListings} icon={<Tag size={22} />} /><KpiTile label="Payable royalties" value={money(earnings?.payable ?? overview.payableRoyalties)} icon={<DollarSign size={22} />} /></div><div className="grid gap-5 xl:grid-cols-[1fr_360px]"><section className="rounded-2xl border border-brand-line bg-white p-5 shadow-soft"><div className="mb-4 flex items-center justify-between gap-3"><h2 className="text-lg font-semibold text-brand-ink">Recent activity</h2><Link href="/dashboard/designer/designs" className="text-sm font-semibold text-brand-blue">View designs</Link></div>{overview.recentActivity.length === 0 ? <EmptyState title="No activity yet" description="Upload your first design to start selling." /> : <div className="grid gap-3">{overview.recentActivity.map((item) => <Link key={`${item.type}-${item.id}`} href={item.type === "listing" ? `/dashboard/designer/listings/${item.id}` : `/dashboard/designer/designs/${item.id}`} className="rounded-xl border border-brand-line p-4 hover:border-brand-blue"><div className="flex flex-wrap items-center justify-between gap-3"><div><p className="font-semibold text-brand-ink">{item.label}</p><p className="text-sm text-brand-muted">{item.type} · {new Date(item.updatedAt).toLocaleDateString()}</p></div><StatusBadge status={item.status.toLowerCase()} /></div></Link>)}</div>}</section><aside className="rounded-2xl border border-brand-line bg-white p-5 shadow-soft"><h2 className="text-lg font-semibold text-brand-ink">Earnings</h2><div className="mt-4 space-y-3 text-sm"><Row label="Pending" value={money(earnings?.pending ?? overview.pendingRoyalties)} /><Row label="Earned" value={money(earnings?.earned ?? 0)} /><Row label="Payable" value={money(earnings?.payable ?? overview.payableRoyalties)} /><Row label="Paid" value={money(earnings?.paid ?? overview.paidPayouts)} /></div><Link href="/dashboard/designer/earnings" className="mt-5 inline-flex min-h-11 w-full items-center justify-center rounded-pill bg-brand-blue px-4 py-2 text-sm font-semibold text-white">View earnings</Link></aside></div></> : null}</DashboardLayout>;
 }
+function Row({ label, value }: { label: string; value: string }) { return <div className="flex items-center justify-between gap-3"><span className="text-brand-muted">{label}</span><span className="font-semibold text-brand-ink">{value}</span></div>; }
+function money(value = 0, currency = "UZS") { return new Intl.NumberFormat("en-US", { style: "currency", currency, maximumFractionDigits: currency === "UZS" ? 0 : 2 }).format(value || 0); }

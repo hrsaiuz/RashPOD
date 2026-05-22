@@ -1,8 +1,9 @@
 import { IsOptional, IsString, MaxLength } from "class-validator";
 
 export class AssignProductionJobDto {
+  @IsOptional()
   @IsString()
-  assigneeId!: string;
+  assigneeId?: string;
 
   @IsOptional()
   @IsString()

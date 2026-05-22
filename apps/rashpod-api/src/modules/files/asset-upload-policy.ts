@@ -33,6 +33,14 @@ export const ASSET_UPLOAD_POLICIES: Record<AssetPurpose, AssetUploadPolicy> = {
     bucketKind: "private",
     pathSegment: "normalized",
   },
+  FILM_SOURCE: {
+    purpose: AssetPurpose.FILM_SOURCE,
+    maxSizeBytes: 120_000_000,
+    allowedMimeTypes: ["image/png", "image/tiff", "application/pdf", "image/svg+xml"],
+    accessPolicy: AssetAccessPolicy.PRIVATE_SIGNED_URL,
+    bucketKind: "private",
+    pathSegment: "film-sources",
+  },
   MOCKUP_IMAGE: {
     purpose: AssetPurpose.MOCKUP_IMAGE,
     maxSizeBytes: 20_000_000,
@@ -56,6 +64,30 @@ export const ASSET_UPLOAD_POLICIES: Record<AssetPurpose, AssetUploadPolicy> = {
     accessPolicy: AssetAccessPolicy.PRIVATE_SIGNED_URL,
     bucketKind: "private",
     pathSegment: "production-files",
+  },
+  MARKETPLACE_EXPORT: {
+    purpose: AssetPurpose.MARKETPLACE_EXPORT,
+    maxSizeBytes: 250_000_000,
+    allowedMimeTypes: ["text/csv", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "application/zip"],
+    accessPolicy: AssetAccessPolicy.PRIVATE_SIGNED_URL,
+    bucketKind: "private",
+    pathSegment: "marketplace-exports",
+  },
+  EXTERNAL_ORDER_IMPORT: {
+    purpose: AssetPurpose.EXTERNAL_ORDER_IMPORT,
+    maxSizeBytes: 80_000_000,
+    allowedMimeTypes: ["text/csv", "application/vnd.ms-excel", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"],
+    accessPolicy: AssetAccessPolicy.PRIVATE_SIGNED_URL,
+    bucketKind: "private",
+    pathSegment: "external-order-imports",
+  },
+  POD_PROVIDER_FILE: {
+    purpose: AssetPurpose.POD_PROVIDER_FILE,
+    maxSizeBytes: 120_000_000,
+    allowedMimeTypes: ["image/png", "image/jpeg", "image/webp", "image/tiff", "application/pdf", "image/svg+xml"],
+    accessPolicy: AssetAccessPolicy.PRIVATE_SIGNED_URL,
+    bucketKind: "private",
+    pathSegment: "pod-provider-files",
   },
   TEMPLATE_IMAGE: {
     purpose: AssetPurpose.TEMPLATE_IMAGE,
@@ -124,12 +156,16 @@ export function buildAssetObjectKey(input: {
       return `designers/${input.ownerId}/designs/${input.designId ?? "unassigned"}/original/${input.assetId}.${ext}`;
     case AssetPurpose.DESIGN_NORMALIZED:
       return `designs/${input.designId ?? "unassigned"}/versions/${input.designVersionId ?? "unassigned"}/normalized/${input.assetId}.${ext}`;
+    case AssetPurpose.FILM_SOURCE:
+      return `film-sources/${input.ownerId}/${input.listingId ?? input.designId ?? "custom"}/${input.assetId}.${ext}`;
     case AssetPurpose.MOCKUP_IMAGE:
       return `mockups/${input.designId ?? "unassigned"}/${input.baseProductId ?? "base"}/${input.mockupTemplateId ?? "template"}/${input.assetId}.${ext}`;
     case AssetPurpose.LISTING_IMAGE:
       return `listings/${input.listingId ?? "unassigned"}/images/${input.assetId}.${ext}`;
     case AssetPurpose.PRODUCTION_FILE:
       return `production/${input.listingId ?? input.designId ?? "unassigned"}/${input.assetId}.${ext}`;
+    case AssetPurpose.MARKETPLACE_EXPORT:
+      return `marketplace-exports/${input.ownerId}/${input.assetId}.${ext}`;
     case AssetPurpose.TEMPLATE_IMAGE:
       return `templates/${input.baseProductId ?? "base"}/${input.mockupTemplateId ?? "template"}/${input.assetId}.${ext}`;
     case AssetPurpose.PRINT_AREA_PREVIEW:

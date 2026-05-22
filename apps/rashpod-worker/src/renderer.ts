@@ -13,7 +13,7 @@ export interface RenderedFile {
 
 export interface PipelineRenderContext {
   id: string;
-  pipeline: "LOCAL" | "GLOBAL_PRINTFUL";
+  pipeline: "LOCAL" | "GLOBAL_PRINTFUL" | "GLOBAL_POD";
   placement?: string;
   design?: { title?: string };
   latestDesignVersion?: { fileKey: string; widthPx?: number | null; heightPx?: number | null; dpi?: number | null; hasTransparency?: boolean | null } | null;
@@ -114,6 +114,21 @@ export class SharpRenderer {
       b: 255,
       alpha: 0,
     });
+  }
+
+  async renderFilmProductionFile(input: { productionJobId: string; queueType: string; widthCm?: number | null; heightCm?: number | null; quantity?: number | null }): Promise<RenderedFile> {
+    const widthPx = Math.max(600, Math.min(6000, Math.round((input.widthCm ?? 30) * 40)));
+    const heightPx = Math.max(600, Math.min(10000, Math.round((input.heightCm ?? 30) * 40)));
+    const label = `${input.queueType} ${input.widthCm ?? "?"}x${input.heightCm ?? "?"}cm x${input.quantity ?? 1}`;
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${widthPx}" height="${heightPx}" viewBox="0 0 ${widthPx} ${heightPx}">
+      <rect width="${widthPx}" height="${heightPx}" fill="rgba(255,255,255,0)"/>
+      <rect x="24" y="24" width="${widthPx - 48}" height="${heightPx - 48}" fill="rgba(120,138,224,0.08)" stroke="#788AE0" stroke-width="8" stroke-dasharray="28 18"/>
+      <text x="${widthPx / 2}" y="${heightPx / 2}" text-anchor="middle" font-family="Arial, sans-serif" font-size="${Math.max(28, Math.min(96, widthPx / 18))}" font-weight="700" fill="#0B1020">${label}</text>
+    </svg>`;
+    const relKey = `film-production-files/${input.productionJobId}/print-ready.png`;
+    const buffer = await sharp(Buffer.from(svg)).png().toBuffer();
+    const fileKey = await this.store.putBuffer(relKey, buffer, "image/png");
+    return { fileKey, objectKey: fileKey, contentType: "image/png", format: "png", widthPx, heightPx };
   }
 
   private async renderImage(

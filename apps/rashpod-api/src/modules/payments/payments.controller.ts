@@ -14,8 +14,15 @@ export class PaymentsController {
   @Post("click/create")
   @UseGuards(JwtAuthGuard, PermissionGuard)
   @RequirePermission("order:manage-own")
-  createClick(@Body() dto: CreateClickPaymentDto) {
-    return this.payments.createClickPayment(dto.orderId);
+  createClick(@CurrentUser() user: RequestUser, @Body() dto: CreateClickPaymentDto) {
+    return this.payments.createClickPayment(dto.orderId, user.sub);
+  }
+
+  @Get()
+  @UseGuards(JwtAuthGuard, PermissionGuard)
+  @RequirePermission("finance:manage")
+  listPayments() {
+    return this.payments.listPayments();
   }
 
   @Post("click/webhook")

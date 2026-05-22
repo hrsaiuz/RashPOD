@@ -1,62 +1,33 @@
-import Link from "next/link";
-import { Search, Star } from "lucide-react";
-import { StorePage } from "../storefront-ui";
+"use client";
 
-const cards = [
-  "Beautiful Samarkand",
-  "Kuch birlikda",
-  "Yuliy Rajabiy",
-  "Beautiful Samarkand",
-  "Kuch birlikda",
-  "Yuliy Rajabiy",
-];
+import Link from "next/link";
+import { useEffect, useState } from "react";
+import { Film, Search } from "lucide-react";
+import { StorePage } from "../storefront-ui";
+import { api } from "../../lib/api";
+
+type FilmListing = { id: string; slug: string; title: string; description?: string | null; price: number; currency: string; imageUrl?: string | null; designer: { displayName: string; handle: string } };
 
 export default function FilmPage() {
-  return (
-    <StorePage>
-      <div className="grid gap-7 lg:grid-cols-[310px_1fr]">
-        <aside className="rounded-[12px] bg-brand-bg p-5">
-          <h1 className="mb-8 text-[18px] font-black uppercase text-black">Filters</h1>
-          <div className="mb-8 flex items-center gap-3 text-[#8E8E94]">
-            <Search size={16} />
-            <span className="text-[12px] uppercase">Search</span>
-          </div>
-          <div className="mb-12 inline-flex rounded-[10px] border border-brand-blue">
-            <button className="rounded-[8px] bg-brand-blue px-4 py-2 text-sm text-white">DTF</button>
-            <button className="px-4 py-2 text-sm text-black">UV DTF</button>
-          </div>
-          {["Design category", "Size", "Price", "Color Type", "Rate", "Designer", "Tags"].map((label) => (
-            <div key={label} className="border-b border-brand-blueLight py-5">
-              <h2 className="text-[16px] font-black uppercase text-black">{label}</h2>
-              {label === "Rate" ? (
-                <div className="mt-4 flex gap-3 text-brand-peach">
-                  {[1, 2, 3, 4, 5].map((n) => <Star key={n} size={20} fill={n < 3 ? "currentColor" : "none"} />)}
-                </div>
-              ) : null}
-            </div>
-          ))}
-        </aside>
-        <section className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
-          {cards.map((title, index) => (
-            <Link key={`${title}-${index}`} href="/film/sample" className="rounded-[12px] bg-brand-bg p-6">
-              <div className="relative aspect-square overflow-hidden rounded-[28px] bg-white">
-                <span className="absolute left-5 top-5 rounded-[8px] bg-[#D66BCD] px-3 py-2 text-[10px] text-white">Best Seller</span>
-                <div className={`grid h-full place-items-center ${index % 3 === 1 ? "bg-[#101214]" : "bg-[#F7F7FA]"}`}>
-                  <div className={`h-36 w-44 rounded-[30px] ${index % 3 === 1 ? "bg-black text-white" : "bg-white text-[#1E2B6E]"} grid place-items-center text-center text-lg font-bold shadow-soft`}>
-                    {title}
-                  </div>
-                </div>
-              </div>
-              <h2 className="mt-5 text-[20px] font-black text-black">CLASSIC Black T-Shirt</h2>
-              <p className="mt-1 text-[12px] text-[#8E8E94]">Designed by Shuwan</p>
-              <div className="mt-6 flex items-center justify-between">
-                <p className="text-[20px] font-black text-black">20$</p>
-                <span className="rounded-[10px] bg-brand-peach px-6 py-3 text-[14px] font-bold text-white">See Product</span>
-              </div>
-            </Link>
-          ))}
-        </section>
-      </div>
-    </StorePage>
-  );
+  const [films, setFilms] = useState<FilmListing[]>([]);
+  const [query, setQuery] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    async function load() {
+      setLoading(true); setError("");
+      try {
+        const suffix = query.trim() ? `&q=${encodeURIComponent(query.trim())}` : "";
+        setFilms(await api.get<FilmListing[]>(`/shop/listings?type=FILM&limit=60${suffix}`));
+      } catch (err) { setError(err instanceof Error ? err.message : "Failed to load films."); }
+      finally { setLoading(false); }
+    }
+    const timer = window.setTimeout(load, 180);
+    return () => window.clearTimeout(timer);
+  }, [query]);
+
+  return <StorePage><div className="grid gap-7 lg:grid-cols-[300px_1fr]"><aside className="rounded-[12px] bg-brand-bg p-5"><h1 className="mb-6 text-[18px] font-black uppercase text-black">Films</h1><label className="flex items-center gap-3 rounded-[10px] bg-white px-4 py-3 text-[#8E8E94]"><Search size={16} /><input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search films" className="w-full bg-transparent text-sm text-brand-ink outline-none" /></label><div className="mt-8 grid gap-3"><span className="rounded-[10px] bg-brand-blue px-4 py-3 text-sm font-bold text-white">DTF / UV-DTF transfer films</span><Link href="/film/custom" className="rounded-[10px] border border-brand-blue bg-white px-4 py-3 text-sm font-bold text-brand-blue">Upload custom film</Link></div></aside><section>{error ? <div className="mb-4 rounded-[12px] border border-red-200 bg-red-50 p-4 text-sm text-red-700">{error}</div> : null}{loading ? <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">{Array.from({ length: 6 }).map((_, i) => <div key={i} className="h-80 animate-pulse rounded-[12px] bg-brand-bg" />)}</div> : films.length === 0 ? <div className="grid min-h-[360px] place-items-center rounded-[12px] bg-brand-bg p-8 text-center"><div><Film className="mx-auto mb-4 text-brand-blue" size={42} /><h2 className="text-xl font-black text-black">No films yet</h2><p className="mt-2 text-sm text-[#8E8E94]">Published DTF / UV-DTF film listings will appear here.</p></div></div> : <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">{films.map((film) => <Link key={film.id} href={`/film/${film.slug}`} className="rounded-[12px] bg-brand-bg p-6 transition hover:-translate-y-0.5 hover:shadow-product"><div className="relative aspect-square overflow-hidden rounded-[24px] bg-white"><div className="absolute left-4 top-4 rounded-[8px] bg-brand-peach px-3 py-2 text-[10px] font-bold text-white">FILM</div>{film.imageUrl ? <img src={film.imageUrl} alt="" className="h-full w-full object-cover" /> : <div className="grid h-full place-items-center text-brand-blue"><Film size={56} /></div>}</div><h2 className="mt-5 text-[20px] font-black text-black">{film.title}</h2><p className="mt-1 text-[12px] text-[#8E8E94]">Designed by {film.designer.displayName}</p><div className="mt-6 flex items-center justify-between gap-3"><p className="text-[20px] font-black text-black">{money(film.price, film.currency)}</p><span className="rounded-[10px] bg-brand-peach px-5 py-3 text-[14px] font-bold text-white">Order film</span></div></Link>)}</div>}</section></div></StorePage>;
 }
+
+function money(value: number, currency: string) { return new Intl.NumberFormat("en-US", { style: "currency", currency, maximumFractionDigits: currency === "UZS" ? 0 : 2 }).format(value || 0); }

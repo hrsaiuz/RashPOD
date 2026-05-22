@@ -12,6 +12,9 @@ export type JobType =
   | "CREATE_PRODUCT_LISTING_DRAFT"
   | "PUBLISH_MARKETPLACE_LISTING"
   | "SYNC_PRINTFUL_CATALOG"
+  | "SYNC_POD_CATALOG"
+  | "UPLOAD_POD_PROVIDER_FILE"
+  | "SYNC_POD_PRODUCT_DRAFT"
   | "RETRY_FAILED_INTEGRATION"
   | "GENERATE_LISTING_IMAGE_PACK"
   | "GENERATE_FILM_PREVIEW"
@@ -54,6 +57,21 @@ export class JobDispatcherService {
     if (jobType === "GENERATE_LISTING_IMAGE_PACK" || jobType === "GENERATE_FILM_PREVIEW" || jobType === "GENERATE_PRODUCTION_FILE") {
       const generatedAssetId = payload.generatedAssetId;
       if (typeof generatedAssetId === "string" && generatedAssetId.length > 0) return `${jobType}:${generatedAssetId}`;
+      const productionJobId = payload.productionJobId;
+      if (jobType === "GENERATE_PRODUCTION_FILE" && typeof productionJobId === "string" && productionJobId.length > 0) return `${jobType}:production-job:${productionJobId}`;
+    }
+    if (jobType === "SYNC_POD_CATALOG") {
+      const providerConfigId = payload.providerConfigId;
+      if (typeof providerConfigId === "string" && providerConfigId.length > 0) return `${jobType}:${providerConfigId}`;
+    }
+    if (jobType === "UPLOAD_POD_PROVIDER_FILE") {
+      const providerConfigId = payload.providerConfigId;
+      const sourceAssetId = payload.sourceAssetId;
+      if (typeof providerConfigId === "string" && typeof sourceAssetId === "string") return `${jobType}:${providerConfigId}:${sourceAssetId}`;
+    }
+    if (jobType === "SYNC_POD_PRODUCT_DRAFT") {
+      const syncRecordId = payload.syncRecordId;
+      if (typeof syncRecordId === "string" && syncRecordId.length > 0) return `${jobType}:${syncRecordId}`;
     }
     return undefined;
   }

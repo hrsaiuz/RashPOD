@@ -1,140 +1,130 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
+import { AlertCircle, Banknote, CreditCard, FileText, RefreshCw, Wallet } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "../../auth/auth-provider";
 import DashboardLayout from "../dashboard-layout";
-import { KpiTile, EmptyState, ErrorState, Skeleton, Card, Button } from "@rashpod/ui";
-import { DollarSign, CreditCard, AlertCircle, CheckCircle } from "lucide-react";
-import Link from "next/link";
 
-interface FinanceKpis {
+type FinanceOverview = {
+  grossSales: number;
+  netSales: number;
+  paidOrders: number;
+  unpaidOrFailedPayments: number;
   pendingRoyalties: number;
-  paidThisMonth: number;
-  clickReconciliation: number;
-  settlementsDue: number;
-}
+  earnedRoyalties: number;
+  payableRoyalties: number;
+  paidPayouts: number;
+  estimatedPlatformMargin: number;
+  reconciliationIssues: number;
+  incompleteCostWarnings: number;
+  currency: string;
+};
 
-export default function FinanceOverview() {
+const links = [
+  { href: "/dashboard/finance/royalties", label: "Royalties", icon: Wallet },
+  { href: "/dashboard/finance/payouts", label: "Payouts", icon: Banknote },
+  { href: "/dashboard/finance/reconciliation", label: "Reconciliation", icon: CreditCard },
+  { href: "/dashboard/finance/payments", label: "Payments", icon: FileText },
+];
+
+export default function FinanceOverviewPage() {
   const router = useRouter();
-  const { user, isLoading: authLoading } = useAuth();
-  const [kpis, setKpis] = useState<FinanceKpis | null>(null);
+  const { user, isLoading } = useAuth();
+  const [data, setData] = useState<FinanceOverview | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  useEffect(() => {
-    if (authLoading) return;
-    if (!user) {
-      router.push("/auth/login?next=/dashboard/finance");
-      return;
+  async function load() {
+    setLoading(true);
+    setError("");
+    try {
+      const res = await fetch("/api/proxy/finance/overview");
+      if (res.status === 401 || res.status === 403) { router.push("/auth/login?next=/dashboard/finance"); return; }
+      if (!res.ok) throw new Error(`Server error (${res.status})`);
+      setData(await res.json());
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load finance overview.");
+    } finally {
+      setLoading(false);
     }
+  }
 
-    const load = async () => {
-      setLoading(true);
-      setError("");
-      try {
-        // TODO: Replace with actual endpoints
-        // const kpiRes = await fetch("/api/proxy/finance/kpis");
-        
-        setKpis({
-          pendingRoyalties: 1250.75,
-          paidThisMonth: 4320.50,
-          clickReconciliation: 850.00,
-          settlementsDue: 3,
-        });
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to load data");
-      } finally {
-        setLoading(false);
-      }
-    };
+  useEffect(() => {
+    if (isLoading || !user) return;
     void load();
-  }, [user, authLoading, router]);
+  }, [user, isLoading]);
+
+  const currency = data?.currency ?? "UZS";
 
   return (
     <DashboardLayout role="finance">
-      <div className="space-y-8">
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, marginBottom: 20, flexWrap: "wrap" }}>
         <div>
-          <h1 className="text-3xl font-bold text-brand-ink mb-2">Finance Dashboard</h1>
-          <p className="text-brand-muted">Monitor royalties, payments, and settlements.</p>
+          <h1 style={{ margin: 0, fontSize: 24, color: "#1A1D2E" }}>Finance Overview</h1>
+          <p style={{ margin: "4px 0 0", color: "#6B7280", fontSize: 13 }}>Sales, royalties, payouts, margin, and reconciliation control.</p>
         </div>
+        <button onClick={load} style={buttonStyle}><RefreshCw size={15} /> Refresh</button>
+      </div>
 
-        {error && (
-          <ErrorState
-            title="Failed to load dashboard"
-            description={error}
-            retry={
-              <Button onClick={() => window.location.reload()} variant="primaryBlue">
-                Retry
-              </Button>
-            }
-          />
-        )}
+      {error ? <Alert message={error} /> : null}
 
-        {!error && (
-          <>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              {loading ? (
-                <>
-                  <Skeleton className="h-32" />
-                  <Skeleton className="h-32" />
-                  <Skeleton className="h-32" />
-                  <Skeleton className="h-32" />
-                </>
-              ) : kpis ? (
-                <>
-                  <KpiTile 
-                    label="Pending Royalties" 
-                    value={`$${kpis.pendingRoyalties.toFixed(2)}`} 
-                    icon={<DollarSign size={24} />} 
-                  />
-                  <KpiTile 
-                    label="Paid This Month" 
-                    value={`$${kpis.paidThisMonth.toFixed(2)}`} 
-                    icon={<CheckCircle size={24} />}
-                    delta={{ value: 8, isPositive: true }}
-                  />
-                  <KpiTile 
-                    label="Click Reconciliation" 
-                    value={`$${kpis.clickReconciliation.toFixed(2)}`} 
-                    icon={<CreditCard size={24} />} 
-                  />
-                  <KpiTile label="Settlements Due" value={kpis.settlementsDue} icon={<AlertCircle size={24} />} />
-                </>
-              ) : null}
-            </div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))", gap: 12, marginBottom: 20 }}>
+        <Kpi label="Gross sales" value={money(data?.grossSales, currency)} loading={loading} />
+        <Kpi label="Net sales" value={money(data?.netSales, currency)} loading={loading} />
+        <Kpi label="Paid orders" value={data?.paidOrders ?? 0} loading={loading} />
+        <Kpi label="Pending royalties" value={money(data?.pendingRoyalties, currency)} loading={loading} />
+        <Kpi label="Payable royalties" value={money(data?.payableRoyalties, currency)} loading={loading} />
+        <Kpi label="Paid payouts" value={money(data?.paidPayouts, currency)} loading={loading} />
+        <Kpi label="Margin estimate" value={money(data?.estimatedPlatformMargin, currency)} loading={loading} />
+        <Kpi label="Recon issues" value={data?.reconciliationIssues ?? 0} loading={loading} warning={(data?.reconciliationIssues ?? 0) > 0} />
+      </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <Card>
-                <h3 className="text-lg font-semibold text-brand-ink mb-4">Quick Links</h3>
-                <div className="space-y-3">
-                  <Link href="/dashboard/finance/royalties">
-                    <Button variant="ghost" className="w-full justify-start">
-                      <DollarSign size={18} className="mr-2" />
-                      Manage Royalties
-                    </Button>
-                  </Link>
-                  <Link href="/dashboard/finance/payments">
-                    <Button variant="ghost" className="w-full justify-start">
-                      <CreditCard size={18} className="mr-2" />
-                      View Payments
-                    </Button>
-                  </Link>
-                </div>
-              </Card>
-
-              <Card>
-                <h3 className="text-lg font-semibold text-brand-ink mb-2">Alerts</h3>
-                <p className="text-sm text-brand-muted">
-                  {kpis && kpis.settlementsDue > 0 
-                    ? `${kpis.settlementsDue} settlement(s) need your attention.`
-                    : "All settlements are up to date."}
-                </p>
-              </Card>
-            </div>
-          </>
-        )}
+      <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1.2fr) minmax(280px, 0.8fr)", gap: 16 }}>
+        <section style={panelStyle}>
+          <h2 style={sectionTitle}>Open Controls</h2>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 10 }}>
+            {links.map(({ href, label, icon: Icon }) => (
+              <Link key={href} href={href} style={linkTileStyle}><Icon size={18} /> {label}</Link>
+            ))}
+          </div>
+        </section>
+        <section style={panelStyle}>
+          <h2 style={sectionTitle}>Warnings</h2>
+          {loading ? <Skeleton /> : null}
+          {!loading && data && data.incompleteCostWarnings === 0 && data.reconciliationIssues === 0 ? <p style={muted}>No finance warnings right now.</p> : null}
+          {!loading && data && data.incompleteCostWarnings > 0 ? <Warning text={`${data.incompleteCostWarnings} item(s) have incomplete margin data.`} /> : null}
+          {!loading && data && data.reconciliationIssues > 0 ? <Warning text={`${data.reconciliationIssues} payment reconciliation item(s) need review.`} /> : null}
+          {!loading && data && data.unpaidOrFailedPayments > 0 ? <Warning text={`${data.unpaidOrFailedPayments} unpaid/failed order(s) remain open.`} /> : null}
+        </section>
       </div>
     </DashboardLayout>
   );
 }
+
+function Kpi({ label, value, loading, warning }: { label: string; value: string | number; loading: boolean; warning?: boolean }) {
+  return <div style={{ ...panelStyle, minHeight: 86 }}><div style={{ color: "#6B7280", fontSize: 12, marginBottom: 8 }}>{label}</div>{loading ? <Skeleton /> : <div style={{ color: warning ? "#B42318" : "#1A1D2E", fontWeight: 800, fontSize: 20, overflowWrap: "anywhere" }}>{value}</div>}</div>;
+}
+
+function Alert({ message }: { message: string }) {
+  return <div role="alert" style={{ background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 8, padding: 14, color: "#B42318", fontSize: 14, marginBottom: 16 }}>{message}</div>;
+}
+
+function Warning({ text }: { text: string }) {
+  return <div style={{ display: "flex", alignItems: "flex-start", gap: 8, color: "#92400E", background: "#FEF3C7", borderRadius: 8, padding: 10, marginTop: 8, fontSize: 13 }}><AlertCircle size={16} /> {text}</div>;
+}
+
+function Skeleton() {
+  return <div style={{ height: 18, width: "70%", borderRadius: 6, background: "#F0F2FA" }} />;
+}
+
+function money(value = 0, currency = "UZS") {
+  return new Intl.NumberFormat("en-US", { style: "currency", currency, maximumFractionDigits: currency === "UZS" ? 0 : 2 }).format(value || 0);
+}
+
+const panelStyle = { background: "white", border: "1px solid #E8EAFB", borderRadius: 8, padding: 16 };
+const sectionTitle = { margin: "0 0 12px", color: "#1F2937", fontSize: 15 };
+const muted = { color: "#6B7280", fontSize: 13, margin: 0 };
+const buttonStyle = { display: "inline-flex", alignItems: "center", gap: 8, border: "1px solid #E8EAFB", background: "white", borderRadius: 8, padding: "8px 12px", color: "#374151", cursor: "pointer" };
+const linkTileStyle = { display: "inline-flex", alignItems: "center", gap: 8, border: "1px solid #E8EAFB", borderRadius: 8, padding: "12px", color: "#374151", textDecoration: "none", fontWeight: 700, fontSize: 13 };

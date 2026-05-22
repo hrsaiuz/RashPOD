@@ -1,4 +1,4 @@
-import { ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
 import { DesignStatus } from "@prisma/client";
 import { PrismaService } from "../../prisma/prisma.service";
 import { AuditService } from "../audit/audit.service";
@@ -51,13 +51,48 @@ export class DesignsService {
     });
     if (!design) throw new NotFoundException("Design not found");
     if (design.designerId !== designerId) throw new ForbiddenException("Not your design");
-    return design;
+    return {
+      ...design,
+      versions: design.versions.map((version) => ({
+        id: version.id,
+        designAssetId: version.designAssetId,
+        widthPx: version.widthPx,
+        heightPx: version.heightPx,
+        dpi: version.dpi,
+        hasTransparency: version.hasTransparency,
+        createdAt: version.createdAt,
+      })),
+      moderationAudits: design.moderationAudits.map((audit) => ({
+        id: audit.id,
+        designId: audit.designId,
+        decision: audit.decision,
+        predefinedReasons: audit.predefinedReasons,
+        customReason: audit.customReason,
+        beforeStatus: audit.beforeStatus,
+        afterStatus: audit.afterStatus,
+        createdAt: audit.createdAt,
+      })),
+      productSelections: design.productSelections.map((selection) => ({
+        ...selection,
+        mockupAssets: selection.mockupAssets.map((asset) => ({
+          id: asset.id,
+          mockupType: asset.mockupType,
+          status: asset.status,
+          imageUrl: asset.imageUrl,
+          thumbnailUrl: asset.thumbnailUrl,
+          failureReason: asset.failureReason,
+          createdAt: asset.createdAt,
+          updatedAt: asset.updatedAt,
+        })),
+      })),
+    };
   }
 
   async submit(designerId: string, designId: string) {
-    const design = await this.prisma.designAsset.findUnique({ where: { id: designId } });
+    const design = await this.prisma.designAsset.findUnique({ where: { id: designId }, include: { versions: { orderBy: { createdAt: "desc" }, take: 1 } } });
     if (!design) throw new NotFoundException("Design not found");
     if (design.designerId !== designerId) throw new ForbiddenException("Not your design");
+    if (design.versions.length === 0) throw new BadRequestException("Upload a verified design file before submitting for moderation");
     const updated = await this.prisma.designAsset.update({
       where: { id: designId },
       data: { status: DesignStatus.PENDING_MODERATION, moderationStatus: "PENDING" },

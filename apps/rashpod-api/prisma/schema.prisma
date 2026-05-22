@@ -63,11 +63,15 @@ enum GeneratedAssetStatus {
 enum AssetPurpose {
   DESIGN_ORIGINAL
   DESIGN_NORMALIZED
+  FILM_SOURCE
   MOCKUP_IMAGE
   LISTING_IMAGE
   PRODUCTION_FILE
+  MARKETPLACE_EXPORT
+  POD_PROVIDER_FILE
   TEMPLATE_IMAGE
   PRINT_AREA_PREVIEW
+  EXTERNAL_ORDER_IMPORT
 }
 
 enum AssetStorageProvider {
@@ -105,6 +109,23 @@ enum ListingType {
   FILM
 }
 
+enum FilmOrderKind {
+  DESIGN_FILM
+  CUSTOM_FILM
+}
+
+enum FilmType {
+  DTF
+  UV_DTF
+}
+
+enum FilmConsentAction {
+  ENABLED
+  REVOKED
+  ADMIN_ENABLED
+  ADMIN_REVOKED
+}
+
 enum ListingStatus {
   DRAFT
   READY_FOR_REVIEW
@@ -120,11 +141,13 @@ enum ListingStatus {
 enum PipelineType {
   LOCAL
   GLOBAL_PRINTFUL
+  GLOBAL_POD
 }
 
 enum ProviderType {
   RASHPOD
   PRINTFUL
+  PRINTIFY
   DIRECT_MARKETPLACE
 }
 
@@ -261,6 +284,186 @@ enum MarketplacePublicationStatus {
   NEEDS_REVIEW
 }
 
+enum MarketplaceType {
+  MANUAL_EXPORT
+}
+
+enum ManualMarketplaceKey {
+  UZUM
+  OLX_UZ
+  TELEGRAM_SHOP
+  INSTAGRAM
+  FACEBOOK
+  OTHER
+}
+
+enum MarketplaceExportFormat {
+  CSV
+  XLSX
+  ZIP_IMAGES
+  CSV_WITH_IMAGE_URLS
+}
+
+enum MarketplaceExportBatchStatus {
+  DRAFT
+  READY
+  EXPORTING
+  EXPORTED
+  FAILED
+  CANCELED
+  PARTIALLY_EXPORTED
+}
+
+enum MarketplaceExportItemStatus {
+  DRAFT
+  READY
+  BLOCKED
+  EXPORTED
+  FAILED
+  CANCELED
+}
+
+enum ExportedListingStatus {
+  EXPORTED
+  MANUALLY_LISTED
+  ACTIVE
+  PAUSED
+  SOLD_EXTERNALLY
+  ARCHIVED
+  ERROR
+}
+
+enum MarketplaceExternalSaleStatus {
+  RECORDED
+  ORDER_CREATED
+  CANCELED
+}
+
+enum MarketplaceExternalSaleSource {
+  MANUAL
+}
+
+enum ExternalOrderSourceType {
+  MARKETPLACE_MANUAL
+  MARKETPLACE_CSV_IMPORT
+  TELEGRAM_MANUAL
+  INSTAGRAM_MANUAL
+  PHONE_ORDER
+  SHOWROOM_OR_OFFLINE
+  GLOBAL_POD_PROVIDER_MANUAL
+  OTHER
+}
+
+enum ExternalOrderPaymentStatus {
+  PAID_EXTERNALLY
+  CASH_ON_DELIVERY
+  PAYMENT_PENDING_MANUAL
+  UNPAID
+  REFUNDED_EXTERNALLY
+  CANCELED_EXTERNALLY
+  MANUAL_REVIEW
+}
+
+enum ExternalOrderIntakeStatus {
+  DRAFT
+  VALIDATING
+  READY_TO_CONVERT
+  CONVERTED_TO_ORDER
+  NEEDS_REVIEW
+  DUPLICATE
+  CANCELED
+  FAILED
+}
+
+enum ExternalOrderItemMappingStatus {
+  MAPPED
+  AUTO_MAPPED
+  NEEDS_MAPPING
+  NOT_FOUND
+  AMBIGUOUS
+}
+
+enum ExternalOrderDuplicateStatus {
+  UNIQUE
+  POSSIBLE_DUPLICATE
+  CONFIRMED_DUPLICATE
+  DUPLICATE_IGNORED
+}
+
+enum ExternalOrderImportStatus {
+  UPLOADED
+  PARSED
+  MAPPED
+  VALIDATED
+  IMPORTED
+  FAILED
+}
+
+enum PodProviderType {
+  PRINTFUL
+  PRINTIFY
+}
+
+enum PodProviderMode {
+  TEST
+  LIVE
+}
+
+enum PodCatalogSyncStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+}
+
+enum PodAvailabilityStatus {
+  AVAILABLE
+  UNAVAILABLE
+  ARCHIVED
+}
+
+enum PodMappingQuality {
+  EXACT
+  COMPATIBLE
+  MANUAL_REVIEW
+}
+
+enum PodProviderFileStatus {
+  PENDING
+  UPLOADED
+  FAILED
+}
+
+enum PodSyncRecordStatus {
+  DRAFT
+  VALIDATING
+  READY
+  SYNCING
+  SYNCED
+  FAILED
+  MANUAL_REVIEW
+  CANCELED
+}
+
+enum PodMockupStatus {
+  PENDING
+  READY
+  FAILED
+}
+
+enum PodWebhookEventStatus {
+  ACCEPTED
+  REJECTED
+  PROCESSED
+  FAILED
+}
+
+enum OrderFulfillmentRoute {
+  LOCAL_PRODUCTION
+  GLOBAL_POD_PROVIDER
+  MANUAL_EXTERNAL
+}
+
 enum PrintfulMappingStatus {
   PENDING
   READY
@@ -296,13 +499,24 @@ enum PaymentStatus {
 
 enum ProductionJobStatus {
   ORDERED
+  WAITING_FOR_FILE
+  FILE_GENERATING
   FILE_CHECK
   READY_FOR_PRINT
+  IN_PRODUCTION
   PRINTING
+  QUALITY_CHECK
   QC
+  QC_FAILED
+  REPRINT_REQUIRED
   PACKING
   READY_FOR_PICKUP
+  READY_FOR_DELIVERY
+  OUT_FOR_DELIVERY
   DELIVERED
+  COMPLETED
+  CANCELED
+  BLOCKED
 }
 
 enum CorporateRequestStatus {
@@ -348,25 +562,51 @@ enum LedgerEntryStatus {
   VOID
 }
 
+enum RoyaltyEntryType {
+  PENDING
+  EARNED
+  PAYABLE
+  PAID
+  REVERSED
+  ADJUSTMENT
+}
+
 enum RoyaltyLedgerStatus {
   CALCULATED
+  PENDING
+  EARNED
+  PAYABLE
+  PAID
   ACKNOWLEDGED
   PAIDOUT
+  REVERSED
+  ADJUSTMENT
   CANCELLED
 }
 
 enum PayoutStatus {
+  DRAFT
   REQUESTED
+  APPROVED
   PROCESSING
+  PAID
   CONFIRMED
   FAILED
   CANCELLED
+  CANCELED
 }
 
 enum PayoutMethod {
   CLICK_WALLET
   BANK_ACCOUNT
   MANUAL
+}
+
+enum PaymentReconciliationStatus {
+  UNRECONCILED
+  MATCHED
+  MISMATCHED
+  MANUAL_REVIEW
 }
 
 enum BonusType {
@@ -411,6 +651,10 @@ model User {
   bonuses      DesignerBonus[] @relation("DesignerBonuses")
   createdBonuses DesignerBonus[] @relation("BonusCreator")
   createdGroupBonuses GroupBonus[] @relation("GroupBonusCreator")
+  supportRequests SupportRequest[] @relation("SupportRequestRequester")
+  filmConsentEvents FilmConsentEvent[] @relation("FilmConsentEventActor")
+  externalOrderIntakes ExternalOrderIntake[] @relation("ExternalOrderIntakeCreator")
+  externalOrderImports ExternalOrderImport[] @relation("ExternalOrderImportCreator")
 }
 
 model UserPreferences {
@@ -463,6 +707,9 @@ model DesignAsset {
   mockupAssets     MockupAsset[]
   printfulFileMappings PrintfulFileMapping[]
   listings         CommerceListing[]
+  supportRequests  SupportRequest[]
+  filmConsentEvents FilmConsentEvent[]
+  externalOrderIntakeItems ExternalOrderIntakeItem[]
 }
 
 model DesignVersion {
@@ -478,6 +725,7 @@ model DesignVersion {
   designAsset DesignAsset @relation(fields: [designAssetId], references: [id])
   moderationCases DesignModerationCase[]
   placements      MockupPlacement[]
+  externalOrderIntakeItems ExternalOrderIntakeItem[]
 }
 
 model DesignModerationCase {
@@ -549,6 +797,12 @@ model FileAsset {
   createdAt          DateTime             @default(now())
   updatedAt          DateTime             @updatedAt
 
+  marketplaceExportBatches    MarketplaceExportBatch[] @relation("MarketplaceExportFile")
+  marketplaceExportZipBatches MarketplaceExportBatch[] @relation("MarketplaceExportZipFile")
+  externalOrderImports        ExternalOrderImport[]
+  externalOrderIntakeItems    ExternalOrderIntakeItem[]
+  podProviderFiles            PodProviderFile[]
+
   @@index([ownerId, purpose, status])
   @@index([designId])
   @@index([listingId])
@@ -568,6 +822,26 @@ model CommercialRights {
   updatedAt                  DateTime  @updatedAt
 
   designAsset DesignAsset @relation(fields: [designAssetId], references: [id])
+}
+
+model FilmConsentEvent {
+  id                 String            @id @default(uuid())
+  designAssetId      String
+  designerId         String
+  actorId            String?
+  designVersionId    String?
+  action             FilmConsentAction
+  reason             String?
+  policySnapshotJson Json?
+  royaltySnapshotJson Json?
+  createdAt          DateTime          @default(now())
+
+  designAsset DesignAsset @relation(fields: [designAssetId], references: [id], onDelete: Cascade)
+  actor       User?       @relation("FilmConsentEventActor", fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([designAssetId, createdAt])
+  @@index([designerId, createdAt])
+  @@index([actorId])
 }
 
 model ProductType {
@@ -590,6 +864,9 @@ model ProductType {
   updatedAt              DateTime @updatedAt
 
   baseProducts           BaseProduct[]
+  marketplaceCategoryMappings MarketplaceCategoryMapping[]
+  podProductMappings     PodProductMapping[]
+  externalOrderIntakeItems ExternalOrderIntakeItem[]
 }
 
 model RoyaltyRule {
@@ -634,6 +911,9 @@ model BaseProduct {
   placementPresets PlacementPreset[]
   productSelections DesignProductSelection[]
   listings CommerceListing[]
+  marketplaceCategoryMappings MarketplaceCategoryMapping[]
+  podProductMappings PodProductMapping[]
+  externalOrderIntakeItems ExternalOrderIntakeItem[]
 }
 
 model MockupTemplate {
@@ -681,6 +961,7 @@ model PrintArea {
 
   mockupTemplate MockupTemplate @relation(fields: [mockupTemplateId], references: [id])
   placements     MockupPlacement[]
+  podPrintAreaMappings PodPrintAreaMapping[]
 }
 
 model PrintfulProductTemplate {
@@ -750,6 +1031,14 @@ model FilmSaleSettings {
   minimumOrderPrice         Decimal? @db.Decimal(10, 2)
   rushOrderFee              Decimal? @db.Decimal(10, 2)
   revocationPolicy          String?
+  currency                  String   @default("UZS")
+  dtfPricingJson            Json?
+  uvDtfPricingJson          Json?
+  consentPolicyJson         Json?
+  royaltyPolicyJson         Json?
+  productionConstraintsJson Json?
+  settingsVersion           Int      @default(1)
+  taxRatePercent            Decimal? @db.Decimal(10, 4)
   updatedAt                 DateTime @updatedAt
 }
 
@@ -927,9 +1216,353 @@ model CommerceListing {
   printfulProductTemplate PrintfulProductTemplate? @relation(fields: [printfulProductTemplateId], references: [id])
   designProductSelection DesignProductSelection? @relation(fields: [designProductSelectionId], references: [id])
   marketplacePublications MarketplacePublication[]
+  marketplaceExportItems MarketplaceExportItem[]
+  exportedListings ExportedListing[]
+  marketplaceExternalSales MarketplaceExternalSale[]
+  externalOrderIntakeItems ExternalOrderIntakeItem[]
+  podSyncRecords PodProviderSyncRecord[]
   cartItems   CartItem[]
   orderItems  OrderItem[]
   royaltyLedgerEntries RoyaltyLedgerEntry[]
+  supportRequests SupportRequest[]
+}
+
+model MarketplaceConfig {
+  id                   String               @id @default(uuid())
+  key                  ManualMarketplaceKey
+  marketplaceType      MarketplaceType      @default(MANUAL_EXPORT)
+  name                 String
+  isEnabled            Boolean              @default(true)
+  countryCode          String               @default("UZ")
+  currency             String               @default("UZS")
+  defaultLanguage      String               @default("uz-Latn")
+  supportedLanguages   Json?
+  supportedListingTypes Json?
+  exportFormats        Json?
+  imageRequirementsJson Json?
+  pricingRulesJson     Json?
+  skuPrefix            String               @default("RPD")
+  statusMappingJson    Json?
+  notes                String?
+  metadataJson         Json?
+  createdById          String?
+  updatedById          String?
+  createdAt            DateTime             @default(now())
+  updatedAt            DateTime             @updatedAt
+
+  categoryMappings MarketplaceCategoryMapping[]
+  exportBatches    MarketplaceExportBatch[]
+  exportedListings ExportedListing[]
+  externalSales    MarketplaceExternalSale[]
+  externalOrderImports ExternalOrderImport[]
+  externalOrderIntakes ExternalOrderIntake[]
+  externalOrderIntakeItems ExternalOrderIntakeItem[]
+
+  @@unique([key, name])
+  @@index([key, isEnabled])
+}
+
+model MarketplaceCategoryMapping {
+  id                         String   @id @default(uuid())
+  marketplaceConfigId        String
+  productTypeId              String
+  baseProductId              String?
+  marketplaceCategoryId      String
+  marketplaceCategoryName    String
+  requiredAttributesJson     Json?
+  optionalAttributesJson     Json?
+  valueMappingsJson          Json?
+  isActive                   Boolean  @default(true)
+  createdById                String?
+  updatedById                String?
+  createdAt                  DateTime @default(now())
+  updatedAt                  DateTime @updatedAt
+
+  marketplaceConfig MarketplaceConfig @relation(fields: [marketplaceConfigId], references: [id], onDelete: Cascade)
+  productType       ProductType       @relation(fields: [productTypeId], references: [id], onDelete: Restrict)
+  baseProduct       BaseProduct?      @relation(fields: [baseProductId], references: [id], onDelete: SetNull)
+
+  @@unique([marketplaceConfigId, productTypeId, baseProductId])
+  @@index([marketplaceConfigId, isActive])
+  @@index([productTypeId])
+  @@index([baseProductId])
+}
+
+model MarketplaceExportBatch {
+  id                    String                       @id @default(uuid())
+  marketplaceConfigId   String
+  status                MarketplaceExportBatchStatus @default(DRAFT)
+  exportFormat          MarketplaceExportFormat      @default(CSV)
+  selectedListingIdsJson Json?
+  exportFileAssetId     String?
+  zipFileAssetId        String?
+  generatedAt           DateTime?
+  exportedAt            DateTime?
+  failureReason         String?
+  notes                 String?
+  createdById           String?
+  updatedById           String?
+  metadataJson          Json?
+  createdAt             DateTime                     @default(now())
+  updatedAt             DateTime                     @updatedAt
+
+  marketplaceConfig MarketplaceConfig @relation(fields: [marketplaceConfigId], references: [id], onDelete: Restrict)
+  exportFileAsset   FileAsset?        @relation("MarketplaceExportFile", fields: [exportFileAssetId], references: [id], onDelete: SetNull)
+  zipFileAsset      FileAsset?        @relation("MarketplaceExportZipFile", fields: [zipFileAssetId], references: [id], onDelete: SetNull)
+  items             MarketplaceExportItem[]
+  exportedListings  ExportedListing[]
+
+  @@index([marketplaceConfigId, status, createdAt])
+  @@index([exportFileAssetId])
+  @@index([zipFileAssetId])
+}
+
+model MarketplaceExportItem {
+  id                    String                      @id @default(uuid())
+  batchId               String
+  listingId             String
+  status                MarketplaceExportItemStatus @default(DRAFT)
+  eligible              Boolean                     @default(false)
+  blockersJson          Json?
+  warningsJson          Json?
+  exportSku             String
+  contentSnapshotJson   Json?
+  priceSnapshotJson     Json?
+  categorySnapshotJson  Json?
+  imageSnapshotJson     Json?
+  variantSnapshotJson   Json?
+  skuOverrideReason     String?
+  priceOverrideReason   String?
+  rowJson               Json?
+  createdAt             DateTime                    @default(now())
+  updatedAt             DateTime                    @updatedAt
+
+  batch   MarketplaceExportBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  listing CommerceListing        @relation(fields: [listingId], references: [id], onDelete: Cascade)
+
+  @@unique([batchId, listingId])
+  @@index([listingId])
+  @@index([exportSku])
+  @@index([status, eligible])
+}
+
+model ExportedListing {
+  id                    String                @id @default(uuid())
+  marketplaceConfigId   String
+  listingId             String
+  exportBatchId         String?
+  exportSku             String
+  exportTitle           String
+  exportPrice           Decimal               @db.Decimal(10, 2)
+  currency              String                @default("UZS")
+  categorySnapshotJson  Json?
+  imageSnapshotJson     Json?
+  contentSnapshotJson   Json?
+  priceSnapshotJson     Json?
+  status                ExportedListingStatus @default(EXPORTED)
+  externalUrl           String?
+  externalListingId     String?
+  manuallyListedById    String?
+  manuallyListedAt      DateTime?
+  lastCheckedAt         DateTime?
+  notes                 String?
+  createdAt             DateTime              @default(now())
+  updatedAt             DateTime              @updatedAt
+
+  marketplaceConfig MarketplaceConfig       @relation(fields: [marketplaceConfigId], references: [id], onDelete: Restrict)
+  listing           CommerceListing         @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  exportBatch       MarketplaceExportBatch? @relation(fields: [exportBatchId], references: [id], onDelete: SetNull)
+  externalSales     MarketplaceExternalSale[]
+  externalOrderIntakeItems ExternalOrderIntakeItem[]
+
+  @@unique([marketplaceConfigId, exportSku])
+  @@index([listingId])
+  @@index([status, updatedAt])
+  @@index([externalListingId])
+}
+
+model MarketplaceExternalSale {
+  id                     String                          @id @default(uuid())
+  marketplaceConfigId    String
+  exportedListingId      String?
+  listingId              String
+  exportSku              String
+  externalOrderId        String?
+  quantity               Int                             @default(1)
+  salePrice              Decimal                         @db.Decimal(10, 2)
+  currency               String                          @default("UZS")
+  customerSnapshotJson   Json?
+  deliverySnapshotJson   Json?
+  saleSnapshotJson       Json?
+  conversionSnapshotJson Json?
+  source                 MarketplaceExternalSaleSource   @default(MANUAL)
+  status                 MarketplaceExternalSaleStatus   @default(RECORDED)
+  notes                  String?
+  createdById            String?
+  createdAt              DateTime                        @default(now())
+  updatedAt              DateTime                        @updatedAt
+
+  marketplaceConfig MarketplaceConfig @relation(fields: [marketplaceConfigId], references: [id], onDelete: Restrict)
+  exportedListing   ExportedListing?  @relation(fields: [exportedListingId], references: [id], onDelete: SetNull)
+  listing           CommerceListing   @relation(fields: [listingId], references: [id], onDelete: Cascade)
+
+  @@index([marketplaceConfigId, status, createdAt])
+  @@index([exportedListingId])
+  @@index([listingId])
+  @@index([externalOrderId])
+}
+
+model ExternalOrderImport {
+  id                     String                    @id @default(uuid())
+  sourceType             ExternalOrderSourceType
+  marketplaceConfigId    String?
+  fileAssetId            String?
+  originalFilename       String?
+  mimeType               String?
+  status                 ExternalOrderImportStatus @default(UPLOADED)
+  columnMappingJson      Json?
+  parsedRowsJson         Json?
+  validationErrorsJson   Json?
+  validationWarningsJson Json?
+  importedCount          Int                       @default(0)
+  failedCount            Int                       @default(0)
+  strictMode             Boolean                   @default(false)
+  rawPayloadHash         String?
+  notes                  String?
+  createdById            String?
+  createdAt              DateTime                  @default(now())
+  updatedAt              DateTime                  @updatedAt
+
+  marketplaceConfig MarketplaceConfig? @relation(fields: [marketplaceConfigId], references: [id], onDelete: SetNull)
+  fileAsset         FileAsset?         @relation(fields: [fileAssetId], references: [id], onDelete: SetNull)
+  createdBy         User?              @relation("ExternalOrderImportCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  intakes           ExternalOrderIntake[]
+
+  @@index([sourceType, status, createdAt])
+  @@index([marketplaceConfigId])
+  @@index([fileAssetId])
+  @@index([rawPayloadHash])
+}
+
+model ExternalOrderIntake {
+  id                     String                       @id @default(uuid())
+  sourceType             ExternalOrderSourceType
+  marketplaceConfigId    String?
+  importId               String?
+  externalOrderId        String?
+  externalOrderUrl       String?
+  customerName           String
+  customerPhone          String
+  customerEmail          String?
+  deliveryMethod         String?
+  deliveryAddress        String?
+  pickupLocation         String?
+  paymentStatus          ExternalOrderPaymentStatus   @default(MANUAL_REVIEW)
+  currency               String                       @default("UZS")
+  totalAmount            Decimal                      @db.Decimal(12, 2)
+  notes                  String?
+  rawPayloadJson         Json?
+  rawPayloadHash         String?
+  status                 ExternalOrderIntakeStatus    @default(DRAFT)
+  duplicateStatus        ExternalOrderDuplicateStatus @default(UNIQUE)
+  validationErrorsJson   Json?
+  validationWarningsJson Json?
+  conversionPreviewJson  Json?
+  internalOrderId        String?                      @unique
+  convertedAt            DateTime?
+  canceledAt             DateTime?
+  createdById            String?
+  createdAt              DateTime                     @default(now())
+  updatedAt              DateTime                     @updatedAt
+
+  marketplaceConfig   MarketplaceConfig? @relation(fields: [marketplaceConfigId], references: [id], onDelete: SetNull)
+  import              ExternalOrderImport? @relation(fields: [importId], references: [id], onDelete: SetNull)
+  internalOrder       Order?             @relation("ExternalOrderInternalOrder", fields: [internalOrderId], references: [id], onDelete: SetNull)
+  createdBy           User?              @relation("ExternalOrderIntakeCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  items               ExternalOrderIntakeItem[]
+  duplicateCandidates ExternalOrderDuplicateCandidate[] @relation("ExternalOrderDuplicateSource")
+  duplicateMatches    ExternalOrderDuplicateCandidate[] @relation("ExternalOrderDuplicateMatch")
+
+  @@index([sourceType, status, createdAt])
+  @@index([marketplaceConfigId, externalOrderId])
+  @@index([externalOrderId])
+  @@index([customerPhone, totalAmount, createdAt])
+  @@index([rawPayloadHash])
+  @@index([duplicateStatus])
+}
+
+model ExternalOrderIntakeItem {
+  id                     String                         @id @default(uuid())
+  intakeId               String
+  externalSku            String?
+  externalListingId      String?
+  externalListingUrl     String?
+  marketplaceConfigId    String?
+  exportedListingId      String?
+  listingId              String?
+  baseProductId          String?
+  productTypeId          String?
+  designId               String?
+  designVersionId        String?
+  providerSyncRecordId   String?
+  title                  String
+  selectedSize           String?
+  selectedColor          String?
+  selectedMaterial       String?
+  selectedPrintSide      String?
+  quantity               Int                            @default(1)
+  unitPrice              Decimal                        @db.Decimal(12, 2)
+  currency               String                         @default("UZS")
+  imageUrl               String?
+  previewAssetId         String?
+  mappingStatus          ExternalOrderItemMappingStatus @default(NEEDS_MAPPING)
+  validationErrorsJson   Json?
+  validationWarningsJson Json?
+  matchedSnapshotJson    Json?
+  rawItemJson            Json?
+  createdAt              DateTime                       @default(now())
+  updatedAt              DateTime                       @updatedAt
+
+  intake             ExternalOrderIntake @relation(fields: [intakeId], references: [id], onDelete: Cascade)
+  marketplaceConfig  MarketplaceConfig?  @relation(fields: [marketplaceConfigId], references: [id], onDelete: SetNull)
+  exportedListing    ExportedListing?    @relation(fields: [exportedListingId], references: [id], onDelete: SetNull)
+  listing            CommerceListing?    @relation(fields: [listingId], references: [id], onDelete: SetNull)
+  baseProduct        BaseProduct?        @relation(fields: [baseProductId], references: [id], onDelete: SetNull)
+  productType        ProductType?        @relation(fields: [productTypeId], references: [id], onDelete: SetNull)
+  design             DesignAsset?        @relation(fields: [designId], references: [id], onDelete: SetNull)
+  designVersion      DesignVersion?      @relation(fields: [designVersionId], references: [id], onDelete: SetNull)
+  providerSyncRecord PodProviderSyncRecord? @relation(fields: [providerSyncRecordId], references: [id], onDelete: SetNull)
+  previewAsset       FileAsset?          @relation(fields: [previewAssetId], references: [id], onDelete: SetNull)
+  orderItems         OrderItem[]
+
+  @@index([intakeId])
+  @@index([externalSku])
+  @@index([exportedListingId])
+  @@index([listingId])
+  @@index([mappingStatus])
+  @@index([providerSyncRecordId])
+}
+
+model ExternalOrderDuplicateCandidate {
+  id               String                       @id @default(uuid())
+  intakeId         String
+  matchedIntakeId  String?
+  duplicateStatus  ExternalOrderDuplicateStatus @default(POSSIBLE_DUPLICATE)
+  matchType        String
+  score            Decimal                      @default(0) @db.Decimal(5, 2)
+  detailsJson      Json?
+  resolutionReason String?
+  resolvedById     String?
+  resolvedAt       DateTime?
+  createdAt        DateTime                     @default(now())
+  updatedAt        DateTime                     @updatedAt
+
+  intake        ExternalOrderIntake  @relation("ExternalOrderDuplicateSource", fields: [intakeId], references: [id], onDelete: Cascade)
+  matchedIntake ExternalOrderIntake? @relation("ExternalOrderDuplicateMatch", fields: [matchedIntakeId], references: [id], onDelete: SetNull)
+
+  @@index([intakeId, duplicateStatus])
+  @@index([matchedIntakeId])
+  @@index([matchType])
 }
 
 model MarketplacePublication {
@@ -969,6 +1602,343 @@ model PrintfulFileMapping {
   @@index([designId, status])
 }
 
+model PodProviderConfig {
+  id                         String               @id @default(uuid())
+  provider                   PodProviderType
+  mode                       PodProviderMode      @default(TEST)
+  displayName                String
+  isEnabled                  Boolean              @default(false)
+  credentialEnvVar           String?
+  credentialSecretRef        String?
+  webhookSecretEnvVar        String?
+  webhookSecretRef           String?
+  apiBaseUrl                 String?
+  storeId                    String?
+  defaultCurrency            String               @default("USD")
+  defaultCountryCode         String?
+  defaultRegion              String?
+  fulfillmentRegion          String?
+  sellingRegion              String?
+  shippingPreference         String?
+  lastCatalogSyncStatus      PodCatalogSyncStatus?
+  lastCatalogSyncAt          DateTime?
+  lastCatalogSyncError       String?
+  metadataJson               Json?
+  createdById                String?
+  updatedById                String?
+  createdAt                  DateTime             @default(now())
+  updatedAt                  DateTime             @updatedAt
+
+  catalogSyncRuns PodProviderCatalogSyncRun[]
+  products        PodProviderProduct[]
+  productMappings PodProductMapping[]
+  printAreaMappings PodPrintAreaMapping[]
+  providerFiles   PodProviderFile[]
+  syncRecords     PodProviderSyncRecord[]
+  webhookEvents   PodWebhookEvent[]
+
+  @@unique([provider, mode])
+  @@index([provider, mode, isEnabled])
+}
+
+model PodProviderCatalogSyncRun {
+  id                  String               @id @default(uuid())
+  providerConfigId    String
+  provider            PodProviderType
+  mode                PodProviderMode
+  status              PodCatalogSyncStatus @default(PENDING)
+  productsSeen        Int                  @default(0)
+  productsUpserted    Int                  @default(0)
+  variantsSeen        Int                  @default(0)
+  printAreasSeen      Int                  @default(0)
+  unavailableMarked   Int                  @default(0)
+  errorMessage        String?
+  requestedById       String?
+  startedAt           DateTime?
+  completedAt         DateTime?
+  metadataJson        Json?
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+
+  providerConfig PodProviderConfig @relation(fields: [providerConfigId], references: [id], onDelete: Cascade)
+
+  @@index([providerConfigId, status, createdAt])
+}
+
+model PodProviderProduct {
+  id                   String                @id @default(uuid())
+  providerConfigId     String
+  provider             PodProviderType
+  mode                 PodProviderMode
+  providerProductId    String
+  name                 String
+  category             String?
+  brand                String?
+  model                String?
+  description          String?
+  imageUrlsJson        Json?
+  availabilityStatus   PodAvailabilityStatus @default(AVAILABLE)
+  regionsJson          Json?
+  currency             String                @default("USD")
+  baseCost             Decimal?              @db.Decimal(10, 2)
+  suggestedRetailPrice Decimal?              @db.Decimal(10, 2)
+  rawMetadataJson      Json?
+  lastSyncedAt         DateTime?
+  archivedAt           DateTime?
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+
+  providerConfig    PodProviderConfig      @relation(fields: [providerConfigId], references: [id], onDelete: Cascade)
+  variants          PodProviderVariant[]
+  printAreas        PodProviderPrintArea[]
+  productMappings   PodProductMapping[]
+  printAreaMappings PodPrintAreaMapping[]
+  syncRecords       PodProviderSyncRecord[]
+
+  @@unique([providerConfigId, providerProductId])
+  @@index([provider, mode, availabilityStatus])
+}
+
+model PodProviderVariant {
+  id                   String                @id @default(uuid())
+  providerProductId    String
+  providerVariantId    String
+  name                 String
+  sku                  String?
+  color                String?
+  size                 String?
+  material             String?
+  availabilityStatus   PodAvailabilityStatus @default(AVAILABLE)
+  regionsJson          Json?
+  currency             String                @default("USD")
+  baseCost             Decimal?              @db.Decimal(10, 2)
+  suggestedRetailPrice Decimal?              @db.Decimal(10, 2)
+  rawMetadataJson      Json?
+  lastSyncedAt         DateTime?
+  archivedAt           DateTime?
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+
+  providerProduct PodProviderProduct @relation(fields: [providerProductId], references: [id], onDelete: Cascade)
+
+  @@unique([providerProductId, providerVariantId])
+  @@index([availabilityStatus])
+}
+
+model PodProviderPrintArea {
+  id                   String                @id @default(uuid())
+  providerProductId    String
+  providerPrintAreaId  String
+  name                 String
+  placement            String?
+  width                Float?
+  height               Float?
+  units                PlacementUnits        @default(INCH)
+  dpi                  Int?
+  techniquesJson       Json?
+  availabilityStatus   PodAvailabilityStatus @default(AVAILABLE)
+  rawMetadataJson      Json?
+  lastSyncedAt         DateTime?
+  archivedAt           DateTime?
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+
+  providerProduct   PodProviderProduct    @relation(fields: [providerProductId], references: [id], onDelete: Cascade)
+  printAreaMappings PodPrintAreaMapping[]
+
+  @@unique([providerProductId, providerPrintAreaId])
+  @@index([placement, availabilityStatus])
+}
+
+model PodProductMapping {
+  id                       String            @id @default(uuid())
+  providerConfigId         String
+  productTypeId            String
+  baseProductId            String?
+  providerProductId        String
+  providerVariantIdsJson   Json?
+  defaultProviderVariantId String?
+  colorMappingJson         Json?
+  sizeMappingJson          Json?
+  materialMappingJson      Json?
+  region                   String?
+  currency                 String            @default("USD")
+  isActive                 Boolean           @default(true)
+  quality                  PodMappingQuality @default(MANUAL_REVIEW)
+  notes                    String?
+  metadataJson             Json?
+  createdById              String?
+  updatedById              String?
+  createdAt                DateTime          @default(now())
+  updatedAt                DateTime          @updatedAt
+
+  providerConfig PodProviderConfig  @relation(fields: [providerConfigId], references: [id], onDelete: Cascade)
+  productType    ProductType        @relation(fields: [productTypeId], references: [id], onDelete: Restrict)
+  baseProduct    BaseProduct?       @relation(fields: [baseProductId], references: [id], onDelete: SetNull)
+  providerProduct PodProviderProduct @relation(fields: [providerProductId], references: [id], onDelete: Restrict)
+  syncRecords    PodProviderSyncRecord[]
+
+  @@unique([providerConfigId, productTypeId, baseProductId, providerProductId])
+  @@index([providerConfigId, isActive])
+  @@index([productTypeId])
+  @@index([baseProductId])
+}
+
+model PodPrintAreaMapping {
+  id                         String            @id @default(uuid())
+  providerConfigId           String
+  printAreaId                String
+  providerProductId          String
+  providerPrintAreaId        String
+  coordinateSystem           String            @default("PROVIDER_UNITS")
+  providerPlacement          String?
+  providerUnits              PlacementUnits    @default(INCH)
+  providerDpi                Int?
+  providerWidth              Float?
+  providerHeight             Float?
+  offsetX                    Float             @default(0)
+  offsetY                    Float             @default(0)
+  supportsRotation           Boolean           @default(false)
+  minScale                   Float?
+  maxScale                   Float?
+  safeZoneMappingJson        Json?
+  technique                  String?
+  isActive                   Boolean           @default(true)
+  quality                    PodMappingQuality @default(MANUAL_REVIEW)
+  notes                      String?
+  metadataJson               Json?
+  createdById                String?
+  updatedById                String?
+  createdAt                  DateTime          @default(now())
+  updatedAt                  DateTime          @updatedAt
+
+  providerConfig   PodProviderConfig    @relation(fields: [providerConfigId], references: [id], onDelete: Cascade)
+  printArea        PrintArea            @relation(fields: [printAreaId], references: [id], onDelete: Restrict)
+  providerProduct  PodProviderProduct   @relation(fields: [providerProductId], references: [id], onDelete: Restrict)
+  providerPrintArea PodProviderPrintArea @relation(fields: [providerPrintAreaId], references: [id], onDelete: Restrict)
+  syncRecords      PodProviderSyncRecord[]
+
+  @@unique([providerConfigId, printAreaId, providerProductId, providerPrintAreaId])
+  @@index([providerConfigId, isActive])
+  @@index([printAreaId])
+}
+
+model PodProviderFile {
+  id                  String                @id @default(uuid())
+  providerConfigId    String
+  provider            PodProviderType
+  mode                PodProviderMode
+  sourceAssetId       String
+  designId            String?
+  designVersionId     String?
+  providerFileId      String?
+  transferUrlSnapshot String?
+  status              PodProviderFileStatus @default(PENDING)
+  failureReason       String?
+  uploadedAt          DateTime?
+  expiresAt           DateTime?
+  metadataJson        Json?
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime              @updatedAt
+
+  providerConfig PodProviderConfig @relation(fields: [providerConfigId], references: [id], onDelete: Cascade)
+  sourceAsset    FileAsset         @relation(fields: [sourceAssetId], references: [id], onDelete: Restrict)
+  syncRecords    PodProviderSyncRecord[]
+
+  @@unique([providerConfigId, sourceAssetId])
+  @@index([provider, mode, status])
+  @@index([sourceAssetId])
+}
+
+model PodProviderSyncRecord {
+  id                                String              @id @default(uuid())
+  providerConfigId                  String
+  provider                          PodProviderType
+  mode                              PodProviderMode
+  listingId                         String
+  designId                          String
+  designVersionId                   String?
+  productTypeId                     String?
+  baseProductId                     String?
+  productMappingId                  String
+  printAreaMappingId                String?
+  providerProductId                 String
+  providerVariantId                 String?
+  providerFileId                    String?
+  providerDraftProductId            String?
+  providerExternalProductId         String?
+  status                            PodSyncRecordStatus @default(DRAFT)
+  failureReason                     String?
+  placementHash                     String
+  providerPlacementPayloadSnapshotJson Json?
+  payloadSnapshotJson               Json?
+  responseSnapshotJson              Json?
+  providerMockupSnapshotJson        Json?
+  createdById                       String?
+  syncedAt                          DateTime?
+  archivedAt                        DateTime?
+  replacedBySyncRecordId            String?
+  createdAt                         DateTime            @default(now())
+  updatedAt                         DateTime            @updatedAt
+
+  providerConfig   PodProviderConfig    @relation(fields: [providerConfigId], references: [id], onDelete: Cascade)
+  listing          CommerceListing      @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  providerProduct  PodProviderProduct   @relation(fields: [providerProductId], references: [id], onDelete: Restrict)
+  productMapping   PodProductMapping    @relation(fields: [productMappingId], references: [id], onDelete: Restrict)
+  printAreaMapping PodPrintAreaMapping? @relation(fields: [printAreaMappingId], references: [id], onDelete: SetNull)
+  providerFile     PodProviderFile?     @relation(fields: [providerFileId], references: [id], onDelete: SetNull)
+  mockups          PodProviderMockup[]
+  orderItems       OrderItem[]
+  productionJobs   ProductionJob[]
+  externalOrderIntakeItems ExternalOrderIntakeItem[]
+
+  @@unique([providerConfigId, listingId, productMappingId, placementHash])
+  @@index([providerConfigId, status, updatedAt])
+  @@index([listingId])
+  @@index([designId])
+}
+
+model PodProviderMockup {
+  id                    String          @id @default(uuid())
+  syncRecordId          String
+  providerMockupId      String?
+  kind                  MockupAssetType
+  imageUrl              String?
+  thumbnailUrl          String?
+  widthPx               Int?
+  heightPx              Int?
+  status                PodMockupStatus @default(PENDING)
+  payloadSnapshotJson   Json?
+  failureReason         String?
+  createdAt             DateTime        @default(now())
+  updatedAt             DateTime        @updatedAt
+
+  syncRecord PodProviderSyncRecord @relation(fields: [syncRecordId], references: [id], onDelete: Cascade)
+
+  @@index([syncRecordId, status])
+}
+
+model PodWebhookEvent {
+  id                  String                @id @default(uuid())
+  providerConfigId    String?
+  provider            PodProviderType
+  mode                PodProviderMode?
+  eventType           String?
+  signatureValid      Boolean?
+  status              PodWebhookEventStatus @default(ACCEPTED)
+  payloadSummaryJson  Json?
+  rawPayloadJson      Json?
+  errorMessage        String?
+  receivedAt          DateTime              @default(now())
+  processedAt         DateTime?
+  createdAt           DateTime              @default(now())
+
+  providerConfig PodProviderConfig? @relation(fields: [providerConfigId], references: [id], onDelete: SetNull)
+
+  @@index([provider, receivedAt])
+  @@index([providerConfigId, status])
+}
+
 model IntegrationLog {
   id                         String               @id @default(uuid())
   designId                   String?
@@ -1000,28 +1970,58 @@ model Cart {
 model CartItem {
   id         String   @id @default(uuid())
   cartId     String
-  listingId  String
+  listingId  String?
   quantity   Int
   unitPrice  Decimal  @db.Decimal(10, 2)
+  currency   String   @default("UZS")
+  selectedSize String?
+  selectedColor String?
+  selectedMaterial String?
+  selectedPrintSide String?
+  itemKind   FilmOrderKind?
+  filmType   FilmType?
+  filmWidthCm Float?
+  filmHeightCm Float?
+  filmAreaCm2 Float?
+  filmSourceAssetId String?
+  filmPricingSnapshotJson Json?
+  filmConsentSnapshotJson Json?
+  filmOptionsJson Json?
   metadataJson Json?
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
   cart       Cart            @relation(fields: [cartId], references: [id], onDelete: Cascade)
-  listing    CommerceListing @relation(fields: [listingId], references: [id])
+  listing    CommerceListing? @relation(fields: [listingId], references: [id])
 }
 
 model Order {
   id            String      @id @default(uuid())
   customerId    String
   status        OrderStatus @default(PENDING_PAYMENT)
+  customerName  String?
+  customerPhone String?
+  customerEmail String?
+  deliveryAddress String?
+  pickupLocation String?
+  customerNote  String?
   subtotal      Decimal     @db.Decimal(10, 2)
   deliveryFee   Decimal     @db.Decimal(10, 2)
+  discountTotal Decimal     @default(0) @db.Decimal(10, 2)
   total         Decimal     @db.Decimal(10, 2)
   currency      String      @default("UZS")
   deliveryType  String?
   deliveryZone  String?
   notes         String?
+  source        String                  @default("RASHPOD")
+  channel       String?
+  externalSourceType ExternalOrderSourceType?
+  externalOrderId String?
+  externalSourceSnapshotJson Json?
+  pricingSnapshotJson Json?
+  deliverySnapshotJson Json?
+  paymentSnapshotJson Json?
+  fulfillmentRoute OrderFulfillmentRoute @default(LOCAL_PRODUCTION)
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
 
@@ -1031,22 +2031,110 @@ model Order {
   productionJobs ProductionJob[]
   ledgerEntries LedgerEntry[]
   royaltyLedgerEntries RoyaltyLedgerEntry[]
+  financeSnapshots OrderFinanceSnapshot[]
+  paymentReconciliations PaymentReconciliation[]
+  supportRequests SupportRequest[]
+  externalOrderIntake ExternalOrderIntake? @relation("ExternalOrderInternalOrder")
+
+  @@index([source, channel, createdAt])
+  @@index([externalSourceType, externalOrderId])
+}
+
+model SupportRequest {
+  id            String               @id @default(uuid())
+  requesterId   String
+  requesterRole UserRole
+  orderId       String?
+  designAssetId String?
+  listingId     String?
+  category      String
+  subject       String?
+  message       String
+  status        SupportRequestStatus @default(OPEN)
+  reviewNotes   String?
+  closedAt      DateTime?
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
+
+  requester User             @relation("SupportRequestRequester", fields: [requesterId], references: [id], onDelete: Cascade)
+  order     Order?           @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  design    DesignAsset?     @relation(fields: [designAssetId], references: [id], onDelete: SetNull)
+  listing   CommerceListing? @relation(fields: [listingId], references: [id], onDelete: SetNull)
+
+  @@index([requesterId, status, createdAt])
+  @@index([orderId])
+  @@index([designAssetId])
+  @@index([listingId])
 }
 
 model OrderItem {
   id          String   @id @default(uuid())
   orderId     String
-  listingId   String
+  listingId   String?
+  listingTitle String?
+  designerId  String?
+  designAssetId String?
+  designVersionId String?
+  productTypeId String?
+  productTypeName String?
+  baseProductId String?
+  baseProductName String?
+  baseProductSku String?
+  selectedSize String?
+  selectedColor String?
+  selectedMaterial String?
+  selectedPrintSide String?
+  itemKind   FilmOrderKind?
+  filmType   FilmType?
+  filmWidthCm Float?
+  filmHeightCm Float?
+  filmAreaCm2 Float?
+  filmSourceAssetId String?
+  filmPricingSnapshotJson Json?
+  filmConsentSnapshotJson Json?
+  filmProductionSnapshotJson Json?
+  mockupAssetIds Json?
+  mockupImageUrl String?
+  productionFileAssetId String?
+  placementSnapshotJson Json?
+  printAreaSnapshotJson Json?
+  royaltySnapshotJson Json?
+  pricingSnapshotJson Json?
+  productionSnapshotJson Json?
+  fulfillmentRoute OrderFulfillmentRoute @default(LOCAL_PRODUCTION)
+  providerSyncRecordId String?
+  providerType PodProviderType?
+  providerProductId String?
+  providerVariantId String?
+  providerFileId String?
+  providerPlacementPayloadSnapshotJson Json?
+  providerFulfillmentSnapshotJson Json?
+  externalOrderIntakeItemId String?
+  externalSourceType ExternalOrderSourceType?
+  externalOrderId String?
+  externalSku String?
+  externalListingId String?
+  externalChannelSnapshotJson Json?
   quantity    Int
   unitPrice   Decimal  @db.Decimal(10, 2)
   totalPrice  Decimal  @db.Decimal(10, 2)
+  designerRoyaltyAmount Decimal? @db.Decimal(10, 2)
+  productionCostEstimate Decimal? @db.Decimal(10, 2)
+  deliveryFeeAllocation Decimal? @db.Decimal(10, 2)
   metadataJson Json?
   createdAt   DateTime @default(now())
 
   order       Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  listing     CommerceListing @relation(fields: [listingId], references: [id])
+  listing     CommerceListing? @relation(fields: [listingId], references: [id])
+  providerSyncRecord PodProviderSyncRecord? @relation(fields: [providerSyncRecordId], references: [id], onDelete: SetNull)
+  externalOrderIntakeItem ExternalOrderIntakeItem? @relation(fields: [externalOrderIntakeItemId], references: [id], onDelete: SetNull)
+  productionJobs ProductionJob[]
   ledgerEntries LedgerEntry[]
   royaltyLedgerEntries RoyaltyLedgerEntry[]
+  financeSnapshots OrderFinanceSnapshot[]
+
+  @@index([externalOrderIntakeItemId])
+  @@index([externalSourceType, externalOrderId])
 }
 
 model PaymentTransaction {
@@ -1054,16 +2142,59 @@ model PaymentTransaction {
   orderId           String
   provider          String
   providerRef       String?
+  providerPaymentId String?
+  checkoutUrl       String?
+  attemptNumber     Int           @default(1)
   amount            Decimal       @db.Decimal(10, 2)
   currency          String        @default("UZS")
   status            PaymentStatus @default(PENDING)
   rawPayloadJson    Json?
+  settingsSnapshotJson Json?
   idempotencyKey    String?
   createdAt         DateTime      @default(now())
   updatedAt         DateTime      @updatedAt
 
   order             Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
   ledgerEntries     LedgerEntry[]
+  reconciliations   PaymentReconciliation[]
+}
+
+model OrderFinanceSnapshot {
+  id                    String   @id @default(uuid())
+  orderId               String
+  orderItemId           String
+  listingId             String?
+  designerId            String?
+  customerId            String?
+  currency              String   @default("UZS")
+  unitPrice             Decimal  @db.Decimal(12, 2)
+  quantity              Int
+  grossLineAmount       Decimal  @db.Decimal(12, 2)
+  discountAmount        Decimal  @default(0) @db.Decimal(12, 2)
+  netRevenue            Decimal  @db.Decimal(12, 2)
+  deliveryFeeAllocation Decimal? @db.Decimal(12, 2)
+  taxAmount             Decimal? @db.Decimal(12, 2)
+  paymentProviderFee    Decimal? @db.Decimal(12, 2)
+  baseProductCost       Decimal? @db.Decimal(12, 2)
+  productionCost        Decimal? @db.Decimal(12, 2)
+  deliveryCost          Decimal? @db.Decimal(12, 2)
+  royaltyRuleSnapshot   Json?
+  royaltyAmount         Decimal  @default(0) @db.Decimal(12, 2)
+  platformMarginEstimate Decimal? @db.Decimal(12, 2)
+  marginIncomplete      Boolean  @default(false)
+  incompleteReason      String?
+  settlementStatus      String   @default("PENDING")
+  refundStatus          String   @default("NONE")
+  calculationBasisJson  Json?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  order     Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  orderItem OrderItem @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
+
+  @@unique([orderItemId])
+  @@index([designerId, settlementStatus])
+  @@index([orderId])
 }
 
 model CurrencyConfig {
@@ -1121,15 +2252,26 @@ model LedgerEntry {
 model RoyaltyLedgerEntry {
   id             String              @id @default(uuid())
   designerId     String
-  orderId        String
-  orderItemId    String
-  listingId      String
+  orderId        String?
+  orderItemId    String?
+  listingId      String?
+  designId       String?
+  designVersionId String?
+  entryType      RoyaltyEntryType    @default(PENDING)
   royaltyRuleId  String?
-  royaltyRate    Decimal             @db.Decimal(10, 4)
+  royaltyRate    Decimal?            @db.Decimal(10, 4)
   amount         Decimal             @db.Decimal(12, 2)
   currency       String              @default("UZS")
   amountUzs      Decimal             @db.Decimal(12, 2)
-  status         RoyaltyLedgerStatus @default(CALCULATED)
+  calculationBasis Json?
+  royaltyRuleSnapshot Json?
+  status         RoyaltyLedgerStatus @default(PENDING)
+  availableAt    DateTime?
+  reason         String?
+  note           String?
+  createdById    String?
+  source         String?
+  reversalOfEntryId String?
   metadataJson   Json?
   createdAt      DateTime            @default(now())
   acknowledgedAt DateTime?
@@ -1137,14 +2279,15 @@ model RoyaltyLedgerEntry {
   payoutId       String?
 
   designer    User            @relation("DesignerRoyaltyLedgerEntries", fields: [designerId], references: [id])
-  order       Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  orderItem   OrderItem       @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
-  listing     CommerceListing @relation(fields: [listingId], references: [id])
+  order       Order?          @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  orderItem   OrderItem?      @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
+  listing     CommerceListing? @relation(fields: [listingId], references: [id])
   royaltyRule RoyaltyRule?    @relation(fields: [royaltyRuleId], references: [id], onDelete: SetNull)
   payout      Payout?         @relation(fields: [payoutId], references: [id], onDelete: SetNull)
 
-  @@unique([orderItemId, designerId])
+  @@index([orderItemId, designerId])
   @@index([designerId, status])
+  @@index([designerId, entryType])
   @@index([orderId])
 }
 
@@ -1155,13 +2298,20 @@ model Payout {
   currency      String       @default("UZS")
   amountUzs     Decimal      @db.Decimal(12, 2)
   method        PayoutMethod @default(MANUAL)
-  status        PayoutStatus @default(REQUESTED)
+  status        PayoutStatus @default(DRAFT)
   reference     String?
   failureReason String?
+  note          String?
+  approvedById  String?
+  paidById      String?
+  exportFileRef String?
   metadataJson  Json?
   requestedAt   DateTime     @default(now())
+  approvedAt    DateTime?
   processingAt  DateTime?
   confirmedAt   DateTime?
+  paidAt        DateTime?
+  canceledAt    DateTime?
   createdAt     DateTime     @default(now())
   updatedAt     DateTime     @updatedAt
 
@@ -1170,6 +2320,34 @@ model Payout {
   ledgerEntries  PayoutLedgerEntry[]
 
   @@index([designerId, status])
+}
+
+model PaymentReconciliation {
+  id                   String                      @id @default(uuid())
+  paymentTransactionId String
+  orderId              String
+  provider             String
+  providerTransactionId String?
+  expectedAmount       Decimal                     @db.Decimal(12, 2)
+  receivedAmount       Decimal?                    @db.Decimal(12, 2)
+  currency             String                      @default("UZS")
+  providerStatus       String?
+  internalStatus       String?
+  discrepancyAmount    Decimal                     @default(0) @db.Decimal(12, 2)
+  status               PaymentReconciliationStatus @default(UNRECONCILED)
+  reconciledAt         DateTime?
+  reviewedById         String?
+  note                 String?
+  rawPayloadJson       Json?
+  createdAt            DateTime                    @default(now())
+  updatedAt            DateTime                    @updatedAt
+
+  paymentTransaction PaymentTransaction @relation(fields: [paymentTransactionId], references: [id], onDelete: Cascade)
+  order              Order              @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@unique([paymentTransactionId])
+  @@index([status, createdAt])
+  @@index([orderId])
 }
 
 model PayoutLedgerEntry {
@@ -1238,11 +2416,68 @@ model ProductionJob {
   orderItemId  String?
   status       ProductionJobStatus @default(ORDERED)
   queueType    String
+  priority     Int                 @default(0)
+  assignedOperatorId String?
+  blockerReason String?
+  failureReason String?
+  customerSnapshotJson Json?
+  productSnapshotJson Json?
+  placementSnapshotJson Json?
+  printAreaSnapshotJson Json?
+  assetSnapshotJson Json?
+  selectedOptionsJson Json?
+  productionFileStatus String?
+  productionFileAssetId String?
+  productionFileObjectKey String?
+  productionFileUrl String?
+  productionFileJobId String?
+  mockupPreviewUrl String?
+  fulfillmentRoute OrderFulfillmentRoute @default(LOCAL_PRODUCTION)
+  providerSyncRecordId String?
+  providerType PodProviderType?
+  providerOrderId String?
+  providerStatus String?
+  externalSourceType ExternalOrderSourceType?
+  externalOrderId String?
+  externalSku String?
+  externalListingId String?
+  externalChannelSnapshotJson Json?
+  providerPayloadSnapshotJson Json?
+  dueAt        DateTime?
+  queuedAt     DateTime            @default(now())
+  startedAt    DateTime?
+  qcAt         DateTime?
+  readyAt      DateTime?
+  completedAt  DateTime?
+  canceledAt   DateTime?
+  qcStatus     String?
+  qcNote       String?
+  qcFailedReason String?
+  qcCheckedById String?
+  qcCheckedAt DateTime?
+  producedQuantity Int?
+  acceptedQuantity Int?
+  rejectedQuantity Int?
+  defectReason String?
+  reprintOfProductionItemId String?
+  deliveryProvider String?
+  deliveryTrackingRef String?
+  deliveryNote String?
+  pickupNote String?
+  statusHistoryJson Json?
   notes        String?
   createdAt    DateTime            @default(now())
   updatedAt    DateTime            @updatedAt
 
   order        Order      @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  orderItem    OrderItem? @relation(fields: [orderItemId], references: [id], onDelete: SetNull)
+  providerSyncRecord PodProviderSyncRecord? @relation(fields: [providerSyncRecordId], references: [id], onDelete: SetNull)
+
+  @@index([orderId, status])
+  @@index([orderItemId])
+  @@index([providerSyncRecordId])
+  @@index([externalSourceType, externalOrderId])
+  @@index([status, createdAt])
 }
 
 model CorporateRequest {
@@ -1378,6 +2613,14 @@ enum IntakeStatus {
   APPROVED
   REJECTED
   ARCHIVED
+}
+
+enum SupportRequestStatus {
+  OPEN
+  IN_REVIEW
+  WAITING_FOR_USER
+  RESOLVED
+  CLOSED
 }
 
 model MediaAsset {

@@ -15,6 +15,8 @@ export interface CartItem {
   designerName: string;
   size: string;
   color: string;
+  material?: string;
+  printSide?: string;
   quantity: number;
 }
 
@@ -76,7 +78,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const itemCount = useMemo(() => items.reduce((sum, item) => sum + item.quantity, 0), [items]);
 
   const addItem = useCallback((item: AddCartItemInput) => {
-    const key = `${item.listingId}:${item.size}:${item.color}`;
+    const key = `${item.listingId}:${item.size}:${item.color}:${item.material ?? ""}:${item.printSide ?? ""}`;
     setItems((current) => {
       const existing = current.find((row) => row.key === key);
       if (existing) {

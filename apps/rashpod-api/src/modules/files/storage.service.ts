@@ -165,4 +165,24 @@ export class StorageService {
     }
     return `https://storage.local/read/${encodeURIComponent(input.objectKey)}?exp=${input.expiresSeconds}`;
   }
+
+  async writePrivateObject(input: { objectKey: string; buffer: Buffer; mimeType: string }) {
+    const storage = this.getStorage();
+    if (!storage) {
+      return {
+        bucket: this.bucketName,
+        sizeBytes: input.buffer.byteLength,
+        storageProvider: "LOCAL_DEV" as const,
+      };
+    }
+    await storage.bucket(this.bucketName).file(input.objectKey).save(input.buffer, {
+      contentType: input.mimeType,
+      resumable: input.buffer.byteLength > 5_000_000,
+    });
+    return {
+      bucket: this.bucketName,
+      sizeBytes: input.buffer.byteLength,
+      storageProvider: "GCS" as const,
+    };
+  }
 }

@@ -10,6 +10,7 @@ const SECRET_BYTES = JWT_SECRET ? new TextEncoder().encode(JWT_SECRET) : null;
 
 const VALID_ROLES = new Set([
   "designer",
+  "customer",
   "moderator",
   "production",
   "finance",
@@ -20,6 +21,7 @@ const VALID_ROLES = new Set([
 
 const ROLE_MAP: Record<string, string> = {
   DESIGNER: "designer",
+  CUSTOMER: "customer",
   MODERATOR: "moderator",
   PRODUCTION_STAFF: "production",
   FINANCE_STAFF: "finance",
@@ -30,7 +32,6 @@ const ROLE_MAP: Record<string, string> = {
 };
 
 const WEB_REDIRECT_ROLES: Record<string, string> = {
-  CUSTOMER: "/account",
   CORPORATE_CLIENT: "/business",
 };
 

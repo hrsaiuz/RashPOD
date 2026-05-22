@@ -354,6 +354,14 @@ export class AdminConfigService {
       minimumOrderPrice: dto.minimumOrderPrice == null ? null : new Prisma.Decimal(dto.minimumOrderPrice),
       rushOrderFee: dto.rushOrderFee == null ? null : new Prisma.Decimal(dto.rushOrderFee),
       revocationPolicy: dto.revocationPolicy,
+      currency: dto.currency ?? "UZS",
+      dtfPricingJson: dto.dtfPricingJson == null ? undefined : (dto.dtfPricingJson as Prisma.InputJsonObject),
+      uvDtfPricingJson: dto.uvDtfPricingJson == null ? undefined : (dto.uvDtfPricingJson as Prisma.InputJsonObject),
+      consentPolicyJson: dto.consentPolicyJson == null ? undefined : (dto.consentPolicyJson as Prisma.InputJsonObject),
+      royaltyPolicyJson: dto.royaltyPolicyJson == null ? undefined : (dto.royaltyPolicyJson as Prisma.InputJsonObject),
+      productionConstraintsJson: dto.productionConstraintsJson == null ? undefined : (dto.productionConstraintsJson as Prisma.InputJsonObject),
+      settingsVersion: dto.settingsVersion,
+      taxRatePercent: dto.taxRatePercent == null ? null : new Prisma.Decimal(dto.taxRatePercent),
     };
     const item = existing
       ? await this.prisma.filmSaleSettings.update({
@@ -367,6 +375,14 @@ export class AdminConfigService {
             minimumOrderPrice: data.minimumOrderPrice,
             rushOrderFee: data.rushOrderFee,
             revocationPolicy: data.revocationPolicy,
+            currency: data.currency,
+            dtfPricingJson: data.dtfPricingJson,
+            uvDtfPricingJson: data.uvDtfPricingJson,
+            consentPolicyJson: data.consentPolicyJson,
+            royaltyPolicyJson: data.royaltyPolicyJson,
+            productionConstraintsJson: data.productionConstraintsJson,
+            settingsVersion: data.settingsVersion == null ? { increment: 1 } : data.settingsVersion,
+            taxRatePercent: data.taxRatePercent,
           },
         })
       : await this.prisma.filmSaleSettings.create({
@@ -379,6 +395,14 @@ export class AdminConfigService {
             minimumOrderPrice: data.minimumOrderPrice,
             rushOrderFee: data.rushOrderFee,
             revocationPolicy: data.revocationPolicy,
+            currency: data.currency,
+            dtfPricingJson: data.dtfPricingJson ?? Prisma.JsonNull,
+            uvDtfPricingJson: data.uvDtfPricingJson ?? Prisma.JsonNull,
+            consentPolicyJson: data.consentPolicyJson ?? Prisma.JsonNull,
+            royaltyPolicyJson: data.royaltyPolicyJson ?? Prisma.JsonNull,
+            productionConstraintsJson: data.productionConstraintsJson ?? Prisma.JsonNull,
+            settingsVersion: data.settingsVersion ?? 1,
+            taxRatePercent: data.taxRatePercent,
           },
         });
     await this.audit.log({ actorId, action: "film-settings.upsert", entityType: "FilmSaleSettings", entityId: item.id });

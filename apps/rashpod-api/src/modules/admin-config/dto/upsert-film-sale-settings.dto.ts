@@ -1,4 +1,4 @@
-import { IsBoolean, IsNumber, IsOptional, IsString, Max, Min } from "class-validator";
+import { IsBoolean, IsInt, IsNumber, IsObject, IsOptional, IsString, Max, Min } from "class-validator";
 
 export class UpsertFilmSaleSettingsDto {
   @IsBoolean()
@@ -31,4 +31,39 @@ export class UpsertFilmSaleSettingsDto {
   @IsString()
   @IsOptional()
   revocationPolicy?: string;
+
+  @IsString()
+  @IsOptional()
+  currency?: string;
+
+  @IsObject()
+  @IsOptional()
+  dtfPricingJson?: Record<string, unknown>;
+
+  @IsObject()
+  @IsOptional()
+  uvDtfPricingJson?: Record<string, unknown>;
+
+  @IsObject()
+  @IsOptional()
+  consentPolicyJson?: Record<string, unknown>;
+
+  @IsObject()
+  @IsOptional()
+  royaltyPolicyJson?: Record<string, unknown>;
+
+  @IsObject()
+  @IsOptional()
+  productionConstraintsJson?: Record<string, unknown>;
+
+  @IsInt()
+  @IsOptional()
+  @Min(1)
+  settingsVersion?: number;
+
+  @IsNumber()
+  @IsOptional()
+  @Min(0)
+  @Max(100)
+  taxRatePercent?: number;
 }

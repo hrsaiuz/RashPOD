@@ -93,11 +93,29 @@ UZPOST_API_KEY=
 UZPOST_TEST_MODE=true
 ```
 
+## Global POD Providers
+```env
+FEATURE_GLOBAL_POD=false
+PRINTFUL_ENABLED=false
+PRINTFUL_API_TOKEN=
+PRINTFUL_API_BASE_URL=https://api.printful.com
+PRINTFUL_STORE_ID=
+PRINTFUL_WEBHOOK_SECRET=
+PRINTIFY_ENABLED=false
+PRINTIFY_API_TOKEN=
+PRINTIFY_API_BASE_URL=https://api.printify.com/v1
+PRINTIFY_WEBHOOK_SECRET=
+```
+
+Provider settings should reference environment variable names or Secret Manager resource names only. Raw Printful/Printify
+tokens must not be returned by API responses or displayed in the dashboard.
+
 ## Feature Flags
 ```env
 FEATURE_FILM_SALES=true
 FEATURE_CORPORATE_ORDERS=false
 FEATURE_MARKETPLACE_EXPORT=false
+FEATURE_GLOBAL_POD=false
 FEATURE_AI_LISTING_COPY=true
 FEATURE_AI_MODERATION_ASSIST=true
 FEATURE_YANDEX_DELIVERY=false

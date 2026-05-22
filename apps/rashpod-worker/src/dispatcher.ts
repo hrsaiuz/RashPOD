@@ -4,6 +4,7 @@ import { EmailJobHandler, EmailSenderPort } from "./jobs/email-handler";
 import { MockupJobHandler } from "./jobs/mockup-handler";
 import { MarketplacePublicationJobHandler } from "./jobs/marketplace-publication-handler";
 import { PipelineMockupJobHandler } from "./jobs/pipeline-mockup-handler";
+import { PodSyncJobHandler } from "./jobs/pod-sync-handler";
 import { PrintfulCatalogSyncJobHandler } from "./jobs/printful-catalog-sync-handler";
 import { WorkerLogger, workerLogger } from "./logger";
 
@@ -12,6 +13,7 @@ export class WorkerDispatcher {
   private readonly pipelineMockupHandler: PipelineMockupJobHandler;
   private readonly marketplacePublicationHandler: MarketplacePublicationJobHandler;
   private readonly printfulCatalogSyncHandler: PrintfulCatalogSyncJobHandler;
+  private readonly podSyncHandler: PodSyncJobHandler;
   private readonly emailHandler: EmailJobHandler;
   private readonly logger: WorkerLogger;
 
@@ -20,6 +22,7 @@ export class WorkerDispatcher {
     this.pipelineMockupHandler = new PipelineMockupJobHandler(repo);
     this.marketplacePublicationHandler = new MarketplacePublicationJobHandler(repo);
     this.printfulCatalogSyncHandler = new PrintfulCatalogSyncJobHandler(repo);
+    this.podSyncHandler = new PodSyncJobHandler();
     this.emailHandler = new EmailJobHandler(emailSender);
     this.logger = logger;
   }
@@ -44,6 +47,12 @@ export class WorkerDispatcher {
         return this.marketplacePublicationHandler.handlePublish(job.payload as { marketplacePublicationId: string });
       case "SYNC_PRINTFUL_CATALOG":
         return this.printfulCatalogSyncHandler.handleSync(job.payload as { requestedBy?: string });
+      case "SYNC_POD_CATALOG":
+        return this.podSyncHandler.handleCatalogSync(job.payload as { providerConfigId: string; syncRunId?: string });
+      case "UPLOAD_POD_PROVIDER_FILE":
+        return this.podSyncHandler.handleProviderFileUpload(job.payload as { providerFileId?: string; providerConfigId?: string; sourceAssetId?: string });
+      case "SYNC_POD_PRODUCT_DRAFT":
+        return this.podSyncHandler.handleProductDraftSync(job.payload as { syncRecordId: string });
       case "GENERATE_LISTING_IMAGE_PACK":
         return this.mockupHandler.handleListingPack(
           job.payload as { placementId: string; generatedAssetIds: string[] },
@@ -51,6 +60,9 @@ export class WorkerDispatcher {
       case "GENERATE_FILM_PREVIEW":
         return this.mockupHandler.handleFilmPreview(job.payload as { placementId: string; generatedAssetId: string });
       case "GENERATE_PRODUCTION_FILE":
+        if (typeof (job.payload as { productionJobId?: unknown }).productionJobId === "string") {
+          return this.mockupHandler.handleProductionFile(job.payload as { productionJobId: string });
+        }
         return this.mockupHandler.handleProductionFile(job.payload as { placementId: string; generatedAssetId: string });
       case "SEND_EMAIL":
         return this.emailHandler.handleSendEmail(job.payload as any);
