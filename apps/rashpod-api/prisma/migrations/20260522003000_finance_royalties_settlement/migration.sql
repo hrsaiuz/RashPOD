@@ -16,6 +16,10 @@ ALTER TYPE "PayoutStatus" ADD VALUE IF NOT EXISTS 'APPROVED';
 ALTER TYPE "PayoutStatus" ADD VALUE IF NOT EXISTS 'PAID';
 ALTER TYPE "PayoutStatus" ADD VALUE IF NOT EXISTS 'CANCELED';
 
+-- Postgres requires new enum values to be committed before they are referenced.
+COMMIT;
+BEGIN;
+
 CREATE TABLE "OrderFinanceSnapshot" (
   "id" TEXT NOT NULL,
   "orderId" TEXT NOT NULL,
