@@ -1,5 +1,6 @@
-import { Injectable, NotFoundException, OnModuleInit } from "@nestjs/common";
+import { Injectable, NotFoundException, OnModuleInit, Optional } from "@nestjs/common";
 import { PrismaService } from "../../prisma/prisma.service";
+import { LaunchCheck, PlatformConfigService } from "../../common/config/platform-config.service";
 import { AuditService } from "../audit/audit.service";
 import { MailerService } from "../mailer/mailer.service";
 import { CreateEmailTemplateDto } from "./dto/create-email-template.dto";
@@ -115,6 +116,7 @@ export class AdminOpsService implements OnModuleInit {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly mailer: MailerService,
+    @Optional() private readonly platformConfig?: PlatformConfigService,
   ) {}
 
   async onModuleInit() {
@@ -155,6 +157,53 @@ export class AdminOpsService implements OnModuleInit {
       failedRatePercent: typeof queueAlerts.failedRatePercent === "number" ? queueAlerts.failedRatePercent : 20,
       alertCooldownSeconds: typeof queueAlerts.alertCooldownSeconds === "number" ? queueAlerts.alertCooldownSeconds : 600,
       alertRecipients,
+    };
+  }
+
+  async launchReadiness() {
+    const envChecks = this.platformConfig?.redactedConfig("api").checks ?? [];
+    const [productTypes, baseProducts, mockupTemplates, printAreas, royaltyRules, admins, paymentSettings, filmSettings, latestMigration, auditCount] = await Promise.all([
+      this.prisma.productType.count(),
+      this.prisma.baseProduct.count().catch(() => 0),
+      this.prisma.mockupTemplate.count(),
+      this.prisma.printArea.count(),
+      this.prisma.royaltyRule.count({ where: { isActive: true } }),
+      this.prisma.user.count({ where: { role: { in: ["ADMIN", "SUPER_ADMIN"] as any } } }),
+      this.prisma.platformSetting.findUnique({ where: { key: "click.payment.settings" } }),
+      this.prisma.filmSaleSettings.findFirst(),
+      this.prisma.$queryRawUnsafe<Array<{ migration_name: string; finished_at: Date | null }>>('SELECT migration_name, finished_at FROM "_prisma_migrations" ORDER BY finished_at DESC NULLS LAST LIMIT 1').catch(() => []),
+      this.prisma.auditLog.count().catch(() => 0),
+    ]);
+    const payment = this.asObject(paymentSettings?.value);
+    const operational: LaunchCheck[] = [
+      this.countCheck("PRODUCT_TYPES", "Product types", productTypes, "At least one product type must exist.", "/dashboard/admin/product-types"),
+      this.countCheck("BASE_PRODUCTS", "Base products", baseProducts, "At least one local base product should exist.", "/dashboard/admin/base-products"),
+      this.countCheck("MOCKUP_TEMPLATES", "Mockup templates", mockupTemplates, "Mockup templates are required for rendering.", "/dashboard/admin/mockup-templates"),
+      this.countCheck("PRINT_AREAS", "Print areas", printAreas, "Print areas are required for canonical placement.", "/dashboard/admin/print-areas"),
+      this.countCheck("ROYALTY_RULES", "Royalty rules", royaltyRules, "At least one active royalty rule is required.", "/dashboard/admin/royalty-rules"),
+      this.countCheck("ADMIN_USERS", "Admin users", admins, "At least one admin or super admin must exist.", "/dashboard/admin/users"),
+      { key: "PAYMENT_SETTINGS", label: "Payment settings", status: payment.enabled ? "PASS" : "WARN", explanation: payment.enabled ? `Click payments configured in ${payment.mode ?? "unknown"} mode.` : "Click payment settings are not enabled.", docsPath: "docs/env-vars.md" },
+      { key: "FILM_SETTINGS", label: "Film settings", status: filmSettings ? "PASS" : "WARN", explanation: filmSettings ? "Film sale settings exist." : "Film sale settings are missing.", docsPath: "docs/admin-config-spec.md" },
+    ];
+    const dataChecks: LaunchCheck[] = [
+      { key: "LATEST_MIGRATION", label: "Latest migration", status: latestMigration[0]?.finished_at ? "PASS" : "WARN", explanation: latestMigration[0]?.migration_name ? `Latest applied migration: ${latestMigration[0].migration_name}.` : "Migration status could not be confirmed from this database.", docsPath: "docs/launch-readiness-runbook.md" },
+      { key: "AUDIT_LOGS", label: "Audit logs", status: auditCount > 0 ? "PASS" : "WARN", explanation: auditCount > 0 ? "Audit log table contains entries." : "No audit entries found yet; verify audit logging in staging.", docsPath: "docs/security-rbac.md" },
+      { key: "PRODUCTION_SEED", label: "Production seed mode", status: process.env.NODE_ENV === "production" && process.env.ALLOW_PRODUCTION_SEED === "true" ? "FAIL" : "PASS", explanation: "Production fake-data seeding is not enabled.", docsPath: "docs/launch-readiness-runbook.md" },
+    ];
+    const all = [...envChecks, ...operational, ...dataChecks];
+    return {
+      generatedAt: new Date().toISOString(),
+      environment: process.env.APP_ENV || process.env.NODE_ENV || "development",
+      summary: {
+        pass: all.filter((check) => check.status === "PASS").length,
+        warn: all.filter((check) => check.status === "WARN").length,
+        fail: all.filter((check) => check.status === "FAIL").length,
+      },
+      sections: [
+        { key: "environment", label: "Environment", checks: envChecks },
+        { key: "operational", label: "Operational", checks: operational },
+        { key: "data", label: "Data", checks: dataChecks },
+      ],
     };
   }
 
@@ -399,5 +448,13 @@ export class AdminOpsService implements OnModuleInit {
     const log = await this.prisma.auditLog.findUnique({ where: { id } });
     if (!log) throw new NotFoundException("Audit log not found");
     return log;
+  }
+
+  private countCheck(key: string, label: string, count: number, emptyExplanation: string, docsPath: string): LaunchCheck {
+    return { key, label, status: count > 0 ? "PASS" : "WARN", explanation: count > 0 ? `${count} configured.` : emptyExplanation, docsPath };
+  }
+
+  private asObject(value: unknown): Record<string, unknown> {
+    return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
   }
 }

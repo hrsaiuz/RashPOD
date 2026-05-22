@@ -25,7 +25,10 @@ export type JobType =
   | "AI_LISTING_COPY"
   | "AI_MARKETPLACE_COPY"
   | "AI_TRANSLATION"
-  | "SEND_EMAIL";
+  | "SEND_EMAIL"
+  | "TELEGRAM_SEND"
+  | "NOTIFICATION_DISPATCH"
+  | "SUPPORT_NOTIFICATION";
 
 @Injectable()
 export class JobDispatcherService {
@@ -89,6 +92,12 @@ export class JobDispatcherService {
       if (typeof workflow === "string" && typeof entityType === "string" && typeof entityId === "string" && typeof snapshotHash === "string") {
         return `${jobType}:${workflow}:${entityType}:${entityId}:${snapshotHash}`;
       }
+    }
+    if (jobType === "SEND_EMAIL" || jobType === "TELEGRAM_SEND" || jobType === "NOTIFICATION_DISPATCH" || jobType === "SUPPORT_NOTIFICATION") {
+      const deliveryId = payload.notificationDeliveryId;
+      if (typeof deliveryId === "string" && deliveryId.length > 0) return `${jobType}:delivery:${deliveryId}`;
+      const idempotencyKey = payload.idempotencyKey;
+      if (typeof idempotencyKey === "string" && idempotencyKey.length > 0) return `${jobType}:${idempotencyKey}`;
     }
     return undefined;
   }

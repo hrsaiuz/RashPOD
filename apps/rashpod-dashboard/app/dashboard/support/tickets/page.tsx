@@ -94,7 +94,7 @@ export default function SupportTicketsPage() {
               return (
                 <div key={t.id} style={{ background: "white", border: "1px solid #E8EAFB", borderRadius: 14, padding: "14px 18px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
                   <div style={{ flex: 1 }}>
-                    <div style={{ fontWeight: 600, fontSize: 14, color: "#1A1D2E", marginBottom: 4 }}>{t.subject}</div>
+                    <button onClick={() => router.push(`/dashboard/support/tickets/${t.id}`)} style={{ fontWeight: 600, fontSize: 14, color: "#788AE0", marginBottom: 4, background: "transparent", border: 0, padding: 0, cursor: "pointer" }}>{t.subject}</button>
                     <div style={{ fontSize: 12, color: "#6B7280" }}>{t.customerName} · {new Date(t.createdAt).toLocaleDateString()}</div>
                   </div>
                   <div style={{ display: "flex", gap: 8, alignItems: "center" }}>

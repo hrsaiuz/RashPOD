@@ -1,5 +1,6 @@
 generator client {
   provider = "prisma-client-js"
+  output   = "../../../node_modules/.prisma/client"
 }
 
 datasource db {
@@ -18,6 +19,64 @@ enum UserRole {
   DESIGNER
   CUSTOMER
   CORPORATE_CLIENT
+}
+
+enum TenantStatus {
+  TRIAL
+  ACTIVE
+  PAST_DUE
+  SUSPENDED
+  ARCHIVED
+}
+
+enum TenantType {
+  RASHPOD_DEFAULT
+  PRINT_SHOP
+  BRAND
+  STOREFRONT
+  WORKSHOP_PARTNER
+  CORPORATE
+}
+
+enum TenantMemberStatus {
+  INVITED
+  ACTIVE
+  SUSPENDED
+  REMOVED
+}
+
+enum PlanStatus {
+  ACTIVE
+  LEGACY
+  DISABLED
+}
+
+enum BillingInterval {
+  MONTHLY
+  YEARLY
+  MANUAL
+}
+
+enum BillingAccountStatus {
+  ACTIVE
+  PAST_DUE
+  SUSPENDED
+}
+
+enum SubscriptionStatus {
+  TRIALING
+  ACTIVE
+  PAST_DUE
+  CANCELED
+  EXPIRED
+}
+
+enum InvoiceStatus {
+  DRAFT
+  ISSUED
+  PAID
+  VOID
+  OVERDUE
 }
 
 enum DesignerStatus {
@@ -70,6 +129,7 @@ enum AssetPurpose {
   MOCKUP_IMAGE
   LISTING_IMAGE
   PRODUCTION_FILE
+  WORKSHOP_QC_EVIDENCE
   MARKETPLACE_EXPORT
   POD_PROVIDER_FILE
   TEMPLATE_IMAGE
@@ -672,6 +732,239 @@ enum BonusStatus {
   CANCELLED
 }
 
+model Tenant {
+  id               String       @id @default(uuid())
+  name             String
+  slug             String       @unique
+  legalName        String?
+  country          String       @default("UZ")
+  region           String?
+  defaultCurrency  String       @default("UZS")
+  defaultLocale    String       @default("uz-Latn")
+  timezone         String       @default("Asia/Tashkent")
+  status           TenantStatus @default(TRIAL)
+  tenantType       TenantType   @default(PRINT_SHOP)
+  ownerUserId      String?
+  planId           String?
+  billingAccountId String?      @unique
+  brandingId       String?      @unique
+  settingsJson     Json?
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+
+  owner          User?           @relation("TenantOwner", fields: [ownerUserId], references: [id], onDelete: SetNull)
+  plan           SaaSPlan?       @relation(fields: [planId], references: [id], onDelete: SetNull)
+  billingAccount BillingAccount? @relation("TenantBillingAccount", fields: [billingAccountId], references: [id], onDelete: SetNull)
+  branding       TenantBranding? @relation("TenantBrandingCurrent", fields: [brandingId], references: [id], onDelete: SetNull)
+  members        TenantMember[]
+  domains        TenantDomain[]
+  entitlementOverrides TenantEntitlementOverride[]
+  subscriptions  Subscription[]
+  invoices       Invoice[]
+  billingAccounts BillingAccount[] @relation("TenantBillingAccounts")
+  brandingRecords TenantBranding[] @relation("TenantBrandingTenant")
+  userPreferences UserPreferences[]
+  designAssets DesignAsset[]
+  fileAssets FileAsset[]
+  productTypes ProductType[]
+  royaltyRules RoyaltyRule[]
+  baseProducts BaseProduct[]
+  mockupTemplates MockupTemplate[]
+  filmSaleSettings FilmSaleSettings[]
+  filmSheetPresets FilmSheetPreset[]
+  gangSheets GangSheet[]
+  deliverySettings DeliverySetting[]
+  generatedAssets GeneratedAsset[]
+  commerceListings CommerceListing[]
+  marketplaceConfigs MarketplaceConfig[]
+  carts Cart[]
+  orders Order[]
+  supportRequests SupportRequest[]
+  paymentTransactions PaymentTransaction[]
+  orderFinanceSnapshots OrderFinanceSnapshot[]
+  ledgerEntries LedgerEntry[]
+  royaltyLedgerEntries RoyaltyLedgerEntry[]
+  payouts Payout[]
+  paymentReconciliations PaymentReconciliation[]
+  productionJobs ProductionJob[]
+  workshopQcEvidence WorkshopQcEvidence[]
+  workshopIssues WorkshopIssue[]
+  workshopMobileActions WorkshopMobileAction[]
+  corporateRequests CorporateRequest[]
+  workerJobs WorkerJob[]
+  analyticsEvents AnalyticsEvent[]
+  notifications Notification[]
+  crmTags CrmTag[]
+  crmNotes CrmNote[]
+  crmContactLogs CrmContactLog[]
+  dailyMetrics DailyMetric[]
+  reportExports ReportExport[]
+  auditLogs AuditLog[]
+  emailTemplates EmailTemplate[]
+  mediaAssets MediaAsset[]
+  designerApplications DesignerApplication[]
+
+  @@index([status, tenantType])
+  @@index([ownerUserId])
+}
+
+model TenantMember {
+  id          String             @id @default(uuid())
+  tenantId    String
+  userId      String
+  roleKey     String
+  status      TenantMemberStatus @default(ACTIVE)
+  invitedById String?
+  invitedAt   DateTime?
+  joinedAt    DateTime?
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user     User   @relation("TenantMemberUser", fields: [userId], references: [id], onDelete: Cascade)
+  invitedBy User? @relation("TenantMemberInviter", fields: [invitedById], references: [id], onDelete: SetNull)
+
+  @@unique([tenantId, userId])
+  @@index([userId, status])
+  @@index([tenantId, roleKey, status])
+}
+
+model SaaSPlan {
+  id             String          @id @default(uuid())
+  name           String
+  code           String          @unique
+  status         PlanStatus      @default(ACTIVE)
+  currency       String          @default("UZS")
+  billingInterval BillingInterval @default(MONTHLY)
+  price          Decimal         @default(0) @db.Decimal(12, 2)
+  trialDays      Int             @default(14)
+  includedLimits Json?
+  featureFlags   Json?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  tenants      Tenant[]
+  subscriptions Subscription[]
+
+  @@index([status, billingInterval])
+}
+
+model TenantEntitlementOverride {
+  id          String   @id @default(uuid())
+  tenantId    String
+  key         String
+  value       Json
+  reason      String?
+  createdById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tenant    Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  createdBy User?  @relation("TenantEntitlementOverrideCreator", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@unique([tenantId, key])
+  @@index([tenantId])
+}
+
+model BillingAccount {
+  id                   String               @id @default(uuid())
+  tenantId             String
+  billingEmail         String
+  companyName          String
+  taxId                String?
+  billingAddress       String?
+  status               BillingAccountStatus @default(ACTIVE)
+  paymentMethodSummary String?
+  createdAt            DateTime             @default(now())
+  updatedAt            DateTime             @updatedAt
+
+  tenant      Tenant   @relation("TenantBillingAccounts", fields: [tenantId], references: [id], onDelete: Cascade)
+  currentFor  Tenant?  @relation("TenantBillingAccount")
+
+  @@index([tenantId, status])
+}
+
+model Subscription {
+  id                 String             @id @default(uuid())
+  tenantId           String
+  planId             String
+  status             SubscriptionStatus @default(TRIALING)
+  startDate          DateTime           @default(now())
+  trialEndsAt        DateTime?
+  currentPeriodStart DateTime?
+  currentPeriodEnd   DateTime?
+  cancelAtPeriodEnd  Boolean            @default(false)
+  manualBilling      Boolean            @default(true)
+  notes              String?
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+
+  tenant   Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  plan     SaaSPlan  @relation(fields: [planId], references: [id], onDelete: Restrict)
+  invoices Invoice[]
+
+  @@index([tenantId, status])
+  @@index([planId, status])
+}
+
+model Invoice {
+  id               String        @id @default(uuid())
+  tenantId         String
+  subscriptionId   String?
+  invoiceNumber    String        @unique
+  amount           Decimal       @db.Decimal(12, 2)
+  currency         String        @default("UZS")
+  status           InvoiceStatus @default(DRAFT)
+  dueDate          DateTime?
+  paidAt           DateTime?
+  lineItems        Json?
+  paymentReference String?
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  tenant       Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  subscription Subscription? @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, status])
+  @@index([subscriptionId])
+}
+
+model TenantBranding {
+  id              String   @id @default(uuid())
+  tenantId        String
+  displayName     String?
+  logoUrl         String?
+  dashboardLogoUrl String?
+  faviconUrl      String?
+  accentColor     String?
+  typographyJson  Json?
+  footerText      String?
+  homepageJson    Json?
+  socialLinksJson Json?
+  legalLinksJson  Json?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  tenant     Tenant  @relation("TenantBrandingTenant", fields: [tenantId], references: [id], onDelete: Cascade)
+  currentFor Tenant? @relation("TenantBrandingCurrent")
+
+  @@index([tenantId])
+}
+
+model TenantDomain {
+  id        String   @id @default(uuid())
+  tenantId  String
+  hostname  String   @unique
+  verified  Boolean  @default(false)
+  isPrimary Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, isPrimary])
+}
+
 model User {
   id           String   @id @default(uuid())
   email        String   @unique
@@ -702,6 +995,16 @@ model User {
   createdBonuses DesignerBonus[] @relation("BonusCreator")
   createdGroupBonuses GroupBonus[] @relation("GroupBonusCreator")
   supportRequests SupportRequest[] @relation("SupportRequestRequester")
+  assignedSupportRequests SupportRequest[] @relation("SupportRequestAssignee")
+  supportMessages SupportMessage[] @relation("SupportMessageAuthor")
+  notifications Notification[] @relation("NotificationUser")
+  notificationDeliveries NotificationDelivery[] @relation("NotificationDeliveryUser")
+  crmNotes CrmNote[] @relation("CrmNoteSubject")
+  authoredCrmNotes CrmNote[] @relation("CrmNoteAuthor")
+  crmContactLogs CrmContactLog[] @relation("CrmContactSubject")
+  authoredCrmContactLogs CrmContactLog[] @relation("CrmContactAuthor")
+  crmTags UserCrmTag[] @relation("UserCrmTagUser")
+  createdCrmTags CrmTag[] @relation("CrmTagCreator")
   filmConsentEvents FilmConsentEvent[] @relation("FilmConsentEventActor")
   externalOrderIntakes ExternalOrderIntake[] @relation("ExternalOrderIntakeCreator")
   externalOrderImports ExternalOrderImport[] @relation("ExternalOrderImportCreator")
@@ -713,11 +1016,16 @@ model User {
   createdAiJobs AiJob[] @relation("AiJobCreator")
   reviewedAiJobs AiJob[] @relation("AiJobReviewer")
   appliedAiSuggestions AiSuggestion[] @relation("AiSuggestionApplier")
+  ownedTenants Tenant[] @relation("TenantOwner")
+  tenantMemberships TenantMember[] @relation("TenantMemberUser")
+  tenantInvitationsSent TenantMember[] @relation("TenantMemberInviter")
+  entitlementOverridesCreated TenantEntitlementOverride[] @relation("TenantEntitlementOverrideCreator")
 }
 
 model UserPreferences {
   id                 String   @id @default(uuid())
   userId             String   @unique
+  tenantId           String?
   portfolioJson      Json?
   payoutDetailsJson  Json?
   notificationJson   Json?
@@ -725,10 +1033,14 @@ model UserPreferences {
   updatedAt          DateTime @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tenant Tenant? @relation(fields: [tenantId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId])
 }
 
 model DesignAsset {
   id          String       @id @default(uuid())
+  tenantId    String?
   designerId  String
   title       String
   description String?
@@ -756,6 +1068,7 @@ model DesignAsset {
   updatedAt   DateTime     @updatedAt
 
   designer         User              @relation(fields: [designerId], references: [id])
+  tenant           Tenant?           @relation(fields: [tenantId], references: [id], onDelete: SetNull)
   versions         DesignVersion[]
   commercialRights CommercialRights?
   moderationCases  DesignModerationCase[]
@@ -769,6 +1082,9 @@ model DesignAsset {
   filmConsentEvents FilmConsentEvent[]
   externalOrderIntakeItems ExternalOrderIntakeItem[]
   gangSheetItems   GangSheetItem[]
+
+  @@index([tenantId, status, createdAt])
+  @@index([tenantId, designerId])
 }
 
 model DesignVersion {
@@ -822,6 +1138,7 @@ model ModerationAudit {
 
 model FileAsset {
   id                 String               @id @default(uuid())
+  tenantId           String?
   ownerId            String
   purpose            AssetPurpose         @default(DESIGN_ORIGINAL)
   storageProvider    AssetStorageProvider @default(GCS)
@@ -863,7 +1180,11 @@ model FileAsset {
   externalOrderIntakeItems    ExternalOrderIntakeItem[]
   podProviderFiles            PodProviderFile[]
   gangSheetSourceItems        GangSheetItem[] @relation("GangSheetSourceAsset")
+  workshopQcEvidence          WorkshopQcEvidence[]
+  workshopIssuePhotos         WorkshopIssue[]
+  tenant                    Tenant? @relation(fields: [tenantId], references: [id], onDelete: SetNull)
 
+  @@index([tenantId, purpose, status])
   @@index([ownerId, purpose, status])
   @@index([designId])
   @@index([listingId])
@@ -907,6 +1228,7 @@ model FilmConsentEvent {
 
 model ProductType {
   id                     String   @id @default(uuid())
+  tenantId               String?
   name                   String
   slug                   String   @unique
   category               String
@@ -928,10 +1250,14 @@ model ProductType {
   marketplaceCategoryMappings MarketplaceCategoryMapping[]
   podProductMappings     PodProductMapping[]
   externalOrderIntakeItems ExternalOrderIntakeItem[]
+  tenant                 Tenant? @relation(fields: [tenantId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, isActive])
 }
 
 model RoyaltyRule {
   id          String   @id @default(uuid())
+  tenantId    String?
   scope       String
   basis       String
   value       Decimal  @db.Decimal(10, 4)
@@ -941,10 +1267,14 @@ model RoyaltyRule {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   royaltyLedgerEntries RoyaltyLedgerEntry[]
+  tenant      Tenant? @relation(fields: [tenantId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, scope, isActive])
 }
 
 model BaseProduct {
   id              String   @id @default(uuid())
+  tenantId        String?
   productTypeId   String
   name            String
   slug            String?
@@ -975,10 +1305,14 @@ model BaseProduct {
   marketplaceCategoryMappings MarketplaceCategoryMapping[]
   podProductMappings PodProductMapping[]
   externalOrderIntakeItems ExternalOrderIntakeItem[]
+  tenant          Tenant? @relation(fields: [tenantId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, isActive])
 }
 
 model MockupTemplate {
   id               String   @id @default(uuid())
+  tenantId         String?
   baseProductId    String
   name             String
   baseImageKey     String
@@ -990,6 +1324,7 @@ model MockupTemplate {
   updatedAt        DateTime @updatedAt
 
   baseProduct BaseProduct @relation(fields: [baseProductId], references: [id])
+  tenant      Tenant? @relation(fields: [tenantId], references: [id], onDelete: SetNull)
   printAreas  PrintArea[]
   placements  MockupPlacement[]
 }
@@ -1084,6 +1419,7 @@ model PlacementPreset {
 
 model FilmSaleSettings {
   id                        String   @id @default(uuid())
+  tenantId                  String?
   enableFilmSalesGlobally   Boolean  @default(false)
   enableDTF                 Boolean  @default(true)
   enableUvDtf               Boolean  @default(true)
@@ -1101,10 +1437,14 @@ model FilmSaleSettings {
   settingsVersion           Int      @default(1)
   taxRatePercent            Decimal? @db.Decimal(10, 4)
   updatedAt                 DateTime @updatedAt
+  tenant                    Tenant? @relation(fields: [tenantId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId])
 }
 
 model FilmSheetPreset {
   id                 String               @id @default(uuid())
+  tenantId           String?
   filmType           FilmType
   name               String
   widthCm            Float
@@ -1129,13 +1469,16 @@ model FilmSheetPreset {
 
   createdBy User? @relation("FilmSheetPresetCreator", fields: [createdById], references: [id], onDelete: SetNull)
   updatedBy User? @relation("FilmSheetPresetUpdater", fields: [updatedById], references: [id], onDelete: SetNull)
+  tenant Tenant? @relation(fields: [tenantId], references: [id], onDelete: SetNull)
   gangSheets GangSheet[]
 
+  @@index([tenantId, enabled])
   @@index([filmType, enabled])
 }
 
 model GangSheet {
   id                         String             @id @default(uuid())
+  tenantId                   String?
   ownerType                  GangSheetOwnerType
   ownerId                    String?
   filmType                   FilmType
@@ -1167,12 +1510,14 @@ model GangSheet {
   sheetPreset FilmSheetPreset? @relation(fields: [sheetPresetId], references: [id], onDelete: SetNull)
   createdBy   User?            @relation("GangSheetCreator", fields: [createdById], references: [id], onDelete: SetNull)
   updatedBy   User?            @relation("GangSheetUpdater", fields: [updatedById], references: [id], onDelete: SetNull)
+  tenant      Tenant?          @relation(fields: [tenantId], references: [id], onDelete: SetNull)
   items       GangSheetItem[]
   cartItems   CartItem[]
   orderItems  OrderItem[]
   productionJobs ProductionJob[]
 
   @@index([ownerType, ownerId, status])
+  @@index([tenantId, status])
   @@index([filmType, status])
   @@index([source, createdAt])
 }
@@ -1231,6 +1576,8 @@ model DeliverySetting {
   etaText               String?
   metadataJson          Json?
   updatedAt             DateTime @updatedAt
+  tenantId             String?
+  tenant               Tenant? @relation(fields: [tenantId], references: [id], onDelete: SetNull)
 }
 
 model MockupPlacement {
@@ -1279,6 +1626,8 @@ model GeneratedAsset {
   archivedAt        DateTime?
   createdAt         DateTime             @default(now())
   updatedAt         DateTime             @updatedAt
+  tenantId                 String?
+  tenant                   Tenant? @relation(fields: [tenantId], references: [id], onDelete: SetNull)
 
   sourcePlacement MockupPlacement @relation(fields: [sourcePlacementId], references: [id])
 }
@@ -1387,6 +1736,8 @@ model CommerceListing {
   publishedAt    DateTime?
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
+  tenantId       String?
+  tenant         Tenant? @relation(fields: [tenantId], references: [id], onDelete: SetNull)
 
   designer    User       @relation("ListingDesigner", fields: [designerId], references: [id])
   designAsset DesignAsset @relation(fields: [designAssetId], references: [id])
@@ -1418,6 +1769,8 @@ model MarketplaceConfig {
   supportedListingTypes Json?
   exportFormats        Json?
   imageRequirementsJson Json?
+  tenantId             String?
+  tenant               Tenant? @relation(fields: [tenantId], references: [id], onDelete: SetNull)
   pricingRulesJson     Json?
   skuPrefix            String               @default("RPD")
   statusMappingJson    Json?
@@ -2138,11 +2491,15 @@ model IntegrationLog {
 
 model Cart {
   id         String   @id @default(uuid())
+  tenantId   String?
   customerId String   @unique
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
   items      CartItem[]
+  tenant     Tenant? @relation(fields: [tenantId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, customerId])
 }
 
 model CartItem {
@@ -2180,6 +2537,7 @@ model CartItem {
 
 model Order {
   id            String      @id @default(uuid())
+  tenantId      String?
   customerId    String
   status        OrderStatus @default(PENDING_PAYMENT)
   customerName  String?
@@ -2204,11 +2562,19 @@ model Order {
   pricingSnapshotJson Json?
   deliverySnapshotJson Json?
   paymentSnapshotJson Json?
+  workshopCode String? @unique
+  packedAt DateTime?
+  packedById String?
+  packingNote String?
+  pickupCompletedAt DateTime?
+  deliveryFailedAt DateTime?
+  deliveryFailedReason String?
   fulfillmentRoute OrderFulfillmentRoute @default(LOCAL_PRODUCTION)
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
 
   customer      User                 @relation("CustomerOrders", fields: [customerId], references: [id])
+  tenant        Tenant?              @relation(fields: [tenantId], references: [id], onDelete: SetNull)
   items         OrderItem[]
   payments      PaymentTransaction[]
   productionJobs ProductionJob[]
@@ -2217,37 +2583,69 @@ model Order {
   financeSnapshots OrderFinanceSnapshot[]
   paymentReconciliations PaymentReconciliation[]
   supportRequests SupportRequest[]
+  workshopIssues WorkshopIssue[]
   externalOrderIntake ExternalOrderIntake? @relation("ExternalOrderInternalOrder")
 
+  @@index([tenantId, status, createdAt])
   @@index([source, channel, createdAt])
   @@index([externalSourceType, externalOrderId])
 }
 
 model SupportRequest {
   id            String               @id @default(uuid())
+  tenantId      String?
   requesterId   String
   requesterRole UserRole
+  assignedToId  String?
   orderId       String?
   designAssetId String?
   listingId     String?
   category      String
   subject       String?
   message       String
+  priority      SupportPriority      @default(NORMAL)
   status        SupportRequestStatus @default(OPEN)
+  source        String               @default("SELF_SERVICE")
   reviewNotes   String?
+  firstResponseAt DateTime?
+  lastCustomerMessageAt DateTime?
+  lastStaffMessageAt DateTime?
+  dueAt         DateTime?
   closedAt      DateTime?
   createdAt     DateTime             @default(now())
   updatedAt     DateTime             @updatedAt
 
-  requester User             @relation("SupportRequestRequester", fields: [requesterId], references: [id], onDelete: Cascade)
-  order     Order?           @relation(fields: [orderId], references: [id], onDelete: SetNull)
-  design    DesignAsset?     @relation(fields: [designAssetId], references: [id], onDelete: SetNull)
-  listing   CommerceListing? @relation(fields: [listingId], references: [id], onDelete: SetNull)
+  requester  User             @relation("SupportRequestRequester", fields: [requesterId], references: [id], onDelete: Cascade)
+  tenant     Tenant?          @relation(fields: [tenantId], references: [id], onDelete: SetNull)
+  assignedTo User?            @relation("SupportRequestAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
+  order      Order?           @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  design     DesignAsset?     @relation(fields: [designAssetId], references: [id], onDelete: SetNull)
+  listing    CommerceListing? @relation(fields: [listingId], references: [id], onDelete: SetNull)
+  messages   SupportMessage[]
 
+  @@index([tenantId, status, priority, createdAt])
   @@index([requesterId, status, createdAt])
+  @@index([assignedToId, status, createdAt])
+  @@index([status, priority, createdAt])
   @@index([orderId])
   @@index([designAssetId])
   @@index([listingId])
+}
+
+model SupportMessage {
+  id               String                   @id @default(uuid())
+  supportRequestId String
+  authorId         String?
+  authorRole       UserRole?
+  body             String
+  visibility       SupportMessageVisibility @default(PUBLIC)
+  createdAt        DateTime                 @default(now())
+
+  supportRequest SupportRequest @relation(fields: [supportRequestId], references: [id], onDelete: Cascade)
+  author         User?          @relation("SupportMessageAuthor", fields: [authorId], references: [id], onDelete: SetNull)
+
+  @@index([supportRequestId, createdAt])
+  @@index([authorId, createdAt])
 }
 
 model OrderItem {
@@ -2327,6 +2725,7 @@ model OrderItem {
 
 model PaymentTransaction {
   id               String        @id @default(uuid())
+  tenantId         String?
   orderId           String
   provider          String
   providerRef       String?
@@ -2343,12 +2742,16 @@ model PaymentTransaction {
   updatedAt         DateTime      @updatedAt
 
   order             Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  tenant            Tenant? @relation(fields: [tenantId], references: [id], onDelete: SetNull)
   ledgerEntries     LedgerEntry[]
   reconciliations   PaymentReconciliation[]
+
+  @@index([tenantId, status, createdAt])
 }
 
 model OrderFinanceSnapshot {
   id                    String   @id @default(uuid())
+  tenantId              String?
   orderId               String
   orderItemId           String
   listingId             String?
@@ -2379,8 +2782,10 @@ model OrderFinanceSnapshot {
 
   order     Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
   orderItem OrderItem @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
+  tenant    Tenant?   @relation(fields: [tenantId], references: [id], onDelete: SetNull)
 
   @@unique([orderItemId])
+  @@index([tenantId, settlementStatus])
   @@index([designerId, settlementStatus])
   @@index([orderId])
 }
@@ -2412,6 +2817,7 @@ model ExchangeRate {
 
 model LedgerEntry {
   id                   String            @id @default(uuid())
+  tenantId             String?
   type                 LedgerEntryType
   status               LedgerEntryStatus @default(POSTED)
   designerId           String?
@@ -2430,15 +2836,18 @@ model LedgerEntry {
   order              Order?              @relation(fields: [orderId], references: [id], onDelete: SetNull)
   orderItem          OrderItem?          @relation(fields: [orderItemId], references: [id], onDelete: SetNull)
   paymentTransaction PaymentTransaction? @relation(fields: [paymentTransactionId], references: [id], onDelete: SetNull)
+  tenant             Tenant?             @relation(fields: [tenantId], references: [id], onDelete: SetNull)
   payoutLines        PayoutLedgerEntry[]
   bonus              DesignerBonus?
 
   @@index([designerId, createdAt])
+  @@index([tenantId, type, status])
   @@index([type, status])
 }
 
 model RoyaltyLedgerEntry {
   id             String              @id @default(uuid())
+  tenantId       String?
   designerId     String
   orderId        String?
   orderItemId    String?
@@ -2472,7 +2881,9 @@ model RoyaltyLedgerEntry {
   listing     CommerceListing? @relation(fields: [listingId], references: [id])
   royaltyRule RoyaltyRule?    @relation(fields: [royaltyRuleId], references: [id], onDelete: SetNull)
   payout      Payout?         @relation(fields: [payoutId], references: [id], onDelete: SetNull)
+  tenant      Tenant?         @relation(fields: [tenantId], references: [id], onDelete: SetNull)
 
+  @@index([tenantId, status])
   @@index([orderItemId, designerId])
   @@index([designerId, status])
   @@index([designerId, entryType])
@@ -2481,6 +2892,7 @@ model RoyaltyLedgerEntry {
 
 model Payout {
   id            String       @id @default(uuid())
+  tenantId      String?
   designerId    String
   amount        Decimal      @db.Decimal(12, 2)
   currency      String       @default("UZS")
@@ -2504,14 +2916,17 @@ model Payout {
   updatedAt     DateTime     @updatedAt
 
   designer       User                 @relation("DesignerPayouts", fields: [designerId], references: [id])
+  tenant         Tenant?              @relation(fields: [tenantId], references: [id], onDelete: SetNull)
   royaltyEntries RoyaltyLedgerEntry[]
   ledgerEntries  PayoutLedgerEntry[]
 
+  @@index([tenantId, status])
   @@index([designerId, status])
 }
 
 model PaymentReconciliation {
   id                   String                      @id @default(uuid())
+  tenantId             String?
   paymentTransactionId String
   orderId              String
   provider             String
@@ -2532,8 +2947,10 @@ model PaymentReconciliation {
 
   paymentTransaction PaymentTransaction @relation(fields: [paymentTransactionId], references: [id], onDelete: Cascade)
   order              Order              @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  tenant             Tenant?            @relation(fields: [tenantId], references: [id], onDelete: SetNull)
 
   @@unique([paymentTransactionId])
+  @@index([tenantId, status, createdAt])
   @@index([status, createdAt])
   @@index([orderId])
 }
@@ -2600,10 +3017,12 @@ model GroupBonus {
 
 model ProductionJob {
   id           String              @id @default(uuid())
+  tenantId     String?
   orderId      String
   orderItemId  String?
   status       ProductionJobStatus @default(ORDERED)
   queueType    String
+  workshopCode String?             @unique
   priority     Int                 @default(0)
   assignedOperatorId String?
   blockerReason String?
@@ -2650,6 +3069,9 @@ model ProductionJob {
   rejectedQuantity Int?
   defectReason String?
   reprintOfProductionItemId String?
+  packedAt DateTime?
+  packedById String?
+  packageCode String?
   deliveryProvider String?
   deliveryTrackingRef String?
   deliveryNote String?
@@ -2660,20 +3082,96 @@ model ProductionJob {
   updatedAt    DateTime            @updatedAt
 
   order        Order      @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  tenant       Tenant?    @relation(fields: [tenantId], references: [id], onDelete: SetNull)
   orderItem    OrderItem? @relation(fields: [orderItemId], references: [id], onDelete: SetNull)
   gangSheet    GangSheet? @relation(fields: [gangSheetId], references: [id], onDelete: SetNull)
   providerSyncRecord PodProviderSyncRecord? @relation(fields: [providerSyncRecordId], references: [id], onDelete: SetNull)
+  workshopIssues WorkshopIssue[]
+  qcEvidence WorkshopQcEvidence[]
 
+  @@index([tenantId, status, createdAt])
   @@index([orderId, status])
   @@index([orderItemId])
   @@index([providerSyncRecordId])
   @@index([externalSourceType, externalOrderId])
   @@index([gangSheetId])
   @@index([status, createdAt])
+  @@index([workshopCode])
+  @@index([packageCode])
+}
+
+model WorkshopQcEvidence {
+  id String @id @default(uuid())
+  tenantId String?
+  productionJobId String
+  assetId String
+  note String?
+  defectReason String?
+  acceptedQuantity Int?
+  rejectedQuantity Int?
+  customerVisible Boolean @default(false)
+  createdById String?
+  createdAt DateTime @default(now())
+
+  productionJob ProductionJob @relation(fields: [productionJobId], references: [id], onDelete: Cascade)
+  tenant Tenant? @relation(fields: [tenantId], references: [id], onDelete: SetNull)
+  asset FileAsset @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, createdAt])
+  @@index([productionJobId, createdAt])
+  @@index([assetId])
+}
+
+model WorkshopIssue {
+  id String @id @default(uuid())
+  tenantId String?
+  productionJobId String?
+  orderId String?
+  type String
+  severity String @default("NORMAL")
+  note String
+  photoAssetId String?
+  status String @default("OPEN")
+  blockedProduction Boolean @default(false)
+  createdById String?
+  resolvedById String?
+  resolvedAt DateTime?
+  resolutionNote String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  productionJob ProductionJob? @relation(fields: [productionJobId], references: [id], onDelete: SetNull)
+  tenant Tenant? @relation(fields: [tenantId], references: [id], onDelete: SetNull)
+  order Order? @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  photoAsset FileAsset? @relation(fields: [photoAssetId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, status, severity])
+  @@index([productionJobId, status, severity])
+  @@index([orderId, status])
+  @@index([status, severity, createdAt])
+}
+
+model WorkshopMobileAction {
+  id String @id @default(uuid())
+  tenantId String?
+  idempotencyKey String @unique
+  actorId String?
+  action String
+  entityType String
+  entityId String
+  responseJson Json?
+  createdAt DateTime @default(now())
+
+  tenant Tenant? @relation(fields: [tenantId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, actorId, createdAt])
+  @@index([actorId, createdAt])
+  @@index([entityType, entityId])
 }
 
 model CorporateRequest {
   id            String               @id @default(uuid())
+  tenantId      String?
   corporateUserId String
   title         String
   details       String?
@@ -2685,8 +3183,11 @@ model CorporateRequest {
   updatedAt     DateTime             @updatedAt
 
   corporateUser User         @relation("CorporateClientRequests", fields: [corporateUserId], references: [id])
+  tenant        Tenant?      @relation(fields: [tenantId], references: [id], onDelete: SetNull)
   bids          DesignerBid[]
   offers        CommercialOffer[]
+
+  @@index([tenantId, status, createdAt])
 }
 
 model DesignerBid {
@@ -2727,6 +3228,7 @@ model CommercialOffer {
 
 model WorkerJob {
   id          String          @id @default(uuid())
+  tenantId    String?
   type        String
   status      WorkerJobStatus @default(PENDING)
   idempotencyKey String?      @unique
@@ -2741,6 +3243,9 @@ model WorkerJob {
   createdAt   DateTime        @default(now())
   updatedAt   DateTime        @updatedAt
 
+  tenant      Tenant? @relation(fields: [tenantId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, type, status])
   @@index([type, status, nextRunAt])
   @@index([status, nextRunAt])
 }
@@ -2869,6 +3374,7 @@ model AiSuggestion {
 
 model AnalyticsEvent {
   id          String   @id @default(uuid())
+  tenantId    String?
   eventType   String
   entityType  String
   entityId    String
@@ -2880,14 +3386,142 @@ model AnalyticsEvent {
   occurredAt  DateTime @default(now())
   createdAt   DateTime @default(now())
 
+  tenant      Tenant? @relation(fields: [tenantId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, eventType, occurredAt])
   @@index([eventType, occurredAt])
   @@index([entityType, entityId])
   @@index([channel, occurredAt])
   @@index([actorId, occurredAt])
 }
 
+model Notification {
+  id             String               @id @default(uuid())
+  tenantId       String?
+  userId         String
+  type           String
+  title          String
+  body           String
+  severity       NotificationSeverity @default(INFO)
+  entityType     String?
+  entityId       String?
+  actionUrl      String?
+  metadataJson   Json?
+  idempotencyKey String?              @unique
+  readAt         DateTime?
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
+
+  user       User                   @relation("NotificationUser", fields: [userId], references: [id], onDelete: Cascade)
+  tenant     Tenant?                @relation(fields: [tenantId], references: [id], onDelete: SetNull)
+  deliveries NotificationDelivery[]
+
+  @@index([tenantId, type, createdAt])
+  @@index([userId, readAt, createdAt])
+  @@index([type, createdAt])
+  @@index([entityType, entityId])
+}
+
+model NotificationDelivery {
+  id             String                     @id @default(uuid())
+  notificationId String
+  userId         String
+  channel        NotificationChannel
+  status         NotificationDeliveryStatus @default(QUEUED)
+  templateKey    String?
+  destination    String?
+  providerRef    String?
+  errorMessage   String?
+  payloadJson    Json?
+  idempotencyKey String?                    @unique
+  attemptedAt    DateTime?
+  deliveredAt    DateTime?
+  createdAt      DateTime                   @default(now())
+  updatedAt      DateTime                   @updatedAt
+
+  notification Notification @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+  user         User         @relation("NotificationDeliveryUser", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, channel, status, createdAt])
+  @@index([notificationId, channel])
+  @@index([status, createdAt])
+}
+
+model CrmTag {
+  id          String       @id @default(uuid())
+  tenantId    String?
+  key         String       @unique
+  label       String
+  color       String?
+  description String?
+  createdById String?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  createdBy User?        @relation("CrmTagCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  tenant    Tenant?      @relation(fields: [tenantId], references: [id], onDelete: SetNull)
+  users     UserCrmTag[]
+
+  @@index([tenantId, key])
+}
+
+model UserCrmTag {
+  id        String   @id @default(uuid())
+  userId    String
+  tagId     String
+  createdAt DateTime @default(now())
+
+  user User   @relation("UserCrmTagUser", fields: [userId], references: [id], onDelete: Cascade)
+  tag  CrmTag @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, tagId])
+  @@index([tagId])
+}
+
+model CrmNote {
+  id        String   @id @default(uuid())
+  tenantId  String?
+  userId    String
+  authorId  String?
+  note      String
+  isPinned  Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user   User  @relation("CrmNoteSubject", fields: [userId], references: [id], onDelete: Cascade)
+  author User? @relation("CrmNoteAuthor", fields: [authorId], references: [id], onDelete: SetNull)
+  tenant Tenant? @relation(fields: [tenantId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, userId, createdAt])
+  @@index([userId, createdAt])
+  @@index([authorId, createdAt])
+}
+
+model CrmContactLog {
+  id           String              @id @default(uuid())
+  tenantId     String?
+  userId       String
+  authorId     String?
+  channel      CrmContactChannel
+  direction    CrmContactDirection @default(OUTBOUND)
+  summary      String
+  outcome      String?
+  metadataJson Json?
+  contactedAt  DateTime            @default(now())
+  createdAt    DateTime            @default(now())
+
+  user   User  @relation("CrmContactSubject", fields: [userId], references: [id], onDelete: Cascade)
+  author User? @relation("CrmContactAuthor", fields: [authorId], references: [id], onDelete: SetNull)
+  tenant Tenant? @relation(fields: [tenantId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, userId, contactedAt])
+  @@index([userId, contactedAt])
+  @@index([authorId, contactedAt])
+}
+
 model DailyMetric {
   id            String   @id @default(uuid())
+  tenantId      String?
   date          DateTime
   metricKey     String
   dimensionType String   @default("platform")
@@ -2901,6 +3535,9 @@ model DailyMetric {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
+  tenant        Tenant? @relation(fields: [tenantId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, metricKey, date])
   @@unique([date, metricKey, dimensionType, dimensionId, channel, currency])
   @@index([metricKey, date])
   @@index([dimensionType, dimensionId, date])
@@ -2908,6 +3545,7 @@ model DailyMetric {
 
 model ReportExport {
   id            String   @id @default(uuid())
+  tenantId      String?
   reportType    String
   status        String   @default("GENERATED")
   format        String   @default("CSV")
@@ -2926,6 +3564,9 @@ model ReportExport {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
+  tenant        Tenant? @relation(fields: [tenantId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, reportType, createdAt])
   @@index([reportType, createdAt])
   @@index([requestedById, createdAt])
   @@index([status, createdAt])
@@ -2933,6 +3574,7 @@ model ReportExport {
 
 model AuditLog {
   id         String   @id @default(uuid())
+  tenantId   String?
   actorId    String?
   actorEmail String?
   actorRole  String?
@@ -2945,7 +3587,9 @@ model AuditLog {
   createdAt  DateTime @default(now())
 
   actor User? @relation(fields: [actorId], references: [id])
+  tenant Tenant? @relation(fields: [tenantId], references: [id], onDelete: SetNull)
 
+  @@index([tenantId, createdAt])
   @@index([entityType, entityId])
   @@index([actorId])
   @@index([createdAt])
@@ -2959,12 +3603,17 @@ model PlatformSetting {
 
 model EmailTemplate {
   id        String   @id @default(uuid())
+  tenantId  String?
   key       String   @unique
   subject   String
   body      String
   variables Json?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  tenant    Tenant? @relation(fields: [tenantId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, key])
 }
 
 model AiSetting {
@@ -3001,8 +3650,55 @@ enum SupportRequestStatus {
   CLOSED
 }
 
+enum SupportPriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+enum SupportMessageVisibility {
+  PUBLIC
+  INTERNAL
+}
+
+enum NotificationChannel {
+  IN_APP
+  EMAIL
+  TELEGRAM
+}
+
+enum NotificationDeliveryStatus {
+  QUEUED
+  DELIVERED
+  FAILED
+  SKIPPED
+}
+
+enum NotificationSeverity {
+  INFO
+  SUCCESS
+  WARNING
+  CRITICAL
+}
+
+enum CrmContactChannel {
+  EMAIL
+  PHONE
+  TELEGRAM
+  IN_APP
+  SUPPORT_TICKET
+  OTHER
+}
+
+enum CrmContactDirection {
+  INBOUND
+  OUTBOUND
+}
+
 model MediaAsset {
   id           String        @id @default(uuid())
+  tenantId     String?
   key          String        @unique
   category     MediaCategory
   title        String
@@ -3021,12 +3717,16 @@ model MediaAsset {
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
 
+  tenant       Tenant? @relation(fields: [tenantId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, category, isActive])
   @@index([category, isActive])
   @@index([category, sortOrder])
 }
 
 model DesignerApplication {
   id                 String       @id @default(uuid())
+  tenantId           String?
   firstName          String
   lastName           String
   email              String
@@ -3048,6 +3748,9 @@ model DesignerApplication {
   submittedAt        DateTime     @default(now())
   updatedAt          DateTime     @updatedAt
 
+  tenant             Tenant?      @relation(fields: [tenantId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, status, submittedAt])
   @@index([status, submittedAt])
   @@index([email])
 }

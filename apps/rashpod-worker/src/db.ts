@@ -8,3 +8,10 @@ export function getPrismaClient() {
   }
   return prismaSingleton;
 }
+
+export async function closePrismaClient() {
+  if (prismaSingleton) {
+    await prismaSingleton.$disconnect();
+    prismaSingleton = null;
+  }
+}

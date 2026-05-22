@@ -1,16 +1,26 @@
 import { ValidationPipe } from "@nestjs/common";
 import { NestFactory } from "@nestjs/core";
 import { AppModule } from "./app.module";
+import { assertEnvironment } from "./common/config/platform-config.service";
+import { SafeExceptionFilter } from "./common/observability/safe-exception.filter";
+import { requestContextMiddleware } from "./common/observability/request-context.middleware";
+import { createRateLimitMiddleware } from "./common/security/rate-limit.middleware";
+import { securityHeadersMiddleware } from "./common/security/security-headers.middleware";
 
 async function bootstrap() {
+  assertEnvironment("api");
   const app = await NestFactory.create(AppModule);
-  app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
+  app.use(requestContextMiddleware);
+  app.use(securityHeadersMiddleware);
+  app.use(createRateLimitMiddleware());
+  app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true, forbidNonWhitelisted: true }));
+  app.useGlobalFilters(new SafeExceptionFilter());
 
   const allowedOrigins = [
+    ...(process.env.CORS_ORIGINS?.split(",").map((origin) => origin.trim()).filter(Boolean) ?? []),
     process.env.WEB_URL,
     process.env.DASHBOARD_URL,
-    "http://localhost:3000",
-    "http://localhost:3001",
+    ...(process.env.NODE_ENV === "production" ? [] : ["http://localhost:3000", "http://localhost:3001"]),
   ].filter((o): o is string => Boolean(o));
 
   app.enableCors({

@@ -1,4 +1,5 @@
 import { renderTemplate } from "./email-templates";
+import { WorkerRepository } from "../repository";
 
 export interface SendEmailPayload {
   to: string;
@@ -76,20 +77,34 @@ export class ZeptoMailSender implements EmailSenderPort {
 }
 
 export class EmailJobHandler {
-  constructor(private readonly sender: EmailSenderPort = new ZeptoMailSender()) {}
+  constructor(private readonly sender: EmailSenderPort = new ZeptoMailSender(), private readonly repo?: WorkerRepository) {}
 
   async handleSendEmail(payload: SendEmailPayload) {
-    const rendered = payload.templateKey ? renderTemplate(payload.templateKey, payload.variables) : null;
+    const deliveryId = (payload as SendEmailPayload & { notificationDeliveryId?: string }).notificationDeliveryId;
+    const delivery = deliveryId && this.repo?.getNotificationDelivery ? await this.repo.getNotificationDelivery(deliveryId) : null;
+    const deliveryPayload = delivery?.payloadJson && typeof delivery.payloadJson === "object" ? delivery.payloadJson as SendEmailPayload : {};
+    const sourcePayload = { ...deliveryPayload, ...payload };
+    const rendered = sourcePayload.templateKey ? renderTemplate(sourcePayload.templateKey, sourcePayload.variables) : null;
     const resolvedPayload: SendEmailPayload = {
-      ...payload,
-      subject: payload.subject || rendered?.subject,
-      html: payload.html || rendered?.html,
-      text: payload.text || rendered?.text,
+      ...sourcePayload,
+      subject: sourcePayload.subject || rendered?.subject,
+      html: sourcePayload.html || rendered?.html,
+      text: sourcePayload.text || rendered?.text,
     };
-    const result = await this.sender.send(resolvedPayload);
-    return {
-      ok: result.accepted,
-      providerRef: result.providerRef,
-    };
+    try {
+      const result = await this.sender.send(resolvedPayload);
+      if (deliveryId && this.repo?.updateNotificationDelivery) {
+        await this.repo.updateNotificationDelivery(deliveryId, { status: result.accepted ? "DELIVERED" : "FAILED", providerRef: result.providerRef, attemptedAt: new Date(), deliveredAt: result.accepted ? new Date() : null });
+      }
+      return {
+        ok: result.accepted,
+        providerRef: result.providerRef,
+      };
+    } catch (error) {
+      if (deliveryId && this.repo?.updateNotificationDelivery) {
+        await this.repo.updateNotificationDelivery(deliveryId, { status: "FAILED", errorMessage: error instanceof Error ? error.message : "Email send failed", attemptedAt: new Date() });
+      }
+      throw error;
+    }
   }
 }

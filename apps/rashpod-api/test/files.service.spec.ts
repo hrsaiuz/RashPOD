@@ -1,5 +1,6 @@
 import { ForbiddenException } from "@nestjs/common";
 import { AssetPurpose } from "@prisma/client";
+import { buildAssetObjectKey } from "../src/modules/files/asset-upload-policy";
 import { FilesService } from "../src/modules/files/files.service";
 
 function storageMock(overrides: Record<string, unknown> = {}) {
@@ -18,6 +19,31 @@ function storageMock(overrides: Record<string, unknown> = {}) {
 }
 
 describe("FilesService completeUpload", () => {
+  it("prefixes new asset keys with tenant context when provided", () => {
+    const key = buildAssetObjectKey({
+      tenantId: "tenant_1",
+      ownerId: "user_1",
+      assetId: "asset_1",
+      purpose: AssetPurpose.DESIGN_ORIGINAL,
+      extension: "png",
+      designId: "design_1",
+    });
+
+    expect(key).toBe("tenants/tenant_1/designers/user_1/designs/design_1/original/asset_1.png");
+  });
+
+  it("preserves legacy global asset keys when tenant context is absent", () => {
+    const key = buildAssetObjectKey({
+      ownerId: "user_1",
+      assetId: "asset_1",
+      purpose: AssetPurpose.LISTING_IMAGE,
+      extension: "jpg",
+      listingId: "listing_1",
+    });
+
+    expect(key).toBe("listings/listing_1/images/asset_1.jpg");
+  });
+
   it("uses storage metadata when available", async () => {
     const prisma: any = {
       fileAsset: {

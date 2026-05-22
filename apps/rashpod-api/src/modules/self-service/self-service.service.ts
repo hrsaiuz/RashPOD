@@ -1,5 +1,5 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
-import { DesignStatus, ListingStatus, OrderStatus, PaymentStatus, Prisma, ProductionJobStatus, SupportRequestStatus, UserRole } from "@prisma/client";
+import { DesignStatus, ListingStatus, OrderStatus, PaymentStatus, Prisma, ProductionJobStatus, SupportMessageVisibility, SupportPriority, SupportRequestStatus, UserRole } from "@prisma/client";
 import { PrismaService } from "../../prisma/prisma.service";
 import { AuditService } from "../audit/audit.service";
 import { PaymentsService } from "../payments/payments.service";
@@ -269,7 +269,18 @@ export class SelfServiceService {
         category: dto.category,
         subject: dto.subject?.trim(),
         message: dto.message.trim(),
+        priority: SupportPriority.NORMAL,
         status: SupportRequestStatus.OPEN,
+        dueAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+        lastCustomerMessageAt: new Date(),
+        messages: {
+          create: {
+            authorId: requesterId,
+            authorRole: requesterRole,
+            body: dto.message.trim(),
+            visibility: SupportMessageVisibility.PUBLIC,
+          },
+        },
       },
     });
     await this.audit.log({ actorId: requesterId, action: "support.request.created", entityType: "SupportRequest", entityId: request.id, metadata: { category: dto.category, ...context } });

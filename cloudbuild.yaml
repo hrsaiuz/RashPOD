@@ -5,6 +5,7 @@ substitutions:
   _API_URL: https://api.rashpod.uz
   _WEB_URL: https://rashpod.uz
   _DASHBOARD_URL: https://office.rashpod.uz
+  _CORS_ORIGINS: https://rashpod.uz,https://office.rashpod.uz
   _GCS_BUCKET_ASSETS: rashpod-assets
   _GCS_BUCKET_PRIVATE: rashpod-private-production
 
@@ -163,8 +164,8 @@ steps:
       - --cpu=1
       - --min-instances=0
       - --max-instances=5
-      - --set-secrets=DATABASE_URL=DATABASE_URL:latest,JWT_SECRET=JWT_SECRET:latest,ZEPTO_SMTP_PASSWORD=ZEPTO_SMTP_PASSWORD:latest,OPENAI_API_KEY=OPENAI_API_KEY:latest,CLICK_SECRET_KEY=CLICK_SECRET_KEY:latest
-      - --set-env-vars=NODE_ENV=production,GCP_PROJECT_ID=${_PROJECT},GCS_BUCKET_ASSETS=${_GCS_BUCKET_ASSETS},GCS_BUCKET_PUBLIC=${_GCS_BUCKET_ASSETS},GCS_BUCKET_PRIVATE=${_GCS_BUCKET_PRIVATE},ZEPTO_SMTP_HOST=smtp.zeptomail.com,ZEPTO_SMTP_PORT=587,ZEPTO_SMTP_FROM=rashpod.uz,ZEPTO_SMTP_USERNAME=emailapikey,JWT_EXPIRES_IN=7d,WEB_URL=${_WEB_URL},DASHBOARD_URL=${_DASHBOARD_URL}
+      - --set-secrets=DATABASE_URL=DATABASE_URL:latest,JWT_SECRET=JWT_SECRET:latest,ZEPTO_SMTP_PASSWORD=ZEPTO_SMTP_PASSWORD:latest,OPENAI_API_KEY=OPENAI_API_KEY:latest,CLICK_SECRET_KEY=CLICK_SECRET_KEY:latest,CLICK_WEBHOOK_SECRET=CLICK_WEBHOOK_SECRET:latest,TELEGRAM_BOT_TOKEN=telegram-bot-token:latest
+      - --set-env-vars=NODE_ENV=production,GCP_PROJECT_ID=${_PROJECT},GCS_BUCKET_ASSETS=${_GCS_BUCKET_ASSETS},GCS_BUCKET_PUBLIC=${_GCS_BUCKET_ASSETS},GCS_BUCKET_PRIVATE=${_GCS_BUCKET_PRIVATE},ZEPTO_SMTP_HOST=smtp.zeptomail.com,ZEPTO_SMTP_PORT=587,ZEPTO_SMTP_FROM=rashpod.uz,ZEPTO_SMTP_USERNAME=emailapikey,JWT_EXPIRES_IN=7d,WEB_URL=${_WEB_URL},DASHBOARD_URL=${_DASHBOARD_URL},CORS_ORIGINS=${_CORS_ORIGINS}
       - --add-cloudsql-instances=rashpod-production:us-central1:rashpod-db
     waitFor: [migrate-db]
 
@@ -184,7 +185,7 @@ steps:
       - --cpu=1
       - --min-instances=0
       - --max-instances=3
-      - --set-secrets=DATABASE_URL=DATABASE_URL:latest
+      - --set-secrets=DATABASE_URL=DATABASE_URL:latest,TELEGRAM_BOT_TOKEN=telegram-bot-token:latest
       - --set-env-vars=NODE_ENV=production,GCP_PROJECT_ID=${_PROJECT},GCS_BUCKET_ASSETS=${_GCS_BUCKET_ASSETS},GCS_BUCKET_PUBLIC=${_GCS_BUCKET_ASSETS},GCS_BUCKET_PRIVATE=${_GCS_BUCKET_PRIVATE}
       - --add-cloudsql-instances=rashpod-production:us-central1:rashpod-db
     waitFor: [push-worker, migrate-db]

@@ -21,6 +21,12 @@ export class AdminOpsController {
     return this.adminOps.getSettings();
   }
 
+  @Get("launch-readiness")
+  @RequirePermission("admin-settings:manage")
+  launchReadiness() {
+    return this.adminOps.launchReadiness();
+  }
+
   @Patch("settings")
   @RequirePermission("admin-settings:manage")
   updateSettings(@CurrentUser() user: RequestUser, @Body() dto: UpdateAdminSettingsDto) {

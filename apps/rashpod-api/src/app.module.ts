@@ -1,5 +1,6 @@
 import { Module } from "@nestjs/common";
 import { ConfigModule } from "@nestjs/config";
+import { PlatformConfigModule } from "./common/config/platform-config.module";
 import { AuthModule } from "./modules/auth/auth.module";
 import { DesignsModule } from "./modules/designs/designs.module";
 import { ModerationModule } from "./modules/moderation/moderation.module";
@@ -35,11 +36,15 @@ import { SelfServiceModule } from "./modules/self-service/self-service.module";
 import { FilmModule } from "./modules/film/film.module";
 import { GangSheetsModule } from "./modules/gang-sheets/gang-sheets.module";
 import { AnalyticsModule } from "./modules/analytics/analytics.module";
+import { CommunicationsModule } from "./modules/communications/communications.module";
+import { WorkshopModule } from "./modules/workshop/workshop.module";
+import { TenantsModule } from "./modules/tenants/tenants.module";
 import { HealthController } from "./health.controller";
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
+    PlatformConfigModule,
     PrismaModule,
     AuditModule,
     AuthModule,
@@ -72,6 +77,9 @@ import { HealthController } from "./health.controller";
     FilmModule,
     GangSheetsModule,
     AnalyticsModule,
+    CommunicationsModule,
+    WorkshopModule,
+    TenantsModule,
     IntakeModule,
     DesignWorkflowModule,
     PrintfulModule,

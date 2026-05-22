@@ -9,4 +9,11 @@ describe("permissions matrix", () => {
   it("requires moderation permission for moderation actions", () => {
     expect(permissions["design:moderate"]).toContain("MODERATOR");
   });
+
+  it("gates tenant administration behind admin and operations roles", () => {
+    expect(permissions["tenant:settings:manage"]).toEqual(["ADMIN", "SUPER_ADMIN", "OPERATIONS_MANAGER"]);
+    expect(permissions["tenant:members:manage"]).toEqual(["ADMIN", "SUPER_ADMIN", "OPERATIONS_MANAGER"]);
+    expect(permissions["tenants:read-all"]).toEqual(["SUPER_ADMIN"]);
+    expect(permissions["entitlements:override"]).toEqual(["SUPER_ADMIN"]);
+  });
 });

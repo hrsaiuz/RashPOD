@@ -91,3 +91,14 @@ Future:
 - Admin account seeded securely.
 - CORS configured.
 - Rate limits enabled.
+- API `/health/live` and `/health/ready` configured as Cloud Run probes.
+- Worker `/health/live` and `/health/ready` configured and SIGTERM shutdown verified.
+- `/dashboard/admin/launch-readiness` has no FAIL checks.
+
+## Rollback
+- Roll back Cloud Run to the last healthy revision for application regressions.
+- Do not delete applied production migrations. Prefer a forward fix or restore to a new Cloud SQL instance from backup.
+- Disable risky feature flags first for payments, AI, marketplace export, global POD, and film sales.
+- Keep failed revision logs, request IDs, and worker job IDs for post-incident review.
+
+See `docs/launch-readiness-runbook.md` for environment setup, Secret Manager mapping, backup/restore, monitoring alerts, and incident response.

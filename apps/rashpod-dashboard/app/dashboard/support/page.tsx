@@ -43,20 +43,17 @@ export default function SupportOverview() {
       setLoading(true);
       setError("");
       try {
-        // TODO: Replace with actual endpoints
-        // const kpiRes = await fetch("/api/proxy/support/kpis");
-        // const ticketsRes = await fetch("/api/proxy/support/tickets?limit=5");
-        
-        setKpis({
-          openTickets: 18,
-          slaBreaches: 2,
-          avgResponse: 1.2,
-          resolvedToday: 14,
-        });
-        setRecentTickets([
-          { id: "1", subject: "Order not received", customer: "john@example.com", status: "open", priority: "high", createdAt: "2025-01-20T10:30:00" },
-          { id: "2", subject: "Design approval question", customer: "jane@example.com", status: "in_progress", priority: "medium", createdAt: "2025-01-20T09:15:00" },
+        const [kpiRes, ticketsRes] = await Promise.all([
+          fetch("/api/proxy/support/kpis"),
+          fetch("/api/proxy/support/tickets?limit=5"),
         ]);
+        if (kpiRes.status === 401 || ticketsRes.status === 401) {
+          router.push("/auth/login?next=/dashboard/support");
+          return;
+        }
+        if (!kpiRes.ok || !ticketsRes.ok) throw new Error("Failed to load support dashboard data");
+        setKpis(await kpiRes.json());
+        setRecentTickets(await ticketsRes.json());
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to load data");
       } finally {
@@ -67,7 +64,7 @@ export default function SupportOverview() {
   }, [user, authLoading, router]);
 
   const ticketColumns: DataTableColumn<TicketEntry>[] = [
-    { key: "subject", header: "Subject", sortable: true },
+    { key: "subject", header: "Subject", sortable: true, render: (_val, row) => <button onClick={() => router.push(`/dashboard/support/tickets/${row.id}`)} className="font-semibold text-brand-blue hover:underline">{row.subject}</button> },
     { key: "customer", header: "Customer" },
     { 
       key: "status", 

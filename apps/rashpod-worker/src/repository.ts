@@ -115,6 +115,14 @@ export interface AiJobRecord {
   failureReason?: string | null;
 }
 
+export interface NotificationDeliveryRecord {
+  id: string;
+  channel: string;
+  status: string;
+  destination?: string | null;
+  payloadJson?: unknown;
+}
+
 export interface WorkerRepository {
   getGeneratedAsset(id: string): Promise<GeneratedAssetRecord | null>;
   updateGeneratedAsset(
@@ -170,4 +178,6 @@ export interface WorkerRepository {
     data: { status?: string; outputSummary?: unknown; tokenUsageJson?: unknown; costEstimateUsd?: number | null; failureReason?: string | null; completedAt?: Date | null },
   ): Promise<AiJobRecord>;
   createAiSuggestion?(data: { aiJobId: string; suggestionType: string; confidence?: number | null; severity?: string | null; payload: unknown }): Promise<{ id: string }>;
+  getNotificationDelivery?(id: string): Promise<NotificationDeliveryRecord | null>;
+  updateNotificationDelivery?(id: string, data: { status?: string; providerRef?: string | null; errorMessage?: string | null; attemptedAt?: Date | null; deliveredAt?: Date | null }): Promise<NotificationDeliveryRecord>;
 }

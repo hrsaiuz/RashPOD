@@ -15,7 +15,7 @@ export class FilesController {
   @Post("upload-url")
   @RequirePermission("file:upload-own")
   createUploadUrl(@CurrentUser() user: RequestUser, @Body() dto: CreateUploadUrlDto) {
-    return this.filesService.createUploadUrl(user.sub, dto);
+    return this.filesService.createUploadUrl(user.sub, dto, user.tenantId ?? user.tid);
   }
 
   @Post("complete-upload")

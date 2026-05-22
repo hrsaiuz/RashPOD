@@ -20,7 +20,8 @@ export class JwtAuthGuard implements CanActivate {
       if (tokenSessionVersion !== activeSessionVersion) {
         throw new UnauthorizedException("Session expired");
       }
-      request.user = payload;
+      const tenantId = typeof payload.tid === "string" ? payload.tid : undefined;
+      request.user = { ...payload, tenantId };
       return true;
     } catch {
       throw new UnauthorizedException("Invalid token");

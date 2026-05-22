@@ -89,6 +89,14 @@ export const ASSET_UPLOAD_POLICIES: Record<AssetPurpose, AssetUploadPolicy> = {
     bucketKind: "private",
     pathSegment: "production-files",
   },
+  WORKSHOP_QC_EVIDENCE: {
+    purpose: AssetPurpose.WORKSHOP_QC_EVIDENCE,
+    maxSizeBytes: 20_000_000,
+    allowedMimeTypes: RASTER_IMAGE_MIME_TYPES,
+    accessPolicy: AssetAccessPolicy.INTERNAL_ONLY,
+    bucketKind: "private",
+    pathSegment: "workshop-qc-evidence",
+  },
   MARKETPLACE_EXPORT: {
     purpose: AssetPurpose.MARKETPLACE_EXPORT,
     maxSizeBytes: 250_000_000,
@@ -162,6 +170,7 @@ export function extensionForAsset(filename: string, mimeType: string) {
 }
 
 export function buildAssetObjectKey(input: {
+  tenantId?: string;
   ownerId: string;
   assetId: string;
   purpose: AssetPurpose;
@@ -175,32 +184,35 @@ export function buildAssetObjectKey(input: {
 }) {
   const policy = resolveAssetUploadPolicy(input.purpose);
   const ext = input.extension.replace(/^\./, "") || "bin";
+  const prefix = input.tenantId ? `tenants/${input.tenantId}/` : "";
   switch (input.purpose) {
     case AssetPurpose.DESIGN_ORIGINAL:
-      return `designers/${input.ownerId}/designs/${input.designId ?? "unassigned"}/original/${input.assetId}.${ext}`;
+      return `${prefix}designers/${input.ownerId}/designs/${input.designId ?? "unassigned"}/original/${input.assetId}.${ext}`;
     case AssetPurpose.DESIGN_NORMALIZED:
-      return `designs/${input.designId ?? "unassigned"}/versions/${input.designVersionId ?? "unassigned"}/normalized/${input.assetId}.${ext}`;
+      return `${prefix}designs/${input.designId ?? "unassigned"}/versions/${input.designVersionId ?? "unassigned"}/normalized/${input.assetId}.${ext}`;
     case AssetPurpose.FILM_SOURCE:
-      return `film-sources/${input.ownerId}/${input.listingId ?? input.designId ?? "custom"}/${input.assetId}.${ext}`;
+      return `${prefix}film-sources/${input.ownerId}/${input.listingId ?? input.designId ?? "custom"}/${input.assetId}.${ext}`;
     case AssetPurpose.GANG_SHEET_SOURCE:
-      return `gang-sheet-sources/${input.ownerId}/${input.assetId}.${ext}`;
+      return `${prefix}gang-sheet-sources/${input.ownerId}/${input.assetId}.${ext}`;
     case AssetPurpose.GANG_SHEET_PREVIEW:
-      return `gang-sheet-previews/${input.ownerId}/${input.assetId}.${ext}`;
+      return `${prefix}gang-sheet-previews/${input.ownerId}/${input.assetId}.${ext}`;
     case AssetPurpose.GANG_SHEET_PRODUCTION_FILE:
-      return `gang-sheet-production/${input.ownerId}/${input.assetId}.${ext}`;
+      return `${prefix}gang-sheet-production/${input.ownerId}/${input.assetId}.${ext}`;
     case AssetPurpose.MOCKUP_IMAGE:
-      return `mockups/${input.designId ?? "unassigned"}/${input.baseProductId ?? "base"}/${input.mockupTemplateId ?? "template"}/${input.assetId}.${ext}`;
+      return `${prefix}mockups/${input.designId ?? "unassigned"}/${input.baseProductId ?? "base"}/${input.mockupTemplateId ?? "template"}/${input.assetId}.${ext}`;
     case AssetPurpose.LISTING_IMAGE:
-      return `listings/${input.listingId ?? "unassigned"}/images/${input.assetId}.${ext}`;
+      return `${prefix}listings/${input.listingId ?? "unassigned"}/images/${input.assetId}.${ext}`;
     case AssetPurpose.PRODUCTION_FILE:
-      return `production/${input.listingId ?? input.designId ?? "unassigned"}/${input.assetId}.${ext}`;
+      return `${prefix}production/${input.listingId ?? input.designId ?? "unassigned"}/${input.assetId}.${ext}`;
+    case AssetPurpose.WORKSHOP_QC_EVIDENCE:
+      return `${prefix}workshop/qc-evidence/${input.ownerId}/${input.assetId}.${ext}`;
     case AssetPurpose.MARKETPLACE_EXPORT:
-      return `marketplace-exports/${input.ownerId}/${input.assetId}.${ext}`;
+      return `${prefix}marketplace-exports/${input.ownerId}/${input.assetId}.${ext}`;
     case AssetPurpose.TEMPLATE_IMAGE:
-      return `templates/${input.baseProductId ?? "base"}/${input.mockupTemplateId ?? "template"}/${input.assetId}.${ext}`;
+      return `${prefix}templates/${input.baseProductId ?? "base"}/${input.mockupTemplateId ?? "template"}/${input.assetId}.${ext}`;
     case AssetPurpose.PRINT_AREA_PREVIEW:
-      return `print-area-previews/${input.printAreaId ?? "print-area"}/${input.assetId}.${ext}`;
+      return `${prefix}print-area-previews/${input.printAreaId ?? "print-area"}/${input.assetId}.${ext}`;
     default:
-      return `${policy.pathSegment}/${input.assetId}.${ext}`;
+      return `${prefix}${policy.pathSegment}/${input.assetId}.${ext}`;
   }
 }

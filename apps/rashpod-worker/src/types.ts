@@ -19,7 +19,10 @@ export type JobType =
   | "AI_LISTING_COPY"
   | "AI_MARKETPLACE_COPY"
   | "AI_TRANSLATION"
-  | "SEND_EMAIL";
+  | "SEND_EMAIL"
+  | "TELEGRAM_SEND"
+  | "NOTIFICATION_DISPATCH"
+  | "SUPPORT_NOTIFICATION";
 
 export interface WorkerJob<T = Record<string, unknown>> {
   id: string;

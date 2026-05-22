@@ -1,9 +1,41 @@
-import { DesignProductSelectionStatus, GeneratedAssetStatus, IntegrationLogStatus, ListingStatus, ListingType, MarketplaceKind, MarketplacePublicationStatus, PipelineType, Prisma, ProductionJobStatus, ProviderType } from "@prisma/client";
+import { DesignProductSelectionStatus, GeneratedAssetStatus, IntegrationLogStatus, ListingStatus, ListingType, MarketplaceKind, MarketplacePublicationStatus, NotificationDeliveryStatus, PipelineType, Prisma, ProductionJobStatus, ProviderType } from "@prisma/client";
 import { getPrismaClient } from "./db";
 import { AiJobRecord, GeneratedAssetRecord, MarketplacePublicationRecord, MockupAssetRecord, PipelineSelectionRecord, PipelineSelectionStatus, ProductionJobRecord, WorkerRepository } from "./repository";
 
 export class PrismaAssetRepository implements WorkerRepository {
   private readonly prisma = getPrismaClient();
+
+  async getNotificationDelivery(id: string) {
+    const row = await this.prisma.notificationDelivery.findUnique({ where: { id } });
+    if (!row) return null;
+    return {
+      id: row.id,
+      channel: row.channel,
+      status: row.status,
+      destination: row.destination,
+      payloadJson: row.payloadJson,
+    };
+  }
+
+  async updateNotificationDelivery(id: string, data: { status?: string; providerRef?: string | null; errorMessage?: string | null; attemptedAt?: Date | null; deliveredAt?: Date | null }) {
+    const row = await this.prisma.notificationDelivery.update({
+      where: { id },
+      data: {
+        status: data.status as NotificationDeliveryStatus | undefined,
+        providerRef: data.providerRef,
+        errorMessage: data.errorMessage,
+        attemptedAt: data.attemptedAt,
+        deliveredAt: data.deliveredAt,
+      },
+    });
+    return {
+      id: row.id,
+      channel: row.channel,
+      status: row.status,
+      destination: row.destination,
+      payloadJson: row.payloadJson,
+    };
+  }
 
   async getGeneratedAsset(id: string): Promise<GeneratedAssetRecord | null> {
     const row = await this.prisma.generatedAsset.findUnique({ where: { id } });

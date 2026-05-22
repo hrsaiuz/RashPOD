@@ -43,8 +43,9 @@ export class AuthService {
     const verifyToken = `verify_${randomUUID()}`;
     AuthSessionStore.issueEmailVerificationToken(user.id, verifyToken, this.emailVerificationTtlMs);
     await this.audit.log({ actorId: user.id, action: "auth.register", entityType: "User", entityId: user.id });
+    const tenantId = await this.ensureDefaultTenantMembership(user.id, user.role);
     void this.sendWelcomeEmail(user.id, user.email, user.displayName, role);
-    return this.sign(user.id, user.role, user.email);
+    return this.sign(user.id, user.role, user.email, tenantId);
   }
 
   private async sendWelcomeEmail(userId: string, email: string, displayName: string, role: UserRole) {
@@ -85,7 +86,8 @@ export class AuthService {
     const valid = await bcrypt.compare(dto.password, user.passwordHash);
     if (!valid) throw new UnauthorizedException("Invalid credentials");
     await this.audit.log({ actorId: user.id, action: "auth.login", entityType: "User", entityId: user.id });
-    return this.sign(user.id, user.role, user.email);
+    const tenantId = await this.resolvePreferredTenantId(user.id, user.role);
+    return this.sign(user.id, user.role, user.email, tenantId);
   }
 
   async logout(userId: string) {
@@ -231,16 +233,48 @@ export class AuthService {
         entityId: user.id,
       });
     }
-    return this.sign(user.id, user.role, user.email);
+    const tenantId = await this.ensureDefaultTenantMembership(user.id, user.role);
+    return this.sign(user.id, user.role, user.email, tenantId);
   }
 
-  private async sign(sub: string, role: UserRole, email: string) {
+  private async sign(sub: string, role: UserRole, email: string, tenantId?: string) {
     const sessionVersion = AuthSessionStore.getSessionVersion(sub);
     const accessToken = await this.jwtService.signAsync(
-      { sub, role, email, sv: sessionVersion },
+      { sub, role, email, sv: sessionVersion, tid: tenantId },
       { secret: process.env.JWT_SECRET || "rashpod-dev-secret", expiresIn: "7d" },
     );
     return { accessToken };
+  }
+
+  private async resolvePreferredTenantId(userId: string, role: UserRole) {
+    const membership = await this.prisma.tenantMember.findFirst({
+      where: { userId, status: "ACTIVE", tenant: { status: { in: ["TRIAL", "ACTIVE", "PAST_DUE"] } } },
+      orderBy: { createdAt: "asc" },
+      select: { tenantId: true },
+    });
+    if (membership) return membership.tenantId;
+    return this.ensureDefaultTenantMembership(userId, role);
+  }
+
+  private async ensureDefaultTenantMembership(userId: string, role: UserRole) {
+    let tenant = await this.prisma.tenant.findUnique({ where: { slug: "rashpod" }, select: { id: true } });
+    if (!tenant) {
+      const plan = await this.prisma.saaSPlan.upsert({
+        where: { code: "rashpod-default" },
+        create: { name: "RashPOD Default", code: "rashpod-default", billingInterval: "MANUAL", trialDays: 0 },
+        update: {},
+      });
+      tenant = await this.prisma.tenant.create({
+        data: { name: "RashPOD", slug: "rashpod", status: "ACTIVE", tenantType: "RASHPOD_DEFAULT", planId: plan.id },
+        select: { id: true },
+      });
+    }
+    await this.prisma.tenantMember.upsert({
+      where: { tenantId_userId: { tenantId: tenant.id, userId } },
+      create: { tenantId: tenant.id, userId, roleKey: role, status: "ACTIVE", joinedAt: new Date() },
+      update: { roleKey: role, status: "ACTIVE" },
+    });
+    return tenant.id;
   }
 
   private exposeLifecycleToken(token: string): { ok: true; token?: string } {

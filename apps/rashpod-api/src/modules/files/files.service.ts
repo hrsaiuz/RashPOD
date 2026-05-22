@@ -18,7 +18,7 @@ export class FilesService {
     @Optional() private readonly audit?: AuditService,
   ) {}
 
-  async createUploadUrl(ownerId: string, dto: CreateUploadUrlDto) {
+  async createUploadUrl(ownerId: string, dto: CreateUploadUrlDto, tenantId?: string) {
     if (process.env.NODE_ENV === "production" && !this.storage.isCloudStorageConfigured()) {
       throw new ServiceUnavailableException("Google Cloud Storage must be configured before accepting production uploads");
     }
@@ -29,6 +29,7 @@ export class FilesService {
     const fileExtension = extensionForAsset(dto.filename, dto.mimeType);
     const objectKey = buildAssetObjectKey({
       ownerId,
+      tenantId,
       assetId: fileId,
       purpose,
       extension: fileExtension,
@@ -45,6 +46,7 @@ export class FilesService {
       data: {
         id: fileId,
         ownerId,
+        tenantId,
         purpose,
         storageProvider,
         accessPolicy: policy.accessPolicy,

@@ -1,6 +1,7 @@
 import { WorkerRepository } from "./repository";
 import { WorkerJob } from "./types";
 import { EmailJobHandler, EmailSenderPort } from "./jobs/email-handler";
+import { TelegramJobHandler } from "./jobs/telegram-handler";
 import { AiJobHandler } from "./jobs/ai-handler";
 import { MockupJobHandler } from "./jobs/mockup-handler";
 import { MarketplacePublicationJobHandler } from "./jobs/marketplace-publication-handler";
@@ -16,6 +17,7 @@ export class WorkerDispatcher {
   private readonly printfulCatalogSyncHandler: PrintfulCatalogSyncJobHandler;
   private readonly podSyncHandler: PodSyncJobHandler;
   private readonly emailHandler: EmailJobHandler;
+  private readonly telegramHandler: TelegramJobHandler;
   private readonly aiHandler: AiJobHandler;
   private readonly logger: WorkerLogger;
 
@@ -25,7 +27,8 @@ export class WorkerDispatcher {
     this.marketplacePublicationHandler = new MarketplacePublicationJobHandler(repo);
     this.printfulCatalogSyncHandler = new PrintfulCatalogSyncJobHandler(repo);
     this.podSyncHandler = new PodSyncJobHandler();
-    this.emailHandler = new EmailJobHandler(emailSender);
+    this.emailHandler = new EmailJobHandler(emailSender, repo);
+    this.telegramHandler = new TelegramJobHandler(repo);
     this.aiHandler = new AiJobHandler(repo);
     this.logger = logger;
   }
@@ -69,6 +72,11 @@ export class WorkerDispatcher {
         return this.mockupHandler.handleProductionFile(job.payload as { placementId: string; generatedAssetId: string });
       case "SEND_EMAIL":
         return this.emailHandler.handleSendEmail(job.payload as any);
+      case "TELEGRAM_SEND":
+        return this.telegramHandler.handleSendTelegram(job.payload as any);
+      case "NOTIFICATION_DISPATCH":
+      case "SUPPORT_NOTIFICATION":
+        return { skipped: true, reason: `${job.type} is handled by API orchestration` };
       case "AI_DESIGN_QA":
       case "AI_MODERATION_ASSIST":
       case "AI_PRODUCT_RECOMMENDATION":

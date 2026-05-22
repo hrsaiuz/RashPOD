@@ -6,6 +6,7 @@ interface AuditLogInput {
   actorId?: string;
   actorEmail?: string;
   actorRole?: string;
+  tenantId?: string;
   action: string;
   entityType: string;
   entityId: string;
@@ -33,6 +34,7 @@ export class AuditService {
         actorId: input.actorId,
         actorEmail: input.actorEmail,
         actorRole: input.actorRole,
+        tenantId: input.tenantId,
         action: input.action,
         entityType: input.entityType,
         entityId: input.entityId,

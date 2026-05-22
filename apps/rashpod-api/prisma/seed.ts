@@ -13,10 +13,22 @@ import {
   DesignStatus,
   ListingStatus,
   ListingType,
+  BillingAccountStatus,
+  BillingInterval,
+  PlanStatus,
+  SubscriptionStatus,
+  TenantMemberStatus,
+  TenantStatus,
+  TenantType,
 } from "@prisma/client";
 import * as bcrypt from "bcryptjs";
 
 const prisma = new PrismaClient();
+const DEFAULT_TENANT_ID = "00000000-0000-4000-8000-000000000100";
+const DEFAULT_PLAN_ID = "00000000-0000-4000-8000-000000000101";
+const DEFAULT_BILLING_ACCOUNT_ID = "00000000-0000-4000-8000-000000000102";
+const DEFAULT_BRANDING_ID = "00000000-0000-4000-8000-000000000103";
+const DEFAULT_SUBSCRIPTION_ID = "00000000-0000-4000-8000-000000000104";
 
 async function upsertUser(input: {
   email: string;
@@ -66,6 +78,107 @@ async function seedUsers() {
   for (const user of users) {
     await upsertUser(user);
   }
+}
+
+async function seedDefaultTenant() {
+  const owner = await prisma.user.findFirst({ where: { role: UserRole.SUPER_ADMIN }, orderBy: { createdAt: "asc" } });
+
+  const plan = await prisma.saaSPlan.upsert({
+    where: { code: "rashpod-default" },
+    create: {
+      id: DEFAULT_PLAN_ID,
+      name: "RashPOD Default",
+      code: "rashpod-default",
+      status: PlanStatus.ACTIVE,
+      currency: "UZS",
+      billingInterval: BillingInterval.MANUAL,
+      price: "0",
+      trialDays: 0,
+      includedLimits: { designs: null, orders: null, users: null, storageGb: null },
+      featureFlags: { defaultTenant: true, whiteLabel: true, workshopMobile: true },
+    },
+    update: {
+      name: "RashPOD Default",
+      status: PlanStatus.ACTIVE,
+      includedLimits: { designs: null, orders: null, users: null, storageGb: null },
+      featureFlags: { defaultTenant: true, whiteLabel: true, workshopMobile: true },
+    },
+  });
+
+  const tenant = await prisma.tenant.upsert({
+    where: { slug: "rashpod" },
+    create: {
+      id: DEFAULT_TENANT_ID,
+      name: "RashPOD",
+      slug: "rashpod",
+      status: TenantStatus.ACTIVE,
+      tenantType: TenantType.RASHPOD_DEFAULT,
+      ownerUserId: owner?.id,
+      planId: plan.id,
+      settingsJson: { defaultTenant: true },
+    },
+    update: {
+      name: "RashPOD",
+      status: TenantStatus.ACTIVE,
+      tenantType: TenantType.RASHPOD_DEFAULT,
+      ownerUserId: owner?.id,
+      planId: plan.id,
+    },
+  });
+
+  const billingAccount = await prisma.billingAccount.upsert({
+    where: { id: DEFAULT_BILLING_ACCOUNT_ID },
+    create: {
+      id: DEFAULT_BILLING_ACCOUNT_ID,
+      tenantId: tenant.id,
+      billingEmail: "billing@rashpod.local",
+      companyName: "RashPOD",
+      status: BillingAccountStatus.ACTIVE,
+    },
+    update: { tenantId: tenant.id, companyName: "RashPOD", status: BillingAccountStatus.ACTIVE },
+  });
+
+  const branding = await prisma.tenantBranding.upsert({
+    where: { id: DEFAULT_BRANDING_ID },
+    create: { id: DEFAULT_BRANDING_ID, tenantId: tenant.id, displayName: "RashPOD", accentColor: "#788AE0" },
+    update: { tenantId: tenant.id, displayName: "RashPOD", accentColor: "#788AE0" },
+  });
+
+  await prisma.tenant.update({
+    where: { id: tenant.id },
+    data: { billingAccountId: billingAccount.id, brandingId: branding.id },
+  });
+
+  await prisma.subscription.upsert({
+    where: { id: DEFAULT_SUBSCRIPTION_ID },
+    create: {
+      id: DEFAULT_SUBSCRIPTION_ID,
+      tenantId: tenant.id,
+      planId: plan.id,
+      status: SubscriptionStatus.ACTIVE,
+      currentPeriodStart: new Date(),
+      manualBilling: true,
+      notes: "Default RashPOD tenant bootstrap subscription.",
+    },
+    update: { tenantId: tenant.id, planId: plan.id, status: SubscriptionStatus.ACTIVE, manualBilling: true },
+  });
+
+  const users = await prisma.user.findMany();
+  for (const user of users) {
+    await prisma.tenantMember.upsert({
+      where: { tenantId_userId: { tenantId: tenant.id, userId: user.id } },
+      create: {
+        tenantId: tenant.id,
+        userId: user.id,
+        roleKey: user.role,
+        status: TenantMemberStatus.ACTIVE,
+        joinedAt: new Date(),
+      },
+      update: { roleKey: user.role, status: TenantMemberStatus.ACTIVE },
+    });
+  }
+
+  return tenant;
 }
 
 async function seedProductTypes() {
@@ -227,6 +340,51 @@ async function seedSampleListings() {
       },
     });
   }
+}
+
+async function backfillDefaultTenantData(tenantId: string) {
+  await prisma.$transaction([
+    prisma.userPreferences.updateMany({ where: { tenantId: null }, data: { tenantId } }),
+    prisma.designAsset.updateMany({ where: { tenantId: null }, data: { tenantId } }),
+    prisma.fileAsset.updateMany({ where: { tenantId: null }, data: { tenantId } }),
+    prisma.productType.updateMany({ where: { tenantId: null }, data: { tenantId } }),
+    prisma.royaltyRule.updateMany({ where: { tenantId: null }, data: { tenantId } }),
+    prisma.baseProduct.updateMany({ where: { tenantId: null }, data: { tenantId } }),
+    prisma.mockupTemplate.updateMany({ where: { tenantId: null }, data: { tenantId } }),
+    prisma.filmSaleSettings.updateMany({ where: { tenantId: null }, data: { tenantId } }),
+    prisma.filmSheetPreset.updateMany({ where: { tenantId: null }, data: { tenantId } }),
+    prisma.gangSheet.updateMany({ where: { tenantId: null }, data: { tenantId } }),
+    prisma.deliverySetting.updateMany({ where: { tenantId: null }, data: { tenantId } }),
+    prisma.generatedAsset.updateMany({ where: { tenantId: null }, data: { tenantId } }),
+    prisma.commerceListing.updateMany({ where: { tenantId: null }, data: { tenantId } }),
+    prisma.marketplaceConfig.updateMany({ where: { tenantId: null }, data: { tenantId } }),
+    prisma.cart.updateMany({ where: { tenantId: null }, data: { tenantId } }),
+    prisma.order.updateMany({ where: { tenantId: null }, data: { tenantId } }),
+    prisma.supportRequest.updateMany({ where: { tenantId: null }, data: { tenantId } }),
+    prisma.paymentTransaction.updateMany({ where: { tenantId: null }, data: { tenantId } }),
+    prisma.orderFinanceSnapshot.updateMany({ where: { tenantId: null }, data: { tenantId } }),
+    prisma.ledgerEntry.updateMany({ where: { tenantId: null }, data: { tenantId } }),
+    prisma.royaltyLedgerEntry.updateMany({ where: { tenantId: null }, data: { tenantId } }),
+    prisma.payout.updateMany({ where: { tenantId: null }, data: { tenantId } }),
+    prisma.paymentReconciliation.updateMany({ where: { tenantId: null }, data: { tenantId } }),
+    prisma.productionJob.updateMany({ where: { tenantId: null }, data: { tenantId } }),
+    prisma.workshopQcEvidence.updateMany({ where: { tenantId: null }, data: { tenantId } }),
+    prisma.workshopIssue.updateMany({ where: { tenantId: null }, data: { tenantId } }),
+    prisma.workshopMobileAction.updateMany({ where: { tenantId: null }, data: { tenantId } }),
+    prisma.corporateRequest.updateMany({ where: { tenantId: null }, data: { tenantId } }),
+    prisma.workerJob.updateMany({ where: { tenantId: null }, data: { tenantId } }),
+    prisma.analyticsEvent.updateMany({ where: { tenantId: null }, data: { tenantId } }),
+    prisma.notification.updateMany({ where: { tenantId: null }, data: { tenantId } }),
+    prisma.crmTag.updateMany({ where: { tenantId: null }, data: { tenantId } }),
+    prisma.crmNote.updateMany({ where: { tenantId: null }, data: { tenantId } }),
+    prisma.crmContactLog.updateMany({ where: { tenantId: null }, data: { tenantId } }),
+    prisma.dailyMetric.updateMany({ where: { tenantId: null }, data: { tenantId } }),
+    prisma.reportExport.updateMany({ where: { tenantId: null }, data: { tenantId } }),
+    prisma.auditLog.updateMany({ where: { tenantId: null }, data: { tenantId } }),
+    prisma.emailTemplate.updateMany({ where: { tenantId: null }, data: { tenantId } }),
+    prisma.mediaAsset.updateMany({ where: { tenantId: null }, data: { tenantId } }),
+    prisma.designerApplication.updateMany({ where: { tenantId: null }, data: { tenantId } }),
+  ]);
 }
 
 
@@ -608,6 +766,7 @@ async function seedPipelineTemplates() {
 
 async function main() {
   await seedUsers();
+  const defaultTenant = await seedDefaultTenant();
   await seedProductTypes();
   await seedCurrencies();
   await seedRoyaltyDefault();
@@ -616,6 +775,7 @@ async function main() {
   await seedBaseProductsAndMockups();
   await seedPipelineTemplates();
   await seedSampleListings();
+  await backfillDefaultTenantData(defaultTenant.id);
   console.log("Seed completed.");
 }
 

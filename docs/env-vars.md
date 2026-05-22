@@ -63,6 +63,14 @@ ZEPTOMAIL_FROM_NAME=RashPOD
 ZEPTOMAIL_API_URL=
 ```
 
+## Telegram Notifications
+```env
+TELEGRAM_BOT_TOKEN=
+```
+
+The worker also accepts the legacy local `Telegram_BOT_TOKEN` spelling. Production should source the token from Google
+Secret Manager secret `telegram-bot-token` in project `rashpod-production`.
+
 ## OpenAI
 ```env
 OPENAI_API_KEY=
@@ -131,4 +139,9 @@ RATE_LIMIT_WINDOW_SECONDS=
 LOG_LEVEL=info
 SENTRY_DSN=
 ENABLE_STRUCTURED_LOGS=true
+ALLOW_PRODUCTION_SEED=false
 ```
+
+Production startup fails when required critical API/worker values are missing. Use `docs/launch-readiness-runbook.md` for
+Secret Manager names and Cloud Run injection examples. Do not store raw secrets in `.env.example`, docs, images, build args,
+or dashboard settings responses.
