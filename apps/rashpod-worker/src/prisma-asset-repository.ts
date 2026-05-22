@@ -1,6 +1,6 @@
 import { DesignProductSelectionStatus, GeneratedAssetStatus, IntegrationLogStatus, ListingStatus, ListingType, MarketplaceKind, MarketplacePublicationStatus, PipelineType, Prisma, ProductionJobStatus, ProviderType } from "@prisma/client";
 import { getPrismaClient } from "./db";
-import { GeneratedAssetRecord, MarketplacePublicationRecord, MockupAssetRecord, PipelineSelectionRecord, PipelineSelectionStatus, ProductionJobRecord, WorkerRepository } from "./repository";
+import { AiJobRecord, GeneratedAssetRecord, MarketplacePublicationRecord, MockupAssetRecord, PipelineSelectionRecord, PipelineSelectionStatus, ProductionJobRecord, WorkerRepository } from "./repository";
 
 export class PrismaAssetRepository implements WorkerRepository {
   private readonly prisma = getPrismaClient();
@@ -19,6 +19,57 @@ export class PrismaAssetRepository implements WorkerRepository {
       widthPx: row.widthPx ?? undefined,
       heightPx: row.heightPx ?? undefined,
     };
+  }
+
+  async getAiJob(id: string): Promise<AiJobRecord | null> {
+    const row = await this.prisma.aiJob.findUnique({ where: { id } });
+    if (!row) return null;
+    return {
+      id: row.id,
+      workflow: row.workflow,
+      entityType: row.entityType,
+      entityId: row.entityId,
+      provider: row.provider,
+      model: row.model,
+      status: row.status,
+      inputSummary: row.inputSummary,
+      inputSnapshot: row.inputSnapshot,
+      promptVersion: row.promptVersion,
+      outputSummary: row.outputSummary,
+      tokenUsageJson: row.tokenUsageJson,
+      costEstimateUsd: row.costEstimateUsd == null ? null : Number(row.costEstimateUsd),
+      failureReason: row.failureReason,
+    };
+  }
+
+  async updateAiJob(id: string, data: { status?: string; outputSummary?: unknown; tokenUsageJson?: unknown; costEstimateUsd?: number | null; failureReason?: string | null; completedAt?: Date | null }): Promise<AiJobRecord> {
+    await this.prisma.aiJob.update({
+      where: { id },
+      data: {
+        status: data.status as any,
+        outputSummary: data.outputSummary === undefined ? undefined : data.outputSummary as Prisma.InputJsonValue,
+        tokenUsageJson: data.tokenUsageJson === undefined ? undefined : data.tokenUsageJson as Prisma.InputJsonValue,
+        costEstimateUsd: data.costEstimateUsd === undefined ? undefined : data.costEstimateUsd,
+        failureReason: data.failureReason,
+        completedAt: data.completedAt === undefined ? undefined : data.completedAt,
+      },
+    });
+    const updated = await this.getAiJob(id);
+    if (!updated) throw new Error(`AI job ${id} not found`);
+    return updated;
+  }
+
+  async createAiSuggestion(data: { aiJobId: string; suggestionType: string; confidence?: number | null; severity?: string | null; payload: unknown }) {
+    const row = await this.prisma.aiSuggestion.create({
+      data: {
+        aiJobId: data.aiJobId,
+        suggestionType: data.suggestionType as any,
+        confidence: data.confidence,
+        severity: (data.severity ?? "INFO") as any,
+        payload: data.payload as Prisma.InputJsonValue,
+      },
+    });
+    return { id: row.id };
   }
 
   async updateGeneratedAsset(
@@ -77,6 +128,7 @@ export class PrismaAssetRepository implements WorkerRepository {
       productionFileUrl: row.productionFileUrl,
       productSnapshotJson: row.productSnapshotJson,
       assetSnapshotJson: row.assetSnapshotJson,
+      gangSheetSnapshotJson: row.gangSheetSnapshotJson,
       selectedOptionsJson: row.selectedOptionsJson,
       notes: row.notes,
     };

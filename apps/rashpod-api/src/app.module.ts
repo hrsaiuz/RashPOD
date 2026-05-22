@@ -33,6 +33,8 @@ import { PrintfulModule } from "./modules/printful/printful.module";
 import { FinanceModule } from "./modules/finance/finance.module";
 import { SelfServiceModule } from "./modules/self-service/self-service.module";
 import { FilmModule } from "./modules/film/film.module";
+import { GangSheetsModule } from "./modules/gang-sheets/gang-sheets.module";
+import { AnalyticsModule } from "./modules/analytics/analytics.module";
 import { HealthController } from "./health.controller";
 
 @Module({
@@ -68,6 +70,8 @@ import { HealthController } from "./health.controller";
     FinanceModule,
     SelfServiceModule,
     FilmModule,
+    GangSheetsModule,
+    AnalyticsModule,
     IntakeModule,
     DesignWorkflowModule,
     PrintfulModule,

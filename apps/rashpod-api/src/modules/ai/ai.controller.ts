@@ -1,4 +1,5 @@
-import { Body, Controller, Post, UseGuards } from "@nestjs/common";
+import { Body, Controller, Get, Param, Post, UseGuards } from "@nestjs/common";
+import { AIEntityType } from "@prisma/client";
 import { CurrentUser, RequestUser } from "../../common/auth/current-user.decorator";
 import { JwtAuthGuard } from "../../common/auth/jwt-auth.guard";
 import { PermissionGuard } from "../../common/auth/permission.guard";
@@ -12,15 +13,16 @@ export class AiController {
   constructor(private readonly ai: AiService) {}
 
   @Post("listing-copy")
+  @RequirePermission("ai:listing-copy-generate")
   listingCopy(
     @CurrentUser() user: RequestUser,
-    @Body() body: { titleHint?: string; descriptionHint?: string; tagsHint?: string[] },
+    @Body() body: { titleHint?: string; descriptionHint?: string; tagsHint?: string[]; listingId?: string },
   ) {
     return this.ai.listingCopy(user.sub, body);
   }
 
   @Post("translate")
-  translate(@CurrentUser() user: RequestUser, @Body() body: { text: string; targetLanguage: "uz" | "ru" | "en" }) {
+  translate(@CurrentUser() user: RequestUser, @Body() body: { text: string; targetLanguage: "uz" | "ru" | "en" | "uz-Latn" | "uz-Cyrl"; entityType?: AIEntityType; entityId?: string }) {
     return this.ai.translate(user.sub, body);
   }
 
@@ -35,6 +37,18 @@ export class AiController {
     @Body() body: { widthPx: number; heightPx: number; hasTransparency: boolean },
   ) {
     return this.ai.filmReadiness(user.sub, body);
+  }
+
+  @Get("listings/:listingId/suggestions")
+  @RequirePermission("ai:jobs-read")
+  listingSuggestions(@Param("listingId") listingId: string) {
+    return this.ai.suggestionsForEntity(AIEntityType.LISTING, listingId);
+  }
+
+  @Post("listings/:listingId/apply-copy")
+  @RequirePermission("ai:suggestions-apply")
+  applyListingCopy(@CurrentUser() user: RequestUser, @Param("listingId") listingId: string, @Body() body: { suggestionId: string; fields?: string[] }) {
+    return this.ai.applyListingCopy(user.sub, listingId, body);
   }
 
   @Post("corporate-offer-draft")

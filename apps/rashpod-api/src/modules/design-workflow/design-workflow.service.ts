@@ -1,5 +1,6 @@
 import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
 import {
+  AIEntityType,
   DesignProductSelectionStatus,
   DesignStatus,
   ListingStatus,
@@ -67,19 +68,27 @@ export class DesignWorkflowService {
   }
 
   async moderationDetail(id: string) {
-    const design = await this.prisma.designAsset.findUnique({
-      where: { id },
-      include: {
-        designer: { select: { id: true, email: true, displayName: true, handle: true } },
-        versions: { orderBy: { createdAt: "desc" }, take: 5 },
-        moderationCases: { orderBy: { createdAt: "desc" }, take: 10 },
-        moderationAudits: { orderBy: { createdAt: "desc" }, take: 10 },
-        productSelections: { include: { mockupAssets: true, localBaseProduct: true, printfulProductTemplate: true, placementPreset: true } },
-        listings: { include: { marketplacePublications: true } },
-      },
-    });
+    const [design, aiJobs] = await Promise.all([
+      this.prisma.designAsset.findUnique({
+        where: { id },
+        include: {
+          designer: { select: { id: true, email: true, displayName: true, handle: true } },
+          versions: { orderBy: { createdAt: "desc" }, take: 5 },
+          moderationCases: { orderBy: { createdAt: "desc" }, take: 10 },
+          moderationAudits: { orderBy: { createdAt: "desc" }, take: 10 },
+          productSelections: { include: { mockupAssets: true, localBaseProduct: true, printfulProductTemplate: true, placementPreset: true } },
+          listings: { include: { marketplacePublications: true } },
+        },
+      }),
+      this.prisma.aiJob.findMany({
+        where: { entityType: AIEntityType.DESIGN, entityId: id },
+        include: { suggestions: { orderBy: { createdAt: "desc" } } },
+        orderBy: { createdAt: "desc" },
+        take: 10,
+      }),
+    ]);
     if (!design) throw new NotFoundException("Design not found");
-    return design;
+    return { ...design, ai: { jobs: aiJobs, suggestions: aiJobs.flatMap((job) => job.suggestions) } };
   }
 
   workflow(id: string) {

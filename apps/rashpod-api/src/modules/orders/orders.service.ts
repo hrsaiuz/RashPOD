@@ -60,6 +60,7 @@ export class OrdersService {
     return this.prisma.cartItem.findMany({
       where: { cartId },
       include: {
+        gangSheet: { include: { items: true } },
         listing: {
           include: {
             designer: { select: { id: true, email: true, displayName: true, handle: true } },
@@ -127,6 +128,26 @@ export class OrdersService {
       if (item.filmType === "DTF" && !filmSettings.enableDTF) throw new ForbiddenException("DTF film checkout is currently disabled");
       if (item.filmType === "UV_DTF" && !filmSettings.enableUvDtf) throw new ForbiddenException("UV-DTF film checkout is currently disabled");
       if (!item.filmPricingSnapshotJson) throw new ForbiddenException("Film cart item is missing a pricing snapshot");
+      if (item.itemKind === FilmOrderKind.GANG_SHEET_FILM) {
+        if (!item.gangSheetId || !item.gangSheet) throw new ForbiddenException("Gang sheet cart item is missing sheet data");
+        if (item.gangSheet.ownerId !== customerId) throw new ForbiddenException("Gang sheet does not belong to this customer");
+        if (item.gangSheet.status !== "READY_FOR_CHECKOUT") throw new ForbiddenException("Gang sheet is not ready for checkout");
+        if (!item.gangSheetSnapshotJson || !item.filmPricingSnapshotJson) throw new ForbiddenException("Gang sheet cart item is missing checkout snapshots");
+        const snapshot = this.objectJson(item.gangSheetSnapshotJson);
+        const snapshotItems = Array.isArray(snapshot.items) ? snapshot.items : [];
+        for (const snapshotItem of snapshotItems) {
+          if (!snapshotItem || typeof snapshotItem !== "object") continue;
+          const record = snapshotItem as Record<string, unknown>;
+          const sourceAssetId = this.stringFrom(record.sourceAssetId);
+          if (sourceAssetId) {
+            const source = await this.prisma.fileAsset.findUnique({ where: { id: sourceAssetId } });
+            if (!source || source.status !== "READY" || source.uploadStatus !== "READY") throw new ForbiddenException("Gang sheet source asset is not ready");
+          }
+          const consent = this.objectJson(record.sourceConsentSnapshot as Prisma.JsonValue | null);
+          if (record.designId && (!consent.allowFilmSales || consent.filmConsentRevokedAt)) throw new ForbiddenException("Gang sheet design film consent is not active");
+        }
+        continue;
+      }
       if (item.itemKind === FilmOrderKind.CUSTOM_FILM) {
         if (!item.filmSourceAssetId) throw new ForbiddenException("Custom film cart item is missing source asset");
         const source = await this.prisma.fileAsset.findUnique({ where: { id: item.filmSourceAssetId } });
@@ -220,7 +241,7 @@ export class OrdersService {
     await this.assertFilmCheckoutAllowed(customerId, items);
 
     for (const item of items) {
-      if (!item.listing && item.itemKind !== FilmOrderKind.CUSTOM_FILM) throw new ForbiddenException("Cart item is missing listing");
+      if (!item.listing && item.itemKind !== FilmOrderKind.CUSTOM_FILM && item.itemKind !== FilmOrderKind.GANG_SHEET_FILM) throw new ForbiddenException("Cart item is missing listing");
       if (item.listing) this.assertListingPurchasable(item.listing);
       if (!Number.isInteger(item.quantity) || item.quantity < 1) throw new BadRequestException("Cart contains an invalid quantity");
     }
@@ -270,7 +291,7 @@ export class OrdersService {
         data: {
           orderId: order.id,
           listingId: item.listingId,
-          listingTitle: item.listing?.title ?? (item.itemKind === FilmOrderKind.CUSTOM_FILM ? "Custom film order" : undefined),
+          listingTitle: item.listing?.title ?? (item.itemKind === FilmOrderKind.CUSTOM_FILM ? "Custom film order" : item.itemKind === FilmOrderKind.GANG_SHEET_FILM ? "Gang sheet film order" : undefined),
           designerId: item.listing?.designerId,
           designAssetId: item.listing?.designAssetId,
           designVersionId: snapshot.designVersionId,
@@ -289,6 +310,8 @@ export class OrdersService {
           filmHeightCm: item.filmHeightCm,
           filmAreaCm2: item.filmAreaCm2,
           filmSourceAssetId: item.filmSourceAssetId,
+          gangSheetId: item.gangSheetId,
+          gangSheetSnapshotJson: (item.gangSheetSnapshotJson ?? Prisma.JsonNull) as Prisma.InputJsonValue,
           filmPricingSnapshotJson: (item.filmPricingSnapshotJson ?? Prisma.JsonNull) as Prisma.InputJsonValue,
           filmConsentSnapshotJson: (item.filmConsentSnapshotJson ?? Prisma.JsonNull) as Prisma.InputJsonValue,
           filmProductionSnapshotJson: snapshot.filmProductionSnapshot as Prisma.InputJsonValue,
@@ -317,6 +340,9 @@ export class OrdersService {
           metadataJson: this.cleanJson({ options: snapshot.selectedOptions, listingSnapshot: snapshot.listingSnapshot }),
         },
       });
+      if (item.itemKind === FilmOrderKind.GANG_SHEET_FILM && item.gangSheetId) {
+        await this.prisma.gangSheet.update({ where: { id: item.gangSheetId }, data: { status: "CHECKED_OUT", checkedOutAt: new Date() } });
+      }
     }
 
     await this.prisma.cartItem.deleteMany({ where: { cartId: cart.id } });
@@ -435,12 +461,16 @@ export class OrdersService {
         baseProductName: item.baseProductName,
         baseProductSku: item.baseProductSku,
         quantity: item.quantity,
+        gangSheetId: item.gangSheetId,
+        gangSheetSnapshot: item.gangSheetSnapshotJson,
       });
       const assetSnapshot = this.cleanJson({
         mockupAssetIds: item.mockupAssetIds,
         mockupImageUrl: item.mockupImageUrl,
         productionFileAssetId: item.productionFileAssetId,
         filmSourceAssetId: item.filmSourceAssetId,
+        gangSheetId: item.gangSheetId,
+        gangSheetSnapshot: item.gangSheetSnapshotJson,
         designAssetId: item.designAssetId,
         designVersionId: item.designVersionId,
       });
@@ -454,9 +484,9 @@ export class OrdersService {
         heightCm: item.filmHeightCm,
       });
       const sourcePlacementId = this.sourcePlacementIdFrom(item.placementSnapshotJson);
-      const isFilmItem = item.itemKind === FilmOrderKind.DESIGN_FILM || item.itemKind === FilmOrderKind.CUSTOM_FILM;
+      const isFilmItem = item.itemKind === FilmOrderKind.DESIGN_FILM || item.itemKind === FilmOrderKind.CUSTOM_FILM || item.itemKind === FilmOrderKind.GANG_SHEET_FILM;
       const isProviderItem = item.fulfillmentRoute === OrderFulfillmentRoute.GLOBAL_POD_PROVIDER && Boolean(item.providerSyncRecordId);
-      const filmSourceReady = isFilmItem && Boolean(item.filmSourceAssetId || item.designVersionId);
+      const filmSourceReady = isFilmItem && Boolean(item.filmSourceAssetId || item.designVersionId || item.gangSheetId);
       const productionFileStatus = isProviderItem ? "PROVIDER_SYNC_READY" : item.productionFileAssetId ? "READY" : isFilmItem && filmSourceReady ? "SOURCE_READY" : sourcePlacementId ? "REQUESTED" : "MISSING_SOURCE";
       const productionStatus = item.productionFileAssetId
         ? ProductionJobStatus.READY_FOR_PRINT
@@ -471,7 +501,7 @@ export class OrdersService {
         data: {
           orderId: order.id,
           orderItemId: item.id,
-          queueType: isProviderItem ? "GLOBAL_POD_PROVIDER" : item.itemKind === FilmOrderKind.DESIGN_FILM || item.itemKind === FilmOrderKind.CUSTOM_FILM ? item.filmType ?? "DTF" : "POD",
+          queueType: isProviderItem ? "GLOBAL_POD_PROVIDER" : isFilmItem ? item.filmType ?? "DTF" : "POD",
           status: productionStatus,
           fulfillmentRoute: item.fulfillmentRoute,
           providerSyncRecordId: item.providerSyncRecordId,
@@ -482,6 +512,8 @@ export class OrdersService {
           externalSku: item.externalSku,
           externalListingId: item.externalListingId,
           externalChannelSnapshotJson: item.externalChannelSnapshotJson ?? undefined,
+          gangSheetId: item.gangSheetId,
+          gangSheetSnapshotJson: item.gangSheetSnapshotJson ?? undefined,
           providerPayloadSnapshotJson: item.providerFulfillmentSnapshotJson ?? item.providerPlacementPayloadSnapshotJson ?? undefined,
           customerSnapshotJson: customerSnapshot,
           productSnapshotJson: productSnapshot,
@@ -489,7 +521,7 @@ export class OrdersService {
           printAreaSnapshotJson: (item.printAreaSnapshotJson ?? Prisma.JsonNull) as Prisma.InputJsonValue,
           assetSnapshotJson: assetSnapshot,
           selectedOptionsJson: selectedOptions,
-          notes: isFilmItem ? JSON.stringify(this.cleanJson({ filmProductionSnapshot: item.filmProductionSnapshotJson, pricingSnapshot: item.filmPricingSnapshotJson })) : undefined,
+          notes: isFilmItem ? JSON.stringify(this.cleanJson({ filmProductionSnapshot: item.filmProductionSnapshotJson, pricingSnapshot: item.filmPricingSnapshotJson, gangSheetSnapshot: item.gangSheetSnapshotJson })) : undefined,
           productionFileStatus,
           productionFileAssetId: item.productionFileAssetId,
           mockupPreviewUrl: item.mockupImageUrl,
@@ -559,6 +591,9 @@ export class OrdersService {
         entityId: job.id,
         metadata: { orderId: order.id, orderItemId: item.id, productionFileStatus },
       });
+      if (item.gangSheetId) {
+        await this.prisma.gangSheet.update({ where: { id: item.gangSheetId }, data: { status: "IN_PRODUCTION" } });
+      }
       createdOrExisting.push(job);
     }
 
@@ -639,6 +674,9 @@ export class OrdersService {
   }
 
   private buildOrderItemSnapshot(item: CheckoutCartItem, deliveryFeeAllocation: number) {
+    if (item.itemKind === FilmOrderKind.GANG_SHEET_FILM) {
+      return this.buildGangSheetOrderItemSnapshot(item, deliveryFeeAllocation);
+    }
     if (item.itemKind === FilmOrderKind.CUSTOM_FILM || item.itemKind === FilmOrderKind.DESIGN_FILM) {
       return this.buildFilmOrderItemSnapshot(item, deliveryFeeAllocation);
     }
@@ -823,6 +861,66 @@ export class OrdersService {
     };
   }
 
+  private buildGangSheetOrderItemSnapshot(item: CheckoutCartItem, deliveryFeeAllocation: number) {
+    if (!item.gangSheetId || !item.gangSheetSnapshotJson) throw new ForbiddenException("Gang sheet cart item is missing checkout snapshot");
+    const sheetSnapshot = this.objectJson(item.gangSheetSnapshotJson);
+    const pricing = this.objectJson(item.filmPricingSnapshotJson ?? null);
+    const preset = this.objectJson(sheetSnapshot.preset as Prisma.JsonValue | null);
+    const sheetWidthCm = Number(sheetSnapshot.widthCm ?? item.filmWidthCm ?? 0);
+    const sheetHeightCm = Number(sheetSnapshot.heightCm ?? item.filmHeightCm ?? 0);
+    const sourceItems = Array.isArray(sheetSnapshot.items) ? sheetSnapshot.items : [];
+    const royaltyBreakdown = Array.isArray(pricing.royaltyBreakdown) ? pricing.royaltyBreakdown : [];
+    const designerRoyaltyAmount = royaltyBreakdown.reduce((sum, entry) => {
+      const record = entry && typeof entry === "object" ? entry as Record<string, unknown> : {};
+      const amount = typeof record.amount === "number" ? record.amount : Number(record.amount ?? 0);
+      return Number.isFinite(amount) ? sum + amount : sum;
+    }, 0);
+    const filmProductionSnapshot = this.cleanJson({
+      itemKind: item.itemKind,
+      filmType: item.filmType ?? sheetSnapshot.filmType,
+      gangSheetId: item.gangSheetId,
+      status: item.gangSheet?.status ?? null,
+      widthCm: sheetWidthCm,
+      heightCm: sheetHeightCm,
+      areaCm2: sheetWidthCm * sheetHeightCm,
+      quantity: item.quantity,
+      source: "GANG_SHEET_BUILDER",
+      itemCount: sourceItems.length,
+      preset,
+      pricing,
+      sheetSnapshot,
+    });
+    return {
+      designVersionId: undefined,
+      productTypeId: undefined,
+      productTypeName: item.filmType ?? this.stringFrom(sheetSnapshot.filmType),
+      baseProductId: undefined,
+      baseProductName: `${this.stringFrom(item.filmType ?? sheetSnapshot.filmType) ?? "DTF"} gang sheet`,
+      baseProductSku: this.stringFrom(item.filmType ?? sheetSnapshot.filmType),
+      mockupAssetIds: [],
+      mockupImageUrl: undefined,
+      productionFileAssetId: undefined,
+      selectedOptions: { filmType: item.filmType ?? sheetSnapshot.filmType, widthCm: sheetWidthCm, heightCm: sheetHeightCm, itemCount: sourceItems.length },
+      listingSnapshot: { id: null, title: "Gang sheet film order", slug: null, type: "GANG_SHEET_FILM", status: item.gangSheet?.status ?? null, publishedAt: null },
+      placementSnapshot: this.cleanJson({ itemKind: item.itemKind, gangSheetId: item.gangSheetId, items: sourceItems }),
+      printAreaSnapshot: this.cleanJson({ widthCm: sheetWidthCm, heightCm: sheetHeightCm, areaCm2: sheetWidthCm * sheetHeightCm, units: "CM", preset }),
+      royaltySnapshot: this.cleanJson({ basis: "GANG_SHEET_FILM", amount: designerRoyaltyAmount, breakdown: royaltyBreakdown }),
+      pricingSnapshot: this.cleanJson({ ...pricing, deliveryFeeAllocation }),
+      productionSnapshot: filmProductionSnapshot,
+      fulfillmentRoute: OrderFulfillmentRoute.LOCAL_PRODUCTION,
+      providerSyncRecordId: undefined,
+      providerType: undefined,
+      providerProductId: undefined,
+      providerVariantId: undefined,
+      providerFileId: undefined,
+      providerPlacementPayloadSnapshot: Prisma.JsonNull,
+      providerFulfillmentSnapshot: Prisma.JsonNull,
+      designerRoyaltyAmount,
+      productionCostEstimate: this.numberFrom(pricing.productionCostEstimate),
+      filmProductionSnapshot,
+    };
+  }
+
   private marginEstimate(listing: CheckoutListing, quantity: number) {
     const price = Number(listing.price) * quantity;
     const cost = listing.cost ? Number(listing.cost) * quantity : listing.localBaseProduct?.baseCost ? Number(listing.localBaseProduct.baseCost) * quantity : 0;
@@ -844,6 +942,11 @@ export class OrdersService {
 
   private stringFrom(value: unknown) {
     return typeof value === "string" && value.length > 0 ? value : undefined;
+  }
+
+  private numberFrom(value: unknown) {
+    const number = typeof value === "number" ? value : typeof value === "string" ? Number(value) : null;
+    return number != null && Number.isFinite(number) ? number : null;
   }
 
   private sourcePlacementIdFrom(value: Prisma.JsonValue | null) {

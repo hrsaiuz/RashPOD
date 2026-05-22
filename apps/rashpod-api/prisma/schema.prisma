@@ -64,6 +64,9 @@ enum AssetPurpose {
   DESIGN_ORIGINAL
   DESIGN_NORMALIZED
   FILM_SOURCE
+  GANG_SHEET_SOURCE
+  GANG_SHEET_PREVIEW
+  GANG_SHEET_PRODUCTION_FILE
   MOCKUP_IMAGE
   LISTING_IMAGE
   PRODUCTION_FILE
@@ -112,6 +115,7 @@ enum ListingType {
 enum FilmOrderKind {
   DESIGN_FILM
   CUSTOM_FILM
+  GANG_SHEET_FILM
 }
 
 enum FilmType {
@@ -124,6 +128,52 @@ enum FilmConsentAction {
   REVOKED
   ADMIN_ENABLED
   ADMIN_REVOKED
+}
+
+enum GangSheetOwnerType {
+  CUSTOMER
+  DESIGNER
+  ADMIN
+  SYSTEM
+}
+
+enum GangSheetStatus {
+  DRAFT
+  VALIDATING
+  READY_FOR_CHECKOUT
+  CHECKED_OUT
+  IN_PRODUCTION
+  COMPLETED
+  ARCHIVED
+  FAILED
+}
+
+enum GangSheetSource {
+  CUSTOMER_BUILDER
+  DESIGNER_DESIGNS
+  ADMIN_BATCH
+  SYSTEM_OPTIMIZATION
+}
+
+enum GangSheetItemSourceType {
+  CUSTOM_UPLOAD
+  DESIGN
+  DESIGN_VERSION
+  ORDER_ITEM
+  ASSET
+}
+
+enum GangSheetItemValidationStatus {
+  PENDING
+  VALID
+  WARNING
+  INVALID
+}
+
+enum GangSheetPricingMode {
+  AREA_BASED
+  SHEET_BASED
+  LINEAR_METER_BASED
 }
 
 enum ListingStatus {
@@ -655,6 +705,14 @@ model User {
   filmConsentEvents FilmConsentEvent[] @relation("FilmConsentEventActor")
   externalOrderIntakes ExternalOrderIntake[] @relation("ExternalOrderIntakeCreator")
   externalOrderImports ExternalOrderImport[] @relation("ExternalOrderImportCreator")
+  ownedGangSheets GangSheet[] @relation("GangSheetOwner")
+  createdGangSheets GangSheet[] @relation("GangSheetCreator")
+  updatedGangSheets GangSheet[] @relation("GangSheetUpdater")
+  createdSheetPresets FilmSheetPreset[] @relation("FilmSheetPresetCreator")
+  updatedSheetPresets FilmSheetPreset[] @relation("FilmSheetPresetUpdater")
+  createdAiJobs AiJob[] @relation("AiJobCreator")
+  reviewedAiJobs AiJob[] @relation("AiJobReviewer")
+  appliedAiSuggestions AiSuggestion[] @relation("AiSuggestionApplier")
 }
 
 model UserPreferences {
@@ -675,7 +733,7 @@ model DesignAsset {
   title       String
   description String?
   tags        Json?
-  categoryId  String?
+    categoryId  String?
   originalFileUrl String?
   processedFileUrl String?
   transparentFileUrl String?
@@ -710,6 +768,7 @@ model DesignAsset {
   supportRequests  SupportRequest[]
   filmConsentEvents FilmConsentEvent[]
   externalOrderIntakeItems ExternalOrderIntakeItem[]
+  gangSheetItems   GangSheetItem[]
 }
 
 model DesignVersion {
@@ -726,6 +785,7 @@ model DesignVersion {
   moderationCases DesignModerationCase[]
   placements      MockupPlacement[]
   externalOrderIntakeItems ExternalOrderIntakeItem[]
+  gangSheetItems   GangSheetItem[]
 }
 
 model DesignModerationCase {
@@ -802,6 +862,7 @@ model FileAsset {
   externalOrderImports        ExternalOrderImport[]
   externalOrderIntakeItems    ExternalOrderIntakeItem[]
   podProviderFiles            PodProviderFile[]
+  gangSheetSourceItems        GangSheetItem[] @relation("GangSheetSourceAsset")
 
   @@index([ownerId, purpose, status])
   @@index([designId])
@@ -1040,6 +1101,123 @@ model FilmSaleSettings {
   settingsVersion           Int      @default(1)
   taxRatePercent            Decimal? @db.Decimal(10, 4)
   updatedAt                 DateTime @updatedAt
+}
+
+model FilmSheetPreset {
+  id                 String               @id @default(uuid())
+  filmType           FilmType
+  name               String
+  widthCm            Float
+  heightCm           Float
+  rollWidthCm        Float?
+  maxLengthCm        Float?
+  printableWidthCm   Float
+  printableHeightCm  Float
+  marginCm           Float                @default(0)
+  gapCm              Float                @default(0)
+  bleedCm            Float?
+  minimumDpi         Int?
+  enabled            Boolean              @default(true)
+  pricingMode        GangSheetPricingMode @default(AREA_BASED)
+  pricingConfigJson  Json?
+  productionNotes    String?
+  metadataJson       Json?
+  createdById        String?
+  updatedById        String?
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+
+  createdBy User? @relation("FilmSheetPresetCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  updatedBy User? @relation("FilmSheetPresetUpdater", fields: [updatedById], references: [id], onDelete: SetNull)
+  gangSheets GangSheet[]
+
+  @@index([filmType, enabled])
+}
+
+model GangSheet {
+  id                         String             @id @default(uuid())
+  ownerType                  GangSheetOwnerType
+  ownerId                    String?
+  filmType                   FilmType
+  sheetPresetId              String?
+  sheetPresetSnapshotJson    Json?
+  widthCm                    Float
+  heightCm                   Float
+  dpi                        Int                @default(300)
+  status                     GangSheetStatus    @default(DRAFT)
+  pricingSnapshotJson        Json?
+  previewAssetId             String?
+  productionFileAssetId      String?
+  source                     GangSheetSource    @default(CUSTOMER_BUILDER)
+  failureReason              String?
+  validationErrorsJson       Json?
+  validationWarningsJson     Json?
+  layoutMetricsJson          Json?
+  internalBatch              Boolean            @default(false)
+  checkedOutAt               DateTime?
+  productionRequestedAt      DateTime?
+  completedAt                DateTime?
+  archivedAt                 DateTime?
+  createdById                String?
+  updatedById                String?
+  createdAt                  DateTime           @default(now())
+  updatedAt                  DateTime           @updatedAt
+
+  owner       User?            @relation("GangSheetOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  sheetPreset FilmSheetPreset? @relation(fields: [sheetPresetId], references: [id], onDelete: SetNull)
+  createdBy   User?            @relation("GangSheetCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  updatedBy   User?            @relation("GangSheetUpdater", fields: [updatedById], references: [id], onDelete: SetNull)
+  items       GangSheetItem[]
+  cartItems   CartItem[]
+  orderItems  OrderItem[]
+  productionJobs ProductionJob[]
+
+  @@index([ownerType, ownerId, status])
+  @@index([filmType, status])
+  @@index([source, createdAt])
+}
+
+model GangSheetItem {
+  id                         String                        @id @default(uuid())
+  gangSheetId                String
+  sourceType                 GangSheetItemSourceType
+  sourceAssetId              String?
+  designId                   String?
+  designVersionId            String?
+  designerId                 String?
+  orderItemId                String?
+  sourceConsentSnapshotJson  Json?
+  sourceAssetSnapshotJson    Json?
+  xCm                        Float
+  yCm                        Float
+  widthCm                    Float
+  heightCm                   Float
+  rotation                   Float                         @default(0)
+  zIndex                     Int                           @default(0)
+  quantity                   Int                           @default(1)
+  locked                     Boolean                       @default(false)
+  mirrored                   Boolean                       @default(false)
+  cutLineEnabled             Boolean                       @default(false)
+  itemPricingSnapshotJson    Json?
+  royaltySnapshotJson        Json?
+  validationStatus           GangSheetItemValidationStatus @default(PENDING)
+  validationErrorsJson       Json?
+  validationWarningsJson     Json?
+  metadataJson               Json?
+  createdAt                  DateTime                      @default(now())
+  updatedAt                  DateTime                      @updatedAt
+
+  gangSheet    GangSheet      @relation(fields: [gangSheetId], references: [id], onDelete: Cascade)
+  sourceAsset  FileAsset?     @relation("GangSheetSourceAsset", fields: [sourceAssetId], references: [id], onDelete: SetNull)
+  design       DesignAsset?   @relation(fields: [designId], references: [id], onDelete: SetNull)
+  designVersion DesignVersion? @relation(fields: [designVersionId], references: [id], onDelete: SetNull)
+  orderItem    OrderItem?     @relation(fields: [orderItemId], references: [id], onDelete: SetNull)
+
+  @@index([gangSheetId, zIndex])
+  @@index([sourceType, sourceAssetId])
+  @@index([designId])
+  @@index([designerId])
+  @@index([orderItemId])
 }
 
 model DeliverySetting {
@@ -1984,6 +2162,8 @@ model CartItem {
   filmHeightCm Float?
   filmAreaCm2 Float?
   filmSourceAssetId String?
+  gangSheetId String?
+  gangSheetSnapshotJson Json?
   filmPricingSnapshotJson Json?
   filmConsentSnapshotJson Json?
   filmOptionsJson Json?
@@ -1993,6 +2173,9 @@ model CartItem {
 
   cart       Cart            @relation(fields: [cartId], references: [id], onDelete: Cascade)
   listing    CommerceListing? @relation(fields: [listingId], references: [id])
+  gangSheet  GangSheet?       @relation(fields: [gangSheetId], references: [id], onDelete: SetNull)
+
+  @@index([gangSheetId])
 }
 
 model Order {
@@ -2090,6 +2273,8 @@ model OrderItem {
   filmHeightCm Float?
   filmAreaCm2 Float?
   filmSourceAssetId String?
+  gangSheetId String?
+  gangSheetSnapshotJson Json?
   filmPricingSnapshotJson Json?
   filmConsentSnapshotJson Json?
   filmProductionSnapshotJson Json?
@@ -2128,6 +2313,8 @@ model OrderItem {
   listing     CommerceListing? @relation(fields: [listingId], references: [id])
   providerSyncRecord PodProviderSyncRecord? @relation(fields: [providerSyncRecordId], references: [id], onDelete: SetNull)
   externalOrderIntakeItem ExternalOrderIntakeItem? @relation(fields: [externalOrderIntakeItemId], references: [id], onDelete: SetNull)
+  gangSheet GangSheet? @relation(fields: [gangSheetId], references: [id], onDelete: SetNull)
+  gangSheetItems GangSheetItem[]
   productionJobs ProductionJob[]
   ledgerEntries LedgerEntry[]
   royaltyLedgerEntries RoyaltyLedgerEntry[]
@@ -2135,6 +2322,7 @@ model OrderItem {
 
   @@index([externalOrderIntakeItemId])
   @@index([externalSourceType, externalOrderId])
+  @@index([gangSheetId])
 }
 
 model PaymentTransaction {
@@ -2432,6 +2620,8 @@ model ProductionJob {
   productionFileUrl String?
   productionFileJobId String?
   mockupPreviewUrl String?
+  gangSheetId String?
+  gangSheetSnapshotJson Json?
   fulfillmentRoute OrderFulfillmentRoute @default(LOCAL_PRODUCTION)
   providerSyncRecordId String?
   providerType PodProviderType?
@@ -2471,12 +2661,14 @@ model ProductionJob {
 
   order        Order      @relation(fields: [orderId], references: [id], onDelete: Cascade)
   orderItem    OrderItem? @relation(fields: [orderItemId], references: [id], onDelete: SetNull)
+  gangSheet    GangSheet? @relation(fields: [gangSheetId], references: [id], onDelete: SetNull)
   providerSyncRecord PodProviderSyncRecord? @relation(fields: [providerSyncRecordId], references: [id], onDelete: SetNull)
 
   @@index([orderId, status])
   @@index([orderItemId])
   @@index([providerSyncRecordId])
   @@index([externalSourceType, externalOrderId])
+  @@index([gangSheetId])
   @@index([status, createdAt])
 }
 
@@ -2551,6 +2743,192 @@ model WorkerJob {
 
   @@index([type, status, nextRunAt])
   @@index([status, nextRunAt])
+}
+
+enum AIProvider {
+  OPENAI
+  DISABLED
+}
+
+enum AIWorkflow {
+  DESIGN_QA
+  MODERATION_ASSIST
+  PRODUCT_RECOMMENDATION
+  LISTING_COPY
+  MARKETPLACE_COPY
+  TRANSLATION
+  TAG_GENERATION
+  RISK_CHECK
+}
+
+enum AIEntityType {
+  DESIGN
+  DESIGN_VERSION
+  LISTING
+  MARKETPLACE_EXPORT_ITEM
+  GANG_SHEET
+  FILM_ORDER
+}
+
+enum AIJobStatus {
+  QUEUED
+  RUNNING
+  SUCCEEDED
+  FAILED
+  CANCELED
+  SKIPPED
+}
+
+enum AISuggestionType {
+  QA_WARNING
+  MODERATION_REASON
+  APPROVAL_RECOMMENDATION
+  REJECTION_RECOMMENDATION
+  PRODUCT_TYPE_RECOMMENDATION
+  BASE_PRODUCT_RECOMMENDATION
+  TEMPLATE_RECOMMENDATION
+  PRINT_AREA_RECOMMENDATION
+  LISTING_TITLE
+  LISTING_DESCRIPTION
+  TAGS
+  MARKETPLACE_CATEGORY
+  TRANSLATION
+  RISK_FLAG
+}
+
+enum AISuggestionSeverity {
+  INFO
+  WARNING
+  BLOCKER
+}
+
+enum AISuggestionStatus {
+  PROPOSED
+  ACCEPTED
+  REJECTED
+  APPLIED
+  EXPIRED
+}
+
+model AiJob {
+  id              String      @id @default(uuid())
+  workflow        AIWorkflow
+  entityType      AIEntityType
+  entityId        String
+  provider        AIProvider  @default(OPENAI)
+  model           String?
+  status          AIJobStatus @default(QUEUED)
+  inputSummary    Json?
+  inputSnapshot   Json?
+  promptVersion   String
+  outputSummary   Json?
+  outputSnapshot  Json?
+  tokenUsageJson  Json?
+  costEstimateUsd Decimal?    @db.Decimal(10, 6)
+  failureReason   String?
+  idempotencyKey  String?     @unique
+  workerJobId     String?
+  createdById     String?
+  reviewedById    String?
+  reviewedAt      DateTime?
+  completedAt     DateTime?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  createdBy   User? @relation("AiJobCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  reviewedBy  User? @relation("AiJobReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+  suggestions AiSuggestion[]
+
+  @@index([workflow, entityType, entityId])
+  @@index([status, createdAt])
+  @@index([createdById, createdAt])
+  @@index([workerJobId])
+}
+
+model AiSuggestion {
+  id                  String               @id @default(uuid())
+  aiJobId             String
+  suggestionType      AISuggestionType
+  confidence          Float?
+  severity            AISuggestionSeverity @default(INFO)
+  payload             Json
+  status              AISuggestionStatus   @default(PROPOSED)
+  humanDecisionReason String?
+  appliedAt           DateTime?
+  appliedById         String?
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+
+  aiJob     AiJob @relation(fields: [aiJobId], references: [id], onDelete: Cascade)
+  appliedBy User? @relation("AiSuggestionApplier", fields: [appliedById], references: [id], onDelete: SetNull)
+
+  @@index([aiJobId, status])
+  @@index([suggestionType, status])
+  @@index([createdAt])
+}
+
+model AnalyticsEvent {
+  id          String   @id @default(uuid())
+  eventType   String
+  entityType  String
+  entityId    String
+  actorType   String?
+  actorId     String?
+  channel     String?
+  source      String?
+  metadataJson Json?
+  occurredAt  DateTime @default(now())
+  createdAt   DateTime @default(now())
+
+  @@index([eventType, occurredAt])
+  @@index([entityType, entityId])
+  @@index([channel, occurredAt])
+  @@index([actorId, occurredAt])
+}
+
+model DailyMetric {
+  id            String   @id @default(uuid())
+  date          DateTime
+  metricKey     String
+  dimensionType String   @default("platform")
+  dimensionId   String   @default("all")
+  channel       String?
+  currency      String   @default("UZS")
+  value         Decimal  @default(0) @db.Decimal(14, 2)
+  count         Int      @default(0)
+  metadataJson  Json?
+  rebuiltAt     DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@unique([date, metricKey, dimensionType, dimensionId, channel, currency])
+  @@index([metricKey, date])
+  @@index([dimensionType, dimensionId, date])
+}
+
+model ReportExport {
+  id            String   @id @default(uuid())
+  reportType    String
+  status        String   @default("GENERATED")
+  format        String   @default("CSV")
+  filtersJson   Json?
+  currency      String?
+  timezone      String   @default("Asia/Tashkent")
+  filename      String
+  contentType   String   @default("text/csv; charset=utf-8")
+  contentText   String?  @db.Text
+  fileAssetId   String?
+  rowCount      Int      @default(0)
+  requestedById String?
+  generatedAt   DateTime?
+  downloadedAt  DateTime?
+  failureReason String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([reportType, createdAt])
+  @@index([requestedById, createdAt])
+  @@index([status, createdAt])
 }
 
 model AuditLog {

@@ -19,6 +19,12 @@ export type JobType =
   | "GENERATE_LISTING_IMAGE_PACK"
   | "GENERATE_FILM_PREVIEW"
   | "GENERATE_PRODUCTION_FILE"
+  | "AI_DESIGN_QA"
+  | "AI_MODERATION_ASSIST"
+  | "AI_PRODUCT_RECOMMENDATION"
+  | "AI_LISTING_COPY"
+  | "AI_MARKETPLACE_COPY"
+  | "AI_TRANSLATION"
   | "SEND_EMAIL";
 
 @Injectable()
@@ -72,6 +78,17 @@ export class JobDispatcherService {
     if (jobType === "SYNC_POD_PRODUCT_DRAFT") {
       const syncRecordId = payload.syncRecordId;
       if (typeof syncRecordId === "string" && syncRecordId.length > 0) return `${jobType}:${syncRecordId}`;
+    }
+    if (jobType.startsWith("AI_")) {
+      const aiJobId = payload.aiJobId;
+      if (typeof aiJobId === "string" && aiJobId.length > 0) return `${jobType}:${aiJobId}`;
+      const workflow = payload.workflow;
+      const entityType = payload.entityType;
+      const entityId = payload.entityId;
+      const snapshotHash = payload.snapshotHash;
+      if (typeof workflow === "string" && typeof entityType === "string" && typeof entityId === "string" && typeof snapshotHash === "string") {
+        return `${jobType}:${workflow}:${entityType}:${entityId}:${snapshotHash}`;
+      }
     }
     return undefined;
   }

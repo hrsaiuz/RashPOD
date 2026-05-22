@@ -57,9 +57,21 @@ export class AdminOpsController {
     return this.adminOps.getAiSettings();
   }
 
+  @Get("ai/settings")
+  @RequirePermission("ai:settings-read")
+  getAiSettingsAlias() {
+    return this.adminOps.getAiSettings();
+  }
+
   @Patch("ai-settings")
   @RequirePermission("ai-settings:manage")
   updateAiSettings(@CurrentUser() user: RequestUser, @Body() dto: UpdateAiSettingsDto) {
+    return this.adminOps.updateAiSettings(user.sub, dto);
+  }
+
+  @Patch("ai/settings")
+  @RequirePermission("ai:settings-manage")
+  updateAiSettingsAlias(@CurrentUser() user: RequestUser, @Body() dto: UpdateAiSettingsDto) {
     return this.adminOps.updateAiSettings(user.sub, dto);
   }
 

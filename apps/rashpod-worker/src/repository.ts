@@ -93,8 +93,26 @@ export interface ProductionJobRecord {
   productionFileUrl?: string | null;
   productSnapshotJson?: unknown;
   assetSnapshotJson?: unknown;
+  gangSheetSnapshotJson?: unknown;
   selectedOptionsJson?: unknown;
   notes?: string | null;
+}
+
+export interface AiJobRecord {
+  id: string;
+  workflow: string;
+  entityType: string;
+  entityId: string;
+  provider?: string | null;
+  model?: string | null;
+  status: string;
+  inputSummary?: unknown;
+  inputSnapshot?: unknown;
+  promptVersion?: string | null;
+  outputSummary?: unknown;
+  tokenUsageJson?: unknown;
+  costEstimateUsd?: number | null;
+  failureReason?: string | null;
 }
 
 export interface WorkerRepository {
@@ -146,4 +164,10 @@ export interface WorkerRepository {
     errorMessage?: string | null;
     responseSummaryJson?: unknown;
   }): Promise<void>;
+  getAiJob?(id: string): Promise<AiJobRecord | null>;
+  updateAiJob?(
+    id: string,
+    data: { status?: string; outputSummary?: unknown; tokenUsageJson?: unknown; costEstimateUsd?: number | null; failureReason?: string | null; completedAt?: Date | null },
+  ): Promise<AiJobRecord>;
+  createAiSuggestion?(data: { aiJobId: string; suggestionType: string; confidence?: number | null; severity?: string | null; payload: unknown }): Promise<{ id: string }>;
 }

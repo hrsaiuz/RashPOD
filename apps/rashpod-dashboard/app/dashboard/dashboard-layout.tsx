@@ -30,6 +30,7 @@ import {
   Film,
   User,
   CloudCog,
+  BarChart3,
 } from "lucide-react";
 
 const ROLE_LINKS: Record<string, Array<{ href: string; label: string; icon?: any; group?: string }>> = {
@@ -41,6 +42,7 @@ const ROLE_LINKS: Record<string, Array<{ href: string; label: string; icon?: any
     { href: "/dashboard/designer/film-rights", label: "Film Rights", icon: Film },
     { href: "/dashboard/designer/corporate-bids", label: "Corporate Bids", icon: Briefcase },
     { href: "/dashboard/designer/royalties", label: "Royalties", icon: DollarSign },
+    { href: "/dashboard/designer/analytics", label: "Analytics", icon: BarChart3 },
     { href: "/dashboard/designer/support", label: "Support", icon: LifeBuoy },
     { href: "/dashboard/designer/settings", label: "Settings", icon: Settings },
   ],
@@ -99,6 +101,7 @@ const ROLE_LINKS: Record<string, Array<{ href: string; label: string; icon?: any
     { href: "/dashboard/admin/corporate-requests", label: "Corporate Requests", icon: ClipboardList, group: "Corporate" },
     { href: "/dashboard/admin/commercial-offers", label: "Commercial Offers", icon: FileText, group: "Corporate" },
     { href: "/dashboard/admin/marketplace", label: "Marketplace", icon: ShoppingBag, group: "AI & Growth" },
+    { href: "/dashboard/admin/analytics", label: "Analytics", icon: BarChart3, group: "AI & Growth" },
     { href: "/dashboard/admin/email-templates", label: "Email Templates", icon: MessageSquare, group: "AI & Growth" },
     { href: "/dashboard/admin/ai-settings", label: "AI Settings", icon: Settings, group: "AI & Growth" },
     { href: "/dashboard/admin/ai-assist", label: "AI Assist", icon: Search, group: "AI & Growth" },

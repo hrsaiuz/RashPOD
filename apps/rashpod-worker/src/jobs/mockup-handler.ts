@@ -7,6 +7,7 @@ export interface MockupRendererPort {
   renderFilmPreview(placementId: string): Promise<RenderedFile>;
   renderProductionFile(placementId: string): Promise<RenderedFile>;
   renderFilmProductionFile?(input: { productionJobId: string; queueType: string; widthCm?: number | null; heightCm?: number | null; quantity?: number | null }): Promise<RenderedFile>;
+  renderGangSheetProductionFile?(input: { productionJobId: string; queueType: string; snapshot: Record<string, unknown>; quantity?: number | null }): Promise<RenderedFile>;
 }
 
 export class MockupJobHandler {
@@ -119,13 +120,21 @@ export class MockupJobHandler {
     await this.repo.updateProductionJob(productionJobId, { productionFileStatus: "PROCESSING", status: "FILE_GENERATING", failureReason: null });
     try {
       const product = this.objectJson(job.productSnapshotJson);
-      const rendered = await this.renderer.renderFilmProductionFile({
-        productionJobId,
-        queueType: job.queueType,
-        widthCm: this.numberFrom(product.filmWidthCm),
-        heightCm: this.numberFrom(product.filmHeightCm),
-        quantity: this.numberFrom(product.quantity),
-      });
+      const gangSheetSnapshot = this.objectJson(job.gangSheetSnapshotJson);
+      const rendered = gangSheetSnapshot.id && this.renderer.renderGangSheetProductionFile
+        ? await this.renderer.renderGangSheetProductionFile({
+            productionJobId,
+            queueType: job.queueType,
+            snapshot: gangSheetSnapshot,
+            quantity: this.numberFrom(product.quantity),
+          })
+        : await this.renderer.renderFilmProductionFile({
+            productionJobId,
+            queueType: job.queueType,
+            widthCm: this.numberFrom(product.filmWidthCm),
+            heightCm: this.numberFrom(product.filmHeightCm),
+            quantity: this.numberFrom(product.quantity),
+          });
       return await this.repo.updateProductionJob(productionJobId, {
         productionFileStatus: "READY",
         productionFileObjectKey: rendered.objectKey,

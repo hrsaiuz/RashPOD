@@ -13,6 +13,12 @@ export type JobType =
   | "GENERATE_LISTING_IMAGE_PACK"
   | "GENERATE_FILM_PREVIEW"
   | "GENERATE_PRODUCTION_FILE"
+  | "AI_DESIGN_QA"
+  | "AI_MODERATION_ASSIST"
+  | "AI_PRODUCT_RECOMMENDATION"
+  | "AI_LISTING_COPY"
+  | "AI_MARKETPLACE_COPY"
+  | "AI_TRANSLATION"
   | "SEND_EMAIL";
 
 export interface WorkerJob<T = Record<string, unknown>> {

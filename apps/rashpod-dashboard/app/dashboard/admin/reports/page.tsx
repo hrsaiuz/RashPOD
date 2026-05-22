@@ -1,5 +1,5 @@
-import AdminPlaceholder from "../admin-placeholder";
+import AdminAnalyticsOverviewPage from "../analytics/page";
 
 export default function Page() {
-  return <AdminPlaceholder title="Reports" description="Sales, royalties, and production reporting." />;
+  return <AdminAnalyticsOverviewPage />;
 }

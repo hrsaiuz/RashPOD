@@ -41,6 +41,30 @@ export const ASSET_UPLOAD_POLICIES: Record<AssetPurpose, AssetUploadPolicy> = {
     bucketKind: "private",
     pathSegment: "film-sources",
   },
+  GANG_SHEET_SOURCE: {
+    purpose: AssetPurpose.GANG_SHEET_SOURCE,
+    maxSizeBytes: 180_000_000,
+    allowedMimeTypes: ["image/png", "image/jpeg", "image/webp", "image/tiff", "application/pdf", "image/svg+xml"],
+    accessPolicy: AssetAccessPolicy.PRIVATE_SIGNED_URL,
+    bucketKind: "private",
+    pathSegment: "gang-sheet-sources",
+  },
+  GANG_SHEET_PREVIEW: {
+    purpose: AssetPurpose.GANG_SHEET_PREVIEW,
+    maxSizeBytes: 30_000_000,
+    allowedMimeTypes: RASTER_IMAGE_MIME_TYPES,
+    accessPolicy: AssetAccessPolicy.PRIVATE_SIGNED_URL,
+    bucketKind: "private",
+    pathSegment: "gang-sheet-previews",
+  },
+  GANG_SHEET_PRODUCTION_FILE: {
+    purpose: AssetPurpose.GANG_SHEET_PRODUCTION_FILE,
+    maxSizeBytes: 300_000_000,
+    allowedMimeTypes: ["image/png", "image/tiff", "application/pdf"],
+    accessPolicy: AssetAccessPolicy.PRIVATE_SIGNED_URL,
+    bucketKind: "private",
+    pathSegment: "gang-sheet-production-files",
+  },
   MOCKUP_IMAGE: {
     purpose: AssetPurpose.MOCKUP_IMAGE,
     maxSizeBytes: 20_000_000,
@@ -158,6 +182,12 @@ export function buildAssetObjectKey(input: {
       return `designs/${input.designId ?? "unassigned"}/versions/${input.designVersionId ?? "unassigned"}/normalized/${input.assetId}.${ext}`;
     case AssetPurpose.FILM_SOURCE:
       return `film-sources/${input.ownerId}/${input.listingId ?? input.designId ?? "custom"}/${input.assetId}.${ext}`;
+    case AssetPurpose.GANG_SHEET_SOURCE:
+      return `gang-sheet-sources/${input.ownerId}/${input.assetId}.${ext}`;
+    case AssetPurpose.GANG_SHEET_PREVIEW:
+      return `gang-sheet-previews/${input.ownerId}/${input.assetId}.${ext}`;
+    case AssetPurpose.GANG_SHEET_PRODUCTION_FILE:
+      return `gang-sheet-production/${input.ownerId}/${input.assetId}.${ext}`;
     case AssetPurpose.MOCKUP_IMAGE:
       return `mockups/${input.designId ?? "unassigned"}/${input.baseProductId ?? "base"}/${input.mockupTemplateId ?? "template"}/${input.assetId}.${ext}`;
     case AssetPurpose.LISTING_IMAGE:

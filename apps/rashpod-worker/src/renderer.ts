@@ -131,6 +131,40 @@ export class SharpRenderer {
     return { fileKey, objectKey: fileKey, contentType: "image/png", format: "png", widthPx, heightPx };
   }
 
+  async renderGangSheetProductionFile(input: { productionJobId: string; queueType: string; snapshot: Record<string, unknown>; quantity?: number | null }): Promise<RenderedFile> {
+    const widthCm = numberFrom(input.snapshot.widthCm) ?? 58;
+    const heightCm = numberFrom(input.snapshot.heightCm) ?? 100;
+    const widthPx = Math.max(600, Math.min(8000, Math.round(widthCm * 40)));
+    const heightPx = Math.max(600, Math.min(16000, Math.round(heightCm * 40)));
+    const items = Array.isArray(input.snapshot.items) ? input.snapshot.items : [];
+    const itemSvg = items.map((item, index) => {
+      const record = item && typeof item === "object" ? item as Record<string, unknown> : {};
+      const x = Math.max(0, (numberFrom(record.xCm) ?? 0) / widthCm * widthPx);
+      const y = Math.max(0, (numberFrom(record.yCm) ?? 0) / heightCm * heightPx);
+      const itemWidth = Math.max(12, (numberFrom(record.widthCm) ?? 5) / widthCm * widthPx);
+      const itemHeight = Math.max(12, (numberFrom(record.heightCm) ?? 5) / heightCm * heightPx);
+      const rotation = numberFrom(record.rotationDeg) ?? 0;
+      const label = escapeXml(String(record.label ?? record.sourceType ?? `Item ${index + 1}`));
+      const fill = index % 2 === 0 ? "#F39E7C" : "#788AE0";
+      const fontSize = Math.max(10, Math.min(36, itemWidth / 8));
+      return `<g transform="rotate(${rotation} ${x + itemWidth / 2} ${y + itemHeight / 2})">
+        <rect x="${x}" y="${y}" width="${itemWidth}" height="${itemHeight}" rx="6" fill="${fill}" fill-opacity="0.22" stroke="${fill}" stroke-width="4"/>
+        <text x="${x + itemWidth / 2}" y="${y + itemHeight / 2}" text-anchor="middle" dominant-baseline="middle" font-family="Arial, sans-serif" font-size="${fontSize}" font-weight="700" fill="#0B1020">${label}</text>
+      </g>`;
+    }).join("\n");
+    const label = `${input.queueType} gang sheet ${widthCm}x${heightCm}cm x${input.quantity ?? 1}`;
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${widthPx}" height="${heightPx}" viewBox="0 0 ${widthPx} ${heightPx}">
+      <rect width="${widthPx}" height="${heightPx}" fill="rgba(255,255,255,0)"/>
+      <rect x="24" y="24" width="${widthPx - 48}" height="${heightPx - 48}" fill="rgba(120,138,224,0.035)" stroke="#788AE0" stroke-width="8" stroke-dasharray="28 18"/>
+      ${itemSvg}
+      <text x="48" y="${heightPx - 48}" font-family="Arial, sans-serif" font-size="${Math.max(22, Math.min(56, widthPx / 32))}" font-weight="700" fill="#0B1020">${escapeXml(label)}</text>
+    </svg>`;
+    const relKey = `gang-sheet-production-files/${input.productionJobId}/print-ready.png`;
+    const buffer = await sharp(Buffer.from(svg)).png().toBuffer();
+    const fileKey = await this.store.putBuffer(relKey, buffer, "image/png");
+    return { fileKey, objectKey: fileKey, contentType: "image/png", format: "png", widthPx, heightPx };
+  }
+
   private async renderImage(
     folder: string,
     prefix: string,
@@ -156,6 +190,11 @@ export class SharpRenderer {
 
 function escapeXml(value: string) {
   return value.replace(/[<>&"']/g, (char) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;", '"': "&quot;", "'": "&apos;" })[char] ?? char);
+}
+
+function numberFrom(value: unknown) {
+  const number = typeof value === "number" ? value : typeof value === "string" ? Number(value) : null;
+  return number != null && Number.isFinite(number) ? number : undefined;
 }
 
 type RenderPlacementConfig = {

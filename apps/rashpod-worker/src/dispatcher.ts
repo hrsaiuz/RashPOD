@@ -1,6 +1,7 @@
 import { WorkerRepository } from "./repository";
 import { WorkerJob } from "./types";
 import { EmailJobHandler, EmailSenderPort } from "./jobs/email-handler";
+import { AiJobHandler } from "./jobs/ai-handler";
 import { MockupJobHandler } from "./jobs/mockup-handler";
 import { MarketplacePublicationJobHandler } from "./jobs/marketplace-publication-handler";
 import { PipelineMockupJobHandler } from "./jobs/pipeline-mockup-handler";
@@ -15,6 +16,7 @@ export class WorkerDispatcher {
   private readonly printfulCatalogSyncHandler: PrintfulCatalogSyncJobHandler;
   private readonly podSyncHandler: PodSyncJobHandler;
   private readonly emailHandler: EmailJobHandler;
+  private readonly aiHandler: AiJobHandler;
   private readonly logger: WorkerLogger;
 
   constructor(repo: WorkerRepository, emailSender?: EmailSenderPort, logger: WorkerLogger = workerLogger) {
@@ -24,6 +26,7 @@ export class WorkerDispatcher {
     this.printfulCatalogSyncHandler = new PrintfulCatalogSyncJobHandler(repo);
     this.podSyncHandler = new PodSyncJobHandler();
     this.emailHandler = new EmailJobHandler(emailSender);
+    this.aiHandler = new AiJobHandler(repo);
     this.logger = logger;
   }
 
@@ -66,6 +69,13 @@ export class WorkerDispatcher {
         return this.mockupHandler.handleProductionFile(job.payload as { placementId: string; generatedAssetId: string });
       case "SEND_EMAIL":
         return this.emailHandler.handleSendEmail(job.payload as any);
+      case "AI_DESIGN_QA":
+      case "AI_MODERATION_ASSIST":
+      case "AI_PRODUCT_RECOMMENDATION":
+      case "AI_LISTING_COPY":
+      case "AI_MARKETPLACE_COPY":
+      case "AI_TRANSLATION":
+        return this.aiHandler.handle(job.payload as { aiJobId: string });
       default:
         return { skipped: true, reason: `No handler for job type ${job.type}` };
     }
