@@ -1,4 +1,4 @@
-@import "../../../../packages/ui/src/styles/globals.css";
+@import "../../../packages/ui/src/styles/globals.css";
 
 .free-shipping-flow {
   position: relative;
