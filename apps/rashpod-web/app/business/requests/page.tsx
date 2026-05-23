@@ -23,7 +23,7 @@ export default function RequestsPage() {
       <Card>
         <div className="p-1">
           {loading ? <Skeleton className="h-40" /> : error ? (
-            <div className="text-sm text-red-600">{error}</div>
+            <div className="text-sm text-semantic-dangerText">{error}</div>
           ) : reqs.length === 0 ? (
             <EmptyState title="No briefs yet" description="Submit your first brief to get bids."
               action={<Link href="/business/requests/new"><Button variant="primaryBlue">Create brief</Button></Link>} />

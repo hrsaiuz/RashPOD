@@ -86,7 +86,7 @@ export default function DesignerApplicationPage() {
       <h1 className="text-[30px] font-bold text-black">Apply as a Designer</h1>
       <p className="mt-7 text-[24px] text-black">Tell us about yourself, your creative work, and the type of products you want to create on RashPOD.</p>
 
-      <form onSubmit={submit} className="mt-14 rounded-[32px] border border-[#5F6067] bg-brand-bg p-10 lg:p-16">
+      <form onSubmit={submit} className="mt-14 rounded-[32px] border border-brand-muted/60 bg-brand-bg p-10 lg:p-16">
         <Stepper step={step} />
         <div className="mt-16 min-h-[590px]">
           {step === 1 ? (
@@ -168,16 +168,16 @@ export default function DesignerApplicationPage() {
                   ["Country", form.country],
                   ["City", form.city],
                 ].map(([label, value]) => (
-                  <div key={label} className="border-b border-[#8E8E94] pb-3">
-                    <p className="text-[15px] text-[#8E8E94]">{label}</p>
-                    <p className="mt-4 min-h-6 text-[20px] text-[#07172D]">{value || "—"}</p>
+                  <div key={label} className="border-b border-brand-subtle pb-3">
+                    <p className="text-[15px] text-brand-subtle">{label}</p>
+                    <p className="mt-4 min-h-6 text-[20px] text-brand-ink">{value || "—"}</p>
                   </div>
                 ))}
               </div>
             </section>
           ) : null}
         </div>
-        {error ? <p className="text-red-600">{error}</p> : null}
+        {error ? <p className="text-semantic-dangerText">{error}</p> : null}
         <div className="flex justify-between gap-4">
           {step > 1 ? <button type="button" onClick={() => setStep(step - 1)} className="h-[68px] rounded-[18px] border border-brand-peach px-10 text-[20px] font-bold text-brand-peach">Back</button> : <span />}
           <button disabled={submitting} className="h-[78px] rounded-[22px] bg-brand-peach px-10 text-[24px] font-bold text-white">

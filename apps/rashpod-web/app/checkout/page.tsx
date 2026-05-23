@@ -6,6 +6,7 @@ import Link from "next/link";
 import { CalendarDays, ChevronDown, ChevronLeft, ChevronRight, Circle, Plus, X } from "lucide-react";
 import { ApiError, api, type Order } from "../../lib/api";
 import { FreeDeliveryBar, useCart, type CartItem } from "../../components/cart/CartProvider";
+import { Button, formatPrice, FormField, Input, PageContainer } from "@rashpod/ui";
 
 type CheckoutStep = "address" | "shipping" | "payment";
 type AuthState = "checking" | "guest" | "authed";
@@ -93,17 +94,19 @@ export default function CheckoutPage() {
 
   return (
     <div className="min-h-screen bg-white">
-      <div className="mx-auto max-w-[1232px] px-5 pb-16 pt-4">
+      <PageContainer variant="storefront" compact className="pb-16 pt-4">
         <BreadcrumbTrail />
-        <div className="mt-10 grid gap-16 lg:grid-cols-[1fr_470px]">
+        <div className="mt-8 grid gap-10 lg:grid-cols-[1fr_420px] lg:gap-16">
           <section>
             <StepNav active={step} setStep={setStep} />
             {authState === "checking" ? <p className="mt-12 text-brand-muted">Checking your session...</p> : null}
             {items.length === 0 && serverCartCount === 0 && authState === "authed" ? (
-              <div className="mt-12 max-w-[520px] rounded-[12px] bg-brand-bg p-8">
-                <h1 className="text-[24px] font-black text-black">Your cart is empty</h1>
+              <div className="mt-12 max-w-form rounded-md bg-brand-bg p-8">
+                <h1 className="text-h3 font-bold text-brand-ink">Your cart is empty</h1>
                 <p className="mt-3 text-brand-muted">Add a product before starting checkout.</p>
-                <Link href="/shop" className="mt-6 inline-flex h-11 items-center rounded-[13px] bg-brand-peach px-6 font-bold text-white">Browse shop</Link>
+                <Link href="/shop" className="mt-6 inline-flex h-12 items-center rounded-pill bg-brand-peach px-6 text-sm font-semibold text-white hover:opacity-90">
+                  Browse shop
+                </Link>
               </div>
             ) : null}
             {items.length > 0 || serverCartCount > 0 ? (
@@ -131,27 +134,30 @@ export default function CheckoutPage() {
           <OrderSummaryPanel serverCartCount={serverCartCount} />
         </div>
 
-        {error ? <p className="mt-8 text-right text-sm font-bold text-red-600">{error}</p> : null}
+        {error ? <p className="mt-8 text-right text-sm font-bold text-semantic-dangerText">{error}</p> : null}
         <div className="mt-8 flex justify-end">
           {step !== "payment" ? (
-            <button
+            <Button
               disabled={!canContinue}
               onClick={() => setStep(step === "address" ? "shipping" : "payment")}
-              className="h-[50px] min-w-[126px] rounded-[14px] bg-brand-peach px-7 text-[20px] font-bold lowercase text-white disabled:opacity-50"
+              variant="primaryPeach"
+              size="lg"
             >
-              countinue
-            </button>
+              Continue
+            </Button>
           ) : (
-            <button
+            <Button
               disabled={!canContinue || placingOrder}
               onClick={placeOrder}
-              className="h-[50px] min-w-[235px] rounded-[14px] bg-brand-peach px-7 text-[18px] font-bold text-white disabled:opacity-50"
+              variant="primaryPeach"
+              size="lg"
+              loading={placingOrder}
             >
               {placingOrder ? "Preparing Click payment..." : "Place Your Order and Pay"}
-            </button>
+            </Button>
           )}
         </div>
-      </div>
+      </PageContainer>
     </div>
   );
 }
@@ -174,27 +180,31 @@ async function syncLocalCartToServer(items: CartItem[]) {
 
 function BreadcrumbTrail() {
   return (
-    <nav className="inline-flex min-h-[39px] items-center gap-5 rounded-[9px] bg-brand-bg px-4 text-[18px] text-[#3B3B43]">
+    <nav className="inline-flex min-h-10 items-center gap-3 overflow-x-auto rounded-xs bg-brand-bg px-4 text-sm text-brand-text sm:gap-5 sm:text-base">
       {["Home", "Category", "Tshirts", "Products"].map((item) => (
-        <span key={item} className="contents">
-          <Link href={item === "Home" ? "/" : item === "Products" ? "/shop" : "/shop"}>{item}</Link>
-          <ChevronRight size={21} strokeWidth={2.1} />
+        <span key={item} className="flex shrink-0 items-center gap-3 sm:gap-5">
+          <Link href={item === "Home" ? "/" : "/shop"} className="hover:text-brand-blue">{item}</Link>
+          <ChevronRight size={18} className="text-brand-subtle" />
         </span>
       ))}
-      <span className="font-bold text-[#33333A]">Checkout</span>
+      <span className="shrink-0 font-bold text-brand-ink">Checkout</span>
     </nav>
   );
 }
 
 function StepNav({ active, setStep }: { active: CheckoutStep; setStep: (step: CheckoutStep) => void }) {
   return (
-    <div className="flex flex-wrap items-center gap-8 text-[22px]">
+    <div className="-mx-1 flex items-center gap-3 overflow-x-auto pb-2 text-base sm:gap-6 sm:text-h3">
       {STEP_LABELS.map((step, index) => (
-        <span key={step.key} className="contents">
-          <button onClick={() => setStep(step.key)} className={active === step.key ? "font-black text-[#33333A]" : "font-normal text-[#4D4D55]"}>
+        <span key={step.key} className="flex shrink-0 items-center gap-3 sm:gap-6">
+          <button
+            type="button"
+            onClick={() => setStep(step.key)}
+            className={`rounded-pill px-3 py-1.5 sm:px-4 ${active === step.key ? "bg-brand-blueLight font-bold text-brand-ink" : "text-brand-muted"}`}
+          >
             {step.label}
           </button>
-          {index < STEP_LABELS.length - 1 ? <ChevronRight size={20} /> : null}
+          {index < STEP_LABELS.length - 1 ? <ChevronRight size={18} className="text-brand-subtle" /> : null}
         </span>
       ))}
     </div>
@@ -225,8 +235,8 @@ function AddressStep({
   setDeliveryAddress: (value: string) => void;
 }) {
   return (
-    <div className="mt-12 max-w-[650px]">
-      <h1 className="text-[20px] font-medium text-black">Choose Your Address</h1>
+    <div className="mt-8 max-w-form lg:mt-12">
+      <h1 className="text-section font-semibold text-brand-ink">Choose Your Address</h1>
       <div className="mt-6 grid gap-4 sm:grid-cols-2">
         <CheckoutInput label="Full name" value={customerName} onChange={setCustomerName} />
         <CheckoutInput label="Phone" value={customerPhone} onChange={setCustomerPhone} />
@@ -236,18 +246,20 @@ function AddressStep({
       <AddressRow
         checked={selected === "home"}
         onClick={() => onSelect("home")}
-        name="Huzefa Bagwala"
+        name={customerName || "Home address"}
         type="Home"
-        address="1131 Dusty Townline, Jacksonville, TX 40322"
+        address={deliveryAddress || "1131 Dusty Townline, Tashkent"}
+        phone={customerPhone}
       />
       <AddressRow
         checked={selected === "office"}
         onClick={() => onSelect("office")}
-        name="IndiaTech"
-        type="OFFICE"
-        address="1219 Harvest Path, Jacksonville, TX 40326"
+        name="Office"
+        type="Office"
+        address="1219 Harvest Path, Tashkent"
+        phone={customerPhone}
       />
-      <button onClick={() => onSelect("pickup")} className="mt-7 inline-flex items-center gap-4 text-[16px] text-brand-blue">
+      <button type="button" onClick={() => onSelect("pickup")} className="mt-6 inline-flex min-h-11 items-center gap-3 text-base text-brand-blue">
         <Plus size={18} /> Pickup counter
       </button>
     </div>
@@ -256,39 +268,33 @@ function AddressStep({
 
 function CheckoutInput({ label, value, onChange, type = "text" }: { label: string; value: string; onChange: (value: string) => void; type?: string }) {
   return (
-    <label className="block text-[12px] font-bold uppercase text-[#555]">
-      <span>{label}</span>
-      <input
-        type={type}
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        className="mt-2 h-11 w-full rounded-[8px] border border-[#DDE2F4] bg-white px-3 text-[14px] font-medium text-[#33333A] outline-none focus:border-brand-blue"
-      />
-    </label>
+    <FormField label={label}>
+      <Input type={type} value={value} onChange={(event) => onChange(event.target.value)} />
+    </FormField>
   );
 }
 
-function AddressRow({ checked, onClick, name, type, address }: { checked: boolean; onClick: () => void; name: string; type: string; address: string }) {
+function AddressRow({ checked, onClick, name, type, address, phone }: { checked: boolean; onClick: () => void; name: string; type: string; address: string; phone?: string }) {
   return (
-    <div className="border-b border-[#DDE2F4] py-8">
-      <div className="flex items-start justify-between gap-5">
-        <button onClick={onClick} className="flex items-start gap-4 text-left">
-          <span className={`mt-1 grid h-[18px] w-[18px] place-items-center rounded-full border-2 ${checked ? "border-brand-blue" : "border-[#A5A8B6]"}`}>
+    <div className="border-b border-brand-line py-6 sm:py-8">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <button type="button" onClick={onClick} className="flex items-start gap-4 text-left">
+          <span className={`mt-1 grid h-[18px] w-[18px] shrink-0 place-items-center rounded-full border-2 ${checked ? "border-brand-blue" : "border-brand-subtle"}`}>
             {checked ? <span className="h-2 w-2 rounded-full bg-brand-blue" /> : null}
           </span>
           <span>
-            <span className="flex items-center gap-3">
-              <span className={`text-[22px] ${checked ? "text-black" : "text-[#8A8A8A]"}`}>{name}</span>
-              <span className="rounded-[4px] border border-brand-blue px-2 py-0.5 text-[11px] text-brand-blue">{type}</span>
+            <span className="flex flex-wrap items-center gap-3">
+              <span className={`text-h3 ${checked ? "text-brand-ink" : "text-brand-muted"}`}>{name}</span>
+              <span className="rounded-xs border border-brand-blue px-2 py-0.5 text-caption text-brand-blue">{type}</span>
             </span>
-            <span className="mt-4 block text-[14px] text-[#555]">{address}</span>
-            <span className="mt-3 block text-[14px] text-[#555]">Contact - (936) 361-0310</span>
+            <span className="mt-3 block text-body text-brand-muted">{address}</span>
+            {phone ? <span className="mt-2 block text-body text-brand-muted">Contact — {phone}</span> : null}
           </span>
         </button>
-        <div className="mt-1 whitespace-nowrap text-[14px]">
-          <button className="text-[#555]">Edit</button>
-          <span className="mx-5 text-[#D4D7E5]">|</span>
-          <button className="text-brand-peach">Remove</button>
+        <div className="flex gap-4 text-sm text-brand-muted sm:mt-1">
+          <button type="button" className="hover:text-brand-ink">Edit</button>
+          <span className="text-brand-line">|</span>
+          <button type="button" className="text-brand-peach hover:opacity-80">Remove</button>
         </div>
       </div>
     </div>
@@ -297,37 +303,41 @@ function AddressRow({ checked, onClick, name, type, address }: { checked: boolea
 
 function ShippingStep({ selected, onSelect }: { selected: string; onSelect: (value: string) => void }) {
   return (
-    <div className="mt-12 max-w-[650px]">
-      <h1 className="text-[20px] font-medium text-black">Shipment Method</h1>
-      <div className="mt-10 rounded-[8px] bg-white shadow-[0_7px_16px_rgba(0,0,0,0.28)]">
+    <div className="mt-8 max-w-form lg:mt-12">
+      <h1 className="text-section font-semibold text-brand-ink">Shipment Method</h1>
+      <div className="mt-6 overflow-hidden rounded-md bg-brand-surface shadow-soft">
         {[
           ["free", "Free", "You get free shipping"],
-          ["priority", "$8.50", "Priority Shipping"],
+          ["priority", "105 000 UZS", "Priority Shipping"],
           ["schedule", "Schedule", "Choose a date that works for you."],
         ].map((row) => (
-          <button key={row[0]} onClick={() => onSelect(row[0])} className="flex w-full items-center justify-between border-b border-[#DDE2F4] px-5 py-3 text-left last:border-b-0">
-            <span className="flex items-center gap-4 text-[15px] text-[#555]">
-              <span className={`grid h-[17px] w-[17px] place-items-center rounded-full border-2 ${selected === row[0] ? "border-brand-blue" : "border-[#A5A8B6]"}`}>
+          <button key={row[0]} type="button" onClick={() => onSelect(row[0])} className="flex w-full flex-col gap-3 border-b border-brand-line px-4 py-4 text-left last:border-b-0 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+            <span className="flex items-center gap-4 text-body text-brand-muted">
+              <span className={`grid h-[17px] w-[17px] shrink-0 place-items-center rounded-full border-2 ${selected === row[0] ? "border-brand-blue" : "border-brand-subtle"}`}>
                 {selected === row[0] ? <span className="h-2 w-2 rounded-full bg-brand-blue" /> : null}
               </span>
-              <span>{row[1]}</span>
+              <span className="font-medium text-brand-ink">{row[1]}</span>
               <span>{row[2]}</span>
             </span>
-            <span className="flex items-center gap-3 text-[14px] text-[#555]">Select Date <ChevronDown size={16} /> <CalendarDays size={20} /></span>
+            {row[0] === "schedule" ? (
+              <span className="flex items-center gap-2 text-sm text-brand-muted sm:pl-8">
+                Select Date <ChevronDown size={16} /> <CalendarDays size={20} />
+              </span>
+            ) : null}
           </button>
         ))}
       </div>
 
-      <div className="mt-5 grid gap-7 sm:grid-cols-[290px_300px]">
-        <div className="h-[86px] rounded-[8px] bg-white p-4 shadow-[0_7px_16px_rgba(0,0,0,0.22)]">
-          <div className="flex items-center justify-between text-[14px] text-black">
+      <div className="mt-5 grid gap-4 lg:grid-cols-2">
+        <div className="rounded-md bg-brand-surface p-4 shadow-soft">
+          <div className="flex items-center justify-between text-sm text-brand-ink">
             <span>Choose delivery time</span>
             <ChevronDown size={15} />
-            <span className="ml-auto text-[11px] text-[#777]">19 SEP</span>
+            <span className="text-caption text-brand-muted">19 SEP</span>
           </div>
-          <div className="mt-4 flex gap-2">
-            {["7 am- 12 pm", "12 pm- 6 pm", "12 PM- 6 PM"].map((time, index) => (
-              <span key={time} className={`rounded-[7px] px-3 py-1 text-[13px] ${index === 0 ? "bg-brand-peach text-white" : "bg-brand-bg text-[#33333A]"}`}>{time}</span>
+          <div className="mt-4 flex flex-wrap gap-2">
+            {["7 am–12 pm", "12 pm–6 pm", "6 pm–9 pm"].map((time, index) => (
+              <span key={time} className={`rounded-xs px-3 py-1.5 text-sm ${index === 0 ? "bg-brand-peach text-white" : "bg-brand-bg text-brand-ink"}`}>{time}</span>
             ))}
           </div>
         </div>
@@ -340,17 +350,19 @@ function ShippingStep({ selected, onSelect }: { selected: string; onSelect: (val
 function CalendarMock() {
   const days = Array.from({ length: 31 }, (_, index) => index + 1);
   return (
-    <div className="rounded-[8px] bg-white p-7 shadow-[0_7px_16px_rgba(0,0,0,0.24)]">
-      <div className="mb-7 flex items-center justify-between text-[#56616D]">
+    <div className="rounded-md bg-brand-surface p-5 shadow-soft sm:p-7">
+      <div className="mb-6 flex items-center justify-between text-brand-muted">
         <ChevronLeft size={18} />
-        <span className="font-bold">September 2021</span>
+        <span className="font-bold text-brand-ink">September 2026</span>
         <ChevronRight size={18} />
       </div>
-      <div className="mb-6 grid grid-cols-7 gap-4 text-center text-[11px] font-bold uppercase tracking-[0.25em] text-[#B7BFCA]">
-        {["San", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => <span key={day}>{day}</span>)}
+      <div className="mb-4 grid grid-cols-7 gap-2 text-center text-caption font-bold uppercase tracking-wider text-brand-subtle">
+        {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => <span key={day}>{day}</span>)}
       </div>
-      <div className="grid grid-cols-7 gap-4 text-center text-[19px] font-bold text-[#56616D]">
-        {days.map((day) => <span key={day} className={day === 19 ? "grid h-8 w-8 place-items-center rounded-full bg-brand-blue text-white" : ""}>{day}</span>)}
+      <div className="grid grid-cols-7 gap-2 text-center text-base font-bold text-brand-muted">
+        {days.map((day) => (
+          <span key={day} className={day === 19 ? "grid h-8 w-8 place-items-center rounded-full bg-brand-blue text-white" : ""}>{day}</span>
+        ))}
       </div>
     </div>
   );
@@ -358,65 +370,73 @@ function CalendarMock() {
 
 function PaymentStep() {
   return (
-    <div className="mt-12 max-w-[650px]">
-      <h1 className="text-[20px] font-medium text-black">Payment Method</h1>
-      <div className="mt-9 divide-y divide-[#DDE2F4]">
-        <div className="flex items-center gap-4 py-4">
-          <span className="grid h-[18px] w-[18px] place-items-center rounded-full border-2 border-brand-blue"><span className="h-2 w-2 rounded-full bg-brand-blue" /></span>
-          <span className="grid h-5 min-w-9 place-items-center rounded-[3px] bg-brand-peach px-2 text-[10px] font-black text-white">Click</span>
-          <span className="text-[16px] text-[#33333A]">Click Uz payment</span>
-          <button className="ml-auto text-brand-peach">Remove</button>
+    <div className="mt-8 max-w-form lg:mt-12">
+      <h1 className="text-section font-semibold text-brand-ink">Payment Method</h1>
+      <div className="mt-6 divide-y divide-brand-line">
+        <div className="flex flex-wrap items-center gap-4 py-4">
+          <span className="grid h-[18px] w-[18px] place-items-center rounded-full border-2 border-brand-blue">
+            <span className="h-2 w-2 rounded-full bg-brand-blue" />
+          </span>
+          <span className="grid h-5 min-w-9 place-items-center rounded-xs bg-brand-peach px-2 text-caption font-black text-white">Click</span>
+          <span className="text-base text-brand-ink">Click Uz payment</span>
+          <button type="button" className="ml-auto text-brand-peach hover:opacity-80">Remove</button>
         </div>
-        <button className="flex items-center gap-4 py-4 text-brand-blue">
+        <button type="button" className="flex min-h-11 items-center gap-4 py-4 text-brand-blue">
           <Plus size={18} /> Add payment method
         </button>
       </div>
-      <p className="mt-6 max-w-[520px] text-[14px] leading-6 text-[#777]">
+      <p className="mt-6 max-w-form text-body leading-relaxed text-brand-muted">
         You will be routed through the Click payment flow after the order is created. RashPOD does not collect or store card numbers.
       </p>
     </div>
   );
 }
 
+const FREE_DELIVERY_TARGET = 500_000;
+
 function OrderSummaryPanel({ serverCartCount }: { serverCartCount: number }) {
   const { items, subtotal, updateQuantity, removeItem } = useCart();
-  const remaining = Math.max(0, 50 - subtotal);
-  const progress = Math.min(100, (subtotal / 50) * 100);
+  const remaining = Math.max(0, FREE_DELIVERY_TARGET - subtotal);
+  const progress = Math.min(100, (subtotal / FREE_DELIVERY_TARGET) * 100);
   return (
-    <aside className="rounded-[10px] bg-brand-bg p-8 shadow-[8px_10px_16px_rgba(0,0,0,0.25)]">
-      <div className="mb-8 flex items-center justify-between">
-        <h2 className="text-[16px] font-bold uppercase text-[#33333A]">Order Summery</h2>
-        <X size={22} />
+    <aside className="rounded-md bg-brand-bg p-6 shadow-soft sm:p-8">
+      <div className="mb-6 flex items-center justify-between">
+        <h2 className="text-section font-bold uppercase text-brand-ink">Order Summary</h2>
+        <X size={22} className="text-brand-muted" />
       </div>
       <FreeDeliveryBar subtotal={subtotal} remaining={remaining} progress={progress} compact />
-      <div className="mb-4 grid grid-cols-[1fr_140px_80px] rounded-[4px] bg-brand-peach px-4 py-2 text-[10px] font-bold text-white">
-        <span>product</span>
-        <span className="text-center">Quantity</span>
+      <div className="mb-4 grid grid-cols-[1fr_100px_72px] rounded-xs bg-brand-peach px-4 py-2 text-caption font-bold text-white sm:grid-cols-[1fr_140px_80px]">
+        <span>Product</span>
+        <span className="text-center">Qty</span>
         <span className="text-right">Total</span>
       </div>
       <div className="max-h-[430px] space-y-3 overflow-y-auto pr-1">
-        {items.length === 0 ? <div className="rounded-[8px] bg-white p-8 text-center text-brand-muted">{serverCartCount > 0 ? `${serverCartCount} server cart item${serverCartCount === 1 ? "" : "s"} ready for checkout.` : "Your cart is empty."}</div> : null}
+        {items.length === 0 ? (
+          <div className="rounded-md bg-brand-surface p-8 text-center text-brand-muted">
+            {serverCartCount > 0 ? `${serverCartCount} server cart item${serverCartCount === 1 ? "" : "s"} ready for checkout.` : "Your cart is empty."}
+          </div>
+        ) : null}
         {items.map((item) => (
-          <div key={item.key} className="grid grid-cols-[74px_1fr_90px_72px] items-center gap-3 rounded-[8px] bg-white p-3">
-            <div className="relative h-[74px] overflow-hidden rounded-[5px] bg-brand-bg">
+          <div key={item.key} className="grid grid-cols-[74px_1fr] items-center gap-3 rounded-md bg-brand-surface p-3 sm:grid-cols-[74px_1fr_90px_72px]">
+            <div className="relative h-[74px] overflow-hidden rounded-xs bg-brand-bg">
               {item.imageUrl ? <Image src={item.imageUrl} alt={item.title} fill sizes="74px" className="object-cover" /> : null}
             </div>
             <div>
-              <h3 className="text-[10px] font-black uppercase text-black">{item.title}</h3>
-              <span className="mt-3 inline-flex items-center gap-1 rounded-[4px] bg-brand-bg px-2 py-1 text-[9px] text-brand-blue">
+              <h3 className="text-caption font-bold uppercase text-brand-ink line-clamp-2">{item.title}</h3>
+              <span className="mt-2 inline-flex items-center gap-1 rounded-xs bg-brand-bg px-2 py-1 text-caption text-brand-blue">
                 <span className="h-2 w-2 rounded-full bg-brand-blue" /> {item.size}
               </span>
-              <p className="mt-3 flex items-center gap-1 text-[8px] uppercase text-[#777]"><Circle size={11} /> {item.color}</p>
+              <p className="mt-2 flex items-center gap-1 text-caption uppercase text-brand-muted"><Circle size={11} /> {item.color}</p>
             </div>
-            <div>
-              <div className="inline-flex h-[28px] min-w-[72px] items-center justify-between rounded-full bg-brand-bg px-3 text-[11px] font-black text-black">
-                <button onClick={() => updateQuantity(item.key, Math.max(1, item.quantity - 1))}>-</button>
+            <div className="col-start-2 sm:col-start-auto">
+              <div className="inline-flex h-7 min-w-[72px] items-center justify-between rounded-pill bg-brand-bg px-3 text-xs font-bold text-brand-ink">
+                <button type="button" onClick={() => updateQuantity(item.key, Math.max(1, item.quantity - 1))}>-</button>
                 <span>{item.quantity}</span>
-                <button onClick={() => updateQuantity(item.key, item.quantity + 1)}>+</button>
+                <button type="button" onClick={() => updateQuantity(item.key, item.quantity + 1)}>+</button>
               </div>
-              <button onClick={() => removeItem(item.key)} className="mt-3 text-[8px] font-medium text-brand-peach">REMOVE</button>
+              <button type="button" onClick={() => removeItem(item.key)} className="mt-2 text-caption font-medium text-brand-peach">Remove</button>
             </div>
-            <p className="text-right text-[13px] font-black text-black">${(item.price * item.quantity).toFixed(2)}</p>
+            <p className="text-right text-sm font-bold tabular-nums text-brand-ink sm:text-base">{formatPrice(item.price * item.quantity)}</p>
           </div>
         ))}
       </div>

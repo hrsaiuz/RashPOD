@@ -12,6 +12,8 @@ import {
   Settings,
   Crown,
   ArrowRight,
+  DollarSign,
+  LifeBuoy,
 } from "lucide-react";
 
 interface RoleEntry {
@@ -64,6 +66,20 @@ const ROLES: RoleEntry[] = [
     description: "Print queues, QC, packing and pickup.",
     icon: <Factory size={18} aria-hidden="true" />,
     accent: "green",
+  },
+  {
+    slug: "finance",
+    title: "Finance",
+    description: "Royalties, payouts, reconciliation, payments.",
+    icon: <DollarSign size={18} aria-hidden="true" />,
+    accent: "blue",
+  },
+  {
+    slug: "support",
+    title: "Support",
+    description: "Tickets, CRM, customer communications.",
+    icon: <LifeBuoy size={18} aria-hidden="true" />,
+    accent: "blue",
   },
   {
     slug: "admin",

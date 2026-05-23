@@ -113,12 +113,28 @@ Semantic colours and the status badge palette: see `rashpod-ui-tokens.md` §3 & 
 Source of truth lives in `packages/ui`:
 
 ```
+PageContainer, PageHeader, Section, PageSections,
+MarketingInput, MarketingSelect, MarketingTextarea, MarketingStepper, MarketingDecoratedPanel,
 Button, Card, Badge, BadgeNew, Input, Select, Textarea, FormField, Modal,
 Drawer, Skeleton, Spinner, EmptyState, ErrorState, KpiTile, ProductCard,
 CategoryTile, DecorativeBackground, DashboardShell, DashboardSidebar,
 DashboardTopbar, PublicHeader, PublicFooter, DataTable, ChartWrapper,
-MetricCard, DashboardPanel, Breadcrumbs, MotionProvider.
+MetricCard, DashboardPanel, Breadcrumbs, MotionProvider, StatusBadge, formatPrice.
 ```
+
+### Layout primitives
+
+- **`PageContainer`** — `variant="storefront" | "dashboard" | "narrow" | "form"` with consistent gutters (`px-4 sm:px-5 md:px-6`).
+- **`PageHeader`** — title, description, optional actions; responsive stack on mobile.
+- **`MarketingInput` / `MarketingSelect` / `MarketingTextarea`** — underline marketing form variant; optimized spacing for 375px.
+
+### Typography utilities (Tailwind)
+
+`text-display`, `text-h1`, `text-h2`, `text-h3`, `text-section`, `text-bodyLg`, `text-body`, `text-caption`, `text-button`, `text-price`.
+
+### Enforcement
+
+Run `node scripts/check-ui-tokens.mjs` to flag raw hex and default Tailwind status colors in app code.
 
 When extending the system add the component to `packages/ui/src/components`
 and export it from `packages/ui/src/index.ts`. Do not implement bespoke

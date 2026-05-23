@@ -6,7 +6,7 @@ import { StorePage, UnderlineInput } from "../storefront-ui";
 
 const contacts = [
   ["Designer Support", "For designer applications, portfolio review, royalties, and product approvals.", "+998 50 27 XX XX", "RASHPOD_DESIGNERS", "bg-brand-peach text-black"],
-  ["Custom Orders", "For companies, teams, events, and branded product requests.", "+998 50 27 XX XX", "RASHPOD_CUSTOM", "bg-[#313238] text-white"],
+  ["Custom Orders", "For companies, teams, events, and branded product requests.", "+998 50 27 XX XX", "RASHPOD_CUSTOM", "bg-brand-ink text-white"],
   ["Print-Ready Films", "For DTF films, UV-DTF films, file requirements, and production questions.", "+998 50 27 XX XX", "RASHPOD_FILMS", "bg-brand-bg text-black"],
   ["Customer Support", "For questions about orders, delivery, returns, or product details.", "+998 50 27 XX XX", "RASHPOD_CUSTOMER", "bg-brand-blue text-white"],
 ];
@@ -47,11 +47,11 @@ export default function ContactPage() {
         ))}
       </div>
 
-      <section className="mt-12 grid overflow-hidden rounded-[32px] border border-[#2E3038] bg-brand-bg lg:grid-cols-[520px_1fr]">
+      <section className="mt-12 grid overflow-hidden rounded-[32px] border border-brand-ink bg-brand-bg lg:grid-cols-[520px_1fr]">
         <div className="relative min-h-[520px] overflow-hidden bg-brand-blueLight p-12">
           <h2 className="text-[34px] font-bold text-black">Contact Information</h2>
-          <p className="mt-7 text-[22px] text-[#555760]">Say something to start a live chat!</p>
-          <div className="mt-32 space-y-16 text-[20px] text-[#20243A]">
+          <p className="mt-7 text-[22px] text-brand-muted">Say something to start a live chat!</p>
+          <div className="mt-32 space-y-16 text-[20px] text-brand-text">
             <p className="flex items-center gap-10"><Phone /> +1012 3456 789</p>
             <p className="flex items-center gap-10"><Mail /> demo@gmail.com</p>
             <p className="flex items-center gap-10"><MapPin /> 132 Dartmouth Street Boston,<br /> Massachusetts 02156 United States</p>
@@ -74,8 +74,8 @@ export default function ContactPage() {
                 <UnderlineInput label="Phone Number" value={form.phoneNumber} onChange={(e) => setForm({ ...form, phoneNumber: e.target.value })} />
               </div>
               <fieldset>
-                <legend className="mb-4 text-[16px] font-bold text-[#07172D]">Select Subject?</legend>
-                <div className="flex flex-wrap gap-x-8 gap-y-4 text-[14px] text-[#344054]">
+                <legend className="mb-4 text-[16px] font-bold text-brand-ink">Select Subject?</legend>
+                <div className="flex flex-wrap gap-x-8 gap-y-4 text-[14px] text-brand-text">
                   {["Order support", "Custom project", "DTF / UV-DTF films", "Designer application", "Partnership", "Other"].map((subject) => (
                     <label key={subject} className="flex items-center gap-2">
                       <input type="radio" name="subject" checked={form.subject === subject} onChange={() => setForm({ ...form, subject })} />
@@ -85,8 +85,8 @@ export default function ContactPage() {
                 </div>
               </fieldset>
               <label className="block">
-                <span className="mb-3 block text-[15px] text-[#8E8E94]">Message</span>
-                <textarea required rows={6} placeholder="Write your message.." value={form.message} onChange={(e) => setForm({ ...form, message: e.target.value })} className="w-full rounded-[18px] border border-[#5F6067] bg-transparent px-4 py-4 outline-none" />
+                <span className="mb-3 block text-[15px] text-brand-subtle">Message</span>
+                <textarea required rows={6} placeholder="Write your message.." value={form.message} onChange={(e) => setForm({ ...form, message: e.target.value })} className="w-full rounded-[18px] border border-brand-muted/60 bg-transparent px-4 py-4 outline-none" />
               </label>
               <div className="flex justify-end">
                 <button disabled={status === "submitting"} className="h-[64px] min-w-[220px] rounded-[18px] bg-brand-peach px-8 text-[22px] font-bold text-white">

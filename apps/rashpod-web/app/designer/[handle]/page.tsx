@@ -76,7 +76,7 @@ export default function DesignerProfilePage({ params }: { params: Promise<{ hand
 
   if (loading) {
     return (
-      <div className="mx-auto max-w-[1232px] px-5 py-10">
+      <div className="mx-auto max-w-storefront px-5 py-10">
         <Skeleton className="mb-8 h-6 w-48" />
         <Skeleton className="mb-12 h-[430px] w-full" />
         <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
@@ -90,7 +90,7 @@ export default function DesignerProfilePage({ params }: { params: Promise<{ hand
 
   if (error || !designer) {
     return (
-      <div className="mx-auto max-w-[1232px] px-5 py-20">
+      <div className="mx-auto max-w-storefront px-5 py-20">
         <ErrorState
           title="Designer not found"
           description="We couldn't find the designer you're looking for."
@@ -113,13 +113,13 @@ export default function DesignerProfilePage({ params }: { params: Promise<{ hand
 
   return (
     <div className="bg-brand-bg pb-16 text-black">
-      <div className="mx-auto max-w-[1232px] px-5 pt-6">
-        <nav className="flex items-center gap-5 text-[15px] text-[#4F5360]" aria-label="Breadcrumb">
+      <div className="mx-auto max-w-storefront px-5 pt-6">
+        <nav className="flex items-center gap-5 text-[15px] text-brand-muted" aria-label="Breadcrumb">
           <Link href="/" className="hover:text-brand-blue">Home</Link>
           <ChevronRight size={18} strokeWidth={1.6} />
           <Link href="/designers" className="hover:text-brand-blue">Designers</Link>
           <ChevronRight size={18} strokeWidth={1.6} />
-          <span className="font-semibold text-[#1C2030]">Profile</span>
+          <span className="font-semibold text-brand-ink">Profile</span>
         </nav>
 
         <h1 className="mt-14 text-[20px] font-extrabold text-black">{designer.displayName}'s SDY A2LKDNVA</h1>
@@ -177,7 +177,7 @@ function DesignerPortraitFrame({ name, imageUrl }: { name: string; imageUrl?: st
 
   return (
     <div className="relative h-[395px] w-[350px] overflow-hidden rounded-[16px]">
-      <div className="absolute inset-[28px] overflow-hidden bg-[#EEF1FA]">
+      <div className="absolute inset-[28px] overflow-hidden bg-brand-bg">
         {imageUrl ? (
           <Image src={imageUrl} alt={name} fill sizes="350px" className="z-10 object-cover object-bottom grayscale" priority />
         ) : (
@@ -196,8 +196,8 @@ function DesignerProductCard({ listing, index }: { listing: Listing; index: numb
   return (
     <Link href={`/product/${listing.slug}`} className="group rounded-[14px] bg-white p-5">
       <article>
-        <div className="relative h-[245px] overflow-hidden rounded-[25px] bg-[#EEF1FA]">
-          <span className="absolute left-5 top-5 z-10 rounded-[7px] bg-[#D877CF] px-3 py-2 text-[8px] font-bold text-white">Best Seller</span>
+        <div className="relative h-[245px] overflow-hidden rounded-[25px] bg-brand-bg">
+          <span className="absolute left-5 top-5 z-10 rounded-[7px] bg-badge-bestSeller px-3 py-2 text-[8px] font-bold text-white">Best Seller</span>
           {listing.imageUrl ? (
             <Image src={listing.imageUrl} alt={listing.title} fill sizes="260px" className="object-cover transition-transform duration-300 group-hover:scale-105" />
           ) : (
@@ -205,7 +205,7 @@ function DesignerProductCard({ listing, index }: { listing: Listing; index: numb
           )}
         </div>
         <h3 className="mt-4 text-[14px] font-extrabold text-black">{listing.title}</h3>
-        <p className="mt-2 text-[10px] text-[#777]">Designed by {listing.designer.displayName}</p>
+        <p className="mt-2 text-[10px] text-brand-subtle">Designed by {listing.designer.displayName}</p>
         <div className="mt-4 flex items-center justify-between">
           <span className="text-[13px] font-black text-black">{formatPrice(listing.price)}</span>
           <span className="inline-flex h-[32px] items-center justify-center rounded-[8px] bg-brand-peach px-4 text-[10px] font-bold text-white">See Product</span>
@@ -217,7 +217,7 @@ function DesignerProductCard({ listing, index }: { listing: Listing; index: numb
 
 function ProductFallback({ dark }: { dark?: boolean }) {
   return (
-    <div className={`absolute inset-0 ${dark ? "bg-[#172217]" : "bg-white"}`} aria-hidden="true">
+    <div className={`absolute inset-0 ${dark ? "bg-brand-ink" : "bg-white"}`} aria-hidden="true">
       <div className={`absolute left-1/2 top-0 h-[280px] w-[205px] -translate-x-1/2 rounded-b-[56px] ${dark ? "bg-black" : "bg-white"} shadow-[inset_0_0_34px_rgba(0,0,0,0.09)]`} />
       <div className="absolute left-1/2 top-[43%] h-[58px] w-[58px] -translate-x-1/2 rounded-[14px] border-[5px] border-brand-peach bg-brand-blueLight" />
     </div>

@@ -333,8 +333,8 @@ export default function MockupEditorPage() {
           <div
             className={`rounded-2xl px-4 py-3 text-sm border ${
               message.kind === "ok"
-                ? "bg-green-50 border-green-200 text-green-900"
-                : "bg-red-50 border-red-200 text-red-900"
+                ? "bg-semantic-successBg border-semantic-success/25 text-semantic-successText"
+                : "bg-semantic-dangerBg border-semantic-danger/25 text-semantic-dangerText"
             }`}
           >
             {message.text}
@@ -342,12 +342,12 @@ export default function MockupEditorPage() {
         )}
 
         {outOfBounds && (
-          <div className="rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900 flex items-center gap-2">
+          <div className="rounded-2xl border border-semantic-warning/25 bg-semantic-warningBg px-4 py-3 text-sm text-semantic-warningText flex items-center gap-2">
             <CircleAlert size={16} /> Design extends past the safe zone — drag it back inside before saving.
           </div>
         )}
         {dpiWarning && (
-          <div className="rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900 flex items-center gap-2">
+          <div className="rounded-2xl border border-semantic-warning/25 bg-semantic-warningBg px-4 py-3 text-sm text-semantic-warningText flex items-center gap-2">
             <CircleAlert size={16} /> {dpiWarning}
           </div>
         )}
@@ -381,7 +381,7 @@ export default function MockupEditorPage() {
 
               {bgSize && (
                 <div
-                  className="absolute border-2 border-red-400/60 pointer-events-none"
+                  className="absolute border-2 border-semantic-danger/60 pointer-events-none"
                   style={{
                     left: safeBounds!.x * scale,
                     top: safeBounds!.y * scale,
@@ -404,7 +404,7 @@ export default function MockupEditorPage() {
 
               {bgSize && placement.designUrl && (
                 <div
-                  className={`absolute cursor-move ${outOfBounds ? "ring-2 ring-red-500" : "ring-1 ring-brand-blue/40"}`}
+                  className={`absolute cursor-move ${outOfBounds ? "ring-2 ring-semantic-danger" : "ring-1 ring-brand-blue/40"}`}
                   style={{
                     left: pos.x * scale,
                     top: pos.y * scale,

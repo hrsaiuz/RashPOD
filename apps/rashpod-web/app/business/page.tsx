@@ -49,7 +49,7 @@ export default function BusinessOverview() {
             <Link href="/business/requests/new"><Button variant="primaryBlue" size="sm">New brief</Button></Link>
           </div>
           {loading ? <Skeleton className="h-32" /> : error ? (
-            <div className="text-sm text-red-600">{error}</div>
+            <div className="text-sm text-semantic-dangerText">{error}</div>
           ) : reqs.length === 0 ? (
             <EmptyState title="No briefs yet" description="Submit a brief to get bids from approved designers."
               action={<Link href="/business/requests/new"><Button variant="primaryBlue">Create brief</Button></Link>} />

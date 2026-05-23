@@ -25,15 +25,15 @@ export interface PublicFooterProps {
 export const PublicFooter: React.FC<PublicFooterProps> = ({
   shopLinks = [
     { href: "/shop", label: "All Products" },
-    { href: "/shop/new", label: "New Arrivals" },
-    { href: "/shop/bestsellers", label: "Bestsellers" },
+    { href: "/shop?sort=new", label: "New Arrivals" },
+    { href: "/shop?sort=bestsellers", label: "Bestsellers" },
     { href: "/film", label: "DTF/UV-DTF Films" },
   ],
   designerLinks = [
     { href: "/designers", label: "Designer Directory" },
     { href: "/sell-on-rashpod", label: "Start Selling" },
-    { href: "/docs/guidelines", label: "Design Guidelines" },
-    { href: "/docs/royalties", label: "Royalties" },
+    { href: "/how-it-works", label: "How It Works" },
+    { href: "/designer-application", label: "Apply as Designer" },
   ],
   companyLinks = [
     { href: "/about", label: "About Us" },
@@ -51,7 +51,7 @@ export const PublicFooter: React.FC<PublicFooterProps> = ({
   return (
     <footer className={cn("relative overflow-hidden bg-brand-peach pt-[272px]", className)}>
       <div className="relative rounded-t-[37px] bg-white px-5 pb-7 pt-[68px] md:rounded-t-[54px]">
-        <div className="mx-auto grid max-w-[1207px] grid-cols-1 gap-9 md:grid-cols-2 lg:grid-cols-[1fr_1fr_1fr_1.8fr]">
+        <div className="mx-auto grid max-w-storefront grid-cols-1 gap-9 md:grid-cols-2 lg:grid-cols-[1fr_1fr_1fr_1.8fr]">
           <FooterColumn title="Shop" links={shopLinks} />
           <FooterColumn title="For Designers" links={designerLinks} />
           <FooterColumn title="Company" links={companyLinks} />
@@ -77,14 +77,14 @@ export const PublicFooter: React.FC<PublicFooterProps> = ({
           </div>
         </div>
 
-        <div className="mx-auto mt-12 flex max-w-[1207px] flex-wrap items-center gap-x-10 gap-y-4 text-[15px] text-[#4B4B55]">
+        <div className="mx-auto mt-12 flex max-w-storefront flex-wrap items-center gap-x-10 gap-y-4 text-body text-brand-muted">
           <span>© 2026 RashPOD, All rights reserved.</span>
           <Link href={termsUrl} className="hover:text-brand-blue">Terms</Link>
           <Link href={privacyUrl} className="hover:text-brand-blue">Privacy</Link>
           <Link href={cookiesUrl} className="hover:text-brand-blue">Shipping & Returns</Link>
         </div>
 
-        <div className="pointer-events-none mx-auto mt-[68px] max-w-[1207px] overflow-hidden">
+        <div className="pointer-events-none mx-auto mt-[68px] max-w-storefront overflow-hidden">
           {logoUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={logoUrl} alt={`${brandName} footer logo`} className="mx-auto h-auto max-h-[180px] w-auto max-w-full select-none object-contain" />
@@ -102,11 +102,11 @@ export const PublicFooter: React.FC<PublicFooterProps> = ({
 function FooterColumn({ title, links }: { title: string; links: PublicFooterLink[] }) {
   return (
     <div>
-      <h3 className="mb-7 text-[16px] font-medium text-[#33333A]">{title}</h3>
+      <h3 className="mb-7 text-body font-medium text-brand-ink">{title}</h3>
       <ul className="space-y-5">
         {links.map((link) => (
           <li key={link.href}>
-            <Link href={link.href} className="text-[16px] text-[#5B5B66] transition-colors hover:text-brand-blue">
+            <Link href={link.href} className="text-body text-brand-muted transition-colors hover:text-brand-blue">
               {link.label}
             </Link>
           </li>

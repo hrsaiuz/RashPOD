@@ -67,7 +67,7 @@ export default function NewRequest() {
                 className="mt-1 w-full rounded-xl border border-brand-line px-4 py-2.5 focus:border-brand-blue focus:outline-none" />
             </div>
           </div>
-          {error && <div className="rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-sm text-red-700">{error}</div>}
+          {error && <div className="rounded-lg border border-semantic-dangerBg bg-semantic-dangerBg px-3 py-2 text-sm text-semantic-dangerText">{error}</div>}
           <Button type="submit" variant="primaryBlue" loading={loading}>Submit brief</Button>
         </form>
       </Card>

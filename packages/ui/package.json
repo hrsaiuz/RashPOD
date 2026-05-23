@@ -6,7 +6,8 @@
   "main": "src/index.ts",
   "exports": {
     ".": "./src/index.ts",
-    "./tailwind-preset": "./tailwind-preset.ts"
+    "./tailwind-preset": "./tailwind-preset.ts",
+    "./styles/globals.css": "./src/styles/globals.css"
   },
   "dependencies": {
     "autoprefixer": "^10.5.0",

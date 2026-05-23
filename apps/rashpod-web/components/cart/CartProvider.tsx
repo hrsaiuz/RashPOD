@@ -4,6 +4,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 import Image from "next/image";
 import Link from "next/link";
 import { Package, Tag, X } from "lucide-react";
+import { formatPrice } from "@rashpod/ui";
 
 export interface CartItem {
   key: string;
@@ -36,7 +37,8 @@ interface CartContextValue {
 }
 
 const STORAGE_KEY = "rashpod_cart_v1";
-const FREE_DELIVERY_TARGET = 50;
+/** Free delivery threshold in UZS */
+const FREE_DELIVERY_TARGET = 500_000;
 const CartContext = createContext<CartContextValue | null>(null);
 
 export function CartProvider({ children }: { children: ReactNode }) {
@@ -136,29 +138,17 @@ function MiniCartDrawer() {
       <div
         aria-hidden="true"
         className={`fixed inset-0 z-40 bg-black/25 transition-opacity duration-300 ${isOpen ? "opacity-100" : "pointer-events-none opacity-0"}`}
-        style={{ opacity: isOpen ? 1 : 0, pointerEvents: isOpen ? "auto" : "none" }}
         onClick={closeCart}
       />
       <aside
         aria-hidden={!isOpen}
-        className="fixed right-0 top-0 z-50 h-dvh w-full max-w-[620px] overflow-hidden rounded-l-[12px] bg-brand-bg shadow-[0_24px_60px_rgba(0,0,0,0.22)] transition-transform duration-300 ease-out"
-        style={{
-          position: "fixed",
-          right: 0,
-          top: 0,
-          zIndex: 50,
-          width: "min(100vw, 620px)",
-          maxWidth: "620px",
-          height: "100dvh",
-          transform: isOpen ? "translateX(0)" : "translateX(100%)",
-          visibility: "visible",
-          pointerEvents: isOpen ? "auto" : "none",
-        }}
+        aria-label="Shopping cart"
+        className={`fixed right-0 top-0 z-modal h-dvh w-full max-w-[620px] overflow-hidden rounded-l-md bg-brand-bg shadow-lg transition-transform duration-300 ease-out ${isOpen ? "translate-x-0" : "translate-x-full pointer-events-none"}`}
       >
-        <div className="flex h-full flex-col px-5 py-6 sm:px-10 sm:py-8">
-          <div className="mb-8 flex items-center justify-between">
-            <h2 className="text-[20px] font-bold uppercase tracking-[0.04em] text-[#33333A]">Order Summary</h2>
-            <button type="button" onClick={closeCart} aria-label="Close cart" className="grid h-9 w-9 place-items-center rounded-full text-[#33333A] transition-colors hover:bg-white">
+        <div className="flex h-full flex-col px-4 py-5 pb-[max(1rem,env(safe-area-inset-bottom))] sm:px-10 sm:py-8">
+          <div className="mb-6 flex items-center justify-between sm:mb-8">
+            <h2 className="text-section font-bold uppercase tracking-wide text-brand-ink">Order Summary</h2>
+            <button type="button" onClick={closeCart} aria-label="Close cart" className="grid h-11 w-11 place-items-center rounded-full text-brand-ink transition-colors hover:bg-white">
               <X size={25} strokeWidth={1.8} />
             </button>
           </div>
@@ -191,8 +181,8 @@ function MiniCartDrawer() {
                     <span className="h-3 w-3 rounded-full bg-brand-blue" />
                     {item.size}
                   </span>
-                  <p className="mt-4 flex items-center gap-2 text-[10px] uppercase text-[#777]">
-                    <span className="h-4 w-4 rounded-full border border-black bg-[#ead7c5]" />
+                  <p className="mt-4 flex items-center gap-2 text-caption uppercase text-brand-muted">
+                    <span className="h-4 w-4 shrink-0 rounded-full border border-brand-ink bg-brand-peachLight" aria-hidden="true" />
                     {item.color}
                   </p>
                 </div>
@@ -200,17 +190,21 @@ function MiniCartDrawer() {
                   <QuantityPill quantity={item.quantity} onChange={(next) => updateQuantity(item.key, next)} />
                   <button type="button" onClick={() => removeItem(item.key)} className="mt-4 text-[10px] font-medium text-brand-peach">Remove</button>
                 </div>
-                <p className="text-right text-[18px] font-black text-black sm:text-right">${(item.price * item.quantity).toFixed(2)}</p>
+                <p className="text-right text-lg font-bold tabular-nums text-brand-ink">{formatPrice(item.price * item.quantity)}</p>
               </div>
             ))}
           </div>
 
-          <div className="mt-6 flex items-center justify-between">
-            <div className="inline-flex h-[30px] w-[205px] items-center gap-2 rounded-full border-2 border-brand-blue bg-white px-4 text-[14px] text-brand-subtle">
+          <div className="mt-6 flex flex-col gap-3 border-t border-brand-line pt-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="hidden min-h-11 items-center gap-2 rounded-pill border-2 border-brand-blue bg-white px-4 text-sm text-brand-subtle sm:inline-flex">
               <span>Coupon Code</span>
               <Tag size={17} className="ml-auto text-brand-peach" />
             </div>
-            <Link href="/checkout" onClick={closeCart} className="inline-flex h-[55px] min-w-[128px] items-center justify-center rounded-[16px] bg-brand-peach px-7 text-[20px] font-bold lowercase text-white transition-transform hover:-translate-y-0.5">
+            <Link
+              href="/checkout"
+              onClick={closeCart}
+              className="inline-flex h-12 w-full items-center justify-center rounded-md bg-brand-peach px-7 text-base font-bold lowercase text-white transition-transform hover:-translate-y-0.5 sm:ml-auto sm:w-auto sm:min-w-[128px] sm:text-xl"
+            >
               continue
             </Link>
           </div>
@@ -223,12 +217,16 @@ function MiniCartDrawer() {
 export function FreeDeliveryBar({ subtotal, remaining, progress, compact }: { subtotal: number; remaining: number; progress: number; compact?: boolean }) {
   return (
     <div className={compact ? "mb-4" : "mb-5"}>
-      <div className="mb-1 flex items-center justify-between text-[10px] font-black text-black">
-        <span>10$</span>
-        <span>{remaining > 0 ? `You're $${remaining.toFixed(0)} away from free shipping` : "You unlocked free shipping"}</span>
-        <span className="relative grid h-9 w-9 place-items-center text-[10px] font-black">
+      <div className="mb-1 flex items-center justify-between text-caption font-bold text-brand-ink">
+        <span>0 UZS</span>
+        <span className="text-center text-xs sm:text-caption">
+          {remaining > 0
+            ? `${formatPrice(remaining)} away from free shipping`
+            : "You unlocked free shipping"}
+        </span>
+        <span className="relative grid h-9 w-9 place-items-center text-caption font-bold">
           <span className="cart-flower absolute inset-0 bg-brand-peach" />
-          <span className="relative z-10">500$</span>
+          <span className="relative z-10">{Math.round(FREE_DELIVERY_TARGET / 1000)}k</span>
         </span>
       </div>
       <div className="h-[13px] overflow-hidden rounded-full border border-brand-blue bg-white">

@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "../../auth/auth-provider";
 import DashboardLayout from "../dashboard-layout";
-import { KpiTile, DataTable, DataTableColumn, EmptyState, ErrorState, Skeleton, Card, Button } from "@rashpod/ui";
+import { KpiTile, DataTable, DataTableColumn, EmptyState, ErrorState, Skeleton, Card, Button, StatusBadge } from "@rashpod/ui";
 import { Search, CheckCircle, XCircle, Clock } from "lucide-react";
 import Link from "next/link";
 
@@ -72,11 +72,7 @@ export default function ModeratorOverview() {
       key: "decision", 
       header: "Decision",
       render: (val) => (
-        <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-          val === 'approved' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
-        }`}>
-          {val}
-        </span>
+        <StatusBadge status={val === "approved" ? "approved" : "rejected"} label={String(val)} />
       ),
     },
     { 

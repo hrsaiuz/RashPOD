@@ -71,7 +71,7 @@ export default function SupportTicketDetailPage() {
             </div>
             <div className="space-y-3">
               {(ticket.messages ?? []).map((message) => (
-                <div key={message.id} className={"rounded-xl border p-4 " + (message.visibility === "INTERNAL" ? "border-amber-200 bg-amber-50" : "border-brand-line bg-surface-card") }>
+                <div key={message.id} className={`rounded-xl border p-4 ${message.visibility === "INTERNAL" ? "border-semantic-warningBg bg-semantic-warningBg" : "border-brand-line bg-surface-card"}`}>
                   <div className="mb-2 flex items-center justify-between gap-2 text-xs text-brand-muted">
                     <span>{message.author?.displayName || message.author?.email || "RashPOD"}</span>
                     <span>{new Date(message.createdAt).toLocaleString()}</span>

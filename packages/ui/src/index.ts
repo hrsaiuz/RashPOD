@@ -3,6 +3,7 @@ export { rashpodTokens, rashpodMotion, rashpodTailwindTheme } from "../../../ras
 // Utility functions
 export * from "./lib/utils";
 export * from "./lib/api";
+export * from "./lib/format-price";
 
 // Existing components
 export * from "./components/ProductCard";
@@ -33,6 +34,10 @@ export * from "./components/MotionProvider";
 export * from "./components/StatusBadge";
 
 // Layout components
+export * from "./components/PageContainer";
+export * from "./components/PageHeader";
+export * from "./components/Section";
+export * from "./components/MarketingForm";
 export * from "./components/PublicHeader";
 export * from "./components/PublicFooter";
 export * from "./components/Breadcrumbs";

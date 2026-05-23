@@ -51,7 +51,7 @@ export default function CustomerOverview() {
             <Link href="/account/orders"><Button variant="ghost" size="sm">View all</Button></Link>
           </div>
           {loading ? <Skeleton className="h-32" /> : error ? (
-            <div className="text-sm text-red-600">{error}</div>
+            <div className="text-sm text-semantic-dangerText">{error}</div>
           ) : orders.length === 0 ? (
             <EmptyState title="No orders yet" description="Browse the shop to find something unique."
               action={<Link href="/shop"><Button variant="primaryBlue">Shop now</Button></Link>} />

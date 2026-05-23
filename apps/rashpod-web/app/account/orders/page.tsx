@@ -20,7 +20,7 @@ export default function OrdersPage() {
       <Card>
         <div className="p-1">
           {loading ? <Skeleton className="h-40" /> : error ? (
-            <div className="text-sm text-red-600">{error}</div>
+            <div className="text-sm text-semantic-dangerText">{error}</div>
           ) : orders.length === 0 ? (
             <EmptyState title="No orders yet" description="Start shopping to see your orders here."
               action={<Link href="/shop"><Button variant="primaryBlue">Browse shop</Button></Link>} />
@@ -28,12 +28,12 @@ export default function OrdersPage() {
             <div className="divide-y divide-brand-line">
               {orders.map((o) => (
                 <Link key={o.id} href={`/account/orders/${o.id}`} className="block py-4 hover:bg-brand-surface rounded-lg px-2 -mx-2 transition">
-                  <div className="flex items-center justify-between">
-                    <div>
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="min-w-0">
                       <div className="font-semibold text-brand-ink">Order {o.id.slice(0, 8).toUpperCase()}</div>
-                      <div className="text-xs text-brand-muted mt-0.5">{new Date(o.createdAt).toLocaleDateString()} · {o.items?.length ?? 0} item(s)</div>
+                      <div className="mt-0.5 text-xs text-brand-muted">{new Date(o.createdAt).toLocaleDateString()} · {o.items?.length ?? 0} item(s)</div>
                     </div>
-                    <div className="flex items-center gap-4">
+                    <div className="flex items-center justify-between gap-4 sm:justify-end">
                       <StatusBadge status={o.status} />
                       <div className="font-semibold tabular-nums">{Number(o.total).toLocaleString()} {o.currency}</div>
                     </div>

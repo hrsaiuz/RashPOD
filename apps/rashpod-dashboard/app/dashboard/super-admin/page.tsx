@@ -85,7 +85,7 @@ export default function SuperAdminOverview() {
           <p className="text-brand-muted">System health, services, and audit logs.</p>
         </div>
 
-        <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-sm text-red-800">
+        <div className="rounded-xl border border-semantic-dangerBg bg-semantic-dangerBg p-4 text-sm text-semantic-dangerText">
           ⚠️ Actions taken here affect all users and all services. Review before making changes.
         </div>
 
@@ -133,7 +133,7 @@ export default function SuperAdminOverview() {
                   <div key={service} className="flex items-center justify-between">
                     <span className="text-sm text-brand-ink">{service}</span>
                     <div className="flex items-center gap-2">
-                      <div className="w-2 h-2 rounded-full bg-green-500" />
+                      <div className="h-2 w-2 rounded-full bg-semantic-success" />
                       <span className="text-xs text-brand-muted">Up</span>
                     </div>
                   </div>

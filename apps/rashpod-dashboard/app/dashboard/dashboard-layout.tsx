@@ -35,6 +35,8 @@ import {
   CheckCircle,
   Landmark,
   ChevronDown,
+  Banknote,
+  ShieldCheck,
 } from "lucide-react";
 
 const ROLE_LINKS: Record<string, Array<{ href: string; label: string; icon?: any; group?: string }>> = {
@@ -44,8 +46,10 @@ const ROLE_LINKS: Record<string, Array<{ href: string; label: string; icon?: any
     { href: "/dashboard/designer/mockup-studio", label: "Mockup Studio", icon: Layers },
     { href: "/dashboard/designer/listings", label: "My Listings", icon: Tag },
     { href: "/dashboard/designer/film-rights", label: "Film Rights", icon: Film },
+    { href: "/dashboard/designer/film-sales", label: "Film Sales", icon: Film },
     { href: "/dashboard/designer/corporate-bids", label: "Corporate Bids", icon: Briefcase },
     { href: "/dashboard/designer/royalties", label: "Royalties", icon: DollarSign },
+    { href: "/dashboard/designer/earnings", label: "Earnings", icon: DollarSign },
     { href: "/dashboard/designer/analytics", label: "Analytics", icon: BarChart3 },
     { href: "/dashboard/notifications", label: "Notifications", icon: Bell },
     { href: "/dashboard/designer/support", label: "Support", icon: LifeBuoy },
@@ -54,6 +58,7 @@ const ROLE_LINKS: Record<string, Array<{ href: string; label: string; icon?: any
   customer: [
     { href: "/dashboard/customer", label: "Overview", icon: LayoutDashboard },
     { href: "/dashboard/customer/orders", label: "Orders", icon: Package },
+    { href: "/dashboard/customer/film-orders", label: "Film Orders", icon: Film },
     { href: "/dashboard/customer/profile", label: "Profile", icon: User },
     { href: "/dashboard/notifications", label: "Notifications", icon: Bell },
     { href: "/dashboard/customer/support", label: "Support", icon: LifeBuoy },
@@ -61,6 +66,13 @@ const ROLE_LINKS: Record<string, Array<{ href: string; label: string; icon?: any
   production: [
     { href: "/dashboard/production", label: "Overview", icon: LayoutDashboard },
     { href: "/dashboard/production/jobs", label: "Production Queue", icon: Factory },
+    { href: "/dashboard/production/mobile", label: "Workshop Mobile", icon: Factory },
+    { href: "/dashboard/production/scan", label: "Scan", icon: Search },
+    { href: "/dashboard/production/qc", label: "QC", icon: CheckCircle },
+    { href: "/dashboard/production/packing", label: "Packing", icon: Package },
+    { href: "/dashboard/production/delivery", label: "Delivery", icon: Package },
+    { href: "/dashboard/production/pickup", label: "Pickup", icon: Package },
+    { href: "/dashboard/production/issues", label: "Issues", icon: ClipboardList },
   ],
   corporate: [],
   moderator: [
@@ -70,6 +82,8 @@ const ROLE_LINKS: Record<string, Array<{ href: string; label: string; icon?: any
   finance: [
     { href: "/dashboard/finance", label: "Overview", icon: LayoutDashboard },
     { href: "/dashboard/finance/royalties", label: "Royalties", icon: DollarSign },
+    { href: "/dashboard/finance/payouts", label: "Payouts", icon: Banknote },
+    { href: "/dashboard/finance/reconciliation", label: "Reconciliation", icon: CreditCard },
     { href: "/dashboard/finance/payments", label: "Payments", icon: CreditCard },
   ],
   support: [
@@ -125,6 +139,11 @@ const ROLE_LINKS: Record<string, Array<{ href: string; label: string; icon?: any
     { href: "/dashboard/super-admin", label: "Overview", icon: LayoutDashboard },
     { href: "/dashboard/super-admin/tenants", label: "Tenants", icon: Landmark },
     { href: "/dashboard/super-admin/plans", label: "Plans", icon: CreditCard },
+    { href: "/dashboard/super-admin/roles", label: "Roles", icon: Users },
+    { href: "/dashboard/super-admin/permissions", label: "Permissions", icon: ShieldCheck },
+    { href: "/dashboard/super-admin/secrets", label: "Secrets", icon: Settings },
+    { href: "/dashboard/super-admin/system", label: "System", icon: CloudCog },
+    { href: "/dashboard/super-admin/audit-logs", label: "Audit Logs", icon: ClipboardList },
     { href: "/dashboard/admin/orders", label: "All Orders", icon: Package },
     { href: "/dashboard/admin/worker-jobs", label: "Worker Jobs", icon: Settings },
     { href: "/dashboard/moderator/designs", label: "Moderation", icon: Search },
@@ -266,14 +285,14 @@ export default function DashboardLayout({ children, role }: { children: ReactNod
       brandName={branding?.theme?.storeName || "RashPOD"}
     >
       {impersonating && (
-        <div className="mb-4 rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3 flex items-center justify-between gap-3">
-          <div className="text-sm text-amber-900">
+        <div className="mb-4 flex flex-col gap-3 rounded-2xl border border-semantic-warningBg bg-semantic-warningBg px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="text-sm text-semantic-warningText">
             <span className="font-semibold">Admin view:</span> you're viewing the {ROLE_LABELS[role] || role} dashboard as
             an admin. Actions you take are logged with your admin identity.
           </div>
           <button
             onClick={() => router.push("/dashboard/admin")}
-            className="text-xs font-semibold px-3 py-1.5 rounded-pill bg-amber-900 text-amber-50 hover:bg-amber-800"
+            className="min-h-11 shrink-0 rounded-pill bg-brand-ink px-4 text-xs font-semibold text-white hover:opacity-90"
           >
             Exit to admin
           </button>

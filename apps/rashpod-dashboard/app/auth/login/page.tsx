@@ -1,7 +1,9 @@
 "use client";
 
-import { FormEvent, useState, useEffect, Suspense } from "react";
+import { FormEvent, Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import Link from "next/link";
+import { Button, Card, FormField, Input, PageContainer } from "@rashpod/ui";
 import { useAuth } from "../auth-provider";
 
 const ROLE_PRIORITY = [
@@ -66,17 +68,11 @@ function LoginForm() {
 
   useEffect(() => {
     if (!API_URL) return;
-
     const controller = new AbortController();
     fetch(`${API_URL}/branding`, { signal: controller.signal })
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => setBranding(data))
-      .catch((error) => {
-        if (error instanceof Error && error.name !== "AbortError") {
-          console.error("Login branding fetch failed", { message: error.message });
-        }
-      });
-
+      .catch(() => undefined);
     return () => controller.abort();
   }, []);
 
@@ -113,83 +109,57 @@ function LoginForm() {
   };
 
   return (
-    <main style={{ maxWidth: 440, margin: "48px auto", padding: 24, background: "white", borderRadius: 20, border: "1px solid #E5E7EB" }}>
-      {branding?.loginLogoUrl && (
-        <div style={{ display: "flex", justifyContent: "center", marginBottom: 20 }}>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={branding.loginLogoUrl} alt={branding.theme?.storeName || "RashPOD"} style={{ maxWidth: 260, maxHeight: 80, objectFit: "contain" }} />
-        </div>
-      )}
-      <h1 style={{ marginTop: 0, color: "#1A1D2E" }}>Dashboard Login</h1>
-      <p style={{ color: "#6B7280", marginTop: 0, fontSize: 14 }}>Sign in to access your dashboard.</p>
-      {successMessage && (
-        <div style={{ background: "#F0F9FF", border: "1px solid #BFDBFE", borderRadius: 12, padding: "12px 16px", marginBottom: 16, color: "#1E40AF", fontSize: 14 }}>
-          {successMessage}
-        </div>
-      )}
-      <form onSubmit={onSubmit} style={{ display: "grid", gap: 14 }}>
-        <div>
-          <label htmlFor="email" style={{ fontSize: 13, fontWeight: 500, color: "#374151", display: "block", marginBottom: 6 }}>
-            Email
-          </label>
-          <input
-            id="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="Email"
-            type="email"
-            required
-            aria-required="true"
-            style={{ width: "100%", padding: 12, borderRadius: 12, border: "1px solid #D1D5DB", boxSizing: "border-box" }}
-          />
-        </div>
-        <div>
-          <label htmlFor="password" style={{ fontSize: 13, fontWeight: 500, color: "#374151", display: "block", marginBottom: 6 }}>
-            Password
-          </label>
-          <input
-            id="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            placeholder="Password"
-            type="password"
-            required
-            aria-required="true"
-            style={{ width: "100%", padding: 12, borderRadius: 12, border: "1px solid #D1D5DB", boxSizing: "border-box" }}
-          />
-        </div>
-        <button
-          type="submit"
-          disabled={loading}
-          style={{
-            padding: "12px 16px",
-            borderRadius: 999,
-            border: "none",
-            background: "#788AE0",
-            color: "white",
-            fontWeight: 600,
-            fontSize: 15,
-            cursor: loading ? "not-allowed" : "pointer",
-            opacity: loading ? 0.7 : 1,
-          }}
-        >
-          {loading ? "Signing in..." : "Sign in"}
-        </button>
-      </form>
-      {error && <p style={{ color: "#B42318", fontSize: 13, marginTop: 12 }}>{error}</p>}
-      <p style={{ textAlign: "center", fontSize: 13, color: "#6B7280", marginTop: 16, marginBottom: 0 }}>
-        Don't have an account?{" "}
-        <a href="/auth/register" style={{ color: "#788AE0", fontWeight: 500, textDecoration: "none" }}>
-          Create one
-        </a>
-      </p>
-    </main>
+    <PageContainer variant="form" compact className="py-12">
+      <Card className="mx-auto max-w-md p-6 sm:p-8">
+        {branding?.loginLogoUrl ? (
+          <div className="mb-6 flex justify-center">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={branding.loginLogoUrl}
+              alt={branding.theme?.storeName || "RashPOD"}
+              className="max-h-20 max-w-[260px] object-contain"
+            />
+          </div>
+        ) : null}
+        <h1 className="text-h3 font-bold text-brand-ink">Dashboard Login</h1>
+        <p className="mt-1 text-sm text-brand-muted">Sign in to access your dashboard.</p>
+        {successMessage ? (
+          <div className="mt-4 rounded-xl border border-semantic-infoBg bg-semantic-infoBg p-3 text-sm text-semantic-infoText">
+            {successMessage}
+          </div>
+        ) : null}
+        <form onSubmit={onSubmit} className="mt-6 grid gap-4">
+          <FormField label="Email" htmlFor="email">
+            <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email" required />
+          </FormField>
+          <FormField label="Password" htmlFor="password">
+            <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Password" required />
+          </FormField>
+          <Button type="submit" variant="primaryBlue" className="w-full" disabled={loading}>
+            {loading ? "Signing in..." : "Sign in"}
+          </Button>
+        </form>
+        {error ? <p className="mt-3 text-sm text-semantic-dangerText">{error}</p> : null}
+        <p className="mt-4 text-center text-sm text-brand-muted">
+          Don&apos;t have an account?{" "}
+          <Link href="/auth/register" className="font-medium text-brand-blue hover:underline">
+            Create one
+          </Link>
+        </p>
+      </Card>
+    </PageContainer>
   );
 }
 
 export default function LoginPage() {
   return (
-    <Suspense fallback={<div style={{ maxWidth: 440, margin: "48px auto", padding: 24, textAlign: "center" }}>Loading...</div>}>
+    <Suspense
+      fallback={
+        <PageContainer variant="form" compact className="py-12 text-center text-brand-muted">
+          Loading...
+        </PageContainer>
+      }
+    >
       <LoginForm />
     </Suspense>
   );

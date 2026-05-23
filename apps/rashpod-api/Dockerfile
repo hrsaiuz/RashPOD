@@ -28,6 +28,7 @@ WORKDIR /app/apps/rashpod-api
 ENV NODE_ENV=production
 
 COPY --from=builder /app/node_modules /app/node_modules
+COPY --from=deps /app/apps/rashpod-api/node_modules ./node_modules
 COPY --from=builder /app/apps/rashpod-api/dist ./dist
 COPY --from=builder /app/apps/rashpod-api/prisma ./prisma
 

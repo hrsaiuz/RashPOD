@@ -13,9 +13,9 @@ type LaunchSection = { key: string; label: string; checks: LaunchCheck[] };
 type LaunchReadiness = { generatedAt: string; environment: string; summary: { pass: number; warn: number; fail: number }; sections: LaunchSection[] };
 
 const style: Record<CheckStatus, { bg: string; text: string; icon: typeof CheckCircle }> = {
-  PASS: { bg: "bg-emerald-50 border-emerald-200", text: "text-emerald-700", icon: CheckCircle },
-  WARN: { bg: "bg-amber-50 border-amber-200", text: "text-amber-800", icon: AlertTriangle },
-  FAIL: { bg: "bg-red-50 border-red-200", text: "text-red-700", icon: CircleX },
+  PASS: { bg: "bg-semantic-successBg border-semantic-success/25", text: "text-semantic-successText", icon: CheckCircle },
+  WARN: { bg: "bg-semantic-warningBg border-semantic-warning/25", text: "text-semantic-warningText", icon: AlertTriangle },
+  FAIL: { bg: "bg-semantic-dangerBg border-semantic-danger/25", text: "text-semantic-dangerText", icon: CircleX },
 };
 
 export default function LaunchReadinessPage() {
@@ -52,9 +52,9 @@ export default function LaunchReadinessPage() {
       {data ? (
         <div className="space-y-5">
           <div className="grid gap-3 sm:grid-cols-3">
-            <Summary label="Pass" value={totals.pass} tone="text-emerald-700" />
-            <Summary label="Warn" value={totals.warn} tone="text-amber-800" />
-            <Summary label="Fail" value={totals.fail} tone="text-red-700" />
+            <Summary label="Pass" value={totals.pass} tone="text-semantic-successText" />
+            <Summary label="Warn" value={totals.warn} tone="text-semantic-warningText" />
+            <Summary label="Fail" value={totals.fail} tone="text-semantic-dangerText" />
           </div>
           {data.sections.map((section) => (
             <section key={section.key} className="rounded-2xl border border-brand-line bg-white p-5 shadow-soft">

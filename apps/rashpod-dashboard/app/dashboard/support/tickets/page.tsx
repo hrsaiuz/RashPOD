@@ -2,6 +2,15 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import {
+  Button,
+  DataTable,
+  EmptyState,
+  ErrorState,
+  PageHeader,
+  Skeleton,
+  StatusBadge,
+} from "@rashpod/ui";
 import { useAuth } from "../../../auth/auth-provider";
 import DashboardLayout from "../../dashboard-layout";
 
@@ -13,23 +22,6 @@ interface Ticket {
   status: "open" | "in_progress" | "resolved" | "closed";
   createdAt: string;
 }
-
-function Skeleton({ w = "100%" }: { w?: string | number }) {
-  return <div style={{ width: w, height: 14, borderRadius: 6, background: "#F0F2FA", margin: "4px 0" }} />;
-}
-
-const PRIORITY_STYLE: Record<string, { bg: string; color: string }> = {
-  low: { bg: "#F0F2FA", color: "#6B7280" },
-  medium: { bg: "#FEF3C7", color: "#92400E" },
-  high: { bg: "#FEE2E2", color: "#991B1B" },
-};
-
-const STATUS_STYLE: Record<string, { bg: string; color: string }> = {
-  open: { bg: "#EEF0FB", color: "#788AE0" },
-  in_progress: { bg: "#FEF3C7", color: "#92400E" },
-  resolved: { bg: "#D1FAE5", color: "#065F46" },
-  closed: { bg: "#F0F2FA", color: "#6B7280" },
-};
 
 export default function SupportTicketsPage() {
   const router = useRouter();
@@ -45,7 +37,10 @@ export default function SupportTicketsPage() {
     const load = async () => {
       try {
         const res = await fetch(`/api/proxy/support/tickets`);
-        if (res.status === 401 || res.status === 403) { router.push("/auth/login"); return; }
+        if (res.status === 401 || res.status === 403) {
+          router.push("/auth/login");
+          return;
+        }
         if (!res.ok) throw new Error(`Server error (${res.status})`);
         setTickets(await res.json());
       } catch (e) {
@@ -61,50 +56,70 @@ export default function SupportTicketsPage() {
 
   return (
     <DashboardLayout role="support">
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20, gap: 12, flexWrap: "wrap" }}>
-        <h1 style={{ margin: 0, fontSize: 22, color: "#1A1D2E" }}>Support Tickets</h1>
-        <div style={{ display: "flex", gap: 6 }}>
-          {(["all", "open", "in_progress", "resolved"] as const).map((f) => (
-            <button key={f} onClick={() => setFilter(f)} style={{ padding: "6px 14px", borderRadius: 999, border: "1px solid", fontSize: 12, fontWeight: 500, cursor: "pointer", borderColor: filter === f ? "#788AE0" : "#E8EAFB", background: filter === f ? "#EEF0FB" : "white", color: filter === f ? "#788AE0" : "#6B7280" }}>
-              {f.replace("_", " ")}
-            </button>
+      <PageHeader
+        title="Support Tickets"
+        actions={
+          <div className="flex flex-wrap gap-2">
+            {(["all", "open", "in_progress", "resolved"] as const).map((f) => (
+              <Button
+                key={f}
+                size="sm"
+                variant={filter === f ? "primaryBlue" : "secondary"}
+                onClick={() => setFilter(f)}
+              >
+                {f.replace("_", " ")}
+              </Button>
+            ))}
+          </div>
+        }
+      />
+
+      {error ? (
+        <ErrorState title="Could not load tickets" description={error} />
+      ) : loading ? (
+        <div className="space-y-3">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <Skeleton key={i} className="h-16 w-full rounded-2xl" />
           ))}
         </div>
-      </div>
-
-      {error && (
-        <div role="alert" style={{ background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 12, padding: 16, marginBottom: 20, color: "#B42318", fontSize: 14 }}>
-          {error}
-        </div>
+      ) : (
+        <DataTable
+          mobileMode="cards"
+          columns={[
+            {
+              key: "subject",
+              header: "Subject",
+              render: (_, row: Ticket) => (
+                <button
+                  type="button"
+                  onClick={() => router.push(`/dashboard/support/tickets/${row.id}`)}
+                  className="font-semibold text-brand-blue hover:underline"
+                >
+                  {row.subject}
+                </button>
+              ),
+            },
+            { key: "customerName", header: "Customer" },
+            {
+              key: "priority",
+              header: "Priority",
+              render: (value) => <StatusBadge status={String(value)} />,
+            },
+            {
+              key: "status",
+              header: "Status",
+              render: (value) => <StatusBadge status={String(value)} />,
+            },
+            {
+              key: "createdAt",
+              header: "Created",
+              render: (value) => new Date(String(value)).toLocaleDateString(),
+            },
+          ]}
+          rows={filtered}
+          emptyState={<EmptyState title="No tickets found" description="Try a different filter." />}
+        />
       )}
-
-      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-        {loading
-          ? Array.from({ length: 5 }).map((_, i) => (
-              <div key={i} style={{ background: "white", border: "1px solid #E8EAFB", borderRadius: 14, padding: "14px 18px" }}>
-                <Skeleton w="40%" />
-                <Skeleton w="25%" />
-              </div>
-            ))
-          : filtered.length === 0
-          ? <p style={{ color: "#9CA3AF", textAlign: "center", padding: 32 }}>No tickets found.</p>
-          : filtered.map((t) => {
-              const ps = PRIORITY_STYLE[t.priority] ?? PRIORITY_STYLE.low;
-              const ss = STATUS_STYLE[t.status] ?? STATUS_STYLE.open;
-              return (
-                <div key={t.id} style={{ background: "white", border: "1px solid #E8EAFB", borderRadius: 14, padding: "14px 18px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-                  <div style={{ flex: 1 }}>
-                    <button onClick={() => router.push(`/dashboard/support/tickets/${t.id}`)} style={{ fontWeight: 600, fontSize: 14, color: "#788AE0", marginBottom: 4, background: "transparent", border: 0, padding: 0, cursor: "pointer" }}>{t.subject}</button>
-                    <div style={{ fontSize: 12, color: "#6B7280" }}>{t.customerName} · {new Date(t.createdAt).toLocaleDateString()}</div>
-                  </div>
-                  <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                    <span style={{ padding: "3px 10px", borderRadius: 999, fontSize: 11, fontWeight: 600, background: ps.bg, color: ps.color, textTransform: "capitalize" }}>{t.priority}</span>
-                    <span style={{ padding: "3px 10px", borderRadius: 999, fontSize: 11, fontWeight: 600, background: ss.bg, color: ss.color, textTransform: "capitalize" }}>{t.status.replace("_", " ")}</span>
-                  </div>
-                </div>
-              );
-            })}
-      </div>
     </DashboardLayout>
   );
 }

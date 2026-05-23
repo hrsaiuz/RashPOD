@@ -2,7 +2,7 @@ import { SimpleCta, StorePage } from "../storefront-ui";
 
 const audience = [
   { title: "For designers", body: "Upload your artwork, create products, and earn royalties without handling production or delivery.", className: "bg-brand-peach text-black" },
-  { title: "For custom orders", body: "Request custom branded products for your company, team, event, or campaign.", className: "bg-[#313238] text-white" },
+  { title: "For custom orders", body: "Request custom branded products for your company, team, event, or campaign.", className: "bg-brand-ink text-white" },
   { title: "Print-Ready Films", body: "Order DTF and UV-DTF films prepared for apparel, stickers, packaging, and small production runs.", className: "bg-brand-bg text-black" },
   { title: "For customers", body: "Shop original apparel, prints, mugs, postcards, and gifts created by independent designers.", className: "bg-brand-blue text-white" },
 ];

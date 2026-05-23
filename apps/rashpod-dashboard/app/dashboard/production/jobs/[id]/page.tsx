@@ -2,9 +2,10 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { use, useEffect, useState, type CSSProperties, type ReactNode } from "react";
+import { use, useEffect, useState, type ReactNode } from "react";
 import { ArrowLeft, CheckCircle2, Download, FilePlus2, PackageCheck, Play, RotateCcw, Truck, UserCheck, XCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { Button, Card, FormField, Input, PageHeader, StatusBadge } from "@rashpod/ui";
 import { useAuth } from "../../../../auth/auth-provider";
 import DashboardLayout from "../../../dashboard-layout";
 
@@ -125,27 +126,29 @@ export default function ProductionJobDetailPage({ params }: { params: Promise<{ 
 
   return (
     <DashboardLayout role="production">
-      <Link href="/dashboard/production/jobs" style={{ display: "inline-flex", alignItems: "center", gap: 8, color: "#788AE0", textDecoration: "none", marginBottom: 18 }}>
+      <Link href="/dashboard/production/jobs" className="mb-4 inline-flex items-center gap-2 text-sm font-medium text-brand-blue hover:underline">
         <ArrowLeft size={16} /> Back to queue
       </Link>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, flexWrap: "wrap", marginBottom: 18 }}>
-        <div>
-          <h1 style={{ margin: 0, fontSize: 22, color: "#1A1D2E" }}>Production Item</h1>
-          {job ? <p style={{ margin: "4px 0 0", color: "#6B7280", fontSize: 13 }}>#{job.order.id.slice(-6)} · {label(job.status)} · {job.productionFileStatus || "MISSING FILE"}</p> : null}
-        </div>
-        {job ? <Badge tone={statusTone(job.status)}>{label(job.status)}</Badge> : null}
-      </div>
+      <PageHeader
+        title="Production Item"
+        description={job ? `#${job.order.id.slice(-6)} · ${formatStatus(job.status)} · ${job.productionFileStatus || "MISSING FILE"}` : undefined}
+        actions={job ? <StatusBadge status={job.status.toLowerCase()} label={formatStatus(job.status)} /> : undefined}
+      />
 
-      {error ? <div role="alert" style={{ background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 8, padding: 16, marginBottom: 20, color: "#B42318", fontSize: 14 }}>{error}</div> : null}
-      {loading ? <div style={{ color: "#6B7280" }}>Loading production item...</div> : null}
-      {!loading && !job ? <div style={{ color: "#6B7280" }}>Production item not found.</div> : null}
+      {error ? (
+        <div role="alert" className="mb-4 rounded-xl border border-semantic-dangerBg bg-semantic-dangerBg p-4 text-sm text-semantic-dangerText">
+          {error}
+        </div>
+      ) : null}
+      {loading ? <p className="text-brand-muted">Loading production item...</p> : null}
+      {!loading && !job ? <p className="text-brand-muted">Production item not found.</p> : null}
 
       {job ? (
-        <div style={{ display: "grid", gridTemplateColumns: "minmax(280px, 360px) minmax(0, 1fr)", gap: 20 }}>
-          <section style={{ background: "white", border: "1px solid #E8EAFB", borderRadius: 8, padding: 18, alignSelf: "start" }}>
-            <div style={{ position: "relative", aspectRatio: "1 / 1", overflow: "hidden", borderRadius: 8, background: "#F0F2FA", marginBottom: 16 }}>
+        <div className="grid gap-5 lg:grid-cols-[minmax(280px,360px)_minmax(0,1fr)]">
+          <Card className="self-start p-4 sm:p-5">
+            <div className="relative mb-4 aspect-square overflow-hidden rounded-xs bg-brand-bg">
               {job.mockupPreviewUrl || job.orderItem?.mockupImageUrl ? (
-                <Image src={(job.mockupPreviewUrl || job.orderItem?.mockupImageUrl)!} alt="Production preview" fill sizes="360px" style={{ objectFit: "cover" }} />
+                <Image src={(job.mockupPreviewUrl || job.orderItem?.mockupImageUrl)!} alt="Production preview" fill sizes="360px" className="object-cover" />
               ) : null}
             </div>
             <Metric label="Order" value={`#${job.order.id.slice(-6)}`} />
@@ -153,9 +156,9 @@ export default function ProductionJobDetailPage({ params }: { params: Promise<{ 
             <Metric label="Phone" value={String(job.customerSnapshotJson?.phone || job.order.customerPhone || "-")} />
             <Metric label="Delivery" value={String(job.customerSnapshotJson?.deliveryAddress || job.order.deliveryAddress || job.order.pickupLocation || "-")} />
             <Metric label="Operator" value={job.assignedOperatorId || "Unassigned"} />
-          </section>
+          </Card>
 
-          <section style={{ display: "grid", gap: 16 }}>
+          <div className="grid gap-4">
             <Panel title="Production Item">
               <Metric label="Listing" value={String(job.productSnapshotJson?.listingTitle || job.orderItem?.listingTitle || "-")} />
               <Metric label="Product" value={String(job.productSnapshotJson?.baseProductName || job.productSnapshotJson?.productTypeName || "-")} />
@@ -165,9 +168,9 @@ export default function ProductionJobDetailPage({ params }: { params: Promise<{ 
             </Panel>
 
             <Panel title="File And Start">
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap", marginBottom: 12 }}>
-                <Badge tone={fileTone(job.productionFileStatus)}>{job.productionFileStatus || "MISSING"}</Badge>
-                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+                <StatusBadge status={fileStatusKey(job.productionFileStatus)} label={job.productionFileStatus || "MISSING"} />
+                <div className="flex flex-wrap gap-2">
                   <ActionButton disabled={submitting} onClick={() => void call("assign", "PATCH")}><UserCheck size={15} /> Assign me</ActionButton>
                   <ActionButton disabled={submitting} onClick={() => void call(job.productionFileStatus === "FAILED" ? "retry-file" : "request-file", "POST", { reason: reason || undefined })}><FilePlus2 size={15} /> File</ActionButton>
                   <ActionButton disabled={submitting || job.productionFileStatus !== "READY"} onClick={() => void call("download-file", "GET")}><Download size={15} /> Download</ActionButton>
@@ -182,14 +185,14 @@ export default function ProductionJobDetailPage({ params }: { params: Promise<{ 
             </Panel>
 
             <Panel title="QC">
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: 10, marginBottom: 12 }}>
-                <Input label="Produced" value={producedQuantity} onChange={setProducedQuantity} />
-                <Input label="Accepted" value={acceptedQuantity} onChange={setAcceptedQuantity} />
-                <Input label="Rejected" value={rejectedQuantity} onChange={setRejectedQuantity} />
+              <div className="mb-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
+                <FieldInput label="Produced" value={producedQuantity} onChange={setProducedQuantity} />
+                <FieldInput label="Accepted" value={acceptedQuantity} onChange={setAcceptedQuantity} />
+                <FieldInput label="Rejected" value={rejectedQuantity} onChange={setRejectedQuantity} />
               </div>
-              <Textarea label="QC note" value={note} onChange={setNote} />
-              <Textarea label="Reason / defect" value={reason} onChange={setReason} />
-              <div style={{ display: "flex", gap: 10, marginTop: 12, flexWrap: "wrap" }}>
+              <FieldTextarea label="QC note" value={note} onChange={setNote} />
+              <FieldTextarea label="Reason / defect" value={reason} onChange={setReason} />
+              <div className="mt-3 flex flex-wrap gap-2">
                 <ActionButton disabled={submitting || !["IN_PRODUCTION", "PRINTING"].includes(job.status)} onClick={() => void status("QUALITY_CHECK", { producedQuantity: numberValue(producedQuantity) })}><PackageCheck size={15} /> Send QC</ActionButton>
                 <ActionButton disabled={submitting || !["QUALITY_CHECK", "QC"].includes(job.status)} onClick={() => void qc(true)}><CheckCircle2 size={15} /> Pass QC</ActionButton>
                 <ActionButton disabled={submitting || !["QUALITY_CHECK", "QC"].includes(job.status)} onClick={() => void qc(false)} tone="danger"><XCircle size={15} /> Fail QC</ActionButton>
@@ -200,11 +203,11 @@ export default function ProductionJobDetailPage({ params }: { params: Promise<{ 
             </Panel>
 
             <Panel title="Fulfillment">
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 10, marginBottom: 12 }}>
-                <Input label="Provider" value={provider} onChange={setProvider} />
-                <Input label="Tracking" value={trackingRef} onChange={setTrackingRef} />
+              <div className="mb-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <FieldInput label="Provider" value={provider} onChange={setProvider} />
+                <FieldInput label="Tracking" value={trackingRef} onChange={setTrackingRef} />
               </div>
-              <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+              <div className="flex flex-wrap gap-2">
                 <ActionButton disabled={submitting || job.qcStatus !== "PASSED"} onClick={() => void call("ready-for-pickup", "POST", { note: note || undefined })}><PackageCheck size={15} /> Pickup</ActionButton>
                 <ActionButton disabled={submitting || job.qcStatus !== "PASSED"} onClick={() => void call("ready-for-delivery", "POST", { note: note || undefined, provider: provider || undefined, trackingRef: trackingRef || undefined })}><Truck size={15} /> Delivery</ActionButton>
                 <ActionButton disabled={submitting || job.status !== "READY_FOR_DELIVERY"} onClick={() => void call("out-for-delivery", "POST", { note: note || undefined, provider: provider || undefined, trackingRef: trackingRef || undefined })}><Truck size={15} /> Out</ActionButton>
@@ -216,15 +219,15 @@ export default function ProductionJobDetailPage({ params }: { params: Promise<{ 
             </Panel>
 
             <Panel title="Notes And Exceptions">
-              <Textarea label="Internal note" value={note} onChange={setNote} />
-              <Textarea label="Reason" value={reason} onChange={setReason} />
-              <div style={{ display: "flex", gap: 10, marginTop: 12, flexWrap: "wrap" }}>
+              <FieldTextarea label="Internal note" value={note} onChange={setNote} />
+              <FieldTextarea label="Reason" value={reason} onChange={setReason} />
+              <div className="mt-3 flex flex-wrap gap-2">
                 <ActionButton disabled={submitting || !note.trim()} onClick={() => void call("notes", "PATCH", { note })}>Save note</ActionButton>
                 <ActionButton disabled={submitting || !reason.trim()} onClick={() => void call("block", "PATCH", { reason })} tone="danger">Block</ActionButton>
                 <ActionButton disabled={submitting || !reason.trim()} onClick={() => void call("cancel", "PATCH", { reason })} tone="danger">Cancel</ActionButton>
               </div>
             </Panel>
-          </section>
+          </div>
         </div>
       ) : null}
     </DashboardLayout>
@@ -232,34 +235,50 @@ export default function ProductionJobDetailPage({ params }: { params: Promise<{ 
 }
 
 function Panel({ title, children }: { title: string; children: ReactNode }) {
-  return <div style={{ background: "white", border: "1px solid #E8EAFB", borderRadius: 8, padding: 18 }}><h2 style={{ margin: "0 0 14px", fontSize: 15, color: "#1F2937" }}>{title}</h2>{children}</div>;
+  return (
+    <Card className="p-4 sm:p-5">
+      <h2 className="mb-3 text-sm font-semibold text-brand-ink">{title}</h2>
+      {children}
+    </Card>
+  );
 }
 
 function Metric({ label, value }: { label: string; value: string }) {
-  return <div style={{ display: "grid", gridTemplateColumns: "128px minmax(0, 1fr)", gap: 12, padding: "8px 0", borderBottom: "1px solid #F0F2FA" }}><span style={{ color: "#6B7280", fontSize: 12 }}>{label}</span><span style={{ color: "#374151", fontSize: 13, overflowWrap: "anywhere" }}>{value}</span></div>;
+  return (
+    <div className="grid grid-cols-[128px_minmax(0,1fr)] gap-3 border-b border-brand-line py-2">
+      <span className="text-xs text-brand-muted">{label}</span>
+      <span className="break-words text-sm text-brand-text">{value}</span>
+    </div>
+  );
 }
 
-function Input({ label: inputLabel, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
-  return <label style={{ display: "grid", gap: 5, color: "#6B7280", fontSize: 12 }}>{inputLabel}<input value={value} onChange={(event) => onChange(event.target.value)} style={inputStyle} /></label>;
+function FieldInput({ label: inputLabel, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
+  return (
+    <FormField label={inputLabel}>
+      <Input value={value} onChange={(event) => onChange(event.target.value)} />
+    </FormField>
+  );
 }
 
-function Textarea({ label: inputLabel, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
-  return <label style={{ display: "grid", gap: 5, color: "#6B7280", fontSize: 12, marginTop: 10 }}>{inputLabel}<textarea value={value} onChange={(event) => onChange(event.target.value)} rows={3} style={{ ...inputStyle, resize: "vertical" }} /></label>;
+function FieldTextarea({ label: inputLabel, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
+  return (
+    <FormField label={inputLabel} className="mt-3">
+      <textarea
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        rows={3}
+        className="w-full resize-y rounded-xs border border-brand-line bg-white px-3 py-2 text-sm text-brand-text"
+      />
+    </FormField>
+  );
 }
 
 function ActionButton({ children, disabled, onClick, tone = "neutral" }: { children: ReactNode; disabled?: boolean; onClick: () => void; tone?: "neutral" | "danger" }) {
-  return <button disabled={disabled} onClick={onClick} style={{ display: "inline-flex", alignItems: "center", gap: 8, border: "1px solid #E8EAFB", borderRadius: 8, background: disabled ? "#F3F4F6" : tone === "danger" ? "#FEF2F2" : "white", color: disabled ? "#9CA3AF" : tone === "danger" ? "#B42318" : "#374151", padding: "8px 10px", fontWeight: 700, cursor: disabled ? "not-allowed" : "pointer" }}>{children}</button>;
-}
-
-function Badge({ children, tone = "neutral" }: { children: ReactNode; tone?: "neutral" | "success" | "warning" | "danger" | "info" }) {
-  const styles: Record<string, CSSProperties> = {
-    neutral: { background: "#F0F2FA", color: "#374151" },
-    success: { background: "#D1FAE5", color: "#047857" },
-    warning: { background: "#FEF3C7", color: "#92400E" },
-    danger: { background: "#FEF2F2", color: "#B42318" },
-    info: { background: "#DBEAFE", color: "#1D4ED8" },
-  };
-  return <span style={{ borderRadius: 999, padding: "5px 10px", fontSize: 12, fontWeight: 800, whiteSpace: "nowrap", ...styles[tone] }}>{children}</span>;
+  return (
+    <Button variant={tone === "danger" ? "danger" : "secondary"} size="sm" disabled={disabled} onClick={onClick}>
+      {children}
+    </Button>
+  );
 }
 
 function formatOptions(value?: Record<string, unknown> | null) {
@@ -278,23 +297,13 @@ function numberValue(value: string) {
   return Number.isFinite(parsed) ? parsed : undefined;
 }
 
-function label(value: string) {
+function formatStatus(value: string) {
   return value.replace(/_/g, " ").toLowerCase().replace(/(^|\s)\S/g, (match) => match.toUpperCase());
 }
 
-function fileTone(status?: string | null): "neutral" | "success" | "warning" | "danger" | "info" {
-  if (status === "READY") return "success";
-  if (status === "FAILED" || status === "MISSING_SOURCE") return "danger";
-  if (status === "QUEUED" || status === "GENERATING") return "info";
-  return "warning";
+function fileStatusKey(status?: string | null) {
+  if (status === "READY") return "approved";
+  if (status === "FAILED" || status === "MISSING_SOURCE") return "failed";
+  if (status === "QUEUED" || status === "GENERATING") return "submitted";
+  return "pending";
 }
-
-function statusTone(status: string): "neutral" | "success" | "warning" | "danger" | "info" {
-  if (["READY_FOR_PICKUP", "READY_FOR_DELIVERY", "DELIVERED", "COMPLETED", "READY_FOR_PRINT"].includes(status)) return "success";
-  if (["BLOCKED", "CANCELED", "QC_FAILED", "REPRINT_REQUIRED"].includes(status)) return "danger";
-  if (["WAITING_FOR_FILE", "FILE_CHECK"].includes(status)) return "warning";
-  if (["FILE_GENERATING", "IN_PRODUCTION", "PRINTING", "QUALITY_CHECK", "QC", "OUT_FOR_DELIVERY"].includes(status)) return "info";
-  return "neutral";
-}
-
-const inputStyle: CSSProperties = { width: "100%", border: "1px solid #E8EAFB", borderRadius: 8, padding: "9px 10px", color: "#374151", background: "white", fontSize: 13 };

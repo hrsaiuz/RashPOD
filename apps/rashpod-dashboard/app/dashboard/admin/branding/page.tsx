@@ -1,7 +1,7 @@
 "use client";
 
 import { ChangeEvent, useEffect, useState } from "react";
-import { Button, Card, Skeleton } from "@rashpod/ui";
+import { Button, Card, rashpodTokens, Skeleton } from "@rashpod/ui";
 import { Upload, Image as ImageIcon } from "lucide-react";
 import DashboardLayout from "../../dashboard-layout";
 
@@ -103,7 +103,7 @@ const HOMEPAGE_IMAGE_SLOTS: {
 const inputClassName =
   "mt-1 w-full rounded-[14px] border border-surface-borderSoft bg-white px-3 py-2 text-sm text-brand-text shadow-xs focus:outline-none focus:ring-4 focus:ring-brand-blue/20 focus:border-brand-blue";
 const uploadButtonClassName =
-  "inline-flex w-full items-center justify-center gap-2 rounded-full bg-brand-blue px-4 py-2 text-sm font-semibold text-white shadow-blueGlow hover:bg-[#6F7FDA] cursor-pointer transition-colors";
+  "inline-flex w-full items-center justify-center gap-2 rounded-full bg-brand-blue px-4 py-2 text-sm font-semibold text-white shadow-blueGlow hover:bg-brand-blue/90 cursor-pointer transition-colors";
 
 export default function BrandingPage() {
   const [branding, setBranding] = useState<Branding | null>(null);
@@ -111,8 +111,8 @@ export default function BrandingPage() {
   const [uploadingKey, setUploadingKey] = useState<SlotKey | null>(null);
   const [error, setError] = useState("");
   const [theme, setTheme] = useState<BrandingTheme>({
-    primaryColor: "#788AE0",
-    peachColor: "#F39E7C",
+    primaryColor: rashpodTokens.colors.brand.blue,
+    peachColor: rashpodTokens.colors.brand.peach,
     storeName: "RashPOD",
     storeTagline: "Print-on-demand by Uzbek creators",
     homeHeroImageUrl: "",
@@ -296,7 +296,7 @@ export default function BrandingPage() {
           </p>
         </div>
 
-        {error && <p className="text-sm text-red-600">{error}</p>}
+        {error && <p className="text-sm text-semantic-dangerText">{error}</p>}
 
         {loading ? (
           <Skeleton className="h-64" />
@@ -399,7 +399,7 @@ export default function BrandingPage() {
             <Button variant="primaryBlue" onClick={saveTheme} disabled={themeSaving}>
               {themeSaving ? "Saving…" : "Save brand identity"}
             </Button>
-            {themeSaved && <span className="text-sm text-green-600">Saved.</span>}
+            {themeSaved && <span className="text-sm text-semantic-successText">Saved.</span>}
           </div>
         </Card>
 
@@ -456,7 +456,7 @@ export default function BrandingPage() {
             <Button variant="primaryBlue" onClick={saveTheme} disabled={themeSaving}>
               {themeSaving ? "Saving…" : "Save homepage artwork"}
             </Button>
-            {themeSaved && <span className="text-sm text-green-600">Saved.</span>}
+            {themeSaved && <span className="text-sm text-semantic-successText">Saved.</span>}
           </div>
         </Card>
       </div>

@@ -36,6 +36,15 @@ const STATUS_MAP: Record<string, StatusMeta> = {
   ready_for_pickup: { label: "Ready for pickup", variant: "yellow" },
   delivered: { label: "Delivered", variant: "green" },
 
+  // Support tickets
+  open: { label: "Open", variant: "blue" },
+  in_progress: { label: "In progress", variant: "yellow" },
+  resolved: { label: "Resolved", variant: "green" },
+  closed: { label: "Closed", variant: "gray" },
+  low: { label: "Low", variant: "gray" },
+  medium: { label: "Medium", variant: "yellow" },
+  high: { label: "High", variant: "red" },
+
   // Order / payment
   pending: { label: "Pending", variant: "gray" },
   paid: { label: "Paid", variant: "green" },

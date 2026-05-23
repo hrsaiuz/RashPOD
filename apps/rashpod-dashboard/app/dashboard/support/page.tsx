@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "../../auth/auth-provider";
 import DashboardLayout from "../dashboard-layout";
-import { KpiTile, DataTable, DataTableColumn, EmptyState, ErrorState, Skeleton, Card, Button } from "@rashpod/ui";
+import { KpiTile, DataTable, DataTableColumn, EmptyState, ErrorState, Skeleton, Card, Button, PageHeader, StatusBadge } from "@rashpod/ui";
 import { Ticket, AlertTriangle, Clock, CheckCircle } from "lucide-react";
 import Link from "next/link";
 
@@ -69,22 +69,17 @@ export default function SupportOverview() {
     { 
       key: "status", 
       header: "Status",
-      render: (val) => (
-        <span className="px-3 py-1 rounded-full text-xs font-medium bg-brand-blueLight text-brand-blue">
-          {val}
-        </span>
-      ),
+      render: (val) => <StatusBadge status={String(val).toLowerCase()} label={String(val)} />,
     },
     { 
       key: "priority", 
       header: "Priority",
-      render: (val) => (
-        <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-          val === 'high' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'
-        }`}>
-          {val}
-        </span>
-      ),
+      render: (val) => {
+        const key = String(val).toLowerCase();
+        if (key === "high" || key === "urgent") return <StatusBadge status="high" label={String(val)} />;
+        if (key === "low") return <StatusBadge status="low" label={String(val)} />;
+        return <StatusBadge status="medium" label={String(val)} />;
+      },
     },
     {
       key: "id",
@@ -100,10 +95,7 @@ export default function SupportOverview() {
   return (
     <DashboardLayout role="support">
       <div className="space-y-8">
-        <div>
-          <h1 className="text-3xl font-bold text-brand-ink mb-2">Support Dashboard</h1>
-          <p className="text-brand-muted">Manage customer tickets and support requests.</p>
-        </div>
+        <PageHeader title="Support Dashboard" description="Manage customer tickets and support requests." />
 
         {error && (
           <ErrorState

@@ -11,7 +11,7 @@ import {
   PackageCheck,
   Tags,
 } from "lucide-react";
-import { getApiBase, getDashboardUrl } from "@rashpod/ui";
+import { getApiBase, getDashboardUrl, ProductCard } from "@rashpod/ui";
 
 interface ProductListing {
   id: string;
@@ -67,8 +67,8 @@ const MARKETPLACES = [
   { src: "/marketplaces/wildberries.svg", name: "Wildberries", width: 158, height: 52 },
 ];
 
-const HOME_MAX = "max-w-[1232px]";
-const HOME_GUTTER = "px-5";
+const HOME_MAX = "max-w-storefront";
+const HOME_GUTTER = "px-4 sm:px-5";
 
 const fadeUp = {
   initial: { opacity: 0, y: 18 },
@@ -286,7 +286,7 @@ function ServiceStrip() {
     <section className="bg-white py-12">
       <div className={`mx-auto grid ${HOME_MAX} grid-cols-1 gap-5 ${HOME_GUTTER} md:grid-cols-2 xl:grid-cols-4`}>
         {services.map(({ label, icon: Icon, shape }) => (
-          <div key={label} className="relative flex h-[109px] items-center overflow-hidden rounded-[14px] bg-[#EEF1FA] px-7">
+          <div key={label} className="relative flex h-[109px] items-center overflow-hidden rounded-[14px] bg-brand-bg px-7">
             <ServiceShape shape={shape} />
             <Icon className="relative z-10 mr-8 h-[66px] w-[66px] stroke-[1.25] text-brand-ink" />
             <p className="relative z-10 whitespace-pre-line text-[29px] leading-[1.1] tracking-[0] text-brand-ink">{label}</p>
@@ -323,44 +323,22 @@ function HomepageProductCarousel({ title, products, badge }: { title: string; pr
       <SectionHeader title={title} href="/shop" />
       <div className={`mx-auto flex ${HOME_MAX} snap-x gap-5 overflow-x-auto ${HOME_GUTTER} pb-7 pt-2 xl:grid xl:grid-cols-4 xl:overflow-visible`}>
         {products.map((product, index) => (
-          <Link key={`${product.id}-${index}`} href={`/product/${product.slug}`} className="min-w-[255px] snap-start xl:min-w-0">
-            <FigmaProductCard product={product} badge={badge} secondaryBadge={index === 1 ? "new" : undefined} />
-          </Link>
+          <ProductCard
+            key={`${product.id}-${index}`}
+            variant="featured"
+            slug={product.slug}
+            title={product.title}
+            price={product.price}
+            imageUrl={product.imageUrl}
+            designer={{ displayName: product.designer }}
+            badge={badge}
+            secondaryBadge={index === 1 ? "new" : undefined}
+            description="high quality, 100% cotton, perfect for vibrant"
+            className="min-w-[255px] snap-start xl:min-w-0"
+          />
         ))}
       </div>
     </section>
-  );
-}
-
-function FigmaProductCard({ product, badge, secondaryBadge }: { product: ProductListing; badge: string; secondaryBadge?: string }) {
-  return (
-    <motion.article
-      whileHover={{ y: -4 }}
-      className="h-full rounded-[15px] bg-white p-6 shadow-[0_14px_32px_rgba(0,0,0,0.14)]"
-    >
-      <div className="relative h-[267px] overflow-hidden rounded-[27px] bg-[#F0F2FA]">
-        <span className="absolute left-5 top-5 z-10 rounded-[7px] bg-[#D877CF] px-3 py-2 text-[9px] font-bold text-white">{badge}</span>
-        {secondaryBadge && <span className="absolute left-5 top-[56px] z-10 rounded-[7px] bg-[#3473C4] px-3 py-2 text-[9px] font-bold text-white">{secondaryBadge}</span>}
-        {product.imageUrl ? (
-          <Image src={product.imageUrl} alt={product.title} fill sizes="272px" className="object-cover" />
-        ) : (
-          <ProductPlaceholder dark={product.slug.includes("black")} />
-        )}
-      </div>
-      <h3 className="mt-5 text-[15px] font-extrabold tracking-[-0.01em] text-black">{product.title}</h3>
-      <p className="mt-3 text-[12px] text-black">high quality, 100% cotton, perfect for vibrant</p>
-      <p className="mt-3 text-[10px] text-[#777]">Designed by {product.designer}</p>
-    </motion.article>
-  );
-}
-
-function ProductPlaceholder({ dark }: { dark?: boolean }) {
-  return (
-    <div className={`absolute inset-0 ${dark ? "bg-[#162216]" : "bg-white"}`} aria-hidden="true">
-      <div className={`absolute left-1/2 top-0 h-[306px] w-[221px] -translate-x-1/2 rounded-b-[60px] ${dark ? "bg-black" : "bg-white"} shadow-[inset_0_0_34px_rgba(0,0,0,0.09)]`} />
-      <div className="absolute left-1/2 top-[42%] h-[63px] w-[63px] -translate-x-1/2 rounded-[15px] border-[5px] border-brand-peach bg-brand-blueLight" />
-      <div className="absolute left-1/2 top-[58%] h-2 w-20 -translate-x-1/2 rounded-full bg-brand-peach" />
-    </div>
   );
 }
 
@@ -384,19 +362,18 @@ function CollectionCarousel({ products }: { products: ProductListing[] }) {
       <SectionHeader title="New Collections" href="/shop?sort=new" />
       <div className={`mx-auto flex ${HOME_MAX} snap-x gap-5 overflow-x-auto ${HOME_GUTTER} pb-7 pt-2 xl:grid xl:grid-cols-4 xl:overflow-visible`}>
         {products.map((product, index) => (
-          <Link key={`${product.id}-collection-${index}`} href={`/product/${product.slug}`} className="min-w-[255px] snap-start xl:min-w-0">
-            <article className="rounded-[14px] bg-[#EEF1FA] p-6">
-              <div className="relative h-[270px] overflow-hidden rounded-[27px] bg-white">
-                <span className="absolute left-4 top-5 z-10 rounded-[7px] bg-[#3473C4] px-3 py-2 text-[9px] font-bold lowercase text-white">new</span>
-                {product.imageUrl ? (
-                  <Image src={product.imageUrl} alt={product.title} fill sizes="272px" className="object-cover" />
-                ) : (
-                  <ProductPlaceholder dark={index === 0 || index === 3} />
-                )}
-              </div>
-              <h3 className="mt-3 text-[15px] font-extrabold uppercase text-black">{product.category ?? product.title}</h3>
-            </article>
-          </Link>
+          <ProductCard
+            key={`${product.id}-collection-${index}`}
+            variant="featured"
+            slug={product.slug}
+            title={product.category ?? product.title}
+            price={product.price}
+            imageUrl={product.imageUrl}
+            designer={{ displayName: product.designer }}
+            badge="New"
+            secondaryBadge="new"
+            className="min-w-[255px] snap-start xl:min-w-0"
+          />
         ))}
       </div>
     </section>
@@ -406,7 +383,7 @@ function CollectionCarousel({ products }: { products: ProductListing[] }) {
 function ClubCta({ dashboardUrl }: { dashboardUrl: string }) {
   return (
     <section className="relative my-14 overflow-hidden bg-white">
-      <div className="relative h-[272px] bg-[#F0F2FA] pt-[54px]">
+      <div className="relative h-[272px] bg-brand-bg pt-[54px]">
       <div className="pointer-events-none absolute inset-0" aria-hidden="true">
         <div className="absolute -left-10 top-0 h-[82px] w-[82px] rounded-br-full bg-brand-blue" />
         <div className="absolute left-[17%] bottom-0 h-[109px] w-[134px] rounded-t-full border-[41px] border-brand-blue" />
@@ -499,7 +476,7 @@ function ActionCards({ dashboardUrl }: { dashboardUrl: string }) {
       href: `${dashboardUrl}/auth/register?role=designer`,
       cta: "Start selling",
       className: "bg-brand-peach text-black",
-      button: "bg-[#EEF1FA] text-black",
+      button: "bg-brand-bg text-brand-ink",
     },
     {
       titleTop: "custom",
@@ -507,7 +484,7 @@ function ActionCards({ dashboardUrl }: { dashboardUrl: string }) {
       body: "Create branded products for teams, events, campaigns, and corporate gifts",
       href: "/corporate",
       cta: "Request a quote",
-      className: "bg-[#303137] text-white",
+      className: "bg-brand-ink text-white",
       button: "bg-brand-blue text-white",
     },
     {
@@ -516,8 +493,8 @@ function ActionCards({ dashboardUrl }: { dashboardUrl: string }) {
       body: "Order ready-to-press films for apparel, stickers, packaging, and production runs",
       href: "/film",
       cta: "Explore films",
-      className: "bg-[#F0F2FA] text-black",
-      button: "bg-[#303137] text-white",
+      className: "bg-brand-bg text-brand-ink",
+      button: "bg-brand-ink text-white",
     },
     {
       titleTop: "SHOP",

@@ -14,7 +14,7 @@ export function StatusTimeline({ steps }: { steps: TimelineStep[] }) {
     <ol className="space-y-3">
       {steps.map((step) => {
         const icon = step.status === "completed" ? <CheckCircle2 size={18} /> : step.status === "failed" ? <AlertCircle size={18} /> : step.status === "current" ? <Clock size={18} /> : <Circle size={18} />;
-        const tone = step.status === "completed" ? "text-emerald-700 bg-emerald-50 border-emerald-200" : step.status === "failed" ? "text-red-700 bg-red-50 border-red-200" : step.status === "current" ? "text-brand-blue bg-blue-50 border-blue-200" : "text-brand-muted bg-white border-brand-line";
+        const tone = step.status === "completed" ? "text-semantic-successText bg-semantic-successBg border-semantic-success/25" : step.status === "failed" ? "text-semantic-dangerText bg-semantic-dangerBg border-semantic-danger/25" : step.status === "current" ? "text-brand-blue bg-semantic-infoBg border-semantic-info/25" : "text-brand-muted bg-white border-brand-line";
         return (
           <li key={step.key} className="flex gap-3">
             <div className={`mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full border ${tone}`}>{icon}</div>

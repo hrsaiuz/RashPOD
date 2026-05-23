@@ -62,7 +62,7 @@ export default function FaqPage() {
                         {q}
                         <ChevronDown className="transition-transform group-open:rotate-180" size={20} />
                       </summary>
-                      <div className="bg-[#344054] px-5 py-5 text-[17px] leading-8 text-white">{a}</div>
+                      <div className="bg-brand-ink px-5 py-5 text-[17px] leading-8 text-white">{a}</div>
                     </details>
                   ))}
                 </div>

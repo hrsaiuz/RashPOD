@@ -129,7 +129,7 @@ export function AnalyticsClient({ role = "admin", title, description, endpoint, 
 
             {chartData.length ? <ChartWrapper title="Trend" data={chartData} xAxisKey="label" dataKey="value" color="blue" /> : null}
 
-            {warningRows.length ? <Card><div className="mb-4 flex items-center gap-2"><AlertTriangle size={18} className="text-amber-600" /><h2 className="text-lg font-semibold text-brand-ink">Warnings</h2></div><DataTable columns={warningColumns} rows={warningRows} emptyState={<EmptyState title="No warnings" description="No analytics warnings for the selected period." />} /></Card> : null}
+            {warningRows.length ? <Card><div className="mb-4 flex items-center gap-2"><AlertTriangle size={18} className="text-semantic-warningText" /><h2 className="text-lg font-semibold text-brand-ink">Warnings</h2></div><DataTable columns={warningColumns} rows={warningRows} emptyState={<EmptyState title="No warnings" description="No analytics warnings for the selected period." />} /></Card> : null}
 
             {tables.map((section) => <Card key={section.title}><h2 className="mb-4 text-lg font-semibold text-brand-ink">{section.title}</h2><DataTable columns={section.columns} rows={section.rows} emptyState={<EmptyState title="No rows" description="No matching rows for this report." />} /></Card>)}
           </>

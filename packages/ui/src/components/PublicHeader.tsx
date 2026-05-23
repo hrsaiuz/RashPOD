@@ -38,6 +38,7 @@ export const PublicHeader: React.FC<PublicHeaderProps> = ({
   const navLinks = [
     { href: shopUrl, label: "Shop" },
     { href: `${shopUrl}#categories`, label: "Categories" },
+    { href: filmsUrl, label: "Films" },
     { href: "/sell-on-rashpod", label: "Sell on RashPOD" },
     { href: "/custom-order", label: "Custom order" },
     { href: "/business", label: "Start Your Business", hasChevron: true },
@@ -52,8 +53,8 @@ export const PublicHeader: React.FC<PublicHeaderProps> = ({
       >
         Skip to content
       </a>
-      <header className={cn("sticky top-0 z-20 bg-[#F0F2FA]/95 backdrop-blur-md", className)}>
-        <div className="mx-auto flex h-[56px] max-w-[1232px] items-center justify-between gap-5 px-5">
+      <header className={cn("sticky top-0 z-sticky bg-brand-bg/95 backdrop-blur-md", className)}>
+        <div className="mx-auto flex h-14 max-w-storefront items-center justify-between gap-5 px-4 sm:px-5 md:h-[76px]">
           <Link href="/" className="flex shrink-0 items-center text-[29px] font-normal lowercase leading-none tracking-[0.16em] text-brand-blue">
             {logoUrl ? (
               // eslint-disable-next-line @next/next/no-img-element

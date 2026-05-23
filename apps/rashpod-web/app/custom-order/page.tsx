@@ -60,7 +60,7 @@ export default function CustomOrderPage() {
         <h2 className="mb-10 text-[16px] font-bold text-black">Who it’s for</h2>
         <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
           {["Companies", "Events", "Campaigns", "Teams & Communities"].map((title) => (
-            <div key={title} className="rounded-[14px] border border-[#313238] p-8 text-center text-black">
+            <div key={title} className="rounded-[14px] border border-brand-ink p-8 text-center text-black">
               <h3 className="font-bold">{title}</h3>
               <p className="mt-6 text-[13px] font-bold">Custom apparel and printed items for groups, launches, promotions, and branded gifts.</p>
             </div>
@@ -72,7 +72,7 @@ export default function CustomOrderPage() {
         <h2 className="mb-10 text-[16px] font-bold text-black">How custom orders work</h2>
         <div className="space-y-3">
           {["Send your brief", "We review the request", "Design and approval", "Production and delivery"].map((title, i) => (
-            <div key={title} className="grid min-h-[82px] grid-cols-[70px_1fr] items-center rounded-[14px] border border-[#313238] px-6 text-black">
+            <div key={title} className="grid min-h-[82px] grid-cols-[70px_1fr] items-center rounded-[14px] border border-brand-ink px-6 text-black">
               <span className="text-[58px] font-black leading-none">{i + 1}</span>
               <div>
                 <h3 className="font-bold">{title}</h3>
@@ -83,7 +83,7 @@ export default function CustomOrderPage() {
         </div>
       </section>
 
-      <form onSubmit={submit} className="mt-20 grid overflow-hidden rounded-[28px] border border-[#5F6067] bg-brand-bg lg:grid-cols-2">
+      <form onSubmit={submit} className="mt-20 grid overflow-hidden rounded-[28px] border border-brand-muted/60 bg-brand-bg lg:grid-cols-2">
         <div className="space-y-12 border-r border-brand-blueLight p-10">
           <div className="grid gap-8 md:grid-cols-2">
             <UnderlineInput label="Full name" required value={form.fullName} onChange={(e) => setForm({ ...form, fullName: e.target.value })} />
@@ -93,7 +93,7 @@ export default function CustomOrderPage() {
           </div>
           <label className="block">
             <span className="mb-3 block text-[16px] text-black">Tell us about your company, event, product idea, preferred colors, placement, and any important details.</span>
-            <textarea rows={6} value={form.details} onChange={(e) => setForm({ ...form, details: e.target.value })} className="w-full border-0 border-b border-[#8E8E94] bg-transparent outline-none" />
+            <textarea rows={6} value={form.details} onChange={(e) => setForm({ ...form, details: e.target.value })} className="w-full border-0 border-b border-brand-subtle bg-transparent outline-none" />
           </label>
           <div className="grid gap-8 md:grid-cols-2">
             <UnderlineInput label="Estimated budget" value={form.estimatedBudget} onChange={(e) => setForm({ ...form, estimatedBudget: e.target.value })} />

@@ -45,7 +45,7 @@ const inputClassName =
 const compactSelectClassName =
   "rounded-[14px] border border-surface-borderSoft bg-white px-3 py-1.5 text-sm text-brand-text shadow-xs focus:outline-none focus:ring-4 focus:ring-brand-blue/20 focus:border-brand-blue";
 const uploadButtonClassName =
-  "inline-flex w-full items-center justify-center gap-2 rounded-full bg-brand-blue px-4 py-2 text-sm font-semibold text-white shadow-blueGlow hover:bg-[#6F7FDA] cursor-pointer transition-colors";
+  "inline-flex w-full items-center justify-center gap-2 rounded-full bg-brand-blue px-4 py-2 text-sm font-semibold text-white shadow-blueGlow hover:bg-brand-blue/90 cursor-pointer transition-colors";
 
 function formatBytes(b: number) {
   if (b < 1024) return `${b} B`;
@@ -207,7 +207,7 @@ export default function MediaLibraryPage() {
               </label>
             </div>
           </div>
-          {error && <p className="text-sm text-red-600 mt-3">{error}</p>}
+          {error && <p className="text-sm text-semantic-dangerText mt-3">{error}</p>}
         </Card>
 
         <div className="flex items-center gap-2">

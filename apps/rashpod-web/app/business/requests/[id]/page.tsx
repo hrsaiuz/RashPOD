@@ -16,7 +16,7 @@ export default function RequestDetail({ params }: { params: Promise<{ id: string
   }, [id]);
 
   if (loading) return <Skeleton className="h-64" />;
-  if (error || !req) return <div className="text-sm text-red-600">{error || "Not found"}</div>;
+  if (error || !req) return <div className="text-sm text-semantic-dangerText">{error || "Not found"}</div>;
 
   return (
     <div className="space-y-6">

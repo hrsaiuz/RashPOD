@@ -1,5 +1,6 @@
-import { DashboardShell } from "../components/DashboardShell";
+import { redirect } from "next/navigation";
 
-export default function AdminLayout({ children }: { children: React.ReactNode }) {
-  return <DashboardShell>{children}</DashboardShell>;
+/** Legacy /admin routes redirect to the modern dashboard admin shell. */
+export default function LegacyAdminLayout() {
+  redirect("/dashboard/admin");
 }

@@ -1,9 +1,19 @@
 "use client";
 
-import { FormEvent, useState, useEffect, Suspense } from "react";
+import { FormEvent, Suspense, useEffect, useState } from "react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
+import { Button, Card, FormField, Input, PageContainer } from "@rashpod/ui";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3002";
+
+function AuthError({ message }: { message: string }) {
+  return (
+    <div role="alert" className="rounded-xs border border-semantic-dangerBg bg-semantic-dangerBg px-3 py-2 text-sm text-semantic-dangerText">
+      {message}
+    </div>
+  );
+}
 
 function RegisterForm() {
   const router = useRouter();
@@ -17,9 +27,7 @@ function RegisterForm() {
 
   useEffect(() => {
     const roleParam = searchParams.get("role");
-    if (roleParam === "designer" || roleParam === "corporate") {
-      setRole(roleParam);
-    }
+    if (roleParam === "designer" || roleParam === "corporate") setRole(roleParam);
   }, [searchParams]);
 
   const onSubmit = async (e: FormEvent) => {
@@ -44,105 +52,53 @@ function RegisterForm() {
     }
   };
 
+  const roleHint =
+    role === "designer" ? "sell your designs" : role === "corporate" ? "request bulk orders" : "shop products";
+
   return (
-    <main style={{ maxWidth: 440, margin: "48px auto", padding: 24, background: "white", borderRadius: 20, border: "1px solid #E5E7EB" }}>
-      <h1 style={{ marginTop: 0, color: "#1A1D2E" }}>Create an account</h1>
-      <p style={{ color: "#6B7280", marginTop: 0, fontSize: 14 }}>
-        Join RashPOD to {role === "designer" ? "sell your designs" : role === "corporate" ? "request bulk orders" : "shop products"}.
-      </p>
-      <form onSubmit={onSubmit} style={{ display: "grid", gap: 14 }}>
-        <div>
-          <label htmlFor="email" style={{ fontSize: 13, fontWeight: 500, color: "#374151", display: "block", marginBottom: 6 }}>
-            Email
-          </label>
-          <input
-            id="email"
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="you@example.com"
-            required
-            style={{ width: "100%", padding: 12, borderRadius: 12, border: "1px solid #D1D5DB", fontSize: 14, boxSizing: "border-box" }}
-          />
-        </div>
-        <div>
-          <label htmlFor="displayName" style={{ fontSize: 13, fontWeight: 500, color: "#374151", display: "block", marginBottom: 6 }}>
-            Display name
-          </label>
-          <input
-            id="displayName"
-            type="text"
-            value={displayName}
-            onChange={(e) => setDisplayName(e.target.value)}
-            placeholder="John Doe"
-            required
-            minLength={2}
-            style={{ width: "100%", padding: 12, borderRadius: 12, border: "1px solid #D1D5DB", fontSize: 14, boxSizing: "border-box" }}
-          />
-        </div>
-        <div>
-          <label htmlFor="password" style={{ fontSize: 13, fontWeight: 500, color: "#374151", display: "block", marginBottom: 6 }}>
-            Password
-          </label>
-          <input
-            id="password"
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            placeholder="••••••••"
-            required
-            minLength={8}
-            style={{ width: "100%", padding: 12, borderRadius: 12, border: "1px solid #D1D5DB", fontSize: 14, boxSizing: "border-box" }}
-          />
-          <p style={{ fontSize: 12, color: "#9CA3AF", margin: "4px 0 0" }}>At least 8 characters</p>
-        </div>
-        <div>
-          <label htmlFor="role" style={{ fontSize: 13, fontWeight: 500, color: "#374151", display: "block", marginBottom: 6 }}>
-            Account type
-          </label>
-          <select
-            id="role"
-            value={role}
-            onChange={(e) => setRole(e.target.value)}
-            style={{ width: "100%", padding: 12, borderRadius: 12, border: "1px solid #D1D5DB", fontSize: 14, background: "white", boxSizing: "border-box" }}
-          >
-            <option value="customer">Customer (shop & order products)</option>
-            <option value="designer">Designer (sell your designs)</option>
-            <option value="corporate">Corporate (bulk orders)</option>
-          </select>
-        </div>
-        <button
-          type="submit"
-          disabled={loading}
-          style={{
-            padding: "12px 16px",
-            borderRadius: 999,
-            border: "none",
-            background: "#788AE0",
-            color: "white",
-            fontWeight: 600,
-            fontSize: 15,
-            cursor: loading ? "not-allowed" : "pointer",
-            opacity: loading ? 0.7 : 1,
-          }}
-        >
-          {loading ? "Creating account..." : "Create account"}
-        </button>
-      </form>
-      {error && <p style={{ color: "#B42318", fontSize: 13, marginTop: 12 }}>{error}</p>}
-      <p style={{ textAlign: "center", fontSize: 13, color: "#6B7280", marginTop: 16, marginBottom: 0 }}>
-        Already have an account?{" "}
-        <a href="/auth/login" style={{ color: "#788AE0", fontWeight: 500, textDecoration: "none" }}>
-          Sign in
-        </a>
-      </p>
-    </main>
+    <PageContainer variant="form" className="py-8 sm:py-12">
+      <Card className="p-4 sm:p-6">
+        <h1 className="text-h3 font-bold text-brand-ink">Create an account</h1>
+        <p className="mt-1 text-sm text-brand-muted">Join RashPOD to {roleHint}.</p>
+        <form onSubmit={onSubmit} className="mt-6 grid gap-4">
+          <FormField label="Email" htmlFor="email">
+            <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" required />
+          </FormField>
+          <FormField label="Display name" htmlFor="displayName">
+            <Input id="displayName" type="text" value={displayName} onChange={(e) => setDisplayName(e.target.value)} placeholder="John Doe" required minLength={2} />
+          </FormField>
+          <FormField label="Password" htmlFor="password" helperText="At least 8 characters">
+            <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" required minLength={8} />
+          </FormField>
+          <FormField label="Account type" htmlFor="role">
+            <select
+              id="role"
+              value={role}
+              onChange={(e) => setRole(e.target.value)}
+              className="min-h-11 w-full rounded-xs border border-brand-line bg-white px-3 text-sm text-brand-text"
+            >
+              <option value="customer">Customer (shop & order products)</option>
+              <option value="designer">Designer (sell your designs)</option>
+              <option value="corporate">Corporate (bulk orders)</option>
+            </select>
+          </FormField>
+          {error ? <AuthError message={error} /> : null}
+          <Button type="submit" variant="primaryBlue" size="lg" loading={loading} className="w-full">
+            Create account
+          </Button>
+        </form>
+        <p className="mt-6 text-center text-sm text-brand-muted">
+          Already have an account?{" "}
+          <Link href="/auth/login" className="font-medium text-brand-blue hover:underline">Sign in</Link>
+        </p>
+      </Card>
+    </PageContainer>
   );
 }
 
 export default function RegisterPage() {
   return (
-    <Suspense fallback={<div style={{ maxWidth: 440, margin: "48px auto", padding: 24, textAlign: "center" }}>Loading...</div>}>
+    <Suspense fallback={<PageContainer variant="form" className="py-12 text-center text-brand-muted">Loading...</PageContainer>}>
       <RegisterForm />
     </Suspense>
   );

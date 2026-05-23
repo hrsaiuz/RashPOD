@@ -3,27 +3,14 @@
 import { use, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { notFound } from "next/navigation";
+import { Button, ErrorState, KpiTile, PageHeader, Skeleton } from "@rashpod/ui";
 import { useAuth } from "../../auth/auth-provider";
 import DashboardLayout from "../dashboard-layout";
 
 const VALID_ROLES = new Set(["designer", "customer", "production", "corporate", "moderator", "finance", "support", "admin", "super-admin"]);
 
-function StatCard({ label, value }: { label: string; value: number }) {
-  return (
-    <div style={{ background: "white", border: "1px solid #E8EAFB", borderRadius: 16, padding: "16px 20px", boxShadow: "0 1px 4px rgba(120,138,224,0.06)" }}>
-      <div style={{ color: "#6B7280", fontSize: 12, fontWeight: 500, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 6 }}>{label}</div>
-      <div style={{ fontSize: 32, fontWeight: 700, color: "#1A1D2E" }}>{value.toLocaleString()}</div>
-    </div>
-  );
-}
-
-function SkeletonStat() {
-  return (
-    <div style={{ background: "white", border: "1px solid #E8EAFB", borderRadius: 16, padding: "16px 20px" }}>
-      <div style={{ height: 12, borderRadius: 6, background: "#F0F2FA", marginBottom: 10, width: "60%" }} />
-      <div style={{ height: 32, borderRadius: 8, background: "#F0F2FA", width: "40%" }} />
-    </div>
-  );
+function formatStatLabel(key: string) {
+  return key.replace(/([A-Z])/g, " $1").replace(/_/g, " ").trim().replace(/^\w/, (c) => c.toUpperCase());
 }
 
 export default function RoleDashboardPage({ params }: { params: Promise<{ role: string }> }) {
@@ -67,27 +54,33 @@ export default function RoleDashboardPage({ params }: { params: Promise<{ role: 
 
   return (
     <DashboardLayout role={role}>
-      <h1 style={{ margin: "0 0 20px", fontSize: 22, color: "#1A1D2E", textTransform: "capitalize" }}>
-        {role.replace("-", " ")} overview
-      </h1>
+      <PageHeader
+        title={`${role.replace("-", " ")} overview`}
+        description="Key metrics for your dashboard."
+      />
 
-      {error && (
-        <div role="alert" style={{ background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 12, padding: 16, marginBottom: 20, color: "#B42318", fontSize: 14 }}>
-          {error}
-          <button onClick={() => window.location.reload()} style={{ marginLeft: 12, background: "none", border: "none", color: "#788AE0", cursor: "pointer", fontWeight: 500, padding: 0 }}>
-            Retry
-          </button>
-        </div>
-      )}
+      {error ? (
+        <ErrorState
+          title="Could not load overview"
+          description={error}
+          retry={
+            <Button variant="primaryBlue" onClick={() => window.location.reload()}>
+              Retry
+            </Button>
+          }
+        />
+      ) : null}
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 12 }}>
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-[repeat(auto-fill,minmax(180px,1fr))]">
         {loading
-          ? Array.from({ length: 4 }).map((_, i) => <SkeletonStat key={i} />)
+          ? Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-28 rounded-md" />)
           : data && Object.keys(data).length > 0
-          ? Object.entries(data).map(([k, v]) => <StatCard key={k} label={k} value={v} />)
-          : !error && (
-              <p style={{ color: "#9CA3AF", fontSize: 14, gridColumn: "1/-1" }}>No data available yet.</p>
-            )}
+            ? Object.entries(data).map(([key, value]) => (
+                <KpiTile key={key} label={formatStatLabel(key)} value={value.toLocaleString()} />
+              ))
+            : !error ? (
+                <p className="col-span-full text-sm text-brand-muted">No data available yet.</p>
+              ) : null}
       </div>
     </DashboardLayout>
   );

@@ -30,7 +30,7 @@ export default function OrderDetail({ params }: { params: Promise<{ id: string }
   };
 
   if (loading) return <Skeleton className="h-64" />;
-  if (error || !order) return <div className="text-sm text-red-600">{error || "Not found"}</div>;
+  if (error || !order) return <div className="text-sm text-semantic-dangerText">{error || "Not found"}</div>;
 
   const cancellable = order.status === "PENDING_PAYMENT" || order.status === "PAID";
 

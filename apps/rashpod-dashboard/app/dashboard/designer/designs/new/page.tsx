@@ -196,7 +196,7 @@ export default function NewDesignPage() {
                 <div className="rounded-2xl border border-brand-line bg-brand-bg p-4">
                   <div className="flex items-center justify-between gap-3 text-sm">
                     <span className="font-semibold text-brand-ink">{uploadLabel(step)}</span>
-                    {step === "failed" ? <AlertCircle size={16} className="text-red-600" /> : <span className="text-brand-muted">{step === "uploading" ? `${uploadPercent}%` : ""}</span>}
+                    {step === "failed" ? <AlertCircle size={16} className="text-semantic-dangerText" /> : <span className="text-brand-muted">{step === "uploading" ? `${uploadPercent}%` : ""}</span>}
                   </div>
                   {step === "uploading" ? <div className="mt-3 h-2 overflow-hidden rounded-full bg-white"><div className="h-full rounded-full bg-brand-blue transition-all" style={{ width: `${uploadPercent}%` }} /></div> : null}
                   {progress ? <p className="mt-2 text-sm text-brand-muted">{progress}</p> : null}

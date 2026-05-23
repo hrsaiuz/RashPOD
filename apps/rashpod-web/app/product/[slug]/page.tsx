@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { ErrorState, Skeleton, getApiBase } from "@rashpod/ui";
 import { useCart } from "../../../components/cart/CartProvider";
+import { COLOR_SWATCHES, swatchStyle } from "../../../lib/product-swatches";
 
 type ProductDetail = {
   id: string;
@@ -57,14 +58,6 @@ type ListingCard = {
 
 const FALLBACK_IMAGE_KEYS = ["mockup-main", "mockup-side", "mockup-flat", "mockup-pack"];
 
-const COLOR_SWATCHES = [
-  { label: "Peach", value: "#ead7c5" },
-  { label: "Lime", value: "#bfd676" },
-  { label: "Periwinkle", value: "#aab4f6" },
-  { label: "Pink", value: "#f5c2ea" },
-  { label: "Sage", value: "linear-gradient(180deg, #e1bda8 0 49%, #9cac7c 50% 100%)" },
-];
-
 const DEFAULT_SIZES = ["Small", "Medium", "Large", "XL", "XXL"];
 
 export default function ProductPage({ params }: { params: Promise<{ slug: string }> }) {
@@ -76,7 +69,7 @@ export default function ProductPage({ params }: { params: Promise<{ slug: string
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [selectedImage, setSelectedImage] = useState(0);
-  const [selectedColor, setSelectedColor] = useState(COLOR_SWATCHES[0].label);
+  const [selectedColor, setSelectedColor] = useState<string>(COLOR_SWATCHES[0].label);
   const [selectedSize, setSelectedSize] = useState(DEFAULT_SIZES[0]);
   const [quantity, setQuantity] = useState(5);
 
@@ -120,7 +113,7 @@ export default function ProductPage({ params }: { params: Promise<{ slug: string
 
   if (loading) {
     return (
-      <div className="mx-auto max-w-[1232px] px-5 py-8">
+      <div className="mx-auto max-w-storefront px-5 py-8">
         <Skeleton className="mb-8 h-10 w-[410px] rounded-[9px]" />
         <div className="grid gap-24 lg:grid-cols-[520px_1fr]">
           <Skeleton className="aspect-[0.86] rounded-[30px]" />
@@ -137,7 +130,7 @@ export default function ProductPage({ params }: { params: Promise<{ slug: string
 
   if (error || !product) {
     return (
-      <div className="mx-auto max-w-[1232px] px-5 py-20">
+      <div className="mx-auto max-w-storefront px-5 py-20">
         <ErrorState title="Product not found" description="We could not find this product." />
       </div>
     );
@@ -164,11 +157,12 @@ export default function ProductPage({ params }: { params: Promise<{ slug: string
   }
 
   return (
-    <div className="bg-white">
-      <div className="mx-auto max-w-[1232px] px-5 pb-12 pt-4">
+    <>
+    <div className="bg-white pb-24 lg:pb-12">
+      <div className="mx-auto max-w-storefront px-4 pb-12 pt-4 sm:px-5">
         <BreadcrumbTrail current="Products" />
 
-        <section className="mt-7 grid gap-24 lg:grid-cols-[520px_1fr]">
+        <section className="mt-7 grid gap-8 lg:grid-cols-[520px_1fr] lg:gap-24">
           <div>
             <div className="relative aspect-[0.88] overflow-hidden rounded-[31px] bg-brand-bg">
               {images[selectedImage] ? (
@@ -205,8 +199,8 @@ export default function ProductPage({ params }: { params: Promise<{ slug: string
           <div className="pt-2">
             <div className="flex items-start justify-between gap-5">
               <div>
-                <h1 className="text-[30px] font-black lowercase leading-none text-black">{product.title}</h1>
-                <p className="mt-4 max-w-[160px] text-[16px] leading-[1.05] text-[#50505B]">designed by {product.designer.displayName}</p>
+                <h1 className="text-h2 font-black lowercase leading-none text-brand-ink">{product.title}</h1>
+                <p className="mt-4 max-w-[160px] text-body leading-tight text-brand-muted">designed by {product.designer.displayName}</p>
               </div>
               <div className="flex gap-3">
                 <IconPill><Heart size={20} className="text-brand-peach" /></IconPill>
@@ -215,11 +209,11 @@ export default function ProductPage({ params }: { params: Promise<{ slug: string
               </div>
             </div>
 
-            <div className="mt-1 border-t border-[#DFE3F5] py-5">
+            <div className="mt-1 border-t border-brand-line py-5">
               <div className="flex flex-wrap items-center gap-5">
                 <div>
-                  <p className="text-[30px] font-black text-black">{price}</p>
-                  <p className="text-[18px] text-[#858585] line-through">{oldPrice}</p>
+                  <p className="text-h2 font-black text-brand-ink">{price}</p>
+                  <p className="text-body text-brand-subtle line-through">{oldPrice}</p>
                 </div>
                 <span className="inline-flex h-[28px] items-center gap-2 rounded-full bg-brand-bg px-4 text-[13px] font-bold text-brand-peach">
                   <Star size={15} /> 4.8
@@ -228,62 +222,63 @@ export default function ProductPage({ params }: { params: Promise<{ slug: string
                   <MessageSquare size={15} /> 67 Reviews
                 </span>
               </div>
-              <p className="mt-2 text-[14px] text-[#8A8A8A]"><span className="font-bold text-[#36A349]">93%</span> of buyers have recommended this.</p>
+              <p className="mt-2 text-sm text-brand-muted"><span className="font-bold text-semantic-successText">93%</span> of buyers have recommended this.</p>
             </div>
 
-            <div className="border-t border-[#DFE3F5] py-5">
-              <h2 className="mb-4 text-[16px] font-medium text-[#33333A]">Choose a Color</h2>
+            <div className="border-t border-brand-line py-5">
+              <h2 className="mb-4 text-body font-medium text-brand-ink">Choose a Color</h2>
               <div className="flex flex-wrap gap-5">
                 {COLOR_SWATCHES.map((swatch) => (
                   <button
                     key={swatch.label}
                     aria-label={swatch.label}
                     onClick={() => setSelectedColor(swatch.label)}
-                    className={`grid h-[52px] w-[52px] place-items-center rounded-full ${selectedColor === swatch.label ? "ring-2 ring-[#EBD9C9] ring-offset-4" : ""}`}
-                    style={{ background: swatch.value }}
+                    className={`grid h-[52px] w-[52px] place-items-center rounded-full ${selectedColor === swatch.label ? "ring-2 ring-brand-peachLight ring-offset-4" : ""}`}
+                    style={swatchStyle(swatch.value)}
                   >
                     {selectedColor === swatch.label ? <Check size={26} className="text-white" /> : null}
                   </button>
                 ))}
               </div>
-              <p className="mt-4 text-[12px] text-[#33333A]">The colors may differ by up to 15% from what you see in the image.</p>
+              <p className="mt-4 text-caption text-brand-ink">The colors may differ by up to 15% from what you see in the image.</p>
             </div>
 
-            <div className="border-t border-[#DFE3F5] py-5">
+            <div className="border-t border-brand-line py-5">
               <div className="mb-5 flex items-center justify-between">
-                <h2 className="text-[16px] font-medium text-[#33333A]">Choose a Size</h2>
-                <button className="text-[15px] text-[#33333A]">Size Guide</button>
+                <h2 className="text-body font-medium text-brand-ink">Choose a Size</h2>
+                <button type="button" className="min-h-11 text-body text-brand-ink">Size Guide</button>
               </div>
               <div className="flex flex-wrap gap-3">
                 {DEFAULT_SIZES.map((size) => (
                   <button
                     key={size}
+                    type="button"
                     onClick={() => setSelectedSize(size)}
-                    className={`inline-flex h-[28px] items-center gap-2 rounded-[6px] px-3 text-[14px] ${selectedSize === size ? "bg-brand-bg text-brand-blue" : "bg-brand-bg text-[#33333A]"}`}
+                    className={`inline-flex min-h-11 items-center gap-2 rounded-xs px-3 text-sm ${selectedSize === size ? "bg-brand-bg text-brand-blue" : "bg-brand-bg text-brand-ink"}`}
                   >
-                    <span className={`h-4 w-4 rounded-full border ${selectedSize === size ? "border-brand-blue bg-brand-blue" : "border-[#33333A]"}`} />
+                    <span className={`h-4 w-4 rounded-full border ${selectedSize === size ? "border-brand-blue bg-brand-blue" : "border-brand-ink"}`} />
                     {size}
                   </button>
                 ))}
               </div>
             </div>
 
-            <div className="border-t border-[#DFE3F5] py-5">
+            <div className="hidden border-t border-brand-line py-5 lg:block">
               <div className="flex flex-wrap gap-4">
-                <div className="inline-flex h-[53px] min-w-[140px] items-center justify-between rounded-[14px] bg-brand-bg px-6 text-[18px] font-black text-black">
-                  <button onClick={() => setQuantity(Math.max(1, quantity - 1))}>-</button>
+                <div className="inline-flex h-[53px] min-w-[140px] items-center justify-between rounded-md bg-brand-bg px-6 text-lg font-bold text-brand-ink">
+                  <button type="button" onClick={() => setQuantity(Math.max(1, quantity - 1))} aria-label="Decrease quantity">-</button>
                   <span>{quantity}</span>
-                  <button onClick={() => setQuantity(quantity + 1)}>+</button>
+                  <button type="button" onClick={() => setQuantity(quantity + 1)} aria-label="Increase quantity">+</button>
                 </div>
-                <button onClick={handleAddToCart} className="h-[53px] min-w-[250px] rounded-[14px] bg-brand-peach px-8 text-[16px] font-bold text-white">
+                <button type="button" onClick={handleAddToCart} className="h-[53px] min-w-[250px] rounded-md bg-brand-peach px-8 text-base font-bold text-white">
                   Add To Cart
                 </button>
               </div>
             </div>
 
-            <div className="rounded-[10px] bg-brand-bg p-4">
+            <div className="rounded-md bg-brand-bg p-4">
               <DeliveryRow icon={<Truck size={19} />} title="Free Delivery" detail="Enter your Postal code for Delivery Availability" />
-              <div className="my-4 h-px bg-[#E8EBF8]" />
+              <div className="my-4 h-px bg-brand-line" />
               <DeliveryRow icon={<ShoppingBag size={18} />} title="Return Delivery" detail="Free 30 days Delivery Return. Details" />
             </div>
           </div>
@@ -304,19 +299,36 @@ export default function ProductPage({ params }: { params: Promise<{ slug: string
         </section>
       </div>
     </div>
+
+    <div className="fixed inset-x-0 bottom-0 z-40 border-t border-brand-line bg-white/95 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur lg:hidden">
+      <div className="mx-auto flex max-w-storefront items-center gap-3 px-1">
+        <div className="min-w-0">
+          <p className="truncate text-lg font-bold text-brand-ink">{price}</p>
+          <p className="truncate text-xs text-brand-muted">{selectedSize} · {selectedColor}</p>
+        </div>
+        <button
+          type="button"
+          onClick={handleAddToCart}
+          className="ml-auto inline-flex h-12 min-w-[148px] shrink-0 items-center justify-center rounded-md bg-brand-peach px-5 text-sm font-bold text-white"
+        >
+          Add to cart
+        </button>
+      </div>
+    </div>
+    </>
   );
 }
 
 function BreadcrumbTrail({ current }: { current: string }) {
   return (
-    <nav className="inline-flex min-h-[39px] items-center gap-5 rounded-[9px] bg-brand-bg px-4 text-[18px] text-[#3B3B43]">
+    <nav className="inline-flex min-h-10 max-w-full items-center gap-3 overflow-x-auto rounded-xs bg-brand-bg px-4 text-sm text-brand-text sm:gap-5 sm:text-base">
       {["Home", "Category", "Tshirts"].map((item) => (
-        <span key={item} className="contents">
-          <Link href={item === "Home" ? "/" : "/shop"}>{item}</Link>
-          <ChevronRight size={21} strokeWidth={2.1} />
+        <span key={item} className="flex shrink-0 items-center gap-3 sm:gap-5">
+          <Link href={item === "Home" ? "/" : "/shop"} className="hover:text-brand-blue">{item}</Link>
+          <ChevronRight size={18} className="text-brand-subtle" />
         </span>
       ))}
-      <span className="font-bold text-black">{current}</span>
+      <span className="shrink-0 font-bold text-brand-ink">{current}</span>
     </nav>
   );
 }
@@ -330,8 +342,8 @@ function DeliveryRow({ icon, title, detail }: { icon: ReactNode; title: string; 
     <div className="flex gap-4">
       <span className="mt-1 text-brand-peach">{icon}</span>
       <div>
-        <h3 className="text-[16px] font-black text-black">{title}</h3>
-        <p className="mt-1 text-[13px] text-[#555] underline">{detail}</p>
+        <h3 className="text-body font-bold text-brand-ink">{title}</h3>
+        <p className="mt-1 text-sm text-brand-muted underline">{detail}</p>
       </div>
     </div>
   );
@@ -349,10 +361,10 @@ function ProductCopy() {
     "Durable leather is easily cleanable so you can keep your look fresh.",
   ];
   return (
-    <section className="mt-28 max-w-[1040px]">
-      <h2 className="text-[28px] font-black text-black">Product Description</h2>
-      <p className="mt-6 max-w-[1060px] text-[17px] leading-[1.65] text-[#8A8A8A]">
-        When it's colder than the far side of the moon and spitting rain too, you've still got to look good.
+    <section className="mt-16 max-w-[1040px] lg:mt-28">
+      <h2 className="text-section font-bold text-brand-ink">Product Description</h2>
+      <p className="mt-6 max-w-[1060px] text-body leading-relaxed text-brand-muted">
+        When it&apos;s colder than the far side of the moon and spitting rain too, you&apos;ve still got to look good.
         From water-repellent leather to a rugged outsole, this product keeps your design bright, wearable,
         and ready for everyday movement.
       </p>
@@ -366,11 +378,11 @@ function ProductCopy() {
 function DetailList({ title, items, blue }: { title: string; items: string[]; blue?: boolean }) {
   return (
     <div className="mt-10">
-      <h2 className="text-[28px] font-black text-black">{title}</h2>
+      <h2 className="text-section font-bold text-brand-ink">{title}</h2>
       <ul className="mt-6 space-y-5">
         {items.map((item) => (
-          <li key={item} className="flex items-start gap-4 text-[17px] text-[#8A8A8A]">
-            <span className={`mt-1 grid h-5 w-5 shrink-0 place-items-center rounded-full ${blue ? "bg-brand-bg text-brand-blue" : "bg-[#EEF0F7] text-black"}`}>
+          <li key={item} className="flex items-start gap-4 text-body text-brand-muted">
+            <span className={`mt-1 grid h-5 w-5 shrink-0 place-items-center rounded-full ${blue ? "bg-brand-bg text-brand-blue" : "bg-brand-bg text-brand-ink"}`}>
               <Check size={14} strokeWidth={3} />
             </span>
             {item}
@@ -383,14 +395,14 @@ function DetailList({ title, items, blue }: { title: string; items: string[]; bl
 
 function RelatedCard({ item }: { item: ListingCard }) {
   return (
-    <Link href={`/product/${item.slug}`} className="block rounded-[13px] bg-white p-6 shadow-[0_18px_35px_rgba(0,0,0,0.14)]">
+    <Link href={`/product/${item.slug}`} className="block rounded-md bg-white p-4 shadow-soft sm:p-6">
       <div className="relative aspect-[0.95] overflow-hidden rounded-[22px] bg-brand-bg">
         {item.imageUrl ? <Image src={item.imageUrl} alt={item.title} fill sizes="280px" className="object-cover" /> : <Package className="m-auto h-full w-20 text-brand-blue" />}
-        <span className="absolute left-6 top-6 rounded-[7px] bg-[#D67AD2] px-2 py-1 text-[9px] font-bold text-white">Best Seller</span>
+        <span className="absolute left-4 top-4 rounded-xs bg-brand-peach px-2 py-1 text-caption font-bold text-white sm:left-6 sm:top-6">Best Seller</span>
       </div>
-      <h3 className="mt-5 text-[16px] font-black text-black">CLASSIC&nbsp; Black T-Shirt</h3>
-      <p className="mt-2 text-[13px] text-black">high quality, 100% cotton, perfect for vibrant</p>
-      <p className="mt-4 text-[11px] text-[#8A8A8A]">Designed by Shuwaan</p>
+      <h3 className="mt-5 text-body font-bold text-brand-ink">CLASSIC&nbsp; Black T-Shirt</h3>
+      <p className="mt-2 text-sm text-brand-text">high quality, 100% cotton, perfect for vibrant</p>
+      <p className="mt-4 text-caption text-brand-muted">Designed by Shuwaan</p>
     </Link>
   );
 }
@@ -409,10 +421,10 @@ function createFallbackRelated(product: ProductDetail): ListingCard[] {
 
 function ProductImagePlaceholder({ compact }: { compact?: boolean }) {
   return (
-    <div className="flex h-full w-full items-center justify-center bg-[#F0F2FA]">
-      <div className={compact ? "relative h-12 w-12 rounded-[12px] bg-white" : "relative h-[72%] w-[72%] rounded-[28px] bg-white shadow-soft"}>
+    <div className="flex h-full w-full items-center justify-center bg-brand-bg">
+      <div className={compact ? "relative h-12 w-12 rounded-md bg-white" : "relative h-[72%] w-[72%] rounded-[28px] bg-white shadow-soft"}>
         <Package className="absolute left-1/2 top-1/2 h-12 w-12 -translate-x-1/2 -translate-y-1/2 text-brand-blue" />
-        {!compact ? <span className="absolute left-8 top-8 rounded-[7px] bg-[#D67AD2] px-2 py-1 text-[10px] font-bold text-white">Best Seller</span> : null}
+        {!compact ? <span className="absolute left-8 top-8 rounded-xs bg-brand-peach px-2 py-1 text-caption font-bold text-white">Best Seller</span> : null}
       </div>
     </div>
   );

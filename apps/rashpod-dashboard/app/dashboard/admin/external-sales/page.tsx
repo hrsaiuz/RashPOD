@@ -290,7 +290,7 @@ export default function ExternalSalesPage() {
         </div>
 
         {error && <ErrorState title="External sales error" description={error} />}
-        {notice && <Card className="border-green-200 bg-green-50 text-sm text-green-800">{notice}</Card>}
+        {notice && <Card className="border-semantic-success/25 bg-semantic-successBg text-sm text-semantic-successText">{notice}</Card>}
         {loading ? <Skeleton className="h-72" /> : null}
 
         {!loading && tab === "overview" && (

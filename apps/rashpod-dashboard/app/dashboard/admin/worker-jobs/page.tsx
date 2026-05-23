@@ -1,7 +1,21 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { RefreshCw } from "lucide-react";
+import {
+  Button,
+  Card,
+  DataTable,
+  DataTableColumn,
+  EmptyState,
+  FormField,
+  Input,
+  KpiTile,
+  PageHeader,
+  Select,
+  StatusBadge,
+} from "@rashpod/ui";
 import { useAuth } from "../../../auth/auth-provider";
 import DashboardLayout from "../../dashboard-layout";
 
@@ -16,12 +30,12 @@ type WorkerJob = {
   updatedAt: string;
 };
 
-const STATUS_STYLE: Record<string, { bg: string; color: string }> = {
-  PENDING: { bg: "#FEF3C7", color: "#92400E" },
-  PROCESSING: { bg: "#DBEAFE", color: "#1E40AF" },
-  COMPLETED: { bg: "#D1FAE5", color: "#065F46" },
-  FAILED: { bg: "#FEE2E2", color: "#991B1B" },
-};
+function mapWorkerStatus(status: string) {
+  const key = status.toLowerCase();
+  if (key === "processing") return "in_progress";
+  if (key === "completed") return "resolved";
+  return key;
+}
 
 export default function AdminWorkerJobsPage() {
   const router = useRouter();
@@ -41,9 +55,13 @@ export default function AdminWorkerJobsPage() {
       if (status) params.set("status", status);
       if (type) params.set("type", type);
       const res = await fetch(`/api/proxy/admin/worker-jobs?${params.toString()}`);
-      if (res.status === 401 || res.status === 403) { clearSession(); router.push("/auth/login"); return; }
+      if (res.status === 401 || res.status === 403) {
+        clearSession();
+        router.push("/auth/login");
+        return;
+      }
       if (!res.ok) throw new Error(`Failed to load jobs (${res.status})`);
-      setJobs(await res.json() as WorkerJob[]);
+      setJobs((await res.json()) as WorkerJob[]);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unknown error");
     } finally {
@@ -52,12 +70,22 @@ export default function AdminWorkerJobsPage() {
   };
 
   const retry = async (id: string) => {
-    if (!user) { setError("Session expired."); return; }
+    if (!user) {
+      setError("Session expired.");
+      return;
+    }
     const res = await fetch(`/api/proxy/admin/worker-jobs/${id}/retry`, {
       method: "POST",
     });
-    if (res.status === 401 || res.status === 403) { clearSession(); router.push("/auth/login"); return; }
-    if (!res.ok) { setError(`Retry failed (${res.status})`); return; }
+    if (res.status === 401 || res.status === 403) {
+      clearSession();
+      router.push("/auth/login");
+      return;
+    }
+    if (!res.ok) {
+      setError(`Retry failed (${res.status})`);
+      return;
+    }
     await load();
   };
 
@@ -66,86 +94,121 @@ export default function AdminWorkerJobsPage() {
     void load();
   }, [user, isLoading, router]);
 
+  const statusCounts = useMemo(
+    () =>
+      jobs.reduce(
+        (acc, job) => {
+          acc[job.status] = (acc[job.status] ?? 0) + 1;
+          return acc;
+        },
+        {} as Record<string, number>,
+      ),
+    [jobs],
+  );
+
+  const columns: DataTableColumn<WorkerJob>[] = useMemo(
+    () => [
+      {
+        key: "type",
+        header: "Type",
+        render: (_value, row) => <span className="font-mono text-xs">{row.type}</span>,
+      },
+      {
+        key: "status",
+        header: "Status",
+        render: (_value, row) => <StatusBadge status={mapWorkerStatus(row.status)} label={row.status} />,
+      },
+      {
+        key: "attempts",
+        header: "Attempts",
+        render: (_value, row) => `${row.attempts}/${row.maxAttempts}`,
+      },
+      {
+        key: "createdAt",
+        header: "Created",
+        render: (value) => <span className="text-brand-muted">{new Date(String(value)).toLocaleString()}</span>,
+      },
+      {
+        key: "errorMessage",
+        header: "Error",
+        render: (value) => (
+          <span className="block max-w-[240px] truncate text-brand-muted" title={String(value ?? "")}>
+            {value ? String(value) : "—"}
+          </span>
+        ),
+      },
+      {
+        key: "actions",
+        header: "Action",
+        render: (_value, row) => (
+          <Button
+            size="sm"
+            variant={row.status === "FAILED" ? "primaryPeach" : "secondary"}
+            disabled={row.status !== "FAILED"}
+            onClick={() => void retry(row.id)}
+            aria-label={`Retry job ${row.id}`}
+          >
+            Retry
+          </Button>
+        ),
+      },
+    ],
+    [],
+  );
+
   return (
     <DashboardLayout role="admin">
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 16, flexWrap: "wrap", gap: 8 }}>
-        <div>
-          <h1 style={{ margin: 0, fontSize: 22, color: "#1A1D2E" }}>Worker Jobs</h1>
-          <p style={{ marginTop: 4, color: "#6B7280", fontSize: 13 }}>
-            Operations queue monitor and manual retry.{user ? ` Signed in as ${user.email}.` : ""}
-          </p>
-        </div>
-      </div>
+      <PageHeader
+        title="Worker Jobs"
+        description={`Operations queue monitor and manual retry.${user ? ` Signed in as ${user.email}.` : ""}`}
+        actions={
+          <Button variant="secondary" onClick={() => void load()} loading={loading}>
+            <RefreshCw size={16} />
+            Refresh
+          </Button>
+        }
+      />
 
-      <form onSubmit={load} style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 16 }} role="search" aria-label="Filter worker jobs">
-        <div>
-          <label htmlFor="wj-status" style={{ position: "absolute", width: 1, height: 1, overflow: "hidden", clip: "rect(0,0,0,0)" }}>Status filter</label>
-          <select id="wj-status" value={status} onChange={(e) => setStatus(e.target.value)} style={{ padding: "9px 12px", borderRadius: 12, border: "1px solid #E8EAFB", background: "white", fontSize: 13 }}>
-            <option value="">All statuses</option>
-            <option value="PENDING">PENDING</option>
-            <option value="PROCESSING">PROCESSING</option>
-            <option value="COMPLETED">COMPLETED</option>
-            <option value="FAILED">FAILED</option>
-          </select>
-        </div>
-        <div>
-          <label htmlFor="wj-type" style={{ position: "absolute", width: 1, height: 1, overflow: "hidden", clip: "rect(0,0,0,0)" }}>Job type filter</label>
-          <input id="wj-type" placeholder="Job type" value={type} onChange={(e) => setType(e.target.value)} style={{ padding: "9px 12px", borderRadius: 12, border: "1px solid #E8EAFB", fontSize: 13 }} />
-        </div>
-        <button type="submit" style={{ padding: "9px 18px", borderRadius: 999, border: "none", background: "#788AE0", color: "white", fontWeight: 600, fontSize: 13, cursor: "pointer" }}>
-          {loading ? "Loading…" : "Refresh"}
-        </button>
-      </form>
+      <Card className="mb-4">
+        <form onSubmit={load} className="flex flex-wrap items-end gap-3" role="search" aria-label="Filter worker jobs">
+          <FormField label="Status filter">
+            <Select id="wj-status" value={status} onChange={(e) => setStatus(e.target.value)}>
+              <option value="">All statuses</option>
+              <option value="PENDING">PENDING</option>
+              <option value="PROCESSING">PROCESSING</option>
+              <option value="COMPLETED">COMPLETED</option>
+              <option value="FAILED">FAILED</option>
+            </Select>
+          </FormField>
+          <FormField label="Job type filter">
+            <Input id="wj-type" placeholder="Job type" value={type} onChange={(e) => setType(e.target.value)} />
+          </FormField>
+          <Button type="submit" loading={loading}>
+            {loading ? "Loading…" : "Apply filters"}
+          </Button>
+        </form>
+      </Card>
 
-      {error && (
-        <div role="alert" style={{ background: "#FEF2F2", border: "1px solid #FECACA", borderRadius: 12, padding: 14, marginBottom: 16, color: "#B42318", fontSize: 14 }}>
+      {error ? (
+        <div role="alert" className="mb-4 rounded-xl border border-semantic-dangerBg bg-semantic-dangerBg p-4 text-sm text-semantic-dangerText">
           {error}
         </div>
-      )}
+      ) : null}
 
-      <div style={{ background: "white", borderRadius: 16, border: "1px solid #E8EAFB", overflow: "hidden" }}>
-        <div style={{ overflowX: "auto" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
-            <caption style={{ position: "absolute", width: 1, height: 1, overflow: "hidden", clip: "rect(0,0,0,0)" }}>Worker jobs list</caption>
-            <thead>
-              <tr style={{ textAlign: "left", background: "#F8F9FF" }}>
-                {["Type", "Status", "Attempts", "Created", "Error", "Action"].map((h) => (
-                  <th key={h} style={{ padding: "10px 14px", fontWeight: 500, color: "#6B7280", borderBottom: "1px solid #E8EAFB", whiteSpace: "nowrap" }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {jobs.length === 0 ? (
-                <tr><td colSpan={6} style={{ padding: 24, color: "#9CA3AF", textAlign: "center" }}>No jobs found.</td></tr>
-              ) : (
-                jobs.map((job) => {
-                  const ss = STATUS_STYLE[job.status] ?? { bg: "#F0F2FA", color: "#374151" };
-                  return (
-                    <tr key={job.id} style={{ borderTop: "1px solid #F0F2FA" }}>
-                      <td style={{ padding: "10px 14px", fontFamily: "monospace", fontSize: 11 }}>{job.type}</td>
-                      <td style={{ padding: "10px 14px" }}>
-                        <span style={{ padding: "3px 10px", borderRadius: 999, fontSize: 11, fontWeight: 600, background: ss.bg, color: ss.color }}>{job.status}</span>
-                      </td>
-                      <td style={{ padding: "10px 14px" }}>{job.attempts}/{job.maxAttempts}</td>
-                      <td style={{ padding: "10px 14px", color: "#6B7280" }}>{new Date(job.createdAt).toLocaleString()}</td>
-                      <td style={{ padding: "10px 14px", maxWidth: 240, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: "#6B7280" }} title={job.errorMessage ?? ""}>{job.errorMessage || "—"}</td>
-                      <td style={{ padding: "10px 14px" }}>
-                        <button
-                          onClick={() => void retry(job.id)}
-                          disabled={job.status !== "FAILED"}
-                          aria-label={`Retry job ${job.id}`}
-                          style={{ padding: "6px 14px", borderRadius: 999, border: "none", background: job.status === "FAILED" ? "#F39E7C" : "#E8EAFB", color: job.status === "FAILED" ? "white" : "#9CA3AF", cursor: job.status === "FAILED" ? "pointer" : "not-allowed", fontWeight: 600, fontSize: 12 }}>
-                          Retry
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
+      <div className="mb-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <KpiTile label="Pending" value={statusCounts.PENDING ?? 0} />
+        <KpiTile label="Processing" value={statusCounts.PROCESSING ?? 0} />
+        <KpiTile label="Completed" value={statusCounts.COMPLETED ?? 0} />
+        <KpiTile label="Failed" value={statusCounts.FAILED ?? 0} className={(statusCounts.FAILED ?? 0) > 0 ? "text-semantic-dangerText" : undefined} />
       </div>
+
+      <DataTable
+        columns={columns}
+        rows={jobs}
+        loading={loading}
+        caption="Worker jobs list"
+        emptyState={<EmptyState title="No jobs found" description="No worker jobs match the current filters." />}
+      />
     </DashboardLayout>
   );
 }

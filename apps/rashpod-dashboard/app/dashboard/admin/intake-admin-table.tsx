@@ -95,7 +95,7 @@ export function IntakeAdminTable({ kind, title, description, emptyTitle }: Intak
         </div>
       </div>
 
-      {error ? <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div> : null}
+      {error ? <div className="rounded-2xl border border-semantic-dangerBg bg-semantic-dangerBg px-4 py-3 text-sm text-semantic-dangerText">{error}</div> : null}
 
       {loading ? (
         <Skeleton className="h-64" />
