@@ -1,4 +1,15 @@
 {
+  "nav": {
+    "shop": "Дўкон",
+    "categories": "Категориялар",
+    "films": "Plenkalar",
+    "sellOnRashpod": "RashPODda sotish",
+    "customOrder": "Maxsus buyurtma",
+    "business": "Biznesingizni boshlang",
+    "about": "Biz haqimizda",
+    "signIn": "Kirish",
+    "startSelling": "Sotishni boshlash"
+  },
   "home": {
     "hero": {
       "title": "Дизайнларингизни юкланг. Маҳсулотларни сотинг. Роялти қазонинг.",

@@ -2,11 +2,37 @@
 
 import * as React from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { motion } from "framer-motion";
 import { Heart, Package, Palette, ShoppingBag } from "lucide-react";
 import { cn } from "../lib/utils";
 import { formatPrice } from "../lib/format-price";
 import { Card } from "./Card";
+
+function ProductCardImage({
+  imageUrl,
+  alt,
+  className,
+  sizes = "(max-width: 640px) 100vw, (max-width: 1280px) 50vw, 280px",
+  priority = false,
+}: {
+  imageUrl: string;
+  alt: string;
+  className?: string;
+  sizes?: string;
+  priority?: boolean;
+}) {
+  return (
+    <Image
+      src={imageUrl}
+      alt={alt}
+      fill
+      sizes={sizes}
+      priority={priority}
+      className={cn("object-cover", className)}
+    />
+  );
+}
 
 export type ProductCardVariant = "compact" | "featured" | "designer-grid";
 
@@ -65,7 +91,7 @@ function ProductCardInner({
             </span>
           ) : null}
           {imageUrl ? (
-            <img src={imageUrl} alt={title} className="h-full w-full object-cover" />
+            <ProductCardImage imageUrl={imageUrl} alt={title} />
           ) : (
             <div className="flex h-full w-full items-center justify-center">
               <Palette size={48} className="text-brand-blue" aria-hidden="true" />
@@ -97,7 +123,7 @@ function ProductCardInner({
             <Heart size={16} />
           </span>
           {imageUrl ? (
-            <img src={imageUrl} alt={title} className="h-full w-full object-cover transition-transform group-hover:scale-105" />
+            <ProductCardImage imageUrl={imageUrl} alt={title} className="transition-transform group-hover:scale-105" />
           ) : (
             <div className="flex h-full w-full items-center justify-center text-brand-muted">
               <Package className="h-12 w-12" />
@@ -137,7 +163,7 @@ function ProductCardInner({
           <Heart size={16} />
         </span>
         {imageUrl ? (
-          <img src={imageUrl} alt={title} className="h-full w-full object-cover" />
+          <ProductCardImage imageUrl={imageUrl} alt={title} />
         ) : (
           <div className="flex h-full w-full items-center justify-center">
             <Palette size={28} className="text-brand-blue" aria-hidden="true" />

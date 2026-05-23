@@ -102,4 +102,48 @@ export class DeliveryService {
     });
     return result;
   }
+
+  async getPublicShopSettings() {
+    const [deliveryOptions, tenant] = await Promise.all([
+      this.prisma.deliverySetting.findMany({
+        where: { isActive: true },
+        orderBy: [{ zone: "asc" }, { providerType: "asc" }],
+      }),
+      this.prisma.tenant.findFirst({ orderBy: { createdAt: "asc" } }),
+    ]);
+
+    const thresholds = deliveryOptions
+      .map((row) => (row.freeDeliveryThreshold != null ? Number(row.freeDeliveryThreshold) : null))
+      .filter((value): value is number => value != null && value > 0);
+    const freeDeliveryThreshold = thresholds.length ? Math.min(...thresholds) : null;
+
+    const pickup = deliveryOptions.find((row) => row.providerType === "PICKUP");
+    const pickupMetadata =
+      pickup?.metadataJson && typeof pickup.metadataJson === "object"
+        ? (pickup.metadataJson as Record<string, unknown>)
+        : {};
+
+    return {
+      currency: tenant?.defaultCurrency ?? "UZS",
+      defaultLocale: tenant?.defaultLocale ?? "uz-Latn",
+      freeDeliveryThreshold,
+      deliveryOptions: deliveryOptions.map((row) => ({
+        id: row.id,
+        providerType: row.providerType,
+        displayName: row.displayName,
+        zone: row.zone,
+        price: row.price != null ? Number(row.price) : null,
+        freeDeliveryThreshold: row.freeDeliveryThreshold != null ? Number(row.freeDeliveryThreshold) : null,
+        etaText: row.etaText,
+      })),
+      pickup: pickup
+        ? {
+            displayName: pickup.displayName,
+            zone: pickup.zone,
+            address: typeof pickupMetadata.address === "string" ? pickupMetadata.address : null,
+            hours: typeof pickupMetadata.hours === "string" ? pickupMetadata.hours : pickup.etaText,
+          }
+        : null,
+    };
+  }
 }

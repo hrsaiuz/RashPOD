@@ -20,7 +20,11 @@ describe("IntakeService", () => {
     },
   };
   const audit = { log: jest.fn() };
-  const service = new IntakeService(prisma as any, audit as any);
+  const files = {
+    createUploadUrl: jest.fn(),
+    completeUpload: jest.fn(),
+  };
+  const service = new IntakeService(prisma as any, audit as any, files as any);
 
   beforeEach(() => {
     jest.clearAllMocks();

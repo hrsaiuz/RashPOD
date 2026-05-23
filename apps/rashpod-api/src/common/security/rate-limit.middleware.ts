@@ -18,6 +18,8 @@ const buckets = new Map<string, Bucket>();
 export const defaultRateLimitRules: RateLimitRule[] = [
   { id: "auth-login", method: "POST", path: /^\/auth\/(login|register|forgot-password|reset-password|otp\/request|otp\/verify)/, max: 10, windowMs: 60_000 },
   { id: "upload-sign", method: "POST", path: /^\/files\/upload-url/, max: 30, windowMs: 60_000 },
+  { id: "intake-upload-sign", method: "POST", path: /^\/intake\/files\/upload-url/, max: 20, windowMs: 60_000 },
+  { id: "intake-submit", method: "POST", path: /^\/intake\/(custom-order-requests|designer-applications|contact-messages)/, max: 10, windowMs: 60_000 },
   { id: "support-create", method: "POST", path: /^\/(customer\/orders\/[^/]+\/support-request|designer\/support-request|support\/tickets)/, max: 12, windowMs: 60_000 },
   { id: "ai-create", method: "POST", path: /^\/ai\//, max: 20, windowMs: 60_000 },
   { id: "payment-retry", method: "POST", path: /^\/(payments\/click\/create|customer\/orders\/[^/]+\/retry-payment)/, max: 12, windowMs: 60_000 },

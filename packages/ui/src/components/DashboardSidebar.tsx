@@ -79,8 +79,15 @@ const ACCENT_CLASSES: Record<NonNullable<DashboardSidebarProps["accent"]>, {
   },
 };
 
+function isOverviewHref(href: string) {
+  const segments = href.split("/").filter(Boolean);
+  return segments.length === 2;
+}
+
 function isLinkActive(link: DashboardLink, activePath: string) {
-  return activePath === link.href || (link.href !== "/dashboard" && activePath.startsWith(`${link.href}/`));
+  if (activePath === link.href) return true;
+  if (isOverviewHref(link.href)) return false;
+  return activePath.startsWith(`${link.href}/`);
 }
 
 function getGroupId(group: string) {

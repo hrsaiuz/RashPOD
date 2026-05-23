@@ -41,6 +41,7 @@ export const permissions = {
   "customer:dashboard-read": ["CUSTOMER", "ADMIN", "SUPER_ADMIN", "SUPPORT_STAFF"],
   "customer:orders-read": ["CUSTOMER", "ADMIN", "SUPER_ADMIN", "SUPPORT_STAFF"],
   "customer:profile-update": ["CUSTOMER", "ADMIN", "SUPER_ADMIN"],
+  "customer:wishlist-manage": ["CUSTOMER", "ADMIN", "SUPER_ADMIN"],
   "customer:payment-retry": ["CUSTOMER", "ADMIN", "SUPER_ADMIN", "SUPPORT_STAFF"],
   "customer:support-create": ["CUSTOMER", "ADMIN", "SUPER_ADMIN", "SUPPORT_STAFF"],
   "designer:dashboard-read": ["DESIGNER", "ADMIN", "SUPER_ADMIN", "SUPPORT_STAFF"],

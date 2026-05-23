@@ -25,8 +25,8 @@ export interface PublicFooterProps {
 export const PublicFooter: React.FC<PublicFooterProps> = ({
   shopLinks = [
     { href: "/shop", label: "All Products" },
-    { href: "/shop?sort=new", label: "New Arrivals" },
-    { href: "/shop?sort=bestsellers", label: "Bestsellers" },
+    { href: "/shop?sort=newest", label: "New Arrivals" },
+    { href: "/shop?sort=popular", label: "Bestsellers" },
     { href: "/film", label: "DTF/UV-DTF Films" },
   ],
   designerLinks = [
@@ -49,14 +49,14 @@ export const PublicFooter: React.FC<PublicFooterProps> = ({
   className,
 }) => {
   return (
-    <footer className={cn("relative overflow-hidden bg-brand-peach pt-[272px]", className)}>
+    <footer className={cn("relative overflow-hidden bg-brand-peach pt-24 md:pt-[272px]", className)}>
       <div className="relative rounded-t-[37px] bg-white px-5 pb-7 pt-[68px] md:rounded-t-[54px]">
-        <div className="mx-auto grid max-w-storefront grid-cols-1 gap-9 md:grid-cols-2 lg:grid-cols-[1fr_1fr_1fr_1.8fr]">
+        <div className="mx-auto grid max-w-storefront grid-cols-2 gap-9 lg:grid-cols-[1fr_1fr_1fr_1.8fr]">
           <FooterColumn title="Shop" links={shopLinks} />
           <FooterColumn title="For Designers" links={designerLinks} />
           <FooterColumn title="Company" links={companyLinks} />
 
-          <div>
+          <div className="col-span-2 lg:col-span-1">
             <h3 className="mb-6 text-[18px] font-extrabold text-black">Join the RASH POD Club</h3>
             <Link
               href="/auth/register"

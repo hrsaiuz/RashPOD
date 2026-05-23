@@ -1,4 +1,15 @@
 {
+  "nav": {
+    "shop": "Shop",
+    "categories": "Categories",
+    "films": "Films",
+    "sellOnRashpod": "Sell on RashPOD",
+    "customOrder": "Custom order",
+    "business": "Start Your Business",
+    "about": "About Us",
+    "signIn": "Sign in",
+    "startSelling": "Start Selling"
+  },
   "home": {
     "hero": {
       "title": "Upload your designs. Sell products. Earn royalties.",

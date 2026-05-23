@@ -1,9 +1,12 @@
 import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from "@nestjs/common";
+import { AssetPurpose } from "@prisma/client";
 import { IntakeStatus } from "@prisma/client";
 import { CurrentUser, RequestUser } from "../../common/auth/current-user.decorator";
 import { JwtAuthGuard } from "../../common/auth/jwt-auth.guard";
 import { PermissionGuard } from "../../common/auth/permission.guard";
 import { RequirePermission } from "../../common/auth/permission.decorator";
+import { CompleteUploadDto } from "../files/dto/complete-upload.dto";
+import { CreateUploadUrlDto } from "../files/dto/create-upload-url.dto";
 import { CreateContactMessageDto } from "./dto/create-contact-message.dto";
 import { CreateCustomOrderRequestDto } from "./dto/create-custom-order-request.dto";
 import { CreateDesignerApplicationDto } from "./dto/create-designer-application.dto";
@@ -27,6 +30,19 @@ export class PublicIntakeController {
   @Post("custom-order-requests")
   createCustomOrderRequest(@Body() dto: CreateCustomOrderRequestDto) {
     return this.intake.createCustomOrderRequest(dto);
+  }
+
+  @Post("files/upload-url")
+  createUploadUrl(@Body() dto: CreateUploadUrlDto) {
+    return this.intake.createPublicUploadUrl({
+      ...dto,
+      purpose: dto.purpose ?? AssetPurpose.DESIGN_ORIGINAL,
+    });
+  }
+
+  @Post("files/complete-upload")
+  completeUpload(@Body() dto: CompleteUploadDto) {
+    return this.intake.completePublicUpload(dto);
   }
 }
 

@@ -1020,6 +1020,39 @@ model User {
   tenantMemberships TenantMember[] @relation("TenantMemberUser")
   tenantInvitationsSent TenantMember[] @relation("TenantMemberInviter")
   entitlementOverridesCreated TenantEntitlementOverride[] @relation("TenantEntitlementOverrideCreator")
+  customerAddresses CustomerAddress[]
+  wishlistItems WishlistItem[]
+}
+
+model CustomerAddress {
+  id            String   @id @default(uuid())
+  userId        String
+  label         String
+  recipientName String
+  phone         String
+  line1         String
+  city          String
+  zone          String   @default("UZ")
+  isDefault     Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model WishlistItem {
+  id        String   @id @default(uuid())
+  userId    String
+  listingId String
+  createdAt DateTime @default(now())
+
+  user    User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  listing CommerceListing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, listingId])
+  @@index([userId])
 }
 
 model UserPreferences {
@@ -1754,6 +1787,7 @@ model CommerceListing {
   orderItems  OrderItem[]
   royaltyLedgerEntries RoyaltyLedgerEntry[]
   supportRequests SupportRequest[]
+  wishlistItems WishlistItem[]
 }
 
 model MarketplaceConfig {

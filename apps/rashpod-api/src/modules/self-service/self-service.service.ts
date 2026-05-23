@@ -1,9 +1,10 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
-import { DesignStatus, ListingStatus, OrderStatus, PaymentStatus, Prisma, ProductionJobStatus, SupportMessageVisibility, SupportPriority, SupportRequestStatus, UserRole } from "@prisma/client";
+import { DesignStatus, ListingStatus, ListingType, OrderStatus, PaymentStatus, Prisma, ProductionJobStatus, SupportMessageVisibility, SupportPriority, SupportRequestStatus, UserRole } from "@prisma/client";
 import { PrismaService } from "../../prisma/prisma.service";
 import { AuditService } from "../audit/audit.service";
 import { PaymentsService } from "../payments/payments.service";
 import { SupportRequestDto, UpdateCustomerProfileDto, UpdateDesignerProfileDto } from "./dto/self-service.dto";
+import { AddWishlistItemDto, CreateCustomerAddressDto, UpdateCustomerAddressDto } from "./dto/customer-address.dto";
 
 type CustomerStatus =
   | "PAYMENT_PENDING"
@@ -28,17 +29,21 @@ export class SelfServiceService {
   ) {}
 
   async customerDashboard(customerId: string) {
-    const orders = await this.prisma.order.findMany({
-      where: { customerId },
-      include: { items: true, payments: { orderBy: { createdAt: "desc" } }, productionJobs: true },
-      orderBy: { createdAt: "desc" },
-      take: 50,
-    });
+    const [orders, wishlistCount] = await Promise.all([
+      this.prisma.order.findMany({
+        where: { customerId },
+        include: { items: true, payments: { orderBy: { createdAt: "desc" } }, productionJobs: true },
+        orderBy: { createdAt: "desc" },
+        take: 50,
+      }),
+      this.prisma.wishlistItem.count({ where: { userId: customerId } }),
+    ]);
     const mapped = orders.map((order) => this.toCustomerOrderSummary(order));
     return {
       activeOrders: mapped.filter((order) => !["DELIVERED", "COMPLETED", "CANCELED"].includes(order.customerStatus)).length,
       unpaidOrders: mapped.filter((order) => order.customerStatus === "PAYMENT_PENDING" || order.customerStatus === "PAYMENT_FAILED").length,
       readyOrders: mapped.filter((order) => order.customerStatus === "READY_FOR_PICKUP" || order.customerStatus === "READY_FOR_DELIVERY").length,
+      wishlistCount,
       productionSummary: mapped.reduce<Record<string, number>>((acc, order) => {
         acc[order.customerStatus] = (acc[order.customerStatus] ?? 0) + 1;
         return acc;
@@ -113,6 +118,123 @@ export class SelfServiceService {
     });
     await this.audit.log({ actorId: customerId, action: "customer.profile.updated", entityType: "User", entityId: customerId });
     return this.customerProfile(updated.id);
+  }
+
+  async listCustomerAddresses(customerId: string) {
+    return this.prisma.customerAddress.findMany({
+      where: { userId: customerId },
+      orderBy: [{ isDefault: "desc" }, { updatedAt: "desc" }],
+    });
+  }
+
+  async createCustomerAddress(customerId: string, dto: CreateCustomerAddressDto) {
+    if (dto.isDefault) {
+      await this.prisma.customerAddress.updateMany({ where: { userId: customerId }, data: { isDefault: false } });
+    }
+    const hasDefault = await this.prisma.customerAddress.count({ where: { userId: customerId, isDefault: true } });
+    const address = await this.prisma.customerAddress.create({
+      data: {
+        userId: customerId,
+        label: dto.label.trim(),
+        recipientName: dto.recipientName.trim(),
+        phone: dto.phone.trim(),
+        line1: dto.line1.trim(),
+        city: dto.city.trim(),
+        zone: dto.zone?.trim() || "UZ",
+        isDefault: dto.isDefault ?? !hasDefault,
+      },
+    });
+    await this.audit.log({ actorId: customerId, action: "customer.address.created", entityType: "CustomerAddress", entityId: address.id });
+    return address;
+  }
+
+  async updateCustomerAddress(customerId: string, addressId: string, dto: UpdateCustomerAddressDto) {
+    const existing = await this.prisma.customerAddress.findUnique({ where: { id: addressId } });
+    if (!existing) throw new NotFoundException("Address not found");
+    if (existing.userId !== customerId) throw new ForbiddenException("Not your address");
+    if (dto.isDefault) {
+      await this.prisma.customerAddress.updateMany({ where: { userId: customerId }, data: { isDefault: false } });
+    }
+    const address = await this.prisma.customerAddress.update({
+      where: { id: addressId },
+      data: {
+        ...(dto.label !== undefined ? { label: dto.label.trim() } : {}),
+        ...(dto.recipientName !== undefined ? { recipientName: dto.recipientName.trim() } : {}),
+        ...(dto.phone !== undefined ? { phone: dto.phone.trim() } : {}),
+        ...(dto.line1 !== undefined ? { line1: dto.line1.trim() } : {}),
+        ...(dto.city !== undefined ? { city: dto.city.trim() } : {}),
+        ...(dto.zone !== undefined ? { zone: dto.zone.trim() || "UZ" } : {}),
+        ...(dto.isDefault !== undefined ? { isDefault: dto.isDefault } : {}),
+      },
+    });
+    await this.audit.log({ actorId: customerId, action: "customer.address.updated", entityType: "CustomerAddress", entityId: address.id });
+    return address;
+  }
+
+  async deleteCustomerAddress(customerId: string, addressId: string) {
+    const existing = await this.prisma.customerAddress.findUnique({ where: { id: addressId } });
+    if (!existing) throw new NotFoundException("Address not found");
+    if (existing.userId !== customerId) throw new ForbiddenException("Not your address");
+    await this.prisma.customerAddress.delete({ where: { id: addressId } });
+    if (existing.isDefault) {
+      const next = await this.prisma.customerAddress.findFirst({ where: { userId: customerId }, orderBy: { updatedAt: "desc" } });
+      if (next) await this.prisma.customerAddress.update({ where: { id: next.id }, data: { isDefault: true } });
+    }
+    await this.audit.log({ actorId: customerId, action: "customer.address.deleted", entityType: "CustomerAddress", entityId: addressId });
+    return { ok: true };
+  }
+
+  async setDefaultCustomerAddress(customerId: string, addressId: string) {
+    const existing = await this.prisma.customerAddress.findUnique({ where: { id: addressId } });
+    if (!existing) throw new NotFoundException("Address not found");
+    if (existing.userId !== customerId) throw new ForbiddenException("Not your address");
+    await this.prisma.customerAddress.updateMany({ where: { userId: customerId }, data: { isDefault: false } });
+    return this.prisma.customerAddress.update({ where: { id: addressId }, data: { isDefault: true } });
+  }
+
+  async listCustomerWishlist(customerId: string) {
+    const rows = await this.prisma.wishlistItem.findMany({
+      where: { userId: customerId },
+      include: {
+        listing: {
+          include: { designer: { select: { id: true, displayName: true, handle: true } } },
+        },
+      },
+      orderBy: { createdAt: "desc" },
+    });
+    return rows
+      .filter((row) => row.listing.status === ListingStatus.PUBLISHED)
+      .map((row) => this.toWishlistListing(row.listing, row.createdAt));
+  }
+
+  async addCustomerWishlistItem(customerId: string, dto: AddWishlistItemDto) {
+    const listing = await this.prisma.commerceListing.findUnique({ where: { id: dto.listingId } });
+    if (!listing) throw new NotFoundException("Listing not found");
+    if (listing.status !== ListingStatus.PUBLISHED) throw new BadRequestException("Listing is not available");
+    const item = await this.prisma.wishlistItem.upsert({
+      where: { userId_listingId: { userId: customerId, listingId: dto.listingId } },
+      create: { userId: customerId, listingId: dto.listingId },
+      update: {},
+    });
+    await this.audit.log({ actorId: customerId, action: "customer.wishlist.add", entityType: "WishlistItem", entityId: item.id, metadata: { listingId: dto.listingId } });
+    return item;
+  }
+
+  async removeCustomerWishlistItem(customerId: string, listingId: string) {
+    const existing = await this.prisma.wishlistItem.findUnique({
+      where: { userId_listingId: { userId: customerId, listingId } },
+    });
+    if (!existing) throw new NotFoundException("Wishlist item not found");
+    await this.prisma.wishlistItem.delete({ where: { id: existing.id } });
+    await this.audit.log({ actorId: customerId, action: "customer.wishlist.remove", entityType: "WishlistItem", entityId: existing.id, metadata: { listingId } });
+    return { ok: true };
+  }
+
+  async isListingWishlisted(customerId: string, listingId: string) {
+    const item = await this.prisma.wishlistItem.findUnique({
+      where: { userId_listingId: { userId: customerId, listingId } },
+    });
+    return { listingId, wishlisted: Boolean(item) };
   }
 
   async designerDashboard(designerId: string) {
@@ -542,5 +664,40 @@ export class SelfServiceService {
 
   private cleanJson(value: Record<string, unknown>): Prisma.InputJsonObject {
     return Object.fromEntries(Object.entries(value).filter(([, entry]) => entry !== undefined && entry !== "")) as Prisma.InputJsonObject;
+  }
+
+  private toWishlistListing(
+    row: {
+      id: string;
+      slug: string;
+      title: string;
+      description: string | null;
+      price: Prisma.Decimal;
+      currency: string;
+      type: ListingType;
+      imagesJson: unknown;
+      designer: { id: string; displayName: string; handle: string | null };
+    },
+    savedAt: Date,
+  ) {
+    const images = Array.isArray(row.imagesJson)
+      ? (row.imagesJson as unknown[]).filter((value): value is string => typeof value === "string")
+      : [];
+    return {
+      id: row.id,
+      slug: row.slug,
+      title: row.title,
+      description: row.description,
+      price: Number(row.price),
+      currency: row.currency,
+      type: row.type,
+      imageUrl: images[0] ?? null,
+      designer: {
+        id: row.designer.id,
+        displayName: row.designer.displayName,
+        handle: row.designer.handle ?? row.designer.displayName.toLowerCase().replace(/[^a-z0-9]+/g, "-"),
+      },
+      savedAt,
+    };
   }
 }

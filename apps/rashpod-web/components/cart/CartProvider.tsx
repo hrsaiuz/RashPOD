@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { Package, Tag, X } from "lucide-react";
@@ -37,11 +37,15 @@ interface CartContextValue {
 }
 
 const STORAGE_KEY = "rashpod_cart_v1";
-/** Free delivery threshold in UZS */
-const FREE_DELIVERY_TARGET = 500_000;
 const CartContext = createContext<CartContextValue | null>(null);
 
-export function CartProvider({ children }: { children: ReactNode }) {
+export function CartProvider({
+  children,
+  freeDeliveryThreshold = 500_000,
+}: {
+  children: ReactNode;
+  freeDeliveryThreshold?: number;
+}) {
   const [items, setItems] = useState<CartItem[]>([]);
   const [isOpen, setIsOpen] = useState(false);
   const [hydrated, setHydrated] = useState(false);
@@ -117,7 +121,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
   return (
     <CartContext.Provider value={value}>
       {children}
-      <MiniCartDrawer />
+      <MiniCartDrawer freeDeliveryThreshold={freeDeliveryThreshold} />
     </CartContext.Provider>
   );
 }
@@ -128,19 +132,51 @@ export function useCart() {
   return context;
 }
 
-function MiniCartDrawer() {
+function MiniCartDrawer({ freeDeliveryThreshold }: { freeDeliveryThreshold: number }) {
   const { items, isOpen, subtotal, closeCart, updateQuantity, removeItem } = useCart();
-  const remaining = Math.max(0, FREE_DELIVERY_TARGET - subtotal);
-  const progress = Math.min(100, (subtotal / FREE_DELIVERY_TARGET) * 100);
+  const drawerRef = useRef<HTMLElement>(null);
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const remaining = Math.max(0, freeDeliveryThreshold - subtotal);
+  const progress = Math.min(100, (subtotal / freeDeliveryThreshold) * 100);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const previousFocus = document.activeElement as HTMLElement | null;
+    closeButtonRef.current?.focus();
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Tab" || !drawerRef.current) return;
+      const focusables = drawerRef.current.querySelectorAll<HTMLElement>(
+        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+      );
+      if (focusables.length === 0) return;
+      const first = focusables[0];
+      const last = focusables[focusables.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      previousFocus?.focus();
+    };
+  }, [isOpen]);
 
   return (
     <>
       <div
-        aria-hidden="true"
+        aria-hidden={!isOpen}
         className={`fixed inset-0 z-40 bg-black/25 transition-opacity duration-300 ${isOpen ? "opacity-100" : "pointer-events-none opacity-0"}`}
         onClick={closeCart}
       />
       <aside
+        ref={drawerRef}
+        role="dialog"
+        aria-modal={isOpen}
         aria-hidden={!isOpen}
         aria-label="Shopping cart"
         className={`fixed right-0 top-0 z-modal h-dvh w-full max-w-[620px] overflow-hidden rounded-l-md bg-brand-bg shadow-lg transition-transform duration-300 ease-out ${isOpen ? "translate-x-0" : "translate-x-full pointer-events-none"}`}
@@ -148,12 +184,12 @@ function MiniCartDrawer() {
         <div className="flex h-full flex-col px-4 py-5 pb-[max(1rem,env(safe-area-inset-bottom))] sm:px-10 sm:py-8">
           <div className="mb-6 flex items-center justify-between sm:mb-8">
             <h2 className="text-section font-bold uppercase tracking-wide text-brand-ink">Order Summary</h2>
-            <button type="button" onClick={closeCart} aria-label="Close cart" className="grid h-11 w-11 place-items-center rounded-full text-brand-ink transition-colors hover:bg-white">
+            <button type="button" ref={closeButtonRef} onClick={closeCart} aria-label="Close cart" className="grid h-11 w-11 place-items-center rounded-full text-brand-ink transition-colors hover:bg-white">
               <X size={25} strokeWidth={1.8} />
             </button>
           </div>
 
-          <FreeDeliveryBar subtotal={subtotal} remaining={remaining} progress={progress} />
+          <FreeDeliveryBar subtotal={subtotal} remaining={remaining} progress={progress} threshold={freeDeliveryThreshold} />
 
           <div className="mb-4 grid grid-cols-[1fr_100px_82px] rounded-[5px] bg-brand-peach px-5 py-2 text-[11px] font-bold text-white sm:grid-cols-[1fr_140px_90px]">
             <span>product</span>
@@ -214,7 +250,19 @@ function MiniCartDrawer() {
   );
 }
 
-export function FreeDeliveryBar({ subtotal, remaining, progress, compact }: { subtotal: number; remaining: number; progress: number; compact?: boolean }) {
+export function FreeDeliveryBar({
+  subtotal,
+  remaining,
+  progress,
+  threshold = 500_000,
+  compact,
+}: {
+  subtotal: number;
+  remaining: number;
+  progress: number;
+  threshold?: number;
+  compact?: boolean;
+}) {
   return (
     <div className={compact ? "mb-4" : "mb-5"}>
       <div className="mb-1 flex items-center justify-between text-caption font-bold text-brand-ink">
@@ -226,7 +274,7 @@ export function FreeDeliveryBar({ subtotal, remaining, progress, compact }: { su
         </span>
         <span className="relative grid h-9 w-9 place-items-center text-caption font-bold">
           <span className="cart-flower absolute inset-0 bg-brand-peach" />
-          <span className="relative z-10">{Math.round(FREE_DELIVERY_TARGET / 1000)}k</span>
+          <span className="relative z-10">{Math.round(threshold / 1000)}k</span>
         </span>
       </div>
       <div className="h-[13px] overflow-hidden rounded-full border border-brand-blue bg-white">
@@ -239,9 +287,9 @@ export function FreeDeliveryBar({ subtotal, remaining, progress, compact }: { su
 function QuantityPill({ quantity, onChange }: { quantity: number; onChange: (quantity: number) => void }) {
   return (
     <div className="inline-flex h-[34px] min-w-[80px] items-center justify-between rounded-full bg-brand-bg px-4 text-[13px] font-black text-black">
-      <button type="button" onClick={() => onChange(Math.max(1, quantity - 1))}>-</button>
-      <span>{quantity}</span>
-      <button type="button" onClick={() => onChange(quantity + 1)}>+</button>
+      <button type="button" aria-label="Decrease quantity" onClick={() => onChange(Math.max(1, quantity - 1))}>-</button>
+      <span aria-live="polite">{quantity}</span>
+      <button type="button" aria-label="Increase quantity" onClick={() => onChange(quantity + 1)}>+</button>
     </div>
   );
 }

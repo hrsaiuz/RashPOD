@@ -1,9 +1,10 @@
-import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from "@nestjs/common";
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } from "@nestjs/common";
 import { CurrentUser, RequestUser } from "../../common/auth/current-user.decorator";
 import { JwtAuthGuard } from "../../common/auth/jwt-auth.guard";
 import { PermissionGuard } from "../../common/auth/permission.guard";
 import { RequirePermission } from "../../common/auth/permission.decorator";
 import { SupportRequestDto, UpdateCustomerProfileDto, UpdateDesignerProfileDto } from "./dto/self-service.dto";
+import { AddWishlistItemDto, CreateCustomerAddressDto, UpdateCustomerAddressDto } from "./dto/customer-address.dto";
 import { SelfServiceService } from "./self-service.service";
 
 @Controller()
@@ -51,6 +52,60 @@ export class SelfServiceController {
   @RequirePermission("customer:profile-update")
   updateCustomerProfile(@CurrentUser() user: RequestUser, @Body() dto: UpdateCustomerProfileDto) {
     return this.selfService.updateCustomerProfile(user.sub, dto);
+  }
+
+  @Get("customer/addresses")
+  @RequirePermission("customer:profile-update")
+  listCustomerAddresses(@CurrentUser() user: RequestUser) {
+    return this.selfService.listCustomerAddresses(user.sub);
+  }
+
+  @Post("customer/addresses")
+  @RequirePermission("customer:profile-update")
+  createCustomerAddress(@CurrentUser() user: RequestUser, @Body() dto: CreateCustomerAddressDto) {
+    return this.selfService.createCustomerAddress(user.sub, dto);
+  }
+
+  @Patch("customer/addresses/:id")
+  @RequirePermission("customer:profile-update")
+  updateCustomerAddress(@CurrentUser() user: RequestUser, @Param("id") id: string, @Body() dto: UpdateCustomerAddressDto) {
+    return this.selfService.updateCustomerAddress(user.sub, id, dto);
+  }
+
+  @Delete("customer/addresses/:id")
+  @RequirePermission("customer:profile-update")
+  deleteCustomerAddress(@CurrentUser() user: RequestUser, @Param("id") id: string) {
+    return this.selfService.deleteCustomerAddress(user.sub, id);
+  }
+
+  @Post("customer/addresses/:id/set-default")
+  @RequirePermission("customer:profile-update")
+  setDefaultCustomerAddress(@CurrentUser() user: RequestUser, @Param("id") id: string) {
+    return this.selfService.setDefaultCustomerAddress(user.sub, id);
+  }
+
+  @Get("customer/wishlist")
+  @RequirePermission("customer:dashboard-read")
+  listCustomerWishlist(@CurrentUser() user: RequestUser) {
+    return this.selfService.listCustomerWishlist(user.sub);
+  }
+
+  @Post("customer/wishlist")
+  @RequirePermission("customer:wishlist-manage")
+  addCustomerWishlistItem(@CurrentUser() user: RequestUser, @Body() dto: AddWishlistItemDto) {
+    return this.selfService.addCustomerWishlistItem(user.sub, dto);
+  }
+
+  @Delete("customer/wishlist/:listingId")
+  @RequirePermission("customer:wishlist-manage")
+  removeCustomerWishlistItem(@CurrentUser() user: RequestUser, @Param("listingId") listingId: string) {
+    return this.selfService.removeCustomerWishlistItem(user.sub, listingId);
+  }
+
+  @Get("customer/wishlist/:listingId/status")
+  @RequirePermission("customer:dashboard-read")
+  wishlistStatus(@CurrentUser() user: RequestUser, @Param("listingId") listingId: string) {
+    return this.selfService.isListingWishlisted(user.sub, listingId);
   }
 
   @Get("designer/dashboard")

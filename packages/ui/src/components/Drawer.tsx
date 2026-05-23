@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "../lib/utils";
 import { X } from "lucide-react";
@@ -43,7 +44,10 @@ export const Drawer: React.FC<DrawerProps> = ({
     };
   }, [open]);
 
-  return (
+  const [mounted, setMounted] = React.useState(false);
+  React.useEffect(() => setMounted(true), []);
+
+  const drawer = (
     <AnimatePresence>
       {open && (
         <>
@@ -52,7 +56,7 @@ export const Drawer: React.FC<DrawerProps> = ({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.18 }}
-            className="fixed inset-0 bg-black/40 backdrop-blur-sm z-40"
+            className="fixed inset-0 z-overlay bg-black/40 backdrop-blur-sm"
             onClick={onClose}
           />
           <motion.div
@@ -61,7 +65,7 @@ export const Drawer: React.FC<DrawerProps> = ({
             exit={{ x: side === "left" ? "-100%" : "100%" }}
             transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
             className={cn(
-              "fixed top-0 bottom-0 z-50 w-80 max-w-[85vw] bg-white shadow-lift overflow-y-auto",
+              "fixed top-0 bottom-0 z-modal w-80 max-w-[85vw] bg-white shadow-lift overflow-y-auto",
               side === "left" ? "left-0" : "right-0",
               className
             )}
@@ -84,5 +88,8 @@ export const Drawer: React.FC<DrawerProps> = ({
       )}
     </AnimatePresence>
   );
+
+  if (!mounted) return null;
+  return createPortal(drawer, document.body);
 };
 Drawer.displayName = "Drawer";

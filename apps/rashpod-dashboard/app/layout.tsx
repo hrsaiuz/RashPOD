@@ -36,7 +36,9 @@ async function getBranding(): Promise<{
   if (!apiUrl) return null;
 
   try {
-    const res = await fetch(`${apiUrl}/branding`, { cache: "no-store" });
+    const res = await fetch(`${apiUrl}/branding`, {
+      next: { revalidate: 60 * 60 * 24 * 7, tags: ["branding"] },
+    });
     if (!res.ok) return null;
     return await res.json();
   } catch {

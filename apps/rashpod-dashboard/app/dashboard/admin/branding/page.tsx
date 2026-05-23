@@ -5,6 +5,16 @@ import { Button, Card, rashpodTokens, Skeleton } from "@rashpod/ui";
 import { Upload, Image as ImageIcon } from "lucide-react";
 import DashboardLayout from "../../dashboard-layout";
 
+async function revalidateStorefrontBranding() {
+  const webUrl = process.env.NEXT_PUBLIC_WEB_URL;
+  const secret = process.env.REVALIDATE_SECRET;
+  if (!webUrl || !secret) return;
+  await fetch(`${webUrl}/api/revalidate/branding`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${secret}` },
+  }).catch(() => undefined);
+}
+
 type SlotKey = "storefrontLogoUrl" | "dashboardLogoUrl" | "loginLogoUrl" | "footerLogoUrl" | "faviconUrl";
 type ThemeImageUrlKey = "homeHeroImageUrl" | "homeDesignerSectionImageUrl";
 type ThemeImageAltKey = "homeHeroImageAlt" | "homeDesignerSectionImageAlt";
@@ -188,6 +198,7 @@ export default function BrandingPage() {
       });
       if (!completeRes.ok) throw new Error(`Finalize failed (${completeRes.status})`);
       await load();
+      await revalidateStorefrontBranding();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Upload failed");
     } finally {
@@ -215,6 +226,7 @@ export default function BrandingPage() {
       if (res.ok) {
         setThemeSaved(true);
         await load();
+        await revalidateStorefrontBranding();
       }
     } finally {
       setThemeSaving(false);

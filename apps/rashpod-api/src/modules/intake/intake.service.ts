@@ -1,7 +1,10 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
+import { Injectable, NotFoundException, ServiceUnavailableException } from "@nestjs/common";
 import { IntakeStatus, Prisma } from "@prisma/client";
 import { PrismaService } from "../../prisma/prisma.service";
 import { AuditService } from "../audit/audit.service";
+import { CompleteUploadDto } from "../files/dto/complete-upload.dto";
+import { CreateUploadUrlDto } from "../files/dto/create-upload-url.dto";
+import { FilesService } from "../files/files.service";
 import { CreateContactMessageDto } from "./dto/create-contact-message.dto";
 import { CreateCustomOrderRequestDto } from "./dto/create-custom-order-request.dto";
 import { CreateDesignerApplicationDto } from "./dto/create-designer-application.dto";
@@ -18,7 +21,24 @@ export class IntakeService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    private readonly files: FilesService,
   ) {}
+
+  private getIntakeOwnerId() {
+    const ownerId = process.env.INTAKE_SYSTEM_OWNER_ID;
+    if (!ownerId) {
+      throw new ServiceUnavailableException("Intake uploads are not configured");
+    }
+    return ownerId;
+  }
+
+  createPublicUploadUrl(dto: CreateUploadUrlDto) {
+    return this.files.createUploadUrl(this.getIntakeOwnerId(), dto);
+  }
+
+  completePublicUpload(dto: CompleteUploadDto) {
+    return this.files.completeUpload(this.getIntakeOwnerId(), dto);
+  }
 
   async createDesignerApplication(dto: CreateDesignerApplicationDto) {
     return this.prisma.designerApplication.create({

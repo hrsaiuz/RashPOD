@@ -222,14 +222,20 @@ export default function DashboardLayout({ children, role }: { children: ReactNod
     return () => controller.abort();
   }, [user]);
 
+  const navRole = useMemo(() => {
+    const actualRole = (user?.role || "").toUpperCase().replace("-", "_");
+    if (actualRole === "SUPER_ADMIN") return "super-admin";
+    return role;
+  }, [role, user?.role]);
+
   const links: DashboardLink[] = useMemo(() => {
-    return (ROLE_LINKS[role] ?? []).map((l) => ({
+    return (ROLE_LINKS[navRole] ?? []).map((l) => ({
       href: l.href,
       label: l.label,
       icon: l.icon,
       group: l.group,
     }));
-  }, [role]);
+  }, [navRole]);
 
   const breadcrumbs: BreadcrumbItem[] = useMemo(() => {
     const segments = pathname.split("/").filter(Boolean);
@@ -272,7 +278,7 @@ export default function DashboardLayout({ children, role }: { children: ReactNod
 
   return (
     <DashboardShell
-      role={ROLE_LABELS[role] || role}
+      role={ROLE_LABELS[navRole] || navRole}
       links={links}
       activePath={pathname}
       user={{

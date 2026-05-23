@@ -17,6 +17,21 @@ export interface PublicHeaderProps {
   logoUrl?: string | null;
   brandName?: string;
   className?: string;
+  cartItemCount?: number;
+  onCartOpen?: () => void;
+  cartIcon?: React.ReactNode;
+  localeSwitcher?: React.ReactNode;
+  navLabels?: {
+    shop?: string;
+    categories?: string;
+    films?: string;
+    sellOnRashpod?: string;
+    customOrder?: string;
+    business?: string;
+    about?: string;
+    signIn?: string;
+    startSelling?: string;
+  };
 }
 
 export const PublicHeader: React.FC<PublicHeaderProps> = ({
@@ -30,19 +45,24 @@ export const PublicHeader: React.FC<PublicHeaderProps> = ({
   logoUrl,
   brandName = "RashPOD",
   className,
+  cartItemCount = 0,
+  onCartOpen,
+  cartIcon,
+  localeSwitcher,
+  navLabels,
 }) => {
   const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false);
   const finalSignInUrl = signInUrl || `${dashboardUrl}/auth/login`;
   const finalStartSellingUrl = startSellingUrl || `${dashboardUrl}/auth/register`;
 
   const navLinks = [
-    { href: shopUrl, label: "Shop" },
-    { href: `${shopUrl}#categories`, label: "Categories" },
-    { href: filmsUrl, label: "Films" },
-    { href: "/sell-on-rashpod", label: "Sell on RashPOD" },
-    { href: "/custom-order", label: "Custom order" },
-    { href: "/business", label: "Start Your Business", hasChevron: true },
-    { href: aboutUrl, label: "About Us" },
+    { href: shopUrl, label: navLabels?.shop ?? "Shop" },
+    { href: `${shopUrl}#categories`, label: navLabels?.categories ?? "Categories" },
+    { href: filmsUrl, label: navLabels?.films ?? "Films" },
+    { href: "/sell-on-rashpod", label: navLabels?.sellOnRashpod ?? "Sell on RashPOD" },
+    { href: "/custom-order", label: navLabels?.customOrder ?? "Custom order" },
+    { href: "/business", label: navLabels?.business ?? "Start Your Business", hasChevron: true },
+    { href: aboutUrl, label: navLabels?.about ?? "About Us" },
   ];
 
   return (
@@ -80,57 +100,91 @@ export const PublicHeader: React.FC<PublicHeaderProps> = ({
 
           {/* Desktop Actions */}
           <div className="hidden items-center gap-4 lg:flex">
+            {localeSwitcher}
+            {onCartOpen ? (
+              <button
+                type="button"
+                className="relative inline-flex h-[34px] w-[34px] items-center justify-center rounded-[10px] border border-surface-borderSoft transition-colors hover:bg-surface-borderSoft"
+                onClick={onCartOpen}
+                aria-label={`Open cart${cartItemCount ? `, ${cartItemCount} items` : ""}`}
+              >
+                {cartIcon}
+                {cartItemCount > 0 ? (
+                  <span className="absolute -right-1 -top-1 inline-flex min-h-5 min-w-5 items-center justify-center rounded-full bg-brand-peach px-1 text-[10px] font-bold text-white">
+                    {cartItemCount > 99 ? "99+" : cartItemCount}
+                  </span>
+                ) : null}
+              </button>
+            ) : null}
             <Link href={finalSignInUrl}>
               <span className="inline-flex h-[34px] items-center justify-center rounded-[10px] border border-brand-peach bg-transparent px-4 text-[13px] font-medium text-brand-ink transition-colors hover:bg-brand-peach hover:text-white">
-                Sign in
+                {navLabels?.signIn ?? "Sign in"}
               </span>
             </Link>
             <Link href={finalStartSellingUrl}>
               <span className="inline-flex h-[34px] items-center justify-center rounded-[10px] bg-brand-peach px-4 text-[13px] font-medium text-white transition-colors hover:bg-[#EA8F6E]">
-                Start Selling
+                {navLabels?.startSelling ?? "Start Selling"}
               </span>
             </Link>
           </div>
 
           {/* Mobile Menu Button */}
-          <button
-            className="rounded-lg p-2 transition-colors hover:bg-surface-borderSoft lg:hidden"
-            onClick={() => setMobileMenuOpen(true)}
-            aria-label="Menu"
-          >
-            <Menu size={24} />
-          </button>
-        </div>
-
-        {/* Mobile Drawer */}
-        <Drawer open={mobileMenuOpen} onClose={() => setMobileMenuOpen(false)} side="right">
-          <nav className="flex flex-col gap-4" aria-label="Mobile navigation">
-            {navLinks.map((link) => (
-              <Link
-                key={link.href}
-                href={link.href}
-                className="flex items-center justify-between py-2 text-base font-medium text-brand-ink transition-colors hover:text-brand-blue"
-                onClick={() => setMobileMenuOpen(false)}
+          <div className="flex items-center gap-1 lg:hidden">
+            {onCartOpen ? (
+              <button
+                type="button"
+                className="relative rounded-lg p-2 transition-colors hover:bg-surface-borderSoft"
+                onClick={onCartOpen}
+                aria-label={`Open cart${cartItemCount ? `, ${cartItemCount} items` : ""}`}
               >
-                <span>{link.label}</span>
-                {link.hasChevron && <ChevronDown size={16} aria-hidden="true" />}
-              </Link>
-            ))}
-            <div className="border-t border-surface-borderSoft pt-4 mt-4 flex flex-col gap-3">
-              <Link href={finalSignInUrl} onClick={() => setMobileMenuOpen(false)}>
-                <span className="inline-flex h-11 w-full items-center justify-center rounded-[12px] border border-brand-peach text-brand-ink">
-                  Sign in
-                </span>
-              </Link>
-              <Link href={finalStartSellingUrl} onClick={() => setMobileMenuOpen(false)}>
-                <span className="inline-flex h-11 w-full items-center justify-center rounded-[12px] bg-brand-peach text-white">
-                  Start Selling
-                </span>
-              </Link>
-            </div>
-          </nav>
-        </Drawer>
+                {cartIcon ?? <Menu size={24} />}
+                {cartItemCount > 0 ? (
+                  <span className="absolute right-0 top-0 inline-flex min-h-5 min-w-5 items-center justify-center rounded-full bg-brand-peach px-1 text-[10px] font-bold text-white">
+                    {cartItemCount > 99 ? "99+" : cartItemCount}
+                  </span>
+                ) : null}
+              </button>
+            ) : null}
+            <button
+              className="rounded-lg p-2 transition-colors hover:bg-surface-borderSoft"
+              onClick={() => setMobileMenuOpen(true)}
+              aria-label="Menu"
+            >
+              <Menu size={24} />
+            </button>
+          </div>
+        </div>
       </header>
+
+      {/* Mobile Drawer — portaled to body so it isn't clipped by sticky header */}
+      <Drawer open={mobileMenuOpen} onClose={() => setMobileMenuOpen(false)} side="right">
+        <nav className="flex flex-col gap-4" aria-label="Mobile navigation">
+          {navLinks.map((link) => (
+            <Link
+              key={link.href}
+              href={link.href}
+              className="flex items-center justify-between py-2 text-base font-medium text-brand-ink transition-colors hover:text-brand-blue"
+              onClick={() => setMobileMenuOpen(false)}
+            >
+              <span>{link.label}</span>
+              {link.hasChevron && <ChevronDown size={16} aria-hidden="true" />}
+            </Link>
+          ))}
+          <div className="border-t border-surface-borderSoft pt-4 mt-4 flex flex-col gap-3">
+            {localeSwitcher ? <div className="pb-2">{localeSwitcher}</div> : null}
+            <Link href={finalSignInUrl} onClick={() => setMobileMenuOpen(false)}>
+              <span className="inline-flex h-11 w-full items-center justify-center rounded-[12px] border border-brand-peach text-brand-ink">
+                {navLabels?.signIn ?? "Sign in"}
+              </span>
+            </Link>
+            <Link href={finalStartSellingUrl} onClick={() => setMobileMenuOpen(false)}>
+              <span className="inline-flex h-11 w-full items-center justify-center rounded-[12px] bg-brand-peach text-white">
+                {navLabels?.startSelling ?? "Start Selling"}
+              </span>
+            </Link>
+          </div>
+        </nav>
+      </Drawer>
     </>
   );
 };
