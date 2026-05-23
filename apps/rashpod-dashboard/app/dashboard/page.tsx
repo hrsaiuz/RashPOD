@@ -6,17 +6,17 @@ import { useAuth } from "../auth/auth-provider";
 import { getDashboardHomePath } from "../../lib/dashboard-routes";
 
 export default function DashboardIndexPage() {
-  const { user, loading } = useAuth();
+  const { user, isLoading } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
-    if (loading) return;
+    if (isLoading) return;
     if (!user) {
       router.replace("/auth/login");
       return;
     }
     router.replace(getDashboardHomePath(user.role));
-  }, [user, loading, router]);
+  }, [user, isLoading, router]);
 
   return null;
 }
