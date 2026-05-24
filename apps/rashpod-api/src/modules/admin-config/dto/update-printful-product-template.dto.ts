@@ -61,6 +61,10 @@ export class UpdatePrintfulProductTemplateDto {
   @IsOptional()
   currency?: string;
 
+  @IsString()
+  @IsOptional()
+  previewImageUrl?: string | null;
+
   @IsBoolean()
   @IsOptional()
   active?: boolean;

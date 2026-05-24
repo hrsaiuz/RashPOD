@@ -31,31 +31,31 @@ export class MockupController {
   }
 
   @Post(":id/approve")
-  @RequirePermission("design:create")
+  @RequirePermission("design:moderate")
   approve(@CurrentUser() user: RequestUser, @Param("id") id: string) {
     return this.mockupService.approvePlacement(user.sub, id);
   }
 
   @Post(":id/generate-preview")
-  @RequirePermission("design:create")
+  @RequirePermission("design:moderate")
   generatePreview(@CurrentUser() user: RequestUser, @Param("id") id: string) {
     return this.mockupService.generatePreview(user.sub, id);
   }
 
   @Post(":id/generate-listing-images")
-  @RequirePermission("design:create")
+  @RequirePermission("design:moderate")
   generateListingImages(@CurrentUser() user: RequestUser, @Param("id") id: string) {
     return this.mockupService.generateListingImages(user.sub, id);
   }
 
   @Post(":id/generate-film-preview")
-  @RequirePermission("design:create")
+  @RequirePermission("design:moderate")
   generateFilmPreview(@CurrentUser() user: RequestUser, @Param("id") id: string) {
     return this.mockupService.generateFilmPreview(user.sub, id);
   }
 
   @Post(":id/generate-production-file")
-  @RequirePermission("design:create")
+  @RequirePermission("design:moderate")
   generateProductionFile(@CurrentUser() user: RequestUser, @Param("id") id: string) {
     return this.mockupService.generateProductionFile(user.sub, id);
   }

@@ -43,13 +43,11 @@ const ROLE_LINKS: Record<string, Array<{ href: string; label: string; icon?: any
   designer: [
     { href: "/dashboard/designer", label: "Overview", icon: LayoutDashboard },
     { href: "/dashboard/designer/designs", label: "My Designs", icon: ImageIcon },
-    { href: "/dashboard/designer/mockup-studio", label: "Mockup Studio", icon: Layers },
     { href: "/dashboard/designer/listings", label: "My Listings", icon: Tag },
     { href: "/dashboard/designer/film-rights", label: "Film Rights", icon: Film },
     { href: "/dashboard/designer/film-sales", label: "Film Sales", icon: Film },
     { href: "/dashboard/designer/corporate-bids", label: "Corporate Bids", icon: Briefcase },
-    { href: "/dashboard/designer/royalties", label: "Royalties", icon: DollarSign },
-    { href: "/dashboard/designer/earnings", label: "Earnings", icon: DollarSign },
+    { href: "/dashboard/designer/earnings", label: "Earnings & Payouts", icon: DollarSign },
     { href: "/dashboard/designer/analytics", label: "Analytics", icon: BarChart3 },
     { href: "/dashboard/notifications", label: "Notifications", icon: Bell },
     { href: "/dashboard/designer/support", label: "Support", icon: LifeBuoy },
@@ -77,7 +75,8 @@ const ROLE_LINKS: Record<string, Array<{ href: string; label: string; icon?: any
   corporate: [],
   moderator: [
     { href: "/dashboard/moderator", label: "Overview", icon: LayoutDashboard },
-    { href: "/dashboard/moderator/designs", label: "Moderation Queue", icon: Search },
+    { href: "/dashboard/moderator/designs", label: "Moderation Queue", icon: Search, group: "Workflow" },
+    { href: "/dashboard/moderator/listings", label: "Listing Review", icon: Tag, group: "Workflow" },
   ],
   finance: [
     { href: "/dashboard/finance", label: "Overview", icon: LayoutDashboard },
@@ -94,6 +93,13 @@ const ROLE_LINKS: Record<string, Array<{ href: string; label: string; icon?: any
   ],
   admin: [
     { href: "/dashboard/admin", label: "Overview", icon: LayoutDashboard },
+    { href: "/dashboard/super-admin/tenants", label: "Tenants", icon: Landmark, group: "Platform" },
+    { href: "/dashboard/super-admin/plans", label: "Plans", icon: CreditCard, group: "Platform" },
+    { href: "/dashboard/super-admin/roles", label: "Roles", icon: Users, group: "Platform" },
+    { href: "/dashboard/super-admin/permissions", label: "Permissions", icon: ShieldCheck, group: "Platform" },
+    { href: "/dashboard/super-admin/secrets", label: "Secrets", icon: Settings, group: "Platform" },
+    { href: "/dashboard/super-admin/system", label: "System", icon: CloudCog, group: "Platform" },
+    { href: "/dashboard/super-admin/audit-logs", label: "Platform Audit Logs", icon: ClipboardList, group: "Platform" },
     { href: "/dashboard/admin/orders", label: "Orders", icon: Package, group: "Operations" },
     { href: "/dashboard/admin/external-sales", label: "External Sales", icon: ClipboardList, group: "Operations" },
     { href: "/dashboard/admin/production", label: "Production", icon: Factory, group: "Operations" },
@@ -134,20 +140,6 @@ const ROLE_LINKS: Record<string, Array<{ href: string; label: string; icon?: any
     { href: "/dashboard/admin/reports", label: "Reports", icon: FileText, group: "AI & Growth" },
     { href: "/dashboard/admin/launch-readiness", label: "Launch Readiness", icon: CheckCircle, group: "Governance" },
     { href: "/dashboard/admin/audit-logs", label: "Audit Logs", icon: ClipboardList, group: "Governance" },
-  ],
-  "super-admin": [
-    { href: "/dashboard/super-admin", label: "Overview", icon: LayoutDashboard },
-    { href: "/dashboard/super-admin/tenants", label: "Tenants", icon: Landmark },
-    { href: "/dashboard/super-admin/plans", label: "Plans", icon: CreditCard },
-    { href: "/dashboard/super-admin/roles", label: "Roles", icon: Users },
-    { href: "/dashboard/super-admin/permissions", label: "Permissions", icon: ShieldCheck },
-    { href: "/dashboard/super-admin/secrets", label: "Secrets", icon: Settings },
-    { href: "/dashboard/super-admin/system", label: "System", icon: CloudCog },
-    { href: "/dashboard/super-admin/audit-logs", label: "Audit Logs", icon: ClipboardList },
-    { href: "/dashboard/admin/orders", label: "All Orders", icon: Package },
-    { href: "/dashboard/admin/worker-jobs", label: "Worker Jobs", icon: Settings },
-    { href: "/dashboard/moderator/designs", label: "Moderation", icon: Search },
-    { href: "/dashboard/finance/royalties", label: "Royalties", icon: DollarSign },
   ],
 };
 
@@ -224,7 +216,7 @@ export default function DashboardLayout({ children, role }: { children: ReactNod
 
   const navRole = useMemo(() => {
     const actualRole = (user?.role || "").toUpperCase().replace("-", "_");
-    if (actualRole === "SUPER_ADMIN") return "super-admin";
+    if (actualRole === "SUPER_ADMIN") return "admin";
     return role;
   }, [role, user?.role]);
 

@@ -7,6 +7,7 @@ export * from "./lib/format-price";
 
 // Existing components
 export * from "./components/ProductCard";
+export * from "./components/ProductPickerCard";
 export * from "./components/CategoryTile";
 export * from "./components/ProductCategoryBentoCard";
 export * from "./components/DecorativeBackground";

@@ -82,6 +82,13 @@ export class ListingsController {
     return this.listings.adminList({ status, type, q, limit: Number.isFinite(parsed) ? parsed : undefined });
   }
 
+  @Get("admin/listings/:id")
+  @UseGuards(JwtAuthGuard, PermissionGuard)
+  @RequirePermission("listing:publish")
+  adminById(@Param("id") id: string) {
+    return this.listings.adminById(id);
+  }
+
   @Patch("admin/listings/:id")
   @UseGuards(JwtAuthGuard, PermissionGuard)
   @RequirePermission("listing:publish")

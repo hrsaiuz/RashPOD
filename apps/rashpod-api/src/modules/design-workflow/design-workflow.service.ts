@@ -159,7 +159,7 @@ export class DesignWorkflowService {
     });
 
     const pendingSelections = await this.prisma.designProductSelection.findMany({
-      where: { designId: design.id, pipeline: PipelineType.LOCAL, status: DesignProductSelectionStatus.MOCKUP_PENDING },
+      where: { designId: design.id, status: DesignProductSelectionStatus.MOCKUP_PENDING },
     });
     for (const selection of pendingSelections) {
       await this.jobs.enqueue(selection.pipeline === PipelineType.LOCAL ? "GENERATE_LOCAL_MOCKUPS" : "GENERATE_PRINTFUL_MOCKUPS", {
@@ -410,7 +410,7 @@ export class DesignWorkflowService {
         positionHash,
         targetMarketplaces: marketplaces as Prisma.InputJsonValue,
         selectedByModeratorId: moderatorId,
-        status: DesignProductSelectionStatus.SELECTED,
+        status: DesignProductSelectionStatus.MOCKUP_PENDING,
       },
       update: {
         placementPresetId: preset.id,
@@ -422,10 +422,12 @@ export class DesignWorkflowService {
         scale: position.scale,
         targetMarketplaces: marketplaces as Prisma.InputJsonValue,
         selectedByModeratorId: moderatorId,
-        status: DesignProductSelectionStatus.SELECTED,
+        status: DesignProductSelectionStatus.MOCKUP_PENDING,
         errorMessage: null,
       },
     });
+
+    await this.ensurePendingMockupAssets(tx, designId, row.id, PipelineType.GLOBAL_PRINTFUL, ProviderType.PRINTFUL);
   }
 
   private async ensurePendingMockupAssets(tx: Prisma.TransactionClient, designId: string, selectionId: string, pipeline: PipelineType, provider: ProviderType) {

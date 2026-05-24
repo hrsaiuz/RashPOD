@@ -4,6 +4,7 @@ import { ChangeEvent, useEffect, useState } from "react";
 import { Button, Card, rashpodTokens, Skeleton } from "@rashpod/ui";
 import { Upload, Image as ImageIcon } from "lucide-react";
 import DashboardLayout from "../../dashboard-layout";
+import { LOGIN_DECORATION_SLOTS, type LoginDecorThemeUrlKey } from "../../../auth/auth-login-slots";
 
 async function revalidateStorefrontBranding() {
   const webUrl = process.env.NEXT_PUBLIC_WEB_URL;
@@ -28,7 +29,7 @@ type BrandingTheme = {
   homeHeroImageAlt: string;
   homeDesignerSectionImageUrl: string;
   homeDesignerSectionImageAlt: string;
-};
+} & Record<LoginDecorThemeUrlKey, string>;
 
 interface Branding {
   storefrontLogoUrl: string | null;
@@ -129,6 +130,14 @@ export default function BrandingPage() {
     homeHeroImageAlt: "RashPOD product mockup and designer artwork preview",
     homeDesignerSectionImageUrl: "",
     homeDesignerSectionImageAlt: "RashPOD designer community artwork",
+    loginDecorBlobTopLeftUrl: "",
+    loginDecorFlowerOrangeUrl: "",
+    loginDecorBlockBottomLeftUrl: "",
+    loginDecorFlowerBlueUrl: "",
+    loginDecorGradientCircleUrl: "",
+    loginDecorSunburstUrl: "",
+    loginDecorStarOrangeUrl: "",
+    loginDecorPentagonsUrl: "",
   });
   const [themeSaving, setThemeSaving] = useState(false);
   const [themeSaved, setThemeSaved] = useState(false);
@@ -297,6 +306,65 @@ export default function BrandingPage() {
     };
   }
 
+  async function uploadLoginDecoration(slot: typeof LOGIN_DECORATION_SLOTS[number], file: File) {
+    setError("");
+    setThemeSaving(false);
+    try {
+      const signRes = await fetch("/api/proxy/admin/media/upload-url", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          category: "UI_ASSET",
+          filename: file.name,
+          mimeType: file.type || "application/octet-stream",
+          sizeBytes: file.size,
+        }),
+      });
+      if (!signRes.ok) throw new Error(`Upload init failed (${signRes.status})`);
+      const signed = await signRes.json();
+
+      const putRes = await fetch(signed.uploadUrl, {
+        method: signed.method || "PUT",
+        headers: signed.headers || {},
+        body: file,
+      });
+      if (!putRes.ok) throw new Error(`Upload failed (${putRes.status})`);
+
+      const completeRes = await fetch("/api/proxy/admin/media/complete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          objectKey: signed.objectKey,
+          category: "UI_ASSET",
+          title: slot.title,
+          description: slot.description,
+          mimeType: file.type || "application/octet-stream",
+          sizeBytes: file.size,
+          key: slot.mediaKey,
+        }),
+      });
+      if (!completeRes.ok) throw new Error(`Finalize failed (${completeRes.status})`);
+      const asset = await completeRes.json();
+      const publicUrl = typeof asset.publicUrl === "string" ? asset.publicUrl : "";
+      const nextTheme = {
+        ...theme,
+        [slot.themeUrlKey]: publicUrl,
+      };
+      setTheme(nextTheme);
+      await saveThemePayload(nextTheme);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Upload failed");
+    }
+  }
+
+  function onLoginDecorationChange(slot: typeof LOGIN_DECORATION_SLOTS[number]) {
+    return (e: ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (file) void uploadLoginDecoration(slot, file);
+      e.target.value = "";
+    };
+  }
+
   return (
     <DashboardLayout role="admin">
       <div className="space-y-6">
@@ -410,6 +478,60 @@ export default function BrandingPage() {
           <div className="flex items-center gap-3 mt-4">
             <Button variant="primaryBlue" onClick={saveTheme} disabled={themeSaving}>
               {themeSaving ? "Saving…" : "Save brand identity"}
+            </Button>
+            {themeSaved && <span className="text-sm text-semantic-successText">Saved.</span>}
+          </div>
+        </Card>
+
+        <Card>
+          <h2 className="text-xl font-semibold text-brand-ink mb-1">Login page decorations</h2>
+          <p className="text-sm text-brand-muted mb-4">
+            Upload the Figma decorative shapes shown around the dashboard login and register forms. Each asset uses a
+            stable media key and is stored in the branding theme for fast loading.
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+            {LOGIN_DECORATION_SLOTS.map((slot) => {
+              const url = theme[slot.themeUrlKey];
+              return (
+                <div
+                  key={slot.themeUrlKey}
+                  className="rounded-2xl border border-surface-borderSoft bg-white/95 p-4 shadow-soft"
+                >
+                  <div className="mb-3">
+                    <h3 className="text-sm font-semibold text-brand-ink">{slot.title}</h3>
+                    <p className="text-xs text-brand-muted mt-1">{slot.description}</p>
+                    <p className="text-[11px] text-brand-subtle mt-1 font-mono">{slot.mediaKey}</p>
+                  </div>
+                  <div className="aspect-square bg-brand-bg rounded-xl flex items-center justify-center overflow-hidden mb-3">
+                    {url ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={url} alt="" className="max-h-full max-w-full object-contain" />
+                    ) : (
+                      <ImageIcon className="text-brand-muted" size={28} />
+                    )}
+                  </div>
+                  <label className="text-xs font-medium text-brand-ink">Image URL</label>
+                  <input
+                    type="url"
+                    value={url}
+                    onChange={(e) => setTheme({ ...theme, [slot.themeUrlKey]: e.target.value })}
+                    placeholder="Upload or paste URL"
+                    className={`${inputClassName} mb-3 text-xs`}
+                  />
+                  <label className="block">
+                    <input type="file" accept="image/*" className="hidden" onChange={onLoginDecorationChange(slot)} />
+                    <span className={uploadButtonClassName}>
+                      <Upload size={16} />
+                      {url ? "Replace" : "Upload"}
+                    </span>
+                  </label>
+                </div>
+              );
+            })}
+          </div>
+          <div className="flex items-center gap-3 mt-4">
+            <Button variant="primaryBlue" onClick={saveTheme} disabled={themeSaving}>
+              {themeSaving ? "Saving…" : "Save login decorations"}
             </Button>
             {themeSaved && <span className="text-sm text-semantic-successText">Saved.</span>}
           </div>

@@ -38,6 +38,7 @@ type PrintfulTemplate = {
   id: string;
   rashpodProductType: string;
   displayName: string;
+  previewImageUrl?: string | null;
   printfulCatalogProductId: string;
   printfulProductName: string;
   defaultTechnique: string;
@@ -100,6 +101,7 @@ export default function AdminPipelineConfigPage() {
     defaultRetailPrice: "",
     estimatedBaseCost: "",
     currency: "USD",
+    previewImageUrl: "",
   });
   const [settingsForm, setSettingsForm] = useState({
     enabled: false,
@@ -195,9 +197,10 @@ export default function AdminPipelineConfigPage() {
         defaultRetailPrice: numberOrUndefined(templateForm.defaultRetailPrice),
         estimatedBaseCost: numberOrUndefined(templateForm.estimatedBaseCost),
         currency: templateForm.currency,
+        previewImageUrl: templateForm.previewImageUrl || undefined,
         active: true,
       });
-      setTemplateForm((current) => ({ ...current, displayName: "", printfulCatalogProductId: "", printfulProductName: "", printfulVariantIds: "" }));
+      setTemplateForm((current) => ({ ...current, displayName: "", printfulCatalogProductId: "", printfulProductName: "", printfulVariantIds: "", previewImageUrl: "" }));
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to save Printful template");
@@ -346,6 +349,7 @@ export default function AdminPipelineConfigPage() {
                 <Field label="Retail price" value={templateForm.defaultRetailPrice} onChange={(value) => setTemplateForm((current) => ({ ...current, defaultRetailPrice: value }))} type="number" />
                 <Field label="Base cost" value={templateForm.estimatedBaseCost} onChange={(value) => setTemplateForm((current) => ({ ...current, estimatedBaseCost: value }))} type="number" />
                 <Field label="Currency" value={templateForm.currency} onChange={(value) => setTemplateForm((current) => ({ ...current, currency: value }))} required />
+                <Field label="Preview image URL" value={templateForm.previewImageUrl} onChange={(value) => setTemplateForm((current) => ({ ...current, previewImageUrl: value }))} />
                 <div className="flex items-end"><Button type="submit" disabled={saving || !templateForm.displayName || !templateForm.printfulVariantIds}><Plus size={16} /> Add Template</Button></div>
               </form>
               <TemplateList items={templates} onToggle={toggleTemplate} />
@@ -385,17 +389,27 @@ function TemplateList({ items, onToggle }: { items: PrintfulTemplate[]; onToggle
   return (
     <div className="mt-5 grid gap-3 lg:grid-cols-3">
       {items.map((item) => (
-        <div key={item.id} className="rounded-[14px] border border-surface-borderSoft p-4">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <p className="font-semibold text-brand-ink">{item.displayName}</p>
-              <p className="text-sm text-brand-muted">{item.printfulProductName} · {item.currency}</p>
-            </div>
-            <StatusBadge status={item.active ? "ACTIVE" : "INACTIVE"} />
+        <div key={item.id} className="overflow-hidden rounded-[14px] border border-surface-borderSoft">
+          <div className="aspect-video flex items-center justify-center bg-brand-bg">
+            {item.previewImageUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={item.previewImageUrl} alt={item.displayName} className="h-full w-full object-contain" />
+            ) : (
+              <Globe2 className="text-brand-muted" size={32} />
+            )}
           </div>
-          <div className="mt-3 flex items-center justify-between text-xs text-brand-muted">
-            <span>{item.defaultTechnique} / {item.defaultPlacement}</span>
-            <Button size="sm" variant="ghost" onClick={() => onToggle(item)}>{item.active ? "Deactivate" : "Activate"}</Button>
+          <div className="p-4">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="font-semibold text-brand-ink">{item.displayName}</p>
+                <p className="text-sm text-brand-muted">{item.printfulProductName} · {item.currency}</p>
+              </div>
+              <StatusBadge status={item.active ? "ACTIVE" : "INACTIVE"} />
+            </div>
+            <div className="mt-3 flex items-center justify-between text-xs text-brand-muted">
+              <span>{item.defaultTechnique} / {item.defaultPlacement}</span>
+              <Button size="sm" variant="ghost" onClick={() => onToggle(item)}>{item.active ? "Deactivate" : "Activate"}</Button>
+            </div>
           </div>
         </div>
       ))}

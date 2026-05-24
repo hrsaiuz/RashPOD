@@ -52,6 +52,10 @@ export class CreatePrintfulProductTemplateDto {
   @IsOptional()
   currency?: string;
 
+  @IsString()
+  @IsOptional()
+  previewImageUrl?: string;
+
   @IsBoolean()
   @IsOptional()
   active?: boolean;

@@ -3,11 +3,12 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { AlertTriangle, ArrowLeft, Globe2, MapPin, Plus, Trash2, XCircle } from "lucide-react";
-import { Button, Card, EmptyState, ErrorState, Input, StatusBadge } from "@rashpod/ui";
+import { AlertTriangle, ArrowLeft, ChevronDown, ChevronUp, Globe2, MapPin, Plus, Trash2, XCircle } from "lucide-react";
+import { Button, Card, EmptyState, ErrorState, Input, ProductPickerGrid, StatusBadge } from "@rashpod/ui";
 import DashboardLayout from "../../../dashboard-layout";
 import { api, type DesignWorkflowDetail } from "../../../../../lib/api";
 import { useAuth } from "../../../../auth/auth-provider";
+import { ModeratorListingWizard } from "../../moderator-listing-wizard";
 
 const REJECTION_REASONS = [
   ["COPYRIGHT_RISK", "Copyright or trademark risk"],
@@ -34,6 +35,7 @@ const MARKETPLACES = [
 type BaseProductOption = {
   id: string;
   name: string;
+  imageUrl?: string | null;
   isActive?: boolean;
   productType?: { name?: string | null } | null;
 };
@@ -91,10 +93,13 @@ type PrintAreaOption = {
 type PrintfulTemplateOption = {
   id: string;
   displayName: string;
+  previewImageUrl?: string | null;
   active?: boolean;
   defaultTechnique?: string | null;
   allowedTechniques?: unknown;
 };
+
+type PipelineMode = "uzbek" | "global";
 
 type LocalSelectionForm = {
   id: string;
@@ -148,6 +153,9 @@ export default function Page() {
   const [selectedReasons, setSelectedReasons] = useState<string[]>([]);
   const [customReason, setCustomReason] = useState("");
   const [notes, setNotes] = useState("");
+  const [pipelineMode, setPipelineMode] = useState<PipelineMode>("uzbek");
+  const [expandedLocal, setExpandedLocal] = useState<Record<string, boolean>>({});
+  const [expandedGlobal, setExpandedGlobal] = useState<Record<string, boolean>>({});
 
   const activeBaseProducts = useMemo(() => baseProducts.filter((item) => item.isActive !== false), [baseProducts]);
   const activeMockupTemplates = useMemo(() => mockupTemplates.filter((item) => item.isActive !== false), [mockupTemplates]);
@@ -164,6 +172,25 @@ export default function Page() {
     void loadConfig();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, authLoading, params.id]);
+
+  const canModerate = useMemo(() => {
+    if (!detail) return false;
+    return ["SUBMITTED", "PENDING_MODERATION"].includes(detail.status);
+  }, [detail]);
+
+  const mockupPending = useMemo(
+    () => detail?.productSelections?.some((selection) => ["MOCKUP_PENDING", "MOCKUP_GENERATING"].includes(selection.status)) ?? false,
+    [detail?.productSelections],
+  );
+
+  useEffect(() => {
+    if (!mockupPending) return;
+    const timer = window.setInterval(() => {
+      void load();
+    }, 5000);
+    return () => window.clearInterval(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mockupPending, params.id]);
 
   async function load() {
     setLoading(true);
@@ -326,13 +353,27 @@ export default function Page() {
     }));
   }
 
+  async function submitApproval() {
+    const decision = pipelineMode === "global" ? "APPROVE_GLOBAL" : "APPROVE_LOCAL";
+    if (decision === "APPROVE_GLOBAL" && (!localSelections.length || !globalSelections.length)) {
+      setError("Global pipeline requires at least one local product and one Printful template.");
+      return;
+    }
+    await submitDecision(decision);
+  }
+
   async function submitDecision(decision: "APPROVE_LOCAL" | "APPROVE_GLOBAL" | "REJECT") {
     setSubmitting(true);
     setError("");
     try {
       const payload = decision === "REJECT"
         ? { decision, rejectionReasons: selectedReasons, customRejectionReason: customReason || undefined, moderatorNotes: notes || undefined }
-        : { decision, localSelections: toLocalPayload(), globalPrintfulSelections: decision === "APPROVE_GLOBAL" ? toGlobalPayload() : undefined, moderatorNotes: notes || undefined };
+        : {
+            decision,
+            localSelections: toLocalPayload(),
+            globalPrintfulSelections: decision === "APPROVE_GLOBAL" ? toGlobalPayload() : undefined,
+            moderatorNotes: notes || undefined,
+          };
       setDetail(await api.post<DesignWorkflowDetail>(`/admin/designs/${params.id}/moderation-decision`, payload));
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to submit moderation decision");
@@ -390,49 +431,84 @@ export default function Page() {
                 </div>
               </Card>
 
+              {canModerate ? (
               <Card>
                 <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
                   <div>
-                    <h2 className="text-xl font-semibold text-brand-ink">Pipeline Decisions</h2>
-                    <p className="mt-1 text-sm text-brand-muted">{configLoading ? "Loading product configuration..." : `${activeBaseProducts.length} local products, ${activePrintfulTemplates.length} global templates`}</p>
+                    <h2 className="text-xl font-semibold text-brand-ink">Pipeline Approval</h2>
+                    <p className="mt-1 text-sm text-brand-muted">{configLoading ? "Loading product configuration..." : `${activeBaseProducts.length} local products, ${activePrintfulTemplates.length} Printful templates`}</p>
                   </div>
                   <Button variant="secondary" size="sm" onClick={loadConfig} disabled={configLoading}>Refresh</Button>
                 </div>
 
+                <div className="mb-5 grid gap-3 sm:grid-cols-2">
+                  <button
+                    type="button"
+                    onClick={() => setPipelineMode("uzbek")}
+                    className={`rounded-2xl border p-4 text-left transition ${pipelineMode === "uzbek" ? "border-brand-blue bg-brand-blue/5 ring-2 ring-brand-blue/20" : "border-surface-borderSoft bg-white"}`}
+                  >
+                    <div className="flex items-center gap-2 text-brand-blue">
+                      <MapPin size={18} />
+                      <span className="font-semibold text-brand-ink">Uzbek pipeline</span>
+                    </div>
+                    <p className="mt-2 text-sm text-brand-muted">Local production with RashPOD base products and mockup templates.</p>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPipelineMode("global")}
+                    className={`rounded-2xl border p-4 text-left transition ${pipelineMode === "global" ? "border-brand-peach bg-brand-peach/10 ring-2 ring-brand-peach/30" : "border-surface-borderSoft bg-white"}`}
+                  >
+                    <div className="flex items-center gap-2 text-brand-peach">
+                      <Globe2 size={18} />
+                      <span className="font-semibold text-brand-ink">Global pipeline</span>
+                    </div>
+                    <p className="mt-2 text-sm text-brand-muted">Uzbek local products plus Printful pathway for global marketplaces.</p>
+                  </button>
+                </div>
+
                 <div className="space-y-5">
-                  <DecisionSection icon={<MapPin size={20} />} title="Local Products">
+                  <DecisionSection icon={<MapPin size={20} />} title={pipelineMode === "global" ? "Uzbek Base Products" : "Select Base Products"}>
                     <div className="space-y-4">
                       {localSelections.map((selection, index) => (
                         <SelectionPanel key={selection.id} title={`Local selection ${index + 1}`} onRemove={localSelections.length > 1 ? () => setLocalSelections((current) => current.filter((_, itemIndex) => itemIndex !== index)) : undefined}>
-                          <div className="grid gap-3 md:grid-cols-2">
-                            <SelectField label="Product" value={selection.localBaseProductId} onChange={(value) => selectLocalProduct(index, value)} options={activeBaseProducts.map((item) => ({ value: item.id, label: item.productType?.name ? `${item.name} (${item.productType.name})` : item.name }))} />
-                            <SelectField label="Placement" value={selection.placementPresetId} onChange={(value) => selectLocalPreset(index, value)} options={localPresetsFor(selection.localBaseProductId).map((item) => ({ value: item.id, label: `${item.name} - ${item.placement}` }))} />
-                            <SelectField label="Mockup template" value={selection.mockupTemplateId} onChange={(value) => selectLocalTemplate(index, value)} options={localTemplatesFor(selection.localBaseProductId).map((item) => ({ value: item.id, label: item.name }))} />
-                            <SelectField label="Print area / safe zone" value={selection.printAreaId} onChange={(value) => selectPrintArea(index, value)} options={printAreasFor(selection.mockupTemplateId, selection.placementPresetId).map((item) => ({ value: item.id, label: `${item.name} - safe ${item.safeWidth}x${item.safeHeight}px` }))} />
+                          <div>
+                            <p className="mb-2 text-sm font-medium text-brand-ink">Base product</p>
+                            <ProductPickerGrid
+                              items={activeBaseProducts.map((item) => ({
+                                id: item.id,
+                                name: item.name,
+                                imageUrl: item.imageUrl,
+                                subtitle: item.productType?.name ?? undefined,
+                                badge: item.productType?.name ?? "Local",
+                              }))}
+                              selectedId={selection.localBaseProductId}
+                              onSelect={(value) => selectLocalProduct(index, value)}
+                              emptyLabel="No active base products configured."
+                            />
                           </div>
-                          <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                            <SelectField label="Unit" value={selection.unit} onChange={(value) => updateLocalSelection(index, { unit: value as LocalSelectionForm["unit"] })} options={[{ value: "CM", label: "Centimeters" }, { value: "PX", label: "Pixels" }]} />
-                            <SelectField label="Anchor" value={selection.anchor} onChange={(value) => updateLocalSelection(index, { anchor: value as LocalSelectionForm["anchor"] })} options={[{ value: "TOP_LEFT", label: "Top left" }, { value: "CENTER", label: "Center" }]} />
-                            <NumberField label="Scale" value={selection.scale} onChange={(value) => updateLocalSelection(index, { scale: value })} />
-                            <NumberField label="Rotation" value={selection.rotation} onChange={(value) => updateLocalSelection(index, { rotation: value })} />
-                          </div>
-                          <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                            {selection.unit === "PX" ? (
-                              <>
-                                <NumberField label="Width px" value={selection.widthPx} onChange={(value) => updateLocalSelection(index, { widthPx: value })} />
-                                <NumberField label="Height px" value={selection.heightPx} onChange={(value) => updateLocalSelection(index, { heightPx: value })} />
-                                <NumberField label="X px" value={selection.xPx} onChange={(value) => updateLocalSelection(index, { xPx: value })} />
-                                <NumberField label="Y px" value={selection.yPx} onChange={(value) => updateLocalSelection(index, { yPx: value })} />
-                              </>
-                            ) : (
-                              <>
-                                <NumberField label="Width cm" value={selection.widthCm} onChange={(value) => updateLocalSelection(index, { widthCm: value })} />
-                                <NumberField label="Height cm" value={selection.heightCm} onChange={(value) => updateLocalSelection(index, { heightCm: value })} />
-                                <NumberField label="X cm" value={selection.xCm} onChange={(value) => updateLocalSelection(index, { xCm: value })} />
-                                <NumberField label="Y cm" value={selection.yCm} onChange={(value) => updateLocalSelection(index, { yCm: value })} />
-                              </>
-                            )}
-                          </div>
+                          <button
+                            type="button"
+                            className="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-brand-blue"
+                            onClick={() => setExpandedLocal((current) => ({ ...current, [selection.id]: !current[selection.id] }))}
+                          >
+                            {expandedLocal[selection.id] ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                            Advanced placement
+                          </button>
+                          {expandedLocal[selection.id] ? (
+                            <>
+                              <div className="mt-3 grid gap-3 md:grid-cols-2">
+                                <SelectField label="Placement" value={selection.placementPresetId} onChange={(value) => selectLocalPreset(index, value)} options={localPresetsFor(selection.localBaseProductId).map((item) => ({ value: item.id, label: `${item.name} - ${item.placement}` }))} />
+                                <SelectField label="Mockup template" value={selection.mockupTemplateId} onChange={(value) => selectLocalTemplate(index, value)} options={localTemplatesFor(selection.localBaseProductId).map((item) => ({ value: item.id, label: item.name }))} />
+                                <SelectField label="Print area / safe zone" value={selection.printAreaId} onChange={(value) => selectPrintArea(index, value)} options={printAreasFor(selection.mockupTemplateId, selection.placementPresetId).map((item) => ({ value: item.id, label: `${item.name} - safe ${item.safeWidth}x${item.safeHeight}px` }))} />
+                              </div>
+                              <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                                <SelectField label="Unit" value={selection.unit} onChange={(value) => updateLocalSelection(index, { unit: value as LocalSelectionForm["unit"] })} options={[{ value: "CM", label: "Centimeters" }, { value: "PX", label: "Pixels" }]} />
+                                <SelectField label="Anchor" value={selection.anchor} onChange={(value) => updateLocalSelection(index, { anchor: value as LocalSelectionForm["anchor"] })} options={[{ value: "TOP_LEFT", label: "Top left" }, { value: "CENTER", label: "Center" }]} />
+                                <NumberField label="Scale" value={selection.scale} onChange={(value) => updateLocalSelection(index, { scale: value })} />
+                                <NumberField label="Rotation" value={selection.rotation} onChange={(value) => updateLocalSelection(index, { rotation: value })} />
+                              </div>
+                            </>
+                          ) : null}
                           {selection.printAreaId ? <p className="mt-3 text-xs text-brand-muted">{printAreaSummary(printAreas.find((item) => item.id === selection.printAreaId))}</p> : <p className="mt-3 text-xs text-status-danger">Select an active print area before approval.</p>}
                         </SelectionPanel>
                       ))}
@@ -442,22 +518,49 @@ export default function Page() {
                     </div>
                   </DecisionSection>
 
-                  <DecisionSection icon={<Globe2 size={20} />} title="Global Printful Products">
+                  {pipelineMode === "global" ? (
+                  <DecisionSection icon={<Globe2 size={20} />} title="Printful Products">
                     <div className="space-y-4">
                       {globalSelections.map((selection, index) => (
-                        <SelectionPanel key={selection.id} title={`Global selection ${index + 1}`} onRemove={globalSelections.length > 1 ? () => setGlobalSelections((current) => current.filter((_, itemIndex) => itemIndex !== index)) : undefined}>
-                          <div className="grid gap-3 md:grid-cols-2">
-                            <SelectField label="Template" value={selection.printfulProductTemplateId} onChange={(value) => selectPrintfulTemplate(index, value)} options={activePrintfulTemplates.map((item) => ({ value: item.id, label: item.displayName }))} />
-                            <SelectField label="Placement" value={selection.placementPresetId} onChange={(value) => selectGlobalPreset(index, value)} options={globalPresetsFor(selection.printfulProductTemplateId).map((item) => ({ value: item.id, label: `${item.name} - ${item.placement}` }))} />
+                        <SelectionPanel key={selection.id} title={`Printful selection ${index + 1}`} onRemove={globalSelections.length > 1 ? () => setGlobalSelections((current) => current.filter((_, itemIndex) => itemIndex !== index)) : undefined}>
+                          <div>
+                            <p className="mb-2 text-sm font-medium text-brand-ink">Printful template</p>
+                            <ProductPickerGrid
+                              items={activePrintfulTemplates.map((item) => ({
+                                id: item.id,
+                                name: item.displayName,
+                                imageUrl: item.previewImageUrl,
+                                subtitle: "Printful catalog",
+                                badge: "Printful",
+                              }))}
+                              selectedId={selection.printfulProductTemplateId}
+                              onSelect={(value) => selectPrintfulTemplate(index, value)}
+                              emptyLabel="No active Printful templates configured."
+                            />
                           </div>
-                          <div className="mt-3 grid gap-3 sm:grid-cols-3 lg:grid-cols-6">
-                            <NumberField label="Width in" value={selection.widthIn} onChange={(value) => updateGlobalSelection(index, { widthIn: value })} />
-                            <NumberField label="Height in" value={selection.heightIn} onChange={(value) => updateGlobalSelection(index, { heightIn: value })} />
-                            <NumberField label="Left in" value={selection.leftIn} onChange={(value) => updateGlobalSelection(index, { leftIn: value })} />
-                            <NumberField label="Top in" value={selection.topIn} onChange={(value) => updateGlobalSelection(index, { topIn: value })} />
-                            <NumberField label="Scale" value={selection.scale} onChange={(value) => updateGlobalSelection(index, { scale: value })} />
-                            <TextField label="Technique" value={selection.technique} onChange={(value) => updateGlobalSelection(index, { technique: value })} />
-                          </div>
+                          <button
+                            type="button"
+                            className="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-brand-blue"
+                            onClick={() => setExpandedGlobal((current) => ({ ...current, [selection.id]: !current[selection.id] }))}
+                          >
+                            {expandedGlobal[selection.id] ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                            Advanced placement
+                          </button>
+                          {expandedGlobal[selection.id] ? (
+                            <>
+                              <div className="mt-3 grid gap-3 md:grid-cols-2">
+                                <SelectField label="Placement" value={selection.placementPresetId} onChange={(value) => selectGlobalPreset(index, value)} options={globalPresetsFor(selection.printfulProductTemplateId).map((item) => ({ value: item.id, label: `${item.name} - ${item.placement}` }))} />
+                              </div>
+                              <div className="mt-3 grid gap-3 sm:grid-cols-3 lg:grid-cols-6">
+                                <NumberField label="Width in" value={selection.widthIn} onChange={(value) => updateGlobalSelection(index, { widthIn: value })} />
+                                <NumberField label="Height in" value={selection.heightIn} onChange={(value) => updateGlobalSelection(index, { heightIn: value })} />
+                                <NumberField label="Left in" value={selection.leftIn} onChange={(value) => updateGlobalSelection(index, { leftIn: value })} />
+                                <NumberField label="Top in" value={selection.topIn} onChange={(value) => updateGlobalSelection(index, { topIn: value })} />
+                                <NumberField label="Scale" value={selection.scale} onChange={(value) => updateGlobalSelection(index, { scale: value })} />
+                                <TextField label="Technique" value={selection.technique} onChange={(value) => updateGlobalSelection(index, { technique: value })} />
+                              </div>
+                            </>
+                          ) : null}
                           <div className="mt-4 flex flex-wrap gap-2">
                             {MARKETPLACES.map(([value, label]) => (
                               <label key={value} className="flex min-h-11 items-center gap-2 rounded-pill border border-surface-borderSoft px-3 text-sm text-brand-ink">
@@ -469,21 +572,20 @@ export default function Page() {
                         </SelectionPanel>
                       ))}
                       <Button variant="secondary" size="sm" onClick={() => setGlobalSelections((current) => [...current, createGlobalSelection(printfulTemplates, placementPresets)])} disabled={configLoading}>
-                        <Plus size={16} /> Add Global Product
+                        <Plus size={16} /> Add Printful Product
                       </Button>
                     </div>
                   </DecisionSection>
+                  ) : null}
                 </div>
 
-                <div className="mt-5 flex flex-wrap gap-3">
-                  <Button onClick={() => submitDecision("APPROVE_LOCAL")} disabled={submitting || configLoading || !localSelections.length} loading={submitting}>
-                    <MapPin size={18} /> Approve Local
-                  </Button>
-                  <Button variant="primaryPeach" onClick={() => submitDecision("APPROVE_GLOBAL")} disabled={submitting || configLoading || !globalSelections.length} loading={submitting}>
-                    <Globe2 size={18} /> Approve Global
+                <div className="mt-5">
+                  <Button onClick={submitApproval} disabled={submitting || configLoading || !localSelections.length || (pipelineMode === "global" && !globalSelections.length)} loading={submitting}>
+                    <MapPin size={18} /> Approve & Generate Mockups
                   </Button>
                 </div>
               </Card>
+              ) : null}
 
               <Card>
                 <h2 className="mb-4 text-xl font-semibold text-brand-ink">Workflow History</h2>
@@ -523,12 +625,19 @@ export default function Page() {
                         {selection.mockupAssets?.length ? (
                           <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                             {selection.mockupAssets.map((asset) => (
-                              <div key={asset.id} className="rounded-xl border border-surface-borderSoft bg-white p-3">
-                                <div className="flex items-center justify-between gap-2">
+                              <div key={asset.id} className="overflow-hidden rounded-xl border border-surface-borderSoft bg-white">
+                                <div className="aspect-square flex items-center justify-center bg-brand-bg">
+                                  {asset.imageUrl || asset.thumbnailUrl ? (
+                                    // eslint-disable-next-line @next/next/no-img-element
+                                    <img src={asset.imageUrl ?? asset.thumbnailUrl ?? ""} alt={asset.mockupType} className="h-full w-full object-contain" />
+                                  ) : (
+                                    <p className="px-3 text-center text-xs text-brand-muted">{asset.status}</p>
+                                  )}
+                                </div>
+                                <div className="flex items-center justify-between gap-2 p-2">
                                   <p className="text-sm font-semibold text-brand-ink">{asset.mockupType}</p>
                                   <StatusBadge status={asset.status} />
                                 </div>
-                                <p className="mt-2 truncate text-xs text-brand-muted">{asset.imageUrl ?? asset.thumbnailUrl ?? "Pending render"}</p>
                               </div>
                             ))}
                           </div>
@@ -540,8 +649,44 @@ export default function Page() {
                   <p className="text-brand-muted">No product selections have been approved yet.</p>
                 )}
               </Card>
+
+              {(detail.listings ?? []).filter((listing) => listing.status === "DRAFT").map((listing) => {
+                const selection = detail.productSelections?.find((item) => item.id === listing.designProductSelectionId);
+                return (
+                  <ModeratorListingWizard
+                    key={listing.id}
+                    listing={{
+                      ...listing,
+                      designProductSelection: selection
+                        ? {
+                            id: selection.id,
+                            pipeline: selection.pipeline,
+                            mockupAssets: selection.mockupAssets,
+                            localBaseProduct: selection.localBaseProduct as {
+                              name?: string;
+                              availableColors?: unknown;
+                              availableSizes?: unknown;
+                              defaultPrice?: string | number | null;
+                              currency?: string;
+                            } | null,
+                            printfulProductTemplate: selection.printfulProductTemplate as {
+                              displayName?: string;
+                              defaultRetailPrice?: string | number | null;
+                              currency?: string;
+                              allowedColorVariantIds?: unknown;
+                              allowedSizeVariantIds?: unknown;
+                            } | null,
+                          }
+                        : null,
+                    }}
+                    designTitle={detail.title}
+                    onSaved={load}
+                  />
+                );
+              })}
             </div>
 
+            {canModerate ? (
             <Card>
               <div className="mb-4 flex items-center gap-2">
                 <AlertTriangle size={20} className="text-status-danger" />
@@ -568,6 +713,7 @@ export default function Page() {
                 <XCircle size={18} /> Submit Rejection
               </Button>
             </Card>
+            ) : null}
           </div>
         )}
       </div>

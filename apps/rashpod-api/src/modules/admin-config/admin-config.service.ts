@@ -598,6 +598,7 @@ export class AdminConfigService {
       defaultRetailPrice: dto.defaultRetailPrice == null ? null : new Prisma.Decimal(dto.defaultRetailPrice),
       estimatedBaseCost: dto.estimatedBaseCost == null ? null : new Prisma.Decimal(dto.estimatedBaseCost),
       currency: dto.currency ?? "USD",
+      previewImageUrl: dto.previewImageUrl,
       active: dto.active,
       metadataJson: dto.metadataJson as Prisma.InputJsonValue | undefined,
     };
@@ -620,6 +621,7 @@ export class AdminConfigService {
       defaultRetailPrice: dto.defaultRetailPrice == null ? undefined : new Prisma.Decimal(dto.defaultRetailPrice),
       estimatedBaseCost: dto.estimatedBaseCost == null ? undefined : new Prisma.Decimal(dto.estimatedBaseCost),
       currency: dto.currency,
+      previewImageUrl: dto.previewImageUrl,
       active: dto.active,
       metadataJson: dto.metadataJson as Prisma.InputJsonValue | undefined,
     };

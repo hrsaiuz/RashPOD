@@ -91,10 +91,31 @@ export class ListingsService {
     return listing;
   }
 
+  async adminById(id: string) {
+    const listing = await this.prisma.commerceListing.findUnique({
+      where: { id },
+      include: {
+        designer: { select: { id: true, email: true, displayName: true, handle: true } },
+        designAsset: { select: { id: true, title: true, status: true } },
+        designProductSelection: {
+          include: {
+            mockupAssets: true,
+            localBaseProduct: true,
+            printfulProductTemplate: true,
+          },
+        },
+        marketplacePublications: { orderBy: { createdAt: "desc" } },
+      },
+    });
+    if (!listing) throw new NotFoundException("Listing not found");
+    return listing;
+  }
+
   async patch(user: RequestUser, id: string, dto: UpdateListingDto, expectedType?: ListingType) {
     const listing = await this.prisma.commerceListing.findUnique({ where: { id } });
     if (!listing) throw new NotFoundException("Listing not found");
     this.assertOwnershipOrAdmin(user, listing.designerId);
+    this.assertDesignerPipelineListingMutable(user, listing);
     if (expectedType && listing.type !== expectedType) {
       throw new ForbiddenException("Listing type mismatch");
     }
@@ -102,12 +123,18 @@ export class ListingsService {
       await this.assertFilmPriceFloor(dto.price);
     }
 
+    const metadataJson = dto.metadataJson
+      ? this.mergePatchMetadata(listing.metadataJson, dto.metadataJson)
+      : undefined;
+
     const updated = await this.prisma.commerceListing.update({
       where: { id },
       data: {
         title: dto.title ?? undefined,
         description: dto.description ?? undefined,
         price: dto.price ?? undefined,
+        tags: dto.tags as Prisma.InputJsonValue | undefined,
+        metadataJson,
       },
     });
     await this.audit.log({
@@ -128,6 +155,7 @@ export class ListingsService {
       user.role === UserRole.SUPER_ADMIN ||
       user.role === UserRole.OPERATIONS_MANAGER;
     if (!isAdmin && listing.designerId !== user.sub) throw new ForbiddenException("Not allowed");
+    this.assertDesignerPipelineListingMutable(user, listing);
     await this.assertListingPublishable(id, user.sub, "listing.publish");
     const updated = await this.prisma.commerceListing.update({
       where: { id },
@@ -349,6 +377,27 @@ export class ListingsService {
     if (!this.isAdminRole(user.role) && user.sub !== designerId) {
       throw new ForbiddenException("Not allowed");
     }
+  }
+
+  private assertDesignerPipelineListingMutable(
+    user: RequestUser,
+    listing: { designerId: string; designProductSelectionId: string | null; status: ListingStatus },
+  ) {
+    if (this.isAdminRole(user.role)) return;
+    if (user.sub !== listing.designerId) return;
+    if (!listing.designProductSelectionId) return;
+    if (listing.status === ListingStatus.PUBLISHED) return;
+    throw new ForbiddenException("Pipeline listings are managed by moderators until published");
+  }
+
+  private mergePatchMetadata(
+    existing: Prisma.JsonValue | null,
+    patch: Record<string, unknown>,
+  ): Prisma.InputJsonValue {
+    const base = existing && typeof existing === "object" && !Array.isArray(existing)
+      ? (existing as Record<string, unknown>)
+      : {};
+    return { ...base, ...patch } as Prisma.InputJsonValue;
   }
 
   private async assertFilmPriceFloor(price: number) {

@@ -1,6 +1,7 @@
 "use client";
 
-import { createContext, ReactNode, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { flushSync } from "react-dom";
 
 type SessionUser = {
   id: string;
@@ -23,7 +24,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    fetch("/api/auth/me")
+    fetch("/api/auth/me", { credentials: "same-origin" })
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => {
         if (d?.user) setUser(d.user as SessionUser);
@@ -32,29 +33,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .finally(() => setIsLoading(false));
   }, []);
 
-  const login = async (email: string, password: string): Promise<{ role: string }> => {
+  const login = useCallback(async (email: string, password: string): Promise<{ role: string }> => {
     const res = await fetch("/api/auth/login", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
+      credentials: "same-origin",
       body: JSON.stringify({ email, password }),
     });
     if (!res.ok) {
       const body = await res.json().catch(() => ({}));
-      throw new Error(body?.error || "Login failed");
+      const message =
+        typeof body?.error === "string"
+          ? body.error
+          : Array.isArray(body?.error)
+            ? body.error.join(", ")
+            : "Login failed";
+      throw new Error(message);
     }
     const data = await res.json();
-    setUser(data.user);
-    return { role: data.role || "CUSTOMER" };
-  };
+    flushSync(() => {
+      setUser(data.user ?? null);
+    });
+    return { role: data.role || data.user?.role || "CUSTOMER" };
+  }, []);
 
-  const clearSession = async () => {
-    await fetch("/api/auth/logout", { method: "POST" });
+  const clearSession = useCallback(async () => {
+    await fetch("/api/auth/logout", { method: "POST", credentials: "same-origin" });
     setUser(null);
-  };
+  }, []);
 
   const value = useMemo<AuthState>(
     () => ({ user, isLoading, clearSession, login }),
-    [user, isLoading],
+    [user, isLoading, clearSession, login],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

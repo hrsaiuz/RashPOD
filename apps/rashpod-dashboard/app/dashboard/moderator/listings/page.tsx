@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { CheckCircle2, RefreshCw, Search, ShieldAlert, XCircle } from "lucide-react";
 import { Button, Card, EmptyState, ErrorState, Input, Skeleton, StatusBadge } from "@rashpod/ui";
 import DashboardLayout from "../../dashboard-layout";
@@ -115,7 +116,9 @@ export default function Page() {
                   {filtered.map((item) => (
                     <tr key={item.id}>
                       <td className="px-5 py-4">
-                        <p className="font-semibold text-brand-ink">{item.title}</p>
+                        <Link href={`/dashboard/moderator/listings/${item.id}`} className="font-semibold text-brand-ink hover:text-brand-blue">
+                          {item.title}
+                        </Link>
                         <p className="text-xs text-brand-muted">{item.type} · {item.slug} · {item.designAsset?.title ?? "No design title"}</p>
                       </td>
                       <td className="px-5 py-4">{item.designer?.displayName ?? item.designer?.email ?? "Unknown"}</td>

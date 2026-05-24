@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { Card, Button } from "@rashpod/ui";
 import {
@@ -98,6 +99,8 @@ const ROLES: RoleEntry[] = [
 ];
 
 export default function DashboardHome() {
+  const router = useRouter();
+
   return (
     <main
       id="main-content"
@@ -157,16 +160,12 @@ export default function DashboardHome() {
       </div>
 
       <div className="mt-10 flex flex-wrap items-center gap-3">
-        <Link href="/auth/login">
-          <Button variant="primaryBlue" size="md">
-            Sign in
-          </Button>
-        </Link>
-        <Link href="/auth/register">
-          <Button variant="secondary" size="md">
-            Create an account
-          </Button>
-        </Link>
+        <Button type="button" variant="primaryBlue" size="md" onClick={() => router.push("/auth/login")}>
+          Sign in
+        </Button>
+        <Button type="button" variant="secondary" size="md" onClick={() => router.push("/auth/register")}>
+          Create an account
+        </Button>
       </div>
     </main>
   );

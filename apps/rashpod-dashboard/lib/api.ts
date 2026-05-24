@@ -201,6 +201,7 @@ export interface Listing {
   status: ListingStatus;
   designerId: string;
   designAssetId: string;
+  designProductSelectionId?: string | null;
   title: string;
   description?: string | null;
   slug: string;

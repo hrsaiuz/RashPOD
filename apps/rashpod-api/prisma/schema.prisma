@@ -1411,6 +1411,7 @@ model PrintfulProductTemplate {
   defaultRetailPrice        Decimal? @db.Decimal(10, 2)
   estimatedBaseCost         Decimal? @db.Decimal(10, 2)
   currency                  String   @default("USD")
+  previewImageUrl           String?
   active                    Boolean  @default(true)
   metadataJson              Json?
   createdAt                 DateTime @default(now())
