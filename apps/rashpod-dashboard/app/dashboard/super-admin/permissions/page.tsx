@@ -1,4 +1,4 @@
-import { SuperAdminPermissionsScreen } from "./super-admin-platform-screens";
+import { SuperAdminPermissionsScreen } from "../super-admin-platform-screens";
 
 export default function SuperAdminPermissionsPage() {
   return <SuperAdminPermissionsScreen />;

@@ -1,4 +1,4 @@
-import { SuperAdminRolesScreen } from "./super-admin-platform-screens";
+import { SuperAdminRolesScreen } from "../super-admin-platform-screens";
 
 export default function SuperAdminRolesPage() {
   return <SuperAdminRolesScreen />;
