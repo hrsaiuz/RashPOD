@@ -5,6 +5,7 @@ WORKDIR /app
 
 COPY package*.json ./
 COPY packages/ui/package*.json ./packages/ui/
+COPY packages/mockup/package*.json ./packages/mockup/
 COPY apps/rashpod-worker/package*.json ./apps/rashpod-worker/
 
 RUN npm ci --workspace=@rashpod/worker --include-workspace-root
@@ -21,6 +22,7 @@ COPY apps/rashpod-worker/ ./apps/rashpod-worker/
 COPY apps/rashpod-api/prisma ./apps/rashpod-api/prisma
 
 RUN npx prisma generate --schema=apps/rashpod-api/prisma/schema.prisma
+RUN cd packages/mockup && npx tsc -p tsconfig.json
 RUN cd apps/rashpod-worker && npx tsc -p tsconfig.json
 
 # ── Stage 3: production runner ─────────────────────────────────────────────────

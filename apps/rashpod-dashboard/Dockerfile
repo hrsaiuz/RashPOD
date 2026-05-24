@@ -4,6 +4,7 @@ WORKDIR /app
 
 COPY package*.json ./
 COPY packages/ui/package*.json ./packages/ui/
+COPY packages/mockup/package*.json ./packages/mockup/
 COPY apps/rashpod-dashboard/package*.json ./apps/rashpod-dashboard/
 
 RUN npm ci --workspace=@rashpod/dashboard --include-workspace-root
@@ -21,6 +22,8 @@ COPY tsconfig.base.json ./
 COPY rashpod-ui-tokens.ts ./
 COPY packages/ ./packages/
 COPY apps/rashpod-dashboard/ ./apps/rashpod-dashboard/
+
+RUN cd packages/mockup && npx tsc -p tsconfig.json
 
 ARG NEXT_PUBLIC_API_URL
 ARG NEXT_PUBLIC_DASHBOARD_URL
