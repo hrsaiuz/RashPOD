@@ -13,15 +13,18 @@ function createService(overrides?: { prisma?: Record<string, unknown> }) {
     },
     ...overrides?.prisma,
   };
+  const storage = {
+    createSignedReadUrl: jest.fn().mockResolvedValue("https://storage.example/preview.png"),
+  };
   const service = new DesignWorkflowService(
     prisma as any,
     { log: jest.fn() } as any,
     {} as any,
     {} as any,
     {} as any,
-    {} as any,
+    storage as any,
   );
-  return { service, prisma };
+  return { service, prisma, storage };
 }
 
 describe("DesignWorkflowService.moderationQueue", () => {
@@ -82,14 +85,15 @@ describe("DesignWorkflowService.moderationQueue", () => {
 
 describe("DesignWorkflowService.moderationDetail", () => {
   it("returns design with ai suggestions when found", async () => {
-    const design = { id: "design-1", title: "Test", versions: [] };
+    const design = { id: "design-1", title: "Test", versions: [{ fileKey: "designs/test.png", widthPx: 1000, heightPx: 800 }] };
     const aiJobs = [{ id: "job-1", suggestions: [{ id: "suggestion-1" }] }];
-    const { service, prisma } = createService();
+    const { service, prisma, storage } = createService();
     prisma.designAsset.findUnique = jest.fn().mockResolvedValue(design);
     prisma.aiJob.findMany = jest.fn().mockResolvedValue(aiJobs);
 
     const result = await service.moderationDetail("design-1");
 
+    expect(storage.createSignedReadUrl).toHaveBeenCalledWith({ objectKey: "designs/test.png", expiresSeconds: 60 * 60 });
     expect(prisma.designAsset.findUnique).toHaveBeenCalledWith(
       expect.objectContaining({ where: { id: "design-1" } }),
     );
@@ -100,6 +104,7 @@ describe("DesignWorkflowService.moderationDetail", () => {
     );
     expect(result).toEqual({
       ...design,
+      previewImageUrl: "https://storage.example/preview.png",
       ai: { jobs: aiJobs, suggestions: [{ id: "suggestion-1" }] },
     });
   });

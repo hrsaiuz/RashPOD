@@ -100,7 +100,9 @@ export class DesignWorkflowService {
       }),
     ]);
     if (!design) throw new NotFoundException("Design not found");
-    return { ...design, ai: { jobs: aiJobs, suggestions: aiJobs.flatMap((job) => job.suggestions) } };
+    const latestVersion = design.versions[0];
+    const previewImageUrl = await this.safeSignedUrl(latestVersion?.fileKey);
+    return { ...design, previewImageUrl, ai: { jobs: aiJobs, suggestions: aiJobs.flatMap((job) => job.suggestions) } };
   }
 
   workflow(id: string) {
@@ -185,7 +187,8 @@ export class DesignWorkflowService {
     };
   }
 
-  private async safeSignedUrl(key: string) {
+  private async safeSignedUrl(key?: string | null) {
+    if (!key) return null;
     try {
       return await this.storage.createSignedReadUrl({ objectKey: key, expiresSeconds: 60 * 60 });
     } catch {

@@ -14,6 +14,7 @@ import {
 import { ArrowLeft, Boxes, Globe2, Image as ImageIcon, Send, ShieldCheck, ShoppingBag, Upload as UploadIcon } from "lucide-react";
 import { useAuth } from "../../../../auth/auth-provider";
 import DashboardLayout from "../../../dashboard-layout";
+import { DesignPreviewCard } from "../../../../../components/design/DesignPreviewCard";
 import {
   api,
   resolveUploadMimeType,
@@ -130,6 +131,7 @@ export default function DesignDetailPage() {
   }
 
   const canSubmit = design && (design.status === "DRAFT" || design.status === "NEEDS_FIX");
+  const latestVersion = design?.versions?.[0];
 
   return (
     <DashboardLayout role="designer">
@@ -154,6 +156,14 @@ export default function DesignDetailPage() {
               </div>
               <StatusBadge status={design.status} />
             </div>
+
+            <DesignPreviewCard
+              title="Design artwork"
+              src={design.previewImageUrl}
+              alt={design.title}
+              widthPx={latestVersion?.widthPx}
+              heightPx={latestVersion?.heightPx}
+            />
 
             <Card>
               <h2 className="text-lg font-semibold text-brand-ink mb-4">Lifecycle</h2>

@@ -219,6 +219,7 @@ export interface DesignProductSelection {
 }
 
 export interface DesignWorkflowDetail extends Design {
+  previewImageUrl?: string | null;
   designer?: {
     id: string;
     email: string;

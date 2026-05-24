@@ -10,6 +10,7 @@ import { api, ApiError, type DesignWorkflowDetail } from "../../../../../lib/api
 import { useAuth } from "../../../../auth/auth-provider";
 import { ModeratorListingWizard } from "../../moderator-listing-wizard";
 import { LocalSelectionMockupEditor } from "../../../../../components/mockup";
+import { DesignPreviewCard } from "../../../../../components/design/DesignPreviewCard";
 
 const REJECTION_REASONS = [
   ["COPYRIGHT_RISK", "Copyright or trademark risk"],
@@ -440,6 +441,14 @@ export default function Page() {
               </Card>
             ) : null}
             <div className="space-y-6">
+              <DesignPreviewCard
+                title="Design artwork"
+                src={detail.previewImageUrl}
+                alt={detail.title}
+                widthPx={latest?.widthPx}
+                heightPx={latest?.heightPx}
+              />
+
               <Card>
                 <div className="mb-4 flex flex-wrap items-start justify-between gap-4">
                   <div>

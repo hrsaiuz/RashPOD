@@ -2,6 +2,7 @@ import { BadRequestException, ForbiddenException, Injectable, NotFoundException 
 import { DesignStatus } from "@prisma/client";
 import { PrismaService } from "../../prisma/prisma.service";
 import { AuditService } from "../audit/audit.service";
+import { StorageService } from "../files/storage.service";
 import { CreateDesignDto } from "./dto/create-design.dto";
 import { CreateDesignVersionDto } from "./dto/create-design-version.dto";
 
@@ -10,6 +11,7 @@ export class DesignsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    private readonly storage: StorageService,
   ) {}
 
   async create(designerId: string, dto: CreateDesignDto) {
@@ -51,8 +53,11 @@ export class DesignsService {
     });
     if (!design) throw new NotFoundException("Design not found");
     if (design.designerId !== designerId) throw new ForbiddenException("Not your design");
+    const latestVersion = design.versions[0];
+    const previewImageUrl = await this.resolvePreviewUrl(latestVersion?.fileKey);
     return {
       ...design,
+      previewImageUrl,
       versions: design.versions.map((version) => ({
         id: version.id,
         designAssetId: version.designAssetId,
@@ -142,5 +147,14 @@ export class DesignsService {
     });
 
     return version;
+  }
+
+  private async resolvePreviewUrl(fileKey?: string | null) {
+    if (!fileKey) return null;
+    try {
+      return await this.storage.createSignedReadUrl({ objectKey: fileKey, expiresSeconds: 60 * 60 });
+    } catch {
+      return null;
+    }
   }
 }

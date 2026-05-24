@@ -1,6 +1,6 @@
 "use client";
 
-import { ChangeEvent, FormEvent, useState } from "react";
+import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
   Button,
@@ -13,7 +13,8 @@ import {
 import { ArrowLeft, Upload as UploadIcon, FileImage, CheckCircle2, AlertCircle, Send } from "lucide-react";
 import { useAuth } from "../../../../auth/auth-provider";
 import DashboardLayout from "../../../dashboard-layout";
-import { api, resolveUploadMimeType, uploadToSignedUrlWithProgress, type Design, type UploadUrlResponse } from "../../../../../lib/api";
+import { DesignPreviewCard } from "../../../../../components/design/DesignPreviewCard";
+import { api, resolveUploadMimeType, uploadToSignedUrlWithProgress, type Design, type DesignWorkflowDetail, type UploadUrlResponse } from "../../../../../lib/api";
 
 const ACCEPTED = ["image/png", "image/jpeg", "image/svg+xml"];
 const MAX_BYTES = 50 * 1024 * 1024;
@@ -50,6 +51,22 @@ export default function NewDesignPage() {
   const [createdId, setCreatedId] = useState<string | null>(null);
   const [submittingForReview, setSubmittingForReview] = useState(false);
   const [submittedForReview, setSubmittedForReview] = useState(false);
+  const [uploadedPreviewUrl, setUploadedPreviewUrl] = useState<string | null>(null);
+
+  const localPreviewUrl = useMemo(() => (file ? URL.createObjectURL(file) : null), [file]);
+
+  useEffect(() => {
+    return () => {
+      if (localPreviewUrl) URL.revokeObjectURL(localPreviewUrl);
+    };
+  }, [localPreviewUrl]);
+
+  useEffect(() => {
+    if (!createdId || step !== "success") return;
+    void api.get<DesignWorkflowDetail>(`/designer/designs/${createdId}`)
+      .then((detail) => setUploadedPreviewUrl(detail.previewImageUrl ?? null))
+      .catch(() => undefined);
+  }, [createdId, step]);
 
   function onPickFile(e: ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0];
@@ -186,7 +203,13 @@ export default function NewDesignPage() {
         </div>
 
         {step === "success" && createdId ? (
-          <Card>
+          <div className="space-y-6">
+            <DesignPreviewCard
+              title="Uploaded design"
+              src={uploadedPreviewUrl ?? localPreviewUrl}
+              alt={title || "Uploaded design"}
+            />
+            <Card>
             <div className="flex flex-col items-center text-center py-6">
               <CheckCircle2 size={48} className="text-semantic-success mb-3" />
               <h2 className="text-xl font-semibold text-brand-ink mb-2">Design uploaded</h2>
@@ -213,6 +236,7 @@ export default function NewDesignPage() {
               </div>
             </div>
           </Card>
+          </div>
         ) : (
           <Card>
             <form onSubmit={onSubmit} className="space-y-5">
@@ -234,6 +258,11 @@ export default function NewDesignPage() {
               </FormField>
 
               <FormField label="Design file" required>
+                {localPreviewUrl ? (
+                  <div className="mb-4">
+                    <DesignPreviewCard title="Selected file" src={localPreviewUrl} alt={file?.name ?? "Selected design"} compact />
+                  </div>
+                ) : null}
                 <label className="flex flex-col items-center justify-center gap-3 px-6 py-8 border-2 border-dashed border-surface-border rounded-2xl cursor-pointer hover:border-brand-blue transition-colors">
                   <FileImage size={36} className="text-brand-muted" />
                   <div className="text-sm text-brand-ink">
