@@ -23,7 +23,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { Button, Card, FormField, Input, StatusBadge } from "@rashpod/ui";
-import { api, uploadToSignedUrl } from "../../../lib/api";
+import { api, resolveUploadMimeType, uploadToSignedUrl } from "../../../lib/api";
 import { useAuth } from "../../auth/auth-provider";
 import DashboardLayout from "../dashboard-layout";
 
