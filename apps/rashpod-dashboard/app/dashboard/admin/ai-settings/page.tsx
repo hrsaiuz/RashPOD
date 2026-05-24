@@ -1,5 +1,5 @@
-import AdminPlaceholder from "../admin-placeholder";
+import { AiSettingsScreen } from "../admin-hub-screens";
 
-export default function Page() {
-  return <AdminPlaceholder title="AI Settings" description="Configure OpenAI assist policies." />;
+export default function AdminAiSettingsPage() {
+  return <AiSettingsScreen />;
 }

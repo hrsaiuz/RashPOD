@@ -1,5 +1,5 @@
-import AdminPlaceholder from "../admin-placeholder";
+import { CorporateClientsScreen } from "../admin-hub-screens";
 
-export default function Page() {
-  return <AdminPlaceholder title="Corporate Clients" description="Corporate client management." />;
+export default function AdminCorporateClientsPage() {
+  return <CorporateClientsScreen />;
 }

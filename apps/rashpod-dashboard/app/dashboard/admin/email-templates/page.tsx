@@ -1,5 +1,5 @@
-import AdminPlaceholder from "../admin-placeholder";
+import { EmailTemplatesScreen } from "../admin-hub-screens";
 
-export default function Page() {
-  return <AdminPlaceholder title="Email Templates" description="Manage ZeptoMail templates." />;
+export default function AdminEmailTemplatesPage() {
+  return <EmailTemplatesScreen />;
 }

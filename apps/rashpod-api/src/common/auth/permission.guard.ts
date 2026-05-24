@@ -1,11 +1,15 @@
 import { CanActivate, ExecutionContext, ForbiddenException, Injectable } from "@nestjs/common";
 import { Reflector } from "@nestjs/core";
 import { PERMISSION_KEY } from "./permission.decorator";
-import { PermissionKey, permissions } from "./permissions";
+import { PermissionKey } from "./permissions";
+import { RbacService } from "./rbac.service";
 
 @Injectable()
 export class PermissionGuard implements CanActivate {
-  constructor(private readonly reflector: Reflector) {}
+  constructor(
+    private readonly reflector: Reflector,
+    private readonly rbac: RbacService,
+  ) {}
 
   canActivate(context: ExecutionContext): boolean {
     const permission = this.reflector.getAllAndOverride<PermissionKey | undefined>(PERMISSION_KEY, [
@@ -16,7 +20,7 @@ export class PermissionGuard implements CanActivate {
     const request = context.switchToHttp().getRequest();
     const role = request.user?.role as string | undefined;
     if (!role) throw new ForbiddenException("Missing role");
-    const allowedRoles = permissions[permission];
+    const allowedRoles = this.rbac.getAllowedRoles(permission);
     if (!allowedRoles.includes(role as never)) {
       throw new ForbiddenException(`Missing permission: ${permission}`);
     }

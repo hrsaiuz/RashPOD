@@ -5,6 +5,7 @@ import { UserRole } from "@prisma/client";
 import { RolesGuard } from "./roles.guard";
 import { PermissionGuard } from "./permission.guard";
 import { permissions } from "./permissions";
+import { RbacService } from "./rbac.service";
 
 describe("RBAC Guards", () => {
   describe("RolesGuard", () => {
@@ -106,10 +107,17 @@ describe("RBAC Guards", () => {
   describe("PermissionGuard", () => {
     let guard: PermissionGuard;
     let reflector: Reflector;
+    const rbac = {
+      getAllowedRoles: (permission: keyof typeof permissions) => [...permissions[permission]],
+    };
 
     beforeEach(async () => {
       const module: TestingModule = await Test.createTestingModule({
-        providers: [PermissionGuard, Reflector],
+        providers: [
+          PermissionGuard,
+          Reflector,
+          { provide: RbacService, useValue: rbac },
+        ],
       }).compile();
 
       guard = module.get<PermissionGuard>(PermissionGuard);

@@ -135,6 +135,31 @@ export class CorporateService {
     return updated;
   }
 
+  listCommercialOffers(opts: { status?: CommercialOfferStatus; limit?: number }) {
+    const limit = Math.min(Math.max(opts.limit ?? 100, 1), 200);
+    return this.prisma.commercialOffer
+      .findMany({
+        where: opts.status ? { status: opts.status } : {},
+        orderBy: { createdAt: "desc" },
+        take: limit,
+        include: {
+          corporateRequest: { select: { id: true, title: true, corporateUserId: true, status: true } },
+          selectedBid: { select: { id: true, designerId: true, designFee: true, status: true } },
+        },
+      })
+      .then((items) =>
+        items.map((item) => ({
+          ...item,
+          subtotal: item.subtotal.toString(),
+          discount: item.discount.toString(),
+          total: item.total.toString(),
+          selectedBid: item.selectedBid
+            ? { ...item.selectedBid, designFee: item.selectedBid.designFee.toString() }
+            : null,
+        })),
+      );
+  }
+
   async createOffer(actorId: string, requestId: string, dto: CreateCommercialOfferDto) {
     const req = await this.prisma.corporateRequest.findUnique({ where: { id: requestId } });
     if (!req) throw new NotFoundException("Corporate request not found");

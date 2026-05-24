@@ -1,5 +1,5 @@
-import AdminPlaceholder from "../admin-placeholder";
+import { CorporateRequestsScreen } from "../admin-hub-screens";
 
-export default function Page() {
-  return <AdminPlaceholder title="Corporate Requests" description="Manage corporate request pipeline." />;
+export default function AdminCorporateRequestsPage() {
+  return <CorporateRequestsScreen />;
 }

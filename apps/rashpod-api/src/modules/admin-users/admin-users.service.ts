@@ -5,6 +5,17 @@ import { AuditService } from "../audit/audit.service";
 import { CurrencyService, PRIMARY_CURRENCY } from "../currency/currency.service";
 import { GrantDesignerBonusDto, GrantGroupBonusDto } from "./dto/grant-designer-bonus.dto";
 import { UpdateDesignerStatusDto } from "./dto/update-designer-status.dto";
+import { UpdateUserRoleDto } from "./dto/update-user-role.dto";
+
+const STAFF_ROLES: UserRole[] = [
+  UserRole.ADMIN,
+  UserRole.SUPER_ADMIN,
+  UserRole.MODERATOR,
+  UserRole.OPERATIONS_MANAGER,
+  UserRole.PRODUCTION_STAFF,
+  UserRole.FINANCE_STAFF,
+  UserRole.SUPPORT_STAFF,
+];
 
 @Injectable()
 export class AdminUsersService {
@@ -17,6 +28,69 @@ export class AdminUsersService {
   private decimal(value: Prisma.Decimal | number | null | undefined): number {
     if (value === null || value === undefined) return 0;
     return typeof value === "number" ? value : Number(value);
+  }
+
+  async listUsers(opts: { search?: string; segment?: "designers" | "customers" | "staff"; role?: UserRole; limit?: number }) {
+    const limit = Math.min(Math.max(opts.limit ?? 50, 1), 200);
+    const where: Prisma.UserWhereInput = {};
+    if (opts.role) {
+      where.role = opts.role;
+    } else if (opts.segment === "designers") {
+      where.role = UserRole.DESIGNER;
+    } else if (opts.segment === "customers") {
+      where.role = { in: [UserRole.CUSTOMER, UserRole.CORPORATE_CLIENT] };
+    } else if (opts.segment === "staff") {
+      where.role = { in: STAFF_ROLES };
+    }
+    if (opts.search) {
+      where.OR = [
+        { email: { contains: opts.search, mode: "insensitive" } },
+        { displayName: { contains: opts.search, mode: "insensitive" } },
+      ];
+    }
+    const rows = await this.prisma.user.findMany({
+      where,
+      orderBy: { createdAt: "desc" },
+      take: limit,
+      select: {
+        id: true,
+        email: true,
+        displayName: true,
+        role: true,
+        designerStatus: true,
+        createdAt: true,
+        _count: { select: { designAssets: true, listings: true, orders: true, corporateRequests: true } },
+      },
+    });
+    return rows.map((r) => ({
+      id: r.id,
+      email: r.email,
+      displayName: r.displayName,
+      role: r.role,
+      designerStatus: r.designerStatus,
+      createdAt: r.createdAt,
+      designsCount: r._count.designAssets,
+      listingsCount: r._count.listings,
+      ordersCount: r._count.orders,
+      requestsCount: r._count.corporateRequests,
+    }));
+  }
+
+  async updateUserRole(actorId: string, id: string, dto: UpdateUserRoleDto, actorRole: UserRole) {
+    const user = await this.prisma.user.findUnique({ where: { id } });
+    if (!user) throw new NotFoundException("User not found");
+    if (dto.role === UserRole.SUPER_ADMIN && actorRole !== UserRole.SUPER_ADMIN) {
+      throw new BadRequestException("Only super admins can assign the SUPER_ADMIN role");
+    }
+    const updated = await this.prisma.user.update({ where: { id }, data: { role: dto.role } });
+    await this.audit.log({
+      actorId,
+      action: "user.role.update",
+      entityType: "User",
+      entityId: id,
+      metadata: { from: user.role, to: dto.role },
+    });
+    return updated;
   }
 
   async listDesigners(opts: { search?: string; limit?: number }) {

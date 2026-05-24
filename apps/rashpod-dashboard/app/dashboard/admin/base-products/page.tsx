@@ -4,6 +4,7 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 import { Button, Card, EmptyState, ErrorState, Skeleton, StatusBadge } from "@rashpod/ui";
 import { Boxes, Plus, Trash2, Upload, X } from "lucide-react";
 import DashboardLayout from "../../dashboard-layout";
+import { api } from "../../../../lib/api";
 
 interface ProductType {
   id: string;
@@ -41,6 +42,7 @@ export default function AdminBaseProductsPage() {
   const [productTypes, setProductTypes] = useState<ProductType[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [productTypesWarning, setProductTypesWarning] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -62,21 +64,29 @@ export default function AdminBaseProductsPage() {
   async function load() {
     setLoading(true);
     setError("");
-    try {
-      const [bpRes, ptRes] = await Promise.all([
-        fetch("/api/proxy/admin/base-products"),
-        fetch("/api/proxy/admin/product-types"),
-      ]);
-      if (!bpRes.ok) throw new Error(`Failed to load base products (${bpRes.status})`);
-      const bp = (await bpRes.json()) as BaseProduct[];
-      const pt = ptRes.ok ? ((await ptRes.json()) as ProductType[]) : [];
-      setItems(Array.isArray(bp) ? bp.map(normalizeBaseProduct) : []);
-      setProductTypes(Array.isArray(pt) ? pt.filter((p) => p.isActive) : []);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load");
-    } finally {
-      setLoading(false);
+    setProductTypesWarning("");
+    const results = await Promise.allSettled([
+      api.get<BaseProduct[]>("/admin/base-products"),
+      api.get<ProductType[]>("/admin/product-types"),
+    ]);
+    const [bpResult, ptResult] = results;
+
+    if (bpResult.status === "fulfilled") {
+      setItems(Array.isArray(bpResult.value) ? bpResult.value.map(normalizeBaseProduct) : []);
+    } else {
+      setItems([]);
+      setError(bpResult.reason instanceof Error ? bpResult.reason.message : "Failed to load base products");
     }
+
+    if (ptResult.status === "fulfilled") {
+      setProductTypes(Array.isArray(ptResult.value) ? ptResult.value.filter((p) => p.isActive) : []);
+    } else {
+      setProductTypes([]);
+      setProductTypesWarning(
+        ptResult.reason instanceof Error ? ptResult.reason.message : "Product types could not be loaded — create form may be limited",
+      );
+    }
+    setLoading(false);
   }
 
   function resetForm() {
@@ -220,6 +230,12 @@ export default function AdminBaseProductsPage() {
             retry={<Button variant="primaryBlue" onClick={load}>Retry</Button>}
           />
         )}
+
+        {productTypesWarning ? (
+          <div className="rounded-xl border border-semantic-warningBg bg-semantic-warningBg px-4 py-3 text-sm text-brand-ink">
+            {productTypesWarning}
+          </div>
+        ) : null}
 
         {loading ? (
           <Skeleton className="h-64" />

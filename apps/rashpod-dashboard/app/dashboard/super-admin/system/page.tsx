@@ -1,8 +1,5 @@
-export default function Page() {
-  return (
-    <main style={{ maxWidth: 1120, margin: "0 auto", padding: 24 }}>
-      <h1>System Settings</h1>
-      <p>System-wide configuration.</p>
-    </main>
-  );
+import { SuperAdminSystemScreen } from "./super-admin-platform-screens";
+
+export default function SuperAdminSystemPage() {
+  return <SuperAdminSystemScreen />;
 }

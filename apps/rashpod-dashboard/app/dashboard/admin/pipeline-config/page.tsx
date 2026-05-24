@@ -81,6 +81,10 @@ export default function AdminPipelineConfigPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [productsError, setProductsError] = useState("");
+  const [presetsError, setPresetsError] = useState("");
+  const [templatesError, setTemplatesError] = useState("");
+  const [settingsError, setSettingsError] = useState("");
 
   const [presetForm, setPresetForm] = useState({
     name: "",
@@ -131,18 +135,49 @@ export default function AdminPipelineConfigPage() {
   async function load() {
     setLoading(true);
     setError("");
-    try {
-      const [products, placementPresets, printfulTemplates, printfulSettings] = await Promise.all([
-        api.get<BaseProduct[]>("/admin/base-products"),
-        api.get<PlacementPreset[]>("/admin/placement-presets"),
-        api.get<PrintfulTemplate[]>("/admin/printful/product-templates"),
-        api.get<PrintfulSettings>("/admin/integrations/printful/settings"),
-      ]);
-      setBaseProducts(products);
-      setPresets(placementPresets);
-      setTemplates(printfulTemplates);
+    setProductsError("");
+    setPresetsError("");
+    setTemplatesError("");
+    setSettingsError("");
+    const results = await Promise.allSettled([
+      api.get<BaseProduct[]>("/admin/base-products"),
+      api.get<PlacementPreset[]>("/admin/placement-presets"),
+      api.get<PrintfulTemplate[]>("/admin/printful/product-templates"),
+      api.get<PrintfulSettings>("/admin/integrations/printful/settings"),
+    ]);
+    const [productsResult, presetsResult, templatesResult, settingsResult] = results;
+    const sectionErrors: string[] = [];
+
+    if (productsResult.status === "fulfilled") {
+      setBaseProducts(productsResult.value);
+    } else {
+      setBaseProducts([]);
+      const message = productsResult.reason instanceof Error ? productsResult.reason.message : "Failed to load base products";
+      setProductsError(message);
+      sectionErrors.push(message);
+    }
+
+    if (presetsResult.status === "fulfilled") {
+      setPresets(presetsResult.value);
+    } else {
+      setPresets([]);
+      const message = presetsResult.reason instanceof Error ? presetsResult.reason.message : "Failed to load placement presets";
+      setPresetsError(message);
+      sectionErrors.push(message);
+    }
+
+    if (templatesResult.status === "fulfilled") {
+      setTemplates(templatesResult.value);
+    } else {
+      setTemplates([]);
+      const message = templatesResult.reason instanceof Error ? templatesResult.reason.message : "Failed to load Printful templates";
+      setTemplatesError(message);
+      sectionErrors.push(message);
+    }
+
+    if (settingsResult.status === "fulfilled") {
+      const printfulSettings = settingsResult.value;
       setSettings(printfulSettings);
-      setPresetForm((current) => ({ ...current, localBaseProductId: current.localBaseProductId || products.find((item) => item.isActive)?.id || "", productTemplateId: current.productTemplateId || printfulTemplates.find((item) => item.active)?.id || "" }));
       setSettingsForm({
         enabled: printfulSettings.enabled,
         defaultStoreId: printfulSettings.defaultStoreId ?? "",
@@ -151,11 +186,25 @@ export default function AdminPipelineConfigPage() {
         allowGlobalWithoutLocal: printfulSettings.allowGlobalWithoutLocal,
         catalogAllowlistJson: JSON.stringify(printfulSettings.catalogAllowlist ?? [], null, 2),
       });
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load pipeline configuration");
-    } finally {
-      setLoading(false);
+    } else {
+      setSettings(null);
+      const message = settingsResult.reason instanceof Error ? settingsResult.reason.message : "Failed to load Printful settings";
+      setSettingsError(message);
+      sectionErrors.push(message);
     }
+
+    const products = productsResult.status === "fulfilled" ? productsResult.value : [];
+    const printfulTemplates = templatesResult.status === "fulfilled" ? templatesResult.value : [];
+    setPresetForm((current) => ({
+      ...current,
+      localBaseProductId: current.localBaseProductId || products.find((item) => item.isActive)?.id || "",
+      productTemplateId: current.productTemplateId || printfulTemplates.find((item) => item.active)?.id || "",
+    }));
+
+    if (sectionErrors.length === results.length) {
+      setError(sectionErrors[0] ?? "Failed to load pipeline configuration");
+    }
+    setLoading(false);
   }
 
   async function createPlacementPreset(event: FormEvent) {
@@ -291,6 +340,7 @@ export default function AdminPipelineConfigPage() {
                   <Layers size={20} className="text-brand-blue" />
                   <h2 className="text-xl font-semibold text-brand-ink">Placement Presets</h2>
                 </div>
+                {presetsError ? <ErrorState title="Placement presets unavailable" description={presetsError} retry={<Button size="sm" onClick={load}>Retry</Button>} /> : null}
                 <form className="grid gap-3 lg:grid-cols-4" onSubmit={createPlacementPreset}>
                   <Field label="Name" value={presetForm.name} onChange={(value) => setPresetForm((current) => ({ ...current, name: value }))} required />
                   <label className="text-sm font-medium text-brand-ink">Pipeline
@@ -330,6 +380,7 @@ export default function AdminPipelineConfigPage() {
                   <Settings size={20} className="text-brand-blue" />
                   <h2 className="text-xl font-semibold text-brand-ink">Printful Settings</h2>
                 </div>
+                {settingsError ? <ErrorState title="Printful settings unavailable" description={settingsError} retry={<Button size="sm" onClick={load}>Retry</Button>} /> : (
                 <form className="space-y-4" onSubmit={saveSettings}>
                   <div className="grid gap-3 sm:grid-cols-2">
                     <label className={checkboxClassName}><input type="checkbox" checked={settingsForm.enabled} onChange={(event) => setSettingsForm((current) => ({ ...current, enabled: event.target.checked }))} /> Enabled</label>
@@ -349,6 +400,7 @@ export default function AdminPipelineConfigPage() {
                     <Button type="button" variant="secondary" onClick={syncCatalog} disabled={saving}><RefreshCw size={16} /> Sync Catalog</Button>
                   </div>
                 </form>
+                )}
               </Card>
             </div>
 
@@ -357,6 +409,7 @@ export default function AdminPipelineConfigPage() {
                 <Globe2 size={20} className="text-brand-blue" />
                 <h2 className="text-xl font-semibold text-brand-ink">Printful Product Templates</h2>
               </div>
+              {templatesError ? <ErrorState title="Printful templates unavailable" description={templatesError} retry={<Button size="sm" onClick={load}>Retry</Button>} /> : null}
               <form className="grid gap-3 lg:grid-cols-4" onSubmit={createPrintfulTemplate}>
                 <Field label="Display name" value={templateForm.displayName} onChange={(value) => setTemplateForm((current) => ({ ...current, displayName: value }))} required />
                 <Field label="RashPOD product type" value={templateForm.rashpodProductType} onChange={(value) => setTemplateForm((current) => ({ ...current, rashpodProductType: value }))} required />

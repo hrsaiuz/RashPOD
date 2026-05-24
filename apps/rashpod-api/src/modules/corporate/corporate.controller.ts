@@ -1,4 +1,5 @@
-import { Body, Controller, Get, Param, Patch, Post, UseGuards } from "@nestjs/common";
+import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from "@nestjs/common";
+import { CommercialOfferStatus } from "@prisma/client";
 import { CurrentUser, RequestUser } from "../../common/auth/current-user.decorator";
 import { JwtAuthGuard } from "../../common/auth/jwt-auth.guard";
 import { PermissionGuard } from "../../common/auth/permission.guard";
@@ -61,6 +62,12 @@ export class CorporateController {
   @RequirePermission("designer-bid:manage")
   selectBid(@CurrentUser() user: RequestUser, @Param("id") id: string) {
     return this.corporate.selectBid(user.sub, id);
+  }
+
+  @Get("admin/commercial-offers")
+  @RequirePermission("commercial-offer:manage")
+  listOffers(@Query("status") status?: CommercialOfferStatus, @Query("limit") limit?: string) {
+    return this.corporate.listCommercialOffers({ status, limit: limit ? Number(limit) : undefined });
   }
 
   @Post("admin/commercial-offers/:requestId")

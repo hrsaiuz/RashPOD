@@ -6,11 +6,30 @@ import { RequirePermission } from "../../common/auth/permission.decorator";
 import { AdminUsersService } from "./admin-users.service";
 import { GrantDesignerBonusDto, GrantGroupBonusDto } from "./dto/grant-designer-bonus.dto";
 import { UpdateDesignerStatusDto } from "./dto/update-designer-status.dto";
+import { UpdateUserRoleDto } from "./dto/update-user-role.dto";
+import { UserRole } from "@prisma/client";
 
 @Controller("admin/users")
 @UseGuards(JwtAuthGuard, PermissionGuard)
 export class AdminUsersController {
   constructor(private readonly service: AdminUsersService) {}
+
+  @Get()
+  @RequirePermission("user:manage")
+  listUsers(
+    @Query("search") search?: string,
+    @Query("segment") segment?: "designers" | "customers" | "staff",
+    @Query("role") role?: UserRole,
+    @Query("limit") limit?: string,
+  ) {
+    return this.service.listUsers({ search, segment, role, limit: limit ? Number(limit) : undefined });
+  }
+
+  @Patch(":id/role")
+  @RequirePermission("user:manage")
+  updateUserRole(@CurrentUser() user: RequestUser, @Param("id") id: string, @Body() dto: UpdateUserRoleDto) {
+    return this.service.updateUserRole(user.sub, id, dto, user.role as UserRole);
+  }
 
   @Get("designers")
   @RequirePermission("user:manage")

@@ -245,7 +245,7 @@ export class AdminConfigController {
   }
 
   @Get("integrations/printful/settings")
-  @RequirePermission("printful-template:manage")
+  @RequirePermission("pipeline-config:read")
   getPrintfulSettings() {
     return this.service.getPrintfulSettings();
   }

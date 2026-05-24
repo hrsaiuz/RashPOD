@@ -1,5 +1,5 @@
-import AdminPlaceholder from "../admin-placeholder";
+import { CommercialOffersScreen } from "../admin-hub-screens";
 
-export default function Page() {
-  return <AdminPlaceholder title="Commercial Offers" description="Manage commercial offers lifecycle." />;
+export default function AdminCommercialOffersPage() {
+  return <CommercialOffersScreen />;
 }

@@ -129,7 +129,7 @@ const ROLE_LINKS: Record<string, Array<{ href: string; label: string; icon?: any
     { href: "/dashboard/admin/film-sale-settings", label: "Film Sale", icon: Film, group: "Commerce" },
     { href: "/dashboard/admin/payment-settings", label: "Payments", icon: CreditCard, group: "Commerce" },
     { href: "/dashboard/admin/currencies", label: "Currencies", icon: DollarSign, group: "Commerce" },
-    { href: "/dashboard/admin/corporate", label: "Corporate", icon: Briefcase, group: "Corporate" },
+    { href: "/dashboard/admin/corporate", label: "Corporate Workflow", icon: Briefcase, group: "Corporate" },
     { href: "/dashboard/admin/corporate-requests", label: "Corporate Requests", icon: ClipboardList, group: "Corporate" },
     { href: "/dashboard/admin/commercial-offers", label: "Commercial Offers", icon: FileText, group: "Corporate" },
     { href: "/dashboard/admin/marketplace", label: "Marketplace", icon: ShoppingBag, group: "AI & Growth" },

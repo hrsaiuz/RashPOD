@@ -39,11 +39,84 @@ export class AdminConfigService {
     return value.filter((item): item is string => typeof item === "string");
   }
 
+  private decimalString(value: Prisma.Decimal | null | undefined) {
+    return value == null ? null : value.toString();
+  }
+
   private serializeBaseProduct<T extends BaseProduct & { productType?: unknown }>(item: T) {
     return {
       ...item,
+      baseCost: this.decimalString(item.baseCost),
+      defaultPrice: this.decimalString(item.defaultPrice),
       availableColors: this.jsonStringArray(item.availableColors),
       availableSizes: this.jsonStringArray(item.availableSizes),
+    };
+  }
+
+  private serializePrintfulTemplate(item: {
+    id: string;
+    rashpodProductType: string;
+    displayName: string;
+    provider: ProviderType;
+    printfulCatalogProductId: string;
+    printfulProductName: string;
+    printfulVariantIds: Prisma.JsonValue;
+    allowedColorVariantIds?: Prisma.JsonValue | null;
+    allowedSizeVariantIds?: Prisma.JsonValue | null;
+    allowedPlacements: Prisma.JsonValue;
+    allowedTechniques: Prisma.JsonValue;
+    defaultTechnique: string;
+    defaultPlacement: string;
+    printfulStoreId?: string | null;
+    defaultRetailPrice?: Prisma.Decimal | null;
+    estimatedBaseCost?: Prisma.Decimal | null;
+    currency: string;
+    previewImageUrl?: string | null;
+    active: boolean;
+    metadataJson?: Prisma.JsonValue | null;
+    createdAt: Date;
+    updatedAt: Date;
+  }) {
+    return {
+      ...item,
+      printfulVariantIds: this.jsonStringArray(item.printfulVariantIds),
+      allowedColorVariantIds: this.jsonStringArray(item.allowedColorVariantIds),
+      allowedSizeVariantIds: this.jsonStringArray(item.allowedSizeVariantIds),
+      allowedPlacements: this.jsonStringArray(item.allowedPlacements),
+      allowedTechniques: this.jsonStringArray(item.allowedTechniques),
+      defaultRetailPrice: this.decimalString(item.defaultRetailPrice),
+      estimatedBaseCost: this.decimalString(item.estimatedBaseCost),
+    };
+  }
+
+  private serializePlacementPreset(item: {
+    id: string;
+    name: string;
+    pipeline: PipelineType;
+    productTemplateId?: string | null;
+    localBaseProductId?: string | null;
+    placement: PlacementKind;
+    defaultWidthCm?: number | null;
+    defaultHeightCm?: number | null;
+    defaultWidthIn?: number | null;
+    defaultHeightIn?: number | null;
+    defaultX?: number | null;
+    defaultY?: number | null;
+    defaultScale: number;
+    alignment: PlacementAlignment;
+    units: PlacementUnits;
+    active: boolean;
+    createdAt: Date;
+    updatedAt: Date;
+    localBaseProduct?: { id: string; name: string } | null;
+    printfulProductTemplate?: { id: string; displayName: string } | null;
+  }) {
+    return {
+      ...item,
+      localBaseProduct: item.localBaseProduct ? { id: item.localBaseProduct.id, name: item.localBaseProduct.name } : null,
+      printfulProductTemplate: item.printfulProductTemplate
+        ? { id: item.printfulProductTemplate.id, displayName: item.printfulProductTemplate.displayName }
+        : null,
     };
   }
 
@@ -455,10 +528,15 @@ export class AdminConfigService {
   }
 
   listPlacementPresets() {
-    return this.prisma.placementPreset.findMany({
-      orderBy: { createdAt: "desc" },
-      include: { localBaseProduct: true, printfulProductTemplate: true },
-    });
+    return this.prisma.placementPreset
+      .findMany({
+        orderBy: { createdAt: "desc" },
+        include: {
+          localBaseProduct: { select: { id: true, name: true } },
+          printfulProductTemplate: { select: { id: true, displayName: true } },
+        },
+      })
+      .then((items) => items.map((item) => this.serializePlacementPreset(item)));
   }
 
   async createPlacementPreset(actorId: string, dto: CreatePlacementPresetDto) {
@@ -511,7 +589,9 @@ export class AdminConfigService {
   }
 
   listPrintfulProductTemplates() {
-    return this.prisma.printfulProductTemplate.findMany({ orderBy: { createdAt: "desc" } });
+    return this.prisma.printfulProductTemplate
+      .findMany({ orderBy: { createdAt: "desc" } })
+      .then((items) => items.map((item) => this.serializePrintfulTemplate(item)));
   }
 
   async createPrintfulProductTemplate(actorId: string, dto: CreatePrintfulProductTemplateDto) {

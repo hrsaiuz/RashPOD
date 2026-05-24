@@ -1,5 +1,5 @@
-import AdminPlaceholder from "../admin-placeholder";
+import { AdminProductionScreen } from "../admin-hub-screens";
 
-export default function Page() {
-  return <AdminPlaceholder title="Production" description="Production operations controls." />;
+export default function AdminProductionPage() {
+  return <AdminProductionScreen />;
 }
