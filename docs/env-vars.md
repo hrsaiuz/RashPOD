@@ -118,6 +118,9 @@ PRINTIFY_WEBHOOK_SECRET=
 Provider settings should reference environment variable names or Secret Manager resource names only. Raw Printful/Printify
 tokens must not be returned by API responses or displayed in the dashboard.
 
+Configure the curated Printful catalog allowlist in admin Pipeline Config (`integrations.printful.catalogAllowlist`).
+Each entry needs a Printful catalog product ID and RashPOD product type before running **Sync Catalog**.
+
 ## Feature Flags
 ```env
 FEATURE_FILM_SALES=true

@@ -542,23 +542,27 @@ export class AdminConfigService {
       connectedMarketplaces: Array.isArray(value.connectedMarketplaces) ? value.connectedMarketplaces : [],
       autoPublishTrusted: Boolean(value.autoPublishTrusted),
       allowGlobalWithoutLocal: Boolean(value.allowGlobalWithoutLocal),
+      catalogAllowlist: Array.isArray(value.catalogAllowlist) ? value.catalogAllowlist : [],
       tokenConfigured: Boolean(process.env.PRINTFUL_API_TOKEN),
       apiBaseUrl: process.env.PRINTFUL_API_BASE_URL || "https://api.printful.com",
     };
   }
 
   async updatePrintfulSettings(actorId: string, dto: UpdatePrintfulSettingsDto) {
+    const existing = await this.prisma.platformSetting.findUnique({ where: { key: "integrations.printful" } });
+    const current = this.objectValue(existing?.value);
     const value = {
-      enabled: dto.enabled ?? false,
-      defaultStoreId: dto.defaultStoreId,
-      connectedMarketplaces: dto.connectedMarketplaces ?? [],
-      autoPublishTrusted: dto.autoPublishTrusted ?? false,
-      allowGlobalWithoutLocal: dto.allowGlobalWithoutLocal ?? false,
+      enabled: dto.enabled ?? Boolean(current.enabled),
+      defaultStoreId: dto.defaultStoreId ?? current.defaultStoreId,
+      connectedMarketplaces: dto.connectedMarketplaces ?? (Array.isArray(current.connectedMarketplaces) ? current.connectedMarketplaces : []),
+      autoPublishTrusted: dto.autoPublishTrusted ?? Boolean(current.autoPublishTrusted),
+      allowGlobalWithoutLocal: dto.allowGlobalWithoutLocal ?? Boolean(current.allowGlobalWithoutLocal),
+      catalogAllowlist: dto.catalogAllowlist ?? (Array.isArray(current.catalogAllowlist) ? current.catalogAllowlist : []),
     };
     const item = await this.prisma.platformSetting.upsert({
       where: { key: "integrations.printful" },
-      create: { key: "integrations.printful", value },
-      update: { value },
+      create: { key: "integrations.printful", value: value as Prisma.InputJsonValue },
+      update: { value: value as Prisma.InputJsonValue },
     });
     await this.prisma.platformSetting.upsert({
       where: { key: "pipeline.allowGlobalWithoutLocal" },

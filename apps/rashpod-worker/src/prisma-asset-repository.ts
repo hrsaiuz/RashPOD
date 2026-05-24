@@ -1,6 +1,7 @@
-import { DesignProductSelectionStatus, GeneratedAssetStatus, IntegrationLogStatus, ListingStatus, ListingType, MarketplaceKind, MarketplacePublicationStatus, NotificationDeliveryStatus, PipelineType, Prisma, ProductionJobStatus, ProviderType } from "@prisma/client";
+import { DesignProductSelectionStatus, GeneratedAssetStatus, IntegrationLogStatus, ListingStatus, ListingType, MarketplaceKind, MarketplacePublicationStatus, NotificationDeliveryStatus, PipelineType, PlacementAlignment, PlacementKind, PlacementUnits, Prisma, ProductionJobStatus, ProviderType } from "@prisma/client";
+import { parsePrintfulSettings } from "@rashpod/printful";
 import { getPrismaClient } from "./db";
-import { AiJobRecord, GeneratedAssetRecord, MarketplacePublicationRecord, MockupAssetRecord, PipelineSelectionRecord, PipelineSelectionStatus, ProductionJobRecord, WorkerRepository } from "./repository";
+import { AiJobRecord, GeneratedAssetRecord, MarketplacePublicationPublishContext, MarketplacePublicationRecord, MockupAssetRecord, PipelineSelectionRecord, PipelineSelectionStatus, PrintfulSettingsRecord, ProductionJobRecord, WorkerRepository } from "./repository";
 
 export class PrismaAssetRepository implements WorkerRepository {
   private readonly prisma = getPrismaClient();
@@ -236,6 +237,8 @@ export class PrismaAssetRepository implements WorkerRepository {
             displayName: row.printfulProductTemplate.displayName,
             printfulCatalogProductId: row.printfulProductTemplate.printfulCatalogProductId,
             printfulVariantIds: row.printfulProductTemplate.printfulVariantIds,
+            allowedPlacements: row.printfulProductTemplate.allowedPlacements,
+            allowedTechniques: row.printfulProductTemplate.allowedTechniques,
             defaultPlacement: row.printfulProductTemplate.defaultPlacement,
             defaultTechnique: row.printfulProductTemplate.defaultTechnique,
             defaultRetailPrice: row.printfulProductTemplate.defaultRetailPrice,
@@ -385,15 +388,202 @@ export class PrismaAssetRepository implements WorkerRepository {
       marketplace: row.marketplace,
       provider: row.provider,
       status: row.status,
+      providerSyncProductId: row.providerSyncProductId,
+      providerExternalListingId: row.providerExternalListingId,
+      metadataJson: row.metadataJson,
       productListing: {
         id: row.productListing.id,
         status: row.productListing.status,
         title: row.productListing.title,
+        price: row.productListing.price,
+        currency: row.productListing.currency,
         pipeline: row.productListing.pipeline,
         mockupAssetIds: row.productListing.mockupAssetIds,
         designProductSelectionId: row.productListing.designProductSelectionId,
+        printfulProductTemplateId: row.productListing.printfulProductTemplateId,
       },
     };
+  }
+
+  async getMarketplacePublicationPublishContext(id: string): Promise<MarketplacePublicationPublishContext | null> {
+    const publication = await this.getMarketplacePublication(id);
+    if (!publication?.productListing.designProductSelectionId) return publication;
+    const selection = await this.getPipelineSelection(publication.productListing.designProductSelectionId);
+    const mockupIds = Array.isArray(publication.productListing.mockupAssetIds) ? publication.productListing.mockupAssetIds.filter((item): item is string => typeof item === "string") : [];
+    const mockupAssets = mockupIds.length
+      ? await this.prisma.mockupAsset.findMany({ where: { id: { in: mockupIds } } })
+      : selection
+        ? await this.prisma.mockupAsset.findMany({ where: { designProductSelectionId: selection.id } })
+        : [];
+    const mapping = selection
+      ? await this.prisma.printfulFileMapping.findFirst({ where: { designId: selection.designId, status: "READY" }, orderBy: { updatedAt: "desc" } })
+      : null;
+    return {
+      ...publication,
+      selection,
+      printfulFileId: mapping?.printfulFileId ?? null,
+      mockupAssets: mockupAssets.map((asset) => ({ id: asset.id, mockupType: asset.mockupType, status: asset.status, imageUrl: asset.imageUrl, objectKey: asset.objectKey })),
+      printfulProductTemplate: selection?.printfulProductTemplate ?? null,
+    };
+  }
+
+  async getMockupAsset(id: string): Promise<MockupAssetRecord | null> {
+    const row = await this.prisma.mockupAsset.findUnique({ where: { id } });
+    if (!row) return null;
+    return { id: row.id, mockupType: row.mockupType, status: row.status, imageUrl: row.imageUrl, objectKey: row.objectKey };
+  }
+
+  async countProcessingMockupAssets(selectionId: string) {
+    return this.prisma.mockupAsset.count({ where: { designProductSelectionId: selectionId, status: { in: ["PENDING", "PROCESSING"] } } });
+  }
+
+  async getPrintfulSettings(): Promise<PrintfulSettingsRecord> {
+    const setting = await this.prisma.platformSetting.findUnique({ where: { key: "integrations.printful" } });
+    const parsed = parsePrintfulSettings(setting?.value);
+    return {
+      enabled: parsed.enabled || process.env.PRINTFUL_ENABLED === "true",
+      defaultStoreId: parsed.defaultStoreId ?? process.env.PRINTFUL_STORE_ID ?? null,
+      catalogAllowlist: parsed.catalogAllowlist,
+    };
+  }
+
+  async upsertPrintfulProductTemplate(input: {
+    rashpodProductType: string;
+    displayName: string;
+    printfulCatalogProductId: string;
+    printfulProductName: string;
+    printfulVariantIds: string[];
+    allowedColorVariantIds?: string[];
+    allowedSizeVariantIds?: string[];
+    allowedPlacements: string[];
+    allowedTechniques: string[];
+    defaultTechnique: string;
+    defaultPlacement: string;
+    defaultRetailPrice?: string | null;
+    estimatedBaseCost?: string | null;
+    currency: string;
+    previewImageUrl?: string | null;
+    printfulStoreId?: string | null;
+    metadataJson?: unknown;
+  }) {
+    const item = await this.prisma.printfulProductTemplate.upsert({
+      where: {
+        provider_printfulCatalogProductId_displayName: {
+          provider: ProviderType.PRINTFUL,
+          printfulCatalogProductId: input.printfulCatalogProductId,
+          displayName: input.displayName,
+        },
+      },
+      create: {
+        rashpodProductType: input.rashpodProductType,
+        displayName: input.displayName,
+        provider: ProviderType.PRINTFUL,
+        printfulCatalogProductId: input.printfulCatalogProductId,
+        printfulProductName: input.printfulProductName,
+        printfulVariantIds: input.printfulVariantIds,
+        allowedColorVariantIds: input.allowedColorVariantIds ?? input.printfulVariantIds,
+        allowedSizeVariantIds: input.allowedSizeVariantIds ?? input.printfulVariantIds,
+        allowedPlacements: input.allowedPlacements,
+        allowedTechniques: input.allowedTechniques,
+        defaultTechnique: input.defaultTechnique,
+        defaultPlacement: input.defaultPlacement,
+        defaultRetailPrice: input.defaultRetailPrice ?? undefined,
+        estimatedBaseCost: input.estimatedBaseCost ?? undefined,
+        currency: input.currency,
+        previewImageUrl: input.previewImageUrl ?? undefined,
+        printfulStoreId: input.printfulStoreId ?? undefined,
+        metadataJson: input.metadataJson as Prisma.InputJsonValue | undefined,
+        active: true,
+      },
+      update: {
+        rashpodProductType: input.rashpodProductType,
+        printfulProductName: input.printfulProductName,
+        printfulVariantIds: input.printfulVariantIds,
+        allowedColorVariantIds: input.allowedColorVariantIds ?? input.printfulVariantIds,
+        allowedSizeVariantIds: input.allowedSizeVariantIds ?? input.printfulVariantIds,
+        allowedPlacements: input.allowedPlacements,
+        allowedTechniques: input.allowedTechniques,
+        defaultTechnique: input.defaultTechnique,
+        defaultPlacement: input.defaultPlacement,
+        defaultRetailPrice: input.defaultRetailPrice ?? undefined,
+        estimatedBaseCost: input.estimatedBaseCost ?? undefined,
+        currency: input.currency,
+        previewImageUrl: input.previewImageUrl ?? undefined,
+        printfulStoreId: input.printfulStoreId ?? undefined,
+        metadataJson: input.metadataJson as Prisma.InputJsonValue | undefined,
+        active: true,
+      },
+    });
+    return { id: item.id, displayName: item.displayName };
+  }
+
+  async ensurePrintfulPlacementPreset(productTemplateId: string, rashpodProductType: string) {
+    const existing = await this.prisma.placementPreset.findFirst({
+      where: { pipeline: PipelineType.GLOBAL_PRINTFUL, productTemplateId, name: "Center front" },
+    });
+    if (existing) return { created: false };
+    await this.prisma.placementPreset.create({
+      data: {
+        name: "Center front",
+        pipeline: PipelineType.GLOBAL_PRINTFUL,
+        productTemplateId,
+        placement: rashpodProductType === "mug" ? PlacementKind.FULL_WRAP : PlacementKind.FRONT,
+        defaultWidthIn: rashpodProductType === "mug" ? 3.5 : 10,
+        defaultHeightIn: rashpodProductType === "mug" ? 3 : 12,
+        defaultScale: 1,
+        alignment: PlacementAlignment.CENTER,
+        units: PlacementUnits.INCH,
+        active: true,
+      },
+    });
+    return { created: true };
+  }
+
+  async ensurePrintfulFileForDesign(designId: string, uploadFromUrl: (url: string) => Promise<{ fileId: string; printfulUrl?: string | null }>) {
+    const existing = await this.prisma.printfulFileMapping.findFirst({
+      where: { designId, status: "READY", printfulFileId: { not: null } },
+      orderBy: { updatedAt: "desc" },
+    });
+    if (existing?.printfulFileId) return { printfulFileId: existing.printfulFileId };
+
+    const design = await this.prisma.designAsset.findUnique({
+      where: { id: designId },
+      include: { versions: { orderBy: { createdAt: "desc" }, take: 1 } },
+    });
+    if (!design?.versions[0]?.fileKey) throw new Error("DESIGN_FILE_MISSING");
+
+    const mapping = await this.prisma.printfulFileMapping.create({
+      data: { designId, status: "PENDING" },
+    });
+    try {
+      const signedUrl = await import("./gcs-signing").then((mod) => mod.createSignedReadUrl(design.versions[0]!.fileKey, 3600));
+      const uploaded = await uploadFromUrl(signedUrl);
+      await this.prisma.printfulFileMapping.update({
+        where: { id: mapping.id },
+        data: { status: "READY", printfulFileId: uploaded.fileId, originalUrl: signedUrl, printfulUrl: uploaded.printfulUrl ?? null },
+      });
+      return { printfulFileId: uploaded.fileId };
+    } catch (error) {
+      await this.prisma.printfulFileMapping.update({ where: { id: mapping.id }, data: { status: "FAILED" } });
+      throw error;
+    }
+  }
+
+  async enqueueWorkerJob(input: { type: string; payload: Record<string, unknown>; nextRunAt?: Date; idempotencyKey?: string }) {
+    if (input.idempotencyKey) {
+      const existing = await this.prisma.workerJob.findFirst({ where: { idempotencyKey: input.idempotencyKey, status: { in: ["PENDING", "PROCESSING"] } } });
+      if (existing) return { jobId: existing.id };
+    }
+    const job = await this.prisma.workerJob.create({
+      data: {
+        type: input.type as any,
+        payloadJson: input.payload as Prisma.InputJsonValue,
+        status: "PENDING",
+        nextRunAt: input.nextRunAt ?? new Date(),
+        idempotencyKey: input.idempotencyKey,
+      },
+    });
+    return { jobId: job.id };
   }
 
   async updateMarketplacePublication(

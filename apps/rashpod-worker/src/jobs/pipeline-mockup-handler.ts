@@ -1,5 +1,6 @@
 import { PipelineRenderContext, RenderedFile, SharpRenderer } from "../renderer";
 import { MockupAssetRecord, PipelineSelectionRecord, WorkerRepository } from "../repository";
+import { PrintfulMockupStartHelper } from "./printful-mockup-poll-handler";
 
 export interface PipelineMockupRendererPort {
   renderListingVariant(selectionId: string, variant: "main" | "lifestyle" | "closeup"): Promise<RenderedFile>;
@@ -8,10 +9,14 @@ export interface PipelineMockupRendererPort {
 }
 
 export class PipelineMockupJobHandler {
+  private readonly printfulHelper: PrintfulMockupStartHelper;
+
   constructor(
     private readonly repo: WorkerRepository,
     private readonly renderer: PipelineMockupRendererPort = new SharpRenderer(),
-  ) {}
+  ) {
+    this.printfulHelper = new PrintfulMockupStartHelper(repo);
+  }
 
   async handleLocalMockups(input: { designProductSelectionId: string; workerJobId?: string }) {
     return this.generateMockups(input.designProductSelectionId, "LOCAL_MOCKUP_GENERATION_FAILED", undefined, input.workerJobId);
@@ -35,7 +40,15 @@ export class PipelineMockupJobHandler {
       return { failed: true, errorCode: "PRINTFUL_API_TOKEN_MISSING" };
     }
 
-    return this.generateMockups(input.designProductSelectionId, "PRINTFUL_MOCKUP_FAILED", "printful-dev-task", input.workerJobId);
+    await repo.updatePipelineSelection(input.designProductSelectionId, { status: "MOCKUP_GENERATING", errorMessage: null });
+    try {
+      const started = await this.printfulHelper.ensureFileAndCreateTask(input.designProductSelectionId, input.workerJobId);
+      return { processing: true, taskKey: started.taskKey, printfulFileId: started.printfulFileId };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "PRINTFUL_MOCKUP_FAILED";
+      await this.failSelection(selection.id, message);
+      return { failed: true, errorCode: message };
+    }
   }
 
   private async generateMockups(selectionId: string, failureCode: string, providerTaskId?: string, renderJobId?: string) {

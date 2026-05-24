@@ -8,6 +8,7 @@ import { MarketplacePublicationJobHandler } from "./jobs/marketplace-publication
 import { PipelineMockupJobHandler } from "./jobs/pipeline-mockup-handler";
 import { PodSyncJobHandler } from "./jobs/pod-sync-handler";
 import { PrintfulCatalogSyncJobHandler } from "./jobs/printful-catalog-sync-handler";
+import { PrintfulMockupPollJobHandler } from "./jobs/printful-mockup-poll-handler";
 import { WorkerLogger, workerLogger } from "./logger";
 
 export class WorkerDispatcher {
@@ -15,6 +16,7 @@ export class WorkerDispatcher {
   private readonly pipelineMockupHandler: PipelineMockupJobHandler;
   private readonly marketplacePublicationHandler: MarketplacePublicationJobHandler;
   private readonly printfulCatalogSyncHandler: PrintfulCatalogSyncJobHandler;
+  private readonly printfulMockupPollHandler: PrintfulMockupPollJobHandler;
   private readonly podSyncHandler: PodSyncJobHandler;
   private readonly emailHandler: EmailJobHandler;
   private readonly telegramHandler: TelegramJobHandler;
@@ -26,6 +28,7 @@ export class WorkerDispatcher {
     this.pipelineMockupHandler = new PipelineMockupJobHandler(repo);
     this.marketplacePublicationHandler = new MarketplacePublicationJobHandler(repo);
     this.printfulCatalogSyncHandler = new PrintfulCatalogSyncJobHandler(repo);
+    this.printfulMockupPollHandler = new PrintfulMockupPollJobHandler(repo);
     this.podSyncHandler = new PodSyncJobHandler();
     this.emailHandler = new EmailJobHandler(emailSender, repo);
     this.telegramHandler = new TelegramJobHandler(repo);
@@ -49,6 +52,8 @@ export class WorkerDispatcher {
         return this.pipelineMockupHandler.handleLocalMockups({ ...(job.payload as { designProductSelectionId: string }), workerJobId: job.id });
       case "GENERATE_PRINTFUL_MOCKUPS":
         return this.pipelineMockupHandler.handlePrintfulMockups({ ...(job.payload as { designProductSelectionId: string }), workerJobId: job.id });
+      case "POLL_PRINTFUL_MOCKUP_TASK":
+        return this.printfulMockupPollHandler.handlePoll(job.payload as { mockupAssetId: string; taskKey: string; designProductSelectionId: string; attempt?: number });
       case "PUBLISH_MARKETPLACE_LISTING":
         return this.marketplacePublicationHandler.handlePublish(job.payload as { marketplacePublicationId: string });
       case "SYNC_PRINTFUL_CATALOG":

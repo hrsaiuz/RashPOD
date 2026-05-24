@@ -1,57 +1,68 @@
+import { PrintfulApiClient, mapCatalogProductToTemplate, parsePrintfulSettings } from "@rashpod/printful";
 import { WorkerRepository } from "../repository";
-
-export interface PrintfulFetchPort {
-  (url: string, init: { method: string; headers: Record<string, string> }): Promise<{ ok: boolean; status: number; json(): Promise<unknown>; text(): Promise<string> }>;
-}
 
 export class PrintfulCatalogSyncJobHandler {
   constructor(
     private readonly repo: WorkerRepository,
-    private readonly fetcher: PrintfulFetchPort = fetch,
+    private readonly client = new PrintfulApiClient(),
   ) {}
 
   async handleSync(input: { requestedBy?: string }) {
     const repo = this.integrationRepo();
-    if (process.env.PRINTFUL_ENABLED !== "true") return this.fail("PRINTFUL_NOT_CONFIGURED", "Printful integration is disabled.");
-    const token = process.env.PRINTFUL_API_TOKEN;
-    if (!token) return this.fail("PRINTFUL_API_TOKEN_MISSING", "Printful API token is missing.");
+    if (!this.client.isEnabled()) return this.fail("PRINTFUL_NOT_CONFIGURED", "Printful integration is disabled.");
+    if (!this.client.hasToken()) return this.fail("PRINTFUL_API_TOKEN_MISSING", "Printful API token is missing.");
+    if (!repo.getPrintfulSettings || !repo.upsertPrintfulProductTemplate || !repo.ensurePrintfulPlacementPreset) {
+      throw new Error("Printful catalog repository methods are not configured");
+    }
 
-    const apiBaseUrl = process.env.PRINTFUL_API_BASE_URL || "https://api.printful.com";
+    const settings = await repo.getPrintfulSettings();
+    const allowlist = settings.catalogAllowlist;
     await repo.createIntegrationLog({
       action: "printful.catalog.sync",
       status: "PENDING",
-      responseSummaryJson: { requestedBy: input.requestedBy ?? null, apiBaseUrl },
+      responseSummaryJson: { requestedBy: input.requestedBy ?? null, allowlistCount: allowlist.length },
     });
 
-    try {
-      const response = await this.fetcher(`${apiBaseUrl.replace(/\/$/, "")}/store/products`, {
-        method: "GET",
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!response.ok) {
-        const body = await response.text();
-        await repo.createIntegrationLog({
-          action: "printful.catalog.sync",
-          status: "FAILED",
-          errorCode: `PRINTFUL_HTTP_${response.status}`,
-          errorMessage: body.slice(0, 500),
-        });
-        return { failed: true, errorCode: `PRINTFUL_HTTP_${response.status}` };
-      }
-
-      const payload = await response.json();
-      const count = Array.isArray((payload as { result?: unknown }).result) ? ((payload as { result: unknown[] }).result).length : null;
+    if (allowlist.length === 0) {
       await repo.createIntegrationLog({
         action: "printful.catalog.sync",
-        status: "SUCCESS",
-        responseSummaryJson: { productCount: count, persistedTemplates: 0 },
+        status: "FAILED",
+        errorCode: "PRINTFUL_ALLOWLIST_EMPTY",
+        errorMessage: "Configure catalogAllowlist in Printful settings before syncing.",
       });
-      return { synced: true, productCount: count, persistedTemplates: 0 };
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Printful catalog sync failed";
-      await repo.createIntegrationLog({ action: "printful.catalog.sync", status: "FAILED", errorCode: "PRINTFUL_SYNC_FAILED", errorMessage: message });
-      return { failed: true, errorCode: "PRINTFUL_SYNC_FAILED" };
+      return { failed: true, errorCode: "PRINTFUL_ALLOWLIST_EMPTY" };
     }
+
+    let persistedTemplates = 0;
+    let updatedPresets = 0;
+    const errors: Array<{ catalogProductId: number; error: string }> = [];
+
+    for (const item of allowlist) {
+      try {
+        const productResponse = await this.client.getCatalogProduct(item.catalogProductId);
+        const product = (productResponse.result ?? {}) as Record<string, unknown>;
+        const technique = item.defaultTechnique ?? "dtg";
+        const printfilesResponse = await this.client.getPrintfiles(item.catalogProductId, technique);
+        const printfiles = (printfilesResponse.result ?? {}) as Record<string, unknown>;
+        const mapped = mapCatalogProductToTemplate({ allowlistItem: item, product, printfiles, storeId: settings.defaultStoreId });
+        const template = await repo.upsertPrintfulProductTemplate(mapped);
+        persistedTemplates += 1;
+        const preset = await repo.ensurePrintfulPlacementPreset(template.id, item.rashpodProductType);
+        if (preset.created) updatedPresets += 1;
+      } catch (error) {
+        errors.push({ catalogProductId: item.catalogProductId, error: error instanceof Error ? error.message : "sync failed" });
+      }
+    }
+
+    const summary = { persistedTemplates, updatedPresets, errors };
+    await repo.createIntegrationLog({
+      action: "printful.catalog.sync",
+      status: errors.length === allowlist.length ? "FAILED" : "SUCCESS",
+      responseSummaryJson: summary,
+      errorCode: errors.length ? "PRINTFUL_PARTIAL_SYNC" : undefined,
+      errorMessage: errors.length ? `${errors.length} catalog item(s) failed` : undefined,
+    });
+    return { synced: true, ...summary };
   }
 
   private async fail(errorCode: string, errorMessage: string) {
@@ -62,6 +73,6 @@ export class PrintfulCatalogSyncJobHandler {
 
   private integrationRepo() {
     if (!this.repo.createIntegrationLog) throw new Error("Integration log repository method is not configured");
-    return this.repo as Required<Pick<WorkerRepository, "createIntegrationLog">>;
+    return this.repo as Required<Pick<WorkerRepository, "createIntegrationLog" | "getPrintfulSettings" | "upsertPrintfulProductTemplate" | "ensurePrintfulPlacementPreset">>;
   }
 }

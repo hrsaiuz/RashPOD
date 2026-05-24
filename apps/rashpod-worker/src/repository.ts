@@ -48,6 +48,8 @@ export interface PipelineSelectionRecord {
     displayName: string;
     printfulCatalogProductId: string;
     printfulVariantIds: unknown;
+    allowedPlacements: unknown;
+    allowedTechniques: unknown;
     defaultPlacement: string;
     defaultTechnique: string;
     defaultRetailPrice?: unknown;
@@ -72,15 +74,43 @@ export interface MarketplacePublicationRecord {
   marketplace: string;
   provider: "RASHPOD" | "PRINTFUL" | "PRINTIFY" | "DIRECT_MARKETPLACE";
   status: MarketplacePublicationStatus;
+  providerSyncProductId?: string | null;
+  providerExternalListingId?: string | null;
+  metadataJson?: unknown;
   productListing: {
     id: string;
     status: string;
     title: string;
+    price?: unknown;
+    currency?: string;
     pipeline?: "LOCAL" | "GLOBAL_PRINTFUL" | "GLOBAL_POD" | null;
     mockupAssetIds?: unknown;
     designProductSelectionId?: string | null;
+    printfulProductTemplateId?: string | null;
   };
 }
+
+export interface MarketplacePublicationPublishContext extends MarketplacePublicationRecord {
+  selection?: PipelineSelectionRecord | null;
+  printfulFileId?: string | null;
+  mockupAssets?: Array<MockupAssetRecord & { mockupType: MockupAssetRecord["mockupType"] }>;
+  printfulProductTemplate?: PipelineSelectionRecord["printfulProductTemplate"];
+}
+
+export type PrintfulCatalogAllowlistItem = {
+  catalogProductId: number;
+  rashpodProductType: string;
+  displayName?: string;
+  defaultVariantIds?: number[];
+  defaultTechnique?: string;
+  defaultPlacement?: string;
+};
+
+export type PrintfulSettingsRecord = {
+  enabled: boolean;
+  defaultStoreId?: string | null;
+  catalogAllowlist: PrintfulCatalogAllowlistItem[];
+};
 
 export interface ProductionJobRecord {
   id: string;
@@ -158,6 +188,7 @@ export interface WorkerRepository {
   ): Promise<MockupAssetRecord>;
   createListingDraftForSelection?(selectionId: string): Promise<{ id: string; status: string } | null>;
   getMarketplacePublication?(id: string): Promise<MarketplacePublicationRecord | null>;
+  getMarketplacePublicationPublishContext?(id: string): Promise<MarketplacePublicationPublishContext | null>;
   updateMarketplacePublication?(
     id: string,
     data: { status?: MarketplacePublicationStatus; errorMessage?: string | null; providerExternalListingId?: string | null; providerSyncProductId?: string | null; lastSyncedAt?: Date | null; metadataJson?: unknown },
@@ -172,6 +203,31 @@ export interface WorkerRepository {
     errorMessage?: string | null;
     responseSummaryJson?: unknown;
   }): Promise<void>;
+  getPrintfulSettings?(): Promise<PrintfulSettingsRecord>;
+  upsertPrintfulProductTemplate?(input: {
+    rashpodProductType: string;
+    displayName: string;
+    printfulCatalogProductId: string;
+    printfulProductName: string;
+    printfulVariantIds: string[];
+    allowedColorVariantIds?: string[];
+    allowedSizeVariantIds?: string[];
+    allowedPlacements: string[];
+    allowedTechniques: string[];
+    defaultTechnique: string;
+    defaultPlacement: string;
+    defaultRetailPrice?: string | null;
+    estimatedBaseCost?: string | null;
+    currency: string;
+    previewImageUrl?: string | null;
+    printfulStoreId?: string | null;
+    metadataJson?: unknown;
+  }): Promise<{ id: string; displayName: string }>;
+  ensurePrintfulPlacementPreset?(productTemplateId: string, rashpodProductType: string): Promise<{ created: boolean }>;
+  ensurePrintfulFileForDesign?(designId: string, uploadFromUrl: (url: string) => Promise<{ fileId: string; printfulUrl?: string | null }>): Promise<{ printfulFileId: string }>;
+  enqueueWorkerJob?(input: { type: string; payload: Record<string, unknown>; nextRunAt?: Date; idempotencyKey?: string }): Promise<{ jobId: string }>;
+  getMockupAsset?(id: string): Promise<MockupAssetRecord | null>;
+  countProcessingMockupAssets?(selectionId: string): Promise<number>;
   getAiJob?(id: string): Promise<AiJobRecord | null>;
   updateAiJob?(
     id: string,

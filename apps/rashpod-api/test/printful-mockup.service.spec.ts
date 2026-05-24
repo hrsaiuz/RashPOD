@@ -24,6 +24,7 @@ describe("PrintfulMockupService", () => {
     expect(payload).toEqual({
       catalog_product_id: "catalog_123",
       variant_ids: ["variant_black_m", "variant_white_l"],
+      format: "jpg",
       files: [
         {
           placement: "front",

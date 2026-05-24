@@ -1,46 +1,53 @@
 import { Injectable } from "@nestjs/common";
-
-export interface PrintfulRequestOptions {
-  method?: "GET" | "POST" | "PUT" | "DELETE";
-  path: string;
-  body?: unknown;
-  requestId?: string;
-}
+import { PrintfulApiClient } from "@rashpod/printful";
+import type { PrintfulRequestOptions } from "./printful.client.types";
 
 @Injectable()
 export class PrintfulClient {
-  private readonly baseUrl = process.env.PRINTFUL_API_BASE_URL || "https://api.printful.com";
+  private readonly client = new PrintfulApiClient();
 
   isEnabled() {
-    return process.env.PRINTFUL_ENABLED === "true";
+    return this.client.isEnabled();
   }
 
   hasToken() {
-    return Boolean(process.env.PRINTFUL_API_TOKEN);
+    return this.client.hasToken();
   }
 
   async request<T>(options: PrintfulRequestOptions): Promise<T> {
-    if (!this.isEnabled()) throw new Error("PRINTFUL_NOT_CONFIGURED");
-    const token = process.env.PRINTFUL_API_TOKEN;
-    if (!token) throw new Error("PRINTFUL_API_TOKEN_MISSING");
-
-    const response = await fetch(`${this.baseUrl}${options.path}`, {
-      method: options.method ?? "GET",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-        ...(options.requestId ? { "X-RashPOD-Request-Id": options.requestId } : {}),
-      },
-      body: options.body == null ? undefined : JSON.stringify(options.body),
+    return this.client.request<T>({
+      method: options.method,
+      path: options.path,
+      body: options.body,
+      query: options.query,
     });
+  }
 
-    const text = await response.text();
-    const parsed = text ? JSON.parse(text) : null;
-    if (!response.ok) {
-      const error = new Error(`PRINTFUL_REQUEST_FAILED:${response.status}`);
-      (error as Error & { responseBody?: unknown }).responseBody = parsed;
-      throw error;
-    }
-    return parsed as T;
+  getCatalogProduct(catalogProductId: number | string) {
+    return this.client.getCatalogProduct(catalogProductId);
+  }
+
+  getPrintfiles(catalogProductId: number | string, technique?: string) {
+    return this.client.getPrintfiles(catalogProductId, technique);
+  }
+
+  uploadFileFromUrl(url: string) {
+    return this.client.uploadFileFromUrl(url);
+  }
+
+  createMockupTask(catalogProductId: number | string, body: Record<string, unknown>) {
+    return this.client.createMockupTask(catalogProductId, body);
+  }
+
+  getMockupTask(taskKey: string) {
+    return this.client.getMockupTask(taskKey);
+  }
+
+  createSyncProduct(body: Record<string, unknown>) {
+    return this.client.createSyncProduct(body);
+  }
+
+  updateSyncVariant(variantId: number | string, body: Record<string, unknown>) {
+    return this.client.updateSyncVariant(variantId, body);
   }
 }

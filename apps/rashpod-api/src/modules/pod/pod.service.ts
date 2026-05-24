@@ -9,6 +9,7 @@ import { PodPlacementTransformService } from "./placement-transform.service";
 import { PodProviderAdapter } from "./provider-adapters/pod-provider-adapter";
 import { PrintfulProviderAdapter } from "./provider-adapters/printful-provider.adapter";
 import { PrintifyProviderAdapter } from "./provider-adapters/printify-provider.adapter";
+import { PrintfulWebhookService } from "../printful/printful-webhook.service";
 
 type JsonObject = Record<string, unknown>;
 
@@ -22,6 +23,7 @@ export class PodService {
     private readonly transform: PodPlacementTransformService,
     private readonly printful: PrintfulProviderAdapter,
     private readonly printify: PrintifyProviderAdapter,
+    private readonly printfulWebhook: PrintfulWebhookService,
   ) {}
 
   async overview() {
@@ -473,6 +475,12 @@ export class PodService {
 
   async logWebhook(providerText: string, body: JsonObject, signature?: string) {
     const provider = this.provider(providerText);
+    if (provider === PodProviderType.PRINTFUL) {
+      const printfulResult = await this.printfulWebhook.handleWebhook(body, signature);
+      if (!printfulResult.accepted) {
+        return { accepted: false, eventId: null, reason: printfulResult.reason };
+      }
+    }
     const config = await this.prisma.podProviderConfig.findFirst({ where: { provider, isEnabled: true }, orderBy: { updatedAt: "desc" } });
     const signatureValid = config?.webhookSecretEnvVar || config?.webhookSecretRef ? Boolean(signature) : undefined;
     const event = await this.prisma.podWebhookEvent.create({

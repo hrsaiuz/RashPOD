@@ -57,6 +57,14 @@ type PrintfulSettings = {
   connectedMarketplaces: string[];
   autoPublishTrusted: boolean;
   allowGlobalWithoutLocal: boolean;
+  catalogAllowlist: Array<{
+    catalogProductId: number;
+    rashpodProductType: string;
+    displayName?: string;
+    defaultVariantIds?: number[];
+    defaultTechnique?: string;
+    defaultPlacement?: string;
+  }>;
   tokenConfigured: boolean;
   apiBaseUrl: string;
 };
@@ -109,7 +117,9 @@ export default function AdminPipelineConfigPage() {
     connectedMarketplaces: "ETSY",
     autoPublishTrusted: false,
     allowGlobalWithoutLocal: false,
+    catalogAllowlistJson: "[]",
   });
+  const [syncMessage, setSyncMessage] = useState("");
 
   useEffect(() => {
     void load();
@@ -139,6 +149,7 @@ export default function AdminPipelineConfigPage() {
         connectedMarketplaces: printfulSettings.connectedMarketplaces.join(", "),
         autoPublishTrusted: printfulSettings.autoPublishTrusted,
         allowGlobalWithoutLocal: printfulSettings.allowGlobalWithoutLocal,
+        catalogAllowlistJson: JSON.stringify(printfulSettings.catalogAllowlist ?? [], null, 2),
       });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load pipeline configuration");
@@ -214,13 +225,16 @@ export default function AdminPipelineConfigPage() {
     setSaving(true);
     setError("");
     try {
+      const catalogAllowlist = JSON.parse(settingsForm.catalogAllowlistJson) as PrintfulSettings["catalogAllowlist"];
       await api.patch("/admin/integrations/printful/settings", {
         enabled: settingsForm.enabled,
         defaultStoreId: settingsForm.defaultStoreId || undefined,
         connectedMarketplaces: csv(settingsForm.connectedMarketplaces),
         autoPublishTrusted: settingsForm.autoPublishTrusted,
         allowGlobalWithoutLocal: settingsForm.allowGlobalWithoutLocal,
+        catalogAllowlist,
       });
+      setSyncMessage("Printful settings saved.");
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to save Printful settings");
@@ -242,8 +256,11 @@ export default function AdminPipelineConfigPage() {
   async function syncCatalog() {
     setSaving(true);
     setError("");
+    setSyncMessage("");
     try {
       await api.post("/admin/printful/product-templates/sync-catalog");
+      setSyncMessage("Catalog sync queued. Refresh templates after the worker completes.");
+      await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to queue catalog sync");
     } finally {
@@ -322,7 +339,11 @@ export default function AdminPipelineConfigPage() {
                   </div>
                   <Field label="Default store ID" value={settingsForm.defaultStoreId} onChange={(value) => setSettingsForm((current) => ({ ...current, defaultStoreId: value }))} />
                   <Field label="Connected marketplaces" value={settingsForm.connectedMarketplaces} onChange={(value) => setSettingsForm((current) => ({ ...current, connectedMarketplaces: value }))} />
-                  <p className="text-xs text-brand-muted">API base: {settings?.apiBaseUrl ?? "https://api.printful.com"}</p>
+                  <label className="text-sm font-medium text-brand-ink lg:col-span-2">Catalog allowlist (JSON)
+                    <textarea value={settingsForm.catalogAllowlistJson} onChange={(event) => setSettingsForm((current) => ({ ...current, catalogAllowlistJson: event.target.value }))} className={textareaClassName} spellCheck={false} />
+                  </label>
+                  <p className="text-xs text-brand-muted lg:col-span-2">Add Printful catalog product IDs with RashPOD product types before running Sync Catalog.</p>
+                  {syncMessage ? <p className="text-sm text-brand-ink lg:col-span-2">{syncMessage}</p> : null}
                   <div className="flex flex-wrap gap-3">
                     <Button type="submit" disabled={saving}>Save Settings</Button>
                     <Button type="button" variant="secondary" onClick={syncCatalog} disabled={saving}><RefreshCw size={16} /> Sync Catalog</Button>
