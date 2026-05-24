@@ -8,7 +8,10 @@
     "start": "next start -p 3001"
   },
   "dependencies": {
+    "@rashpod/mockup": "*",
     "@rashpod/ui": "*",
+    "konva": "^9.3.20",
+    "react-konva": "^18.2.10",
     "autoprefixer": "^10.5.0",
     "clsx": "^2.1.1",
     "framer-motion": "^12.38.0",

@@ -12,7 +12,13 @@ function createService(prismaOverrides: any = {}) {
   };
   const audit = { log: jest.fn() } as any;
   const jobs = { enqueue: jest.fn() } as any;
-  return { service: new DesignWorkflowService(prisma, audit, jobs, new PlacementCalculationService(), new MarketplaceComplianceService()), prisma, audit, jobs };
+  const storage = {
+    isCloudStorageConfigured: jest.fn().mockReturnValue(false),
+    buildPublicUrl: jest.fn(),
+    createPublicSignedReadUrl: jest.fn(),
+    createSignedReadUrl: jest.fn(),
+  } as any;
+  return { service: new DesignWorkflowService(prisma, audit, jobs, new PlacementCalculationService(), new MarketplaceComplianceService(), storage), prisma, audit, jobs };
 }
 
 describe("DesignWorkflowService moderation validation", () => {

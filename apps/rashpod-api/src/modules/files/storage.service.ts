@@ -166,6 +166,22 @@ export class StorageService {
     return `https://storage.local/read/${encodeURIComponent(input.objectKey)}?exp=${input.expiresSeconds}`;
   }
 
+  async createPublicSignedReadUrl(input: { objectKey: string; expiresSeconds: number }) {
+    const storage = this.getStorage();
+    if (storage) {
+      const [url] = await storage
+        .bucket(this.publicBucketName)
+        .file(input.objectKey)
+        .getSignedUrl({
+          version: "v4",
+          action: "read",
+          expires: Date.now() + input.expiresSeconds * 1000,
+        });
+      return url;
+    }
+    return `https://storage.local/public-read/${encodeURIComponent(input.objectKey)}?exp=${input.expiresSeconds}`;
+  }
+
   async writePrivateObject(input: { objectKey: string; buffer: Buffer; mimeType: string }) {
     const storage = this.getStorage();
     if (!storage) {

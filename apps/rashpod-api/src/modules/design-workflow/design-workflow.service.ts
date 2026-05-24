@@ -16,8 +16,10 @@ import {
   ProviderType,
 } from "@prisma/client";
 import { createHash } from "crypto";
+import { presetToInitialPlacement, type PrintAreaRect } from "@rashpod/mockup";
 import { PrismaService } from "../../prisma/prisma.service";
 import { AuditService } from "../audit/audit.service";
+import { StorageService } from "../files/storage.service";
 import { JobDispatcherService } from "../worker-jobs/job-dispatcher.service";
 import { MarketplaceComplianceService } from "./marketplace-compliance.service";
 import { PlacementCalculationService } from "./placement-calculation.service";
@@ -45,6 +47,7 @@ export class DesignWorkflowService {
     private readonly jobs: JobDispatcherService,
     private readonly placementCalculation: PlacementCalculationService,
     private readonly marketplaceCompliance: MarketplaceComplianceService,
+    private readonly storage: StorageService,
   ) {}
 
   moderationQueue(filters?: { status?: string; q?: string }) {
@@ -93,6 +96,92 @@ export class DesignWorkflowService {
 
   workflow(id: string) {
     return this.moderationDetail(id);
+  }
+
+  async mockupEditorContext(
+    designId: string,
+    query: { localBaseProductId: string; mockupTemplateId: string; printAreaId: string; placementPresetId: string },
+  ) {
+    const [design, baseProduct, template, printArea, preset] = await Promise.all([
+      this.prisma.designAsset.findUnique({
+        where: { id: designId },
+        include: { versions: { orderBy: { createdAt: "desc" }, take: 1 } },
+      }),
+      this.prisma.baseProduct.findUnique({ where: { id: query.localBaseProductId } }),
+      this.prisma.mockupTemplate.findUnique({ where: { id: query.mockupTemplateId } }),
+      this.prisma.printArea.findUnique({ where: { id: query.printAreaId } }),
+      this.prisma.placementPreset.findUnique({ where: { id: query.placementPresetId } }),
+    ]);
+
+    if (!design) throw new NotFoundException("Design not found");
+    const latestVersion = design.versions[0];
+    if (!latestVersion?.fileKey) throw new BadRequestException("DESIGN_FILE_MISSING");
+
+    if (!baseProduct?.isActive) throw new BadRequestException("PRODUCT_SELECTION_REQUIRED: local base product is not active");
+    if (!template?.isActive || template.baseProductId !== baseProduct.id) {
+      throw new BadRequestException("INVALID_PLACEMENT: mockup template is not active for local product");
+    }
+    if (!printArea?.isActive || printArea.mockupTemplateId !== template.id) {
+      throw new BadRequestException("INVALID_PLACEMENT: printable area is not active");
+    }
+    if (!preset?.active || preset.pipeline !== PipelineType.LOCAL) {
+      throw new BadRequestException("INVALID_PLACEMENT: placement preset is not active for local pipeline");
+    }
+
+    const printAreaRect: PrintAreaRect = {
+      x: printArea.x,
+      y: printArea.y,
+      width: printArea.width,
+      height: printArea.height,
+      safeX: printArea.safeX,
+      safeY: printArea.safeY,
+      safeWidth: printArea.safeWidth,
+      safeHeight: printArea.safeHeight,
+      widthCm: printArea.widthCm,
+      heightCm: printArea.heightCm,
+    };
+
+    const templateImageUrl = this.storage.isCloudStorageConfigured()
+      ? this.storage.buildPublicUrl(template.baseImageKey)
+      : await this.storage.createPublicSignedReadUrl({ objectKey: template.baseImageKey, expiresSeconds: 60 * 60 });
+    const designImageUrl = await this.safeSignedUrl(latestVersion.fileKey);
+
+    const initialPlacement = presetToInitialPlacement(
+      {
+        defaultWidthCm: preset.defaultWidthCm,
+        defaultHeightCm: preset.defaultHeightCm,
+        defaultX: preset.defaultX,
+        defaultY: preset.defaultY,
+        defaultScale: preset.defaultScale,
+        alignment: typeof preset.alignment === "string" ? preset.alignment : null,
+      },
+      printAreaRect,
+    );
+
+    return {
+      templateWidthPx: 2000,
+      templateHeightPx: 2000,
+      templateImageUrl,
+      designImageUrl,
+      printArea: printAreaRect,
+      constraints: {
+        allowMove: printArea.allowMove,
+        allowResize: printArea.allowResize,
+        allowRotate: printArea.allowRotate,
+        minScale: printArea.minScale,
+        maxScale: printArea.maxScale,
+      },
+      initialPlacement,
+      preset: { id: preset.id, name: preset.name, alignment: preset.alignment },
+    };
+  }
+
+  private async safeSignedUrl(key: string) {
+    try {
+      return await this.storage.createSignedReadUrl({ objectKey: key, expiresSeconds: 60 * 60 });
+    } catch {
+      return null;
+    }
   }
 
   async submitModerationDecision(moderator: { sub: string; role: string; email?: string }, designId: string, dto: SubmitModerationDecisionDto) {

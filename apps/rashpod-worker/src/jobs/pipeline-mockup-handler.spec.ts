@@ -11,7 +11,12 @@ function createRepo(): WorkerRepository & { selection: any; assets: any[]; listi
       design: { id: "design_1", title: "Demo", designerId: "designer_1" },
       latestDesignVersion: { id: "ver_1", fileKey: "designs/ver_1.png", dpi: 300 },
       placement: "FRONT",
-      placementConfigJson: { printArea: { x: 10, y: 20, width: 100, height: 120 } },
+      placementConfigJson: {
+        version: 1,
+        mockupTemplate: { id: "tpl_1", name: "Front", baseImageKey: "templates/base.png" },
+        printArea: { x: 10, y: 20, width: 100, height: 120, safeX: 20, safeY: 30, safeWidth: 80, safeHeight: 80 },
+        position: { x: 25, y: 35, width: 60, height: 60, scale: 1, rotation: 0 },
+      },
       localBaseProduct: { id: "bp_1", name: "T-shirt", currency: "UZS" },
     },
     assets: [

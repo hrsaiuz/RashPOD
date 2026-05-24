@@ -16,6 +16,7 @@
     "seed": "tsx prisma/seed.ts"
   },
   "dependencies": {
+    "@rashpod/mockup": "*",
     "@google-cloud/storage": "7.16.0",
     "@nestjs/common": "11.1.6",
     "@nestjs/config": "4.0.2",

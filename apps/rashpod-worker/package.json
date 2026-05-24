@@ -9,6 +9,7 @@
     "test": "jest"
   },
   "dependencies": {
+    "@rashpod/mockup": "*",
     "@google-cloud/storage": "7.16.0",
     "@prisma/client": "6.7.0",
     "sharp": "0.34.5",

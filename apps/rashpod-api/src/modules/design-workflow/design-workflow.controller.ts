@@ -4,6 +4,7 @@ import { JwtAuthGuard } from "../../common/auth/jwt-auth.guard";
 import { PermissionGuard } from "../../common/auth/permission.guard";
 import { RequirePermission } from "../../common/auth/permission.decorator";
 import { DesignWorkflowService } from "./design-workflow.service";
+import { MockupEditorContextQueryDto } from "./dto/mockup-editor-context-query.dto";
 import { SubmitModerationDecisionDto } from "./dto/moderation-decision.dto";
 
 @Controller("admin/designs")
@@ -21,6 +22,12 @@ export class DesignWorkflowController {
   @RequirePermission("design:moderate")
   moderationDetail(@Param("id") id: string) {
     return this.workflow.moderationDetail(id);
+  }
+
+  @Get(":id/mockup-editor-context")
+  @RequirePermission("design:moderate")
+  mockupEditorContext(@Param("id") id: string, @Query() query: MockupEditorContextQueryDto) {
+    return this.workflow.mockupEditorContext(id, query);
   }
 
   @Post(":id/moderation-decision")

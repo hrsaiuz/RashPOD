@@ -9,6 +9,7 @@ import DashboardLayout from "../../../dashboard-layout";
 import { api, type DesignWorkflowDetail } from "../../../../../lib/api";
 import { useAuth } from "../../../../auth/auth-provider";
 import { ModeratorListingWizard } from "../../moderator-listing-wizard";
+import { LocalSelectionMockupEditor } from "../../../../../components/mockup";
 
 const REJECTION_REASONS = [
   ["COPYRIGHT_RISK", "Copyright or trademark risk"],
@@ -486,26 +487,62 @@ export default function Page() {
                               emptyLabel="No active base products configured."
                             />
                           </div>
+                          <div className="mt-4 grid gap-3 md:grid-cols-2">
+                            <SelectField label="Placement" value={selection.placementPresetId} onChange={(value) => selectLocalPreset(index, value)} options={localPresetsFor(selection.localBaseProductId).map((item) => ({ value: item.id, label: `${item.name} - ${item.placement}` }))} />
+                            <SelectField label="Mockup template" value={selection.mockupTemplateId} onChange={(value) => selectLocalTemplate(index, value)} options={localTemplatesFor(selection.localBaseProductId).map((item) => ({ value: item.id, label: item.name }))} />
+                            <SelectField label="Print area / safe zone" value={selection.printAreaId} onChange={(value) => selectPrintArea(index, value)} options={printAreasFor(selection.mockupTemplateId, selection.placementPresetId).map((item) => ({ value: item.id, label: `${item.name} - safe ${item.safeWidth}x${item.safeHeight}px` }))} />
+                          </div>
+                          {selection.localBaseProductId && selection.mockupTemplateId && selection.printAreaId && selection.placementPresetId && params.id ? (
+                            <div className="mt-4">
+                              <p className="mb-2 text-sm font-medium text-brand-ink">Visual placement</p>
+                              <LocalSelectionMockupEditor
+                                designId={String(params.id)}
+                                selection={{
+                                  localBaseProductId: selection.localBaseProductId,
+                                  mockupTemplateId: selection.mockupTemplateId,
+                                  printAreaId: selection.printAreaId,
+                                  placementPresetId: selection.placementPresetId,
+                                  unit: selection.unit,
+                                }}
+                                onPlacementChange={(payload) =>
+                                  updateLocalSelection(index, {
+                                    unit: "PX",
+                                    widthPx: String(payload.widthPx),
+                                    heightPx: String(payload.heightPx),
+                                    xPx: String(payload.xPx),
+                                    yPx: String(payload.yPx),
+                                    widthCm: String(payload.widthCm),
+                                    heightCm: String(payload.heightCm),
+                                    xCm: String(payload.xCm),
+                                    yCm: String(payload.yCm),
+                                    scale: String(payload.scale),
+                                    rotation: String(payload.rotation),
+                                  })
+                                }
+                              />
+                            </div>
+                          ) : null}
                           <button
                             type="button"
                             className="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-brand-blue"
                             onClick={() => setExpandedLocal((current) => ({ ...current, [selection.id]: !current[selection.id] }))}
                           >
                             {expandedLocal[selection.id] ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                            Advanced placement
+                            Numeric placement debug
                           </button>
                           {expandedLocal[selection.id] ? (
                             <>
-                              <div className="mt-3 grid gap-3 md:grid-cols-2">
-                                <SelectField label="Placement" value={selection.placementPresetId} onChange={(value) => selectLocalPreset(index, value)} options={localPresetsFor(selection.localBaseProductId).map((item) => ({ value: item.id, label: `${item.name} - ${item.placement}` }))} />
-                                <SelectField label="Mockup template" value={selection.mockupTemplateId} onChange={(value) => selectLocalTemplate(index, value)} options={localTemplatesFor(selection.localBaseProductId).map((item) => ({ value: item.id, label: item.name }))} />
-                                <SelectField label="Print area / safe zone" value={selection.printAreaId} onChange={(value) => selectPrintArea(index, value)} options={printAreasFor(selection.mockupTemplateId, selection.placementPresetId).map((item) => ({ value: item.id, label: `${item.name} - safe ${item.safeWidth}x${item.safeHeight}px` }))} />
-                              </div>
                               <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                                 <SelectField label="Unit" value={selection.unit} onChange={(value) => updateLocalSelection(index, { unit: value as LocalSelectionForm["unit"] })} options={[{ value: "CM", label: "Centimeters" }, { value: "PX", label: "Pixels" }]} />
                                 <SelectField label="Anchor" value={selection.anchor} onChange={(value) => updateLocalSelection(index, { anchor: value as LocalSelectionForm["anchor"] })} options={[{ value: "TOP_LEFT", label: "Top left" }, { value: "CENTER", label: "Center" }]} />
                                 <NumberField label="Scale" value={selection.scale} onChange={(value) => updateLocalSelection(index, { scale: value })} />
                                 <NumberField label="Rotation" value={selection.rotation} onChange={(value) => updateLocalSelection(index, { rotation: value })} />
+                              </div>
+                              <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                                <NumberField label="X px" value={selection.xPx} onChange={(value) => updateLocalSelection(index, { xPx: value })} />
+                                <NumberField label="Y px" value={selection.yPx} onChange={(value) => updateLocalSelection(index, { yPx: value })} />
+                                <NumberField label="Width px" value={selection.widthPx} onChange={(value) => updateLocalSelection(index, { widthPx: value })} />
+                                <NumberField label="Height px" value={selection.heightPx} onChange={(value) => updateLocalSelection(index, { heightPx: value })} />
                               </div>
                             </>
                           ) : null}
