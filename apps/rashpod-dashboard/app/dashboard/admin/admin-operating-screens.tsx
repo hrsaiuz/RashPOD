@@ -299,12 +299,25 @@ export function MockupTemplatesScreen() {
 
   async function load() {
     setState("loading"); setError("");
-    try {
-      const [templates, bases] = await Promise.all([api.get<MockupTemplate[]>("/admin/mockup-templates"), api.get<BaseProduct[]>("/admin/base-products")]);
-      setItems(Array.isArray(templates) ? templates : []);
-      setBaseProducts(Array.isArray(bases) ? bases : []);
-      setState("ready");
-    } catch (err) { setError(errorMessage(err)); setState("error"); }
+    const results = await Promise.allSettled([
+      api.get<MockupTemplate[]>("/admin/mockup-templates"),
+      api.get<BaseProduct[]>("/admin/base-products"),
+    ]);
+    const [templatesResult, basesResult] = results;
+    if (templatesResult.status === "fulfilled") {
+      setItems(Array.isArray(templatesResult.value) ? templatesResult.value : []);
+    } else {
+      setItems([]);
+      setError(errorMessage(templatesResult.reason));
+    }
+    if (basesResult.status === "fulfilled") {
+      setBaseProducts(Array.isArray(basesResult.value) ? basesResult.value : []);
+    } else {
+      setBaseProducts([]);
+      const baseError = errorMessage(basesResult.reason);
+      setError((current) => current ? `${current} · ${baseError}` : baseError);
+    }
+    setState(templatesResult.status === "fulfilled" || basesResult.status === "fulfilled" ? "ready" : "error");
   }
   useEffect(() => { void load(); }, []);
   const baseName = useMemo(() => new Map(baseProducts.map((item) => [item.id, item.name])), [baseProducts]);
