@@ -250,15 +250,16 @@ export function WorkshopItemPage({ id }: { id: string }) {
     setBusy(true);
     setError("");
     try {
+      const mimeType = resolveUploadMimeType(file);
       const signed = await api.post<UploadSignResponse>(`/workshop/items/${item.id}/qc/evidence/sign-upload`, {
         filename: file.name,
-        mimeType: file.type || "image/jpeg",
+        mimeType,
         sizeBytes: file.size,
       });
-      await uploadToSignedUrl(signed.url, file, signed.headers || signed.uploadHeaders);
+      await uploadToSignedUrl(signed.url, file, mimeType, signed.headers || signed.uploadHeaders);
       await api.post(`/workshop/items/${item.id}/qc/evidence/${signed.fileId}/complete`, {
         uploadedSizeBytes: file.size,
-        uploadedMimeType: file.type || "image/jpeg",
+        uploadedMimeType: mimeType,
         note: note || undefined,
         defectReason: reason || undefined,
         acceptedQuantity: numberValue(accepted),
