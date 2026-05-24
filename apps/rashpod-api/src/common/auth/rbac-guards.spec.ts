@@ -149,6 +149,23 @@ describe("RBAC Guards", () => {
       expect(guard.canActivate(mockContext)).toBe(true);
     });
 
+    it("should allow MODERATOR access to pipeline-config:read", () => {
+      jest.spyOn(reflector, "getAllAndOverride").mockReturnValue("pipeline-config:read");
+
+      const mockContext = createMockContext({ role: "MODERATOR" });
+
+      expect(guard.canActivate(mockContext)).toBe(true);
+    });
+
+    it("should deny MODERATOR access to base-product:manage", () => {
+      jest.spyOn(reflector, "getAllAndOverride").mockReturnValue("base-product:manage");
+
+      const mockContext = createMockContext({ role: "MODERATOR" });
+
+      expect(() => guard.canActivate(mockContext)).toThrow(ForbiddenException);
+      expect(() => guard.canActivate(mockContext)).toThrow("Missing permission: base-product:manage");
+    });
+
     it("should allow SUPER_ADMIN access to all permissions", () => {
       const allPermissions = Object.keys(permissions) as Array<keyof typeof permissions>;
 

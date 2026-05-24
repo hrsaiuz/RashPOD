@@ -6,7 +6,7 @@ import { useParams, useRouter } from "next/navigation";
 import { AlertTriangle, ArrowLeft, ChevronDown, ChevronUp, Globe2, MapPin, Plus, Trash2, XCircle } from "lucide-react";
 import { Button, Card, EmptyState, ErrorState, Input, ProductPickerGrid, StatusBadge } from "@rashpod/ui";
 import DashboardLayout from "../../../dashboard-layout";
-import { api, type DesignWorkflowDetail } from "../../../../../lib/api";
+import { api, ApiError, type DesignWorkflowDetail } from "../../../../../lib/api";
 import { useAuth } from "../../../../auth/auth-provider";
 import { ModeratorListingWizard } from "../../moderator-listing-wizard";
 import { LocalSelectionMockupEditor } from "../../../../../components/mockup";
@@ -150,7 +150,10 @@ export default function Page() {
   const [loading, setLoading] = useState(true);
   const [configLoading, setConfigLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState("");
+  const [loadError, setLoadError] = useState("");
+  const [loadNotFound, setLoadNotFound] = useState(false);
+  const [configError, setConfigError] = useState("");
+  const [actionError, setActionError] = useState("");
   const [selectedReasons, setSelectedReasons] = useState<string[]>([]);
   const [customReason, setCustomReason] = useState("");
   const [notes, setNotes] = useState("");
@@ -195,11 +198,18 @@ export default function Page() {
 
   async function load() {
     setLoading(true);
-    setError("");
+    setLoadError("");
+    setLoadNotFound(false);
     try {
       setDetail(await api.get<DesignWorkflowDetail>(`/admin/designs/${params.id}/moderation-detail`));
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to load design");
+      if (e instanceof ApiError && e.status === 404) {
+        setLoadNotFound(true);
+        setDetail(null);
+      } else {
+        setLoadError(e instanceof Error ? e.message : "Failed to load design");
+        setDetail(null);
+      }
     } finally {
       setLoading(false);
     }
@@ -207,6 +217,7 @@ export default function Page() {
 
   async function loadConfig() {
     setConfigLoading(true);
+    setConfigError("");
     try {
       const [products, presets, templates, areas, printful] = await Promise.all([
         api.get<BaseProductOption[]>("/admin/base-products"),
@@ -223,7 +234,7 @@ export default function Page() {
       setLocalSelections((current) => current.length ? current : [createLocalSelection(products, presets, templates, areas)]);
       setGlobalSelections((current) => current.length ? current : [createGlobalSelection(printful, presets)]);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to load pipeline configuration");
+      setConfigError(e instanceof Error ? e.message : "Failed to load pipeline configuration");
     } finally {
       setConfigLoading(false);
     }
@@ -357,7 +368,7 @@ export default function Page() {
   async function submitApproval() {
     const decision = pipelineMode === "global" ? "APPROVE_GLOBAL" : "APPROVE_LOCAL";
     if (decision === "APPROVE_GLOBAL" && (!localSelections.length || !globalSelections.length)) {
-      setError("Global pipeline requires at least one local product and one Printful template.");
+      setActionError("Global pipeline requires at least one local product and one Printful template.");
       return;
     }
     await submitDecision(decision);
@@ -365,7 +376,7 @@ export default function Page() {
 
   async function submitDecision(decision: "APPROVE_LOCAL" | "APPROVE_GLOBAL" | "REJECT") {
     setSubmitting(true);
-    setError("");
+    setActionError("");
     try {
       const payload = decision === "REJECT"
         ? { decision, rejectionReasons: selectedReasons, customRejectionReason: customReason || undefined, moderatorNotes: notes || undefined }
@@ -377,7 +388,7 @@ export default function Page() {
           };
       setDetail(await api.post<DesignWorkflowDetail>(`/admin/designs/${params.id}/moderation-decision`, payload));
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to submit moderation decision");
+      setActionError(e instanceof Error ? e.message : "Failed to submit moderation decision");
     } finally {
       setSubmitting(false);
     }
@@ -385,12 +396,12 @@ export default function Page() {
 
   async function retryMockup(selectionId: string) {
     setSubmitting(true);
-    setError("");
+    setActionError("");
     try {
       await api.post(`/admin/design-product-selections/${selectionId}/retry-mockup`);
       await load();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to retry mockup generation");
+      setActionError(e instanceof Error ? e.message : "Failed to retry mockup generation");
     } finally {
       setSubmitting(false);
     }
@@ -408,14 +419,26 @@ export default function Page() {
           {detail ? <StatusBadge status={detail.status} /> : null}
         </div>
 
-        {error ? <ErrorState title="Moderation issue" description={error} retry={<Button onClick={load}>Retry</Button>} /> : null}
+        {loadError ? <ErrorState title="Moderation issue" description={loadError} retry={<Button onClick={load}>Retry</Button>} /> : null}
+        {actionError ? <ErrorState title="Action failed" description={actionError} retry={<Button onClick={() => setActionError("")}>Dismiss</Button>} /> : null}
 
         {loading ? (
           <Card><p className="text-brand-muted">Loading design...</p></Card>
-        ) : !detail ? (
+        ) : loadNotFound ? (
           <EmptyState title="Design not found" description="This moderation item is no longer available." />
-        ) : (
+        ) : !detail ? null : (
           <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_420px]">
+            {configError ? (
+              <Card className="xl:col-span-2 border-status-warning/30 bg-status-warning/5">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <p className="font-semibold text-brand-ink">Pipeline configuration unavailable</p>
+                    <p className="mt-1 text-sm text-brand-muted">{configError}</p>
+                  </div>
+                  <Button variant="secondary" size="sm" onClick={loadConfig} disabled={configLoading}>Retry</Button>
+                </div>
+              </Card>
+            ) : null}
             <div className="space-y-6">
               <Card>
                 <div className="mb-4 flex flex-wrap items-start justify-between gap-4">

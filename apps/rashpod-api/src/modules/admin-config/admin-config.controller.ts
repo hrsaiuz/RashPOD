@@ -83,7 +83,7 @@ export class AdminConfigController {
   }
 
   @Get("base-products")
-  @RequirePermission("base-product:manage")
+  @RequirePermission("pipeline-config:read")
   listBaseProducts() {
     return this.service.listBaseProducts();
   }
@@ -113,7 +113,7 @@ export class AdminConfigController {
   }
 
   @Get("mockup-templates")
-  @RequirePermission("mockup-template:manage")
+  @RequirePermission("pipeline-config:read")
   listMockupTemplates() {
     return this.service.listMockupTemplates();
   }
@@ -143,7 +143,7 @@ export class AdminConfigController {
   }
 
   @Get("print-areas")
-  @RequirePermission("print-area:manage")
+  @RequirePermission("pipeline-config:read")
   listPrintAreas() {
     return this.service.listPrintAreas();
   }
@@ -203,7 +203,7 @@ export class AdminConfigController {
   }
 
   @Get("placement-presets")
-  @RequirePermission("mockup-template:manage")
+  @RequirePermission("pipeline-config:read")
   listPlacementPresets() {
     return this.service.listPlacementPresets();
   }
@@ -221,7 +221,7 @@ export class AdminConfigController {
   }
 
   @Get("printful/product-templates")
-  @RequirePermission("printful-template:manage")
+  @RequirePermission("pipeline-config:read")
   listPrintfulProductTemplates() {
     return this.service.listPrintfulProductTemplates();
   }

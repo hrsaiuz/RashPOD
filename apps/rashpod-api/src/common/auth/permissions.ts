@@ -3,6 +3,7 @@ export const permissions = {
   "design:read-own": ["DESIGNER", "ADMIN", "SUPER_ADMIN"],
   "design:submit-own": ["DESIGNER"],
   "design:moderate": ["MODERATOR", "ADMIN", "SUPER_ADMIN"],
+  "pipeline-config:read": ["MODERATOR", "ADMIN", "SUPER_ADMIN", "OPERATIONS_MANAGER"],
   "design-workflow:retry": ["ADMIN", "SUPER_ADMIN", "OPERATIONS_MANAGER", "MODERATOR"],
   "rights:update-own": ["DESIGNER", "ADMIN", "SUPER_ADMIN"],
   "rights:enable-film-own": ["DESIGNER", "ADMIN", "SUPER_ADMIN"],

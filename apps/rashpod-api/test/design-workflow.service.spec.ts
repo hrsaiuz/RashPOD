@@ -1,11 +1,17 @@
-import { DesignStatus } from "@prisma/client";
+import { AIEntityType, DesignStatus } from "@prisma/client";
+import { NotFoundException } from "@nestjs/common";
 import { DesignWorkflowService } from "../src/modules/design-workflow/design-workflow.service";
 
-function createService() {
+function createService(overrides?: { prisma?: Record<string, unknown> }) {
   const prisma = {
     designAsset: {
       findMany: jest.fn().mockResolvedValue([]),
+      findUnique: jest.fn(),
     },
+    aiJob: {
+      findMany: jest.fn().mockResolvedValue([]),
+    },
+    ...overrides?.prisma,
   };
   const service = new DesignWorkflowService(
     prisma as any,
@@ -71,5 +77,38 @@ describe("DesignWorkflowService.moderationQueue", () => {
         }),
       }),
     );
+  });
+});
+
+describe("DesignWorkflowService.moderationDetail", () => {
+  it("returns design with ai suggestions when found", async () => {
+    const design = { id: "design-1", title: "Test", versions: [] };
+    const aiJobs = [{ id: "job-1", suggestions: [{ id: "suggestion-1" }] }];
+    const { service, prisma } = createService();
+    prisma.designAsset.findUnique = jest.fn().mockResolvedValue(design);
+    prisma.aiJob.findMany = jest.fn().mockResolvedValue(aiJobs);
+
+    const result = await service.moderationDetail("design-1");
+
+    expect(prisma.designAsset.findUnique).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: "design-1" } }),
+    );
+    expect(prisma.aiJob.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { entityType: AIEntityType.DESIGN, entityId: "design-1" },
+      }),
+    );
+    expect(result).toEqual({
+      ...design,
+      ai: { jobs: aiJobs, suggestions: [{ id: "suggestion-1" }] },
+    });
+  });
+
+  it("throws NotFoundException when design is missing", async () => {
+    const { service, prisma } = createService();
+    prisma.designAsset.findUnique = jest.fn().mockResolvedValue(null);
+    prisma.aiJob.findMany = jest.fn().mockResolvedValue([]);
+
+    await expect(service.moderationDetail("missing-id")).rejects.toBeInstanceOf(NotFoundException);
   });
 });
