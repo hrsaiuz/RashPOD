@@ -110,12 +110,51 @@ CREATE INDEX IF NOT EXISTS "AiSuggestion_aiJobId_status_idx" ON "AiSuggestion"("
 CREATE INDEX IF NOT EXISTS "AiSuggestion_suggestionType_status_idx" ON "AiSuggestion"("suggestionType", "status");
 CREATE INDEX IF NOT EXISTS "AiSuggestion_createdAt_idx" ON "AiSuggestion"("createdAt");
 
-ALTER TABLE "DesignModerationCase" ADD CONSTRAINT "DesignModerationCase_designAssetId_fkey" FOREIGN KEY ("designAssetId") REFERENCES "DesignAsset"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
-ALTER TABLE "DesignModerationCase" ADD CONSTRAINT "DesignModerationCase_designVersionId_fkey" FOREIGN KEY ("designVersionId") REFERENCES "DesignVersion"("id") ON DELETE SET NULL ON UPDATE CASCADE;
-ALTER TABLE "DesignModerationCase" ADD CONSTRAINT "DesignModerationCase_reviewerId_fkey" FOREIGN KEY ("reviewerId") REFERENCES "User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'DesignModerationCase_designAssetId_fkey') THEN
+    ALTER TABLE "DesignModerationCase" ADD CONSTRAINT "DesignModerationCase_designAssetId_fkey" FOREIGN KEY ("designAssetId") REFERENCES "DesignAsset"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+  END IF;
+END $$;
 
-ALTER TABLE "AiJob" ADD CONSTRAINT "AiJob_createdById_fkey" FOREIGN KEY ("createdById") REFERENCES "User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
-ALTER TABLE "AiJob" ADD CONSTRAINT "AiJob_reviewedById_fkey" FOREIGN KEY ("reviewedById") REFERENCES "User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'DesignModerationCase_designVersionId_fkey') THEN
+    ALTER TABLE "DesignModerationCase" ADD CONSTRAINT "DesignModerationCase_designVersionId_fkey" FOREIGN KEY ("designVersionId") REFERENCES "DesignVersion"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+  END IF;
+END $$;
 
-ALTER TABLE "AiSuggestion" ADD CONSTRAINT "AiSuggestion_aiJobId_fkey" FOREIGN KEY ("aiJobId") REFERENCES "AiJob"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-ALTER TABLE "AiSuggestion" ADD CONSTRAINT "AiSuggestion_appliedById_fkey" FOREIGN KEY ("appliedById") REFERENCES "User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'DesignModerationCase_reviewerId_fkey') THEN
+    ALTER TABLE "DesignModerationCase" ADD CONSTRAINT "DesignModerationCase_reviewerId_fkey" FOREIGN KEY ("reviewerId") REFERENCES "User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+  END IF;
+END $$;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'AiJob_createdById_fkey') THEN
+    ALTER TABLE "AiJob" ADD CONSTRAINT "AiJob_createdById_fkey" FOREIGN KEY ("createdById") REFERENCES "User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+  END IF;
+END $$;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'AiJob_reviewedById_fkey') THEN
+    ALTER TABLE "AiJob" ADD CONSTRAINT "AiJob_reviewedById_fkey" FOREIGN KEY ("reviewedById") REFERENCES "User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+  END IF;
+END $$;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'AiSuggestion_aiJobId_fkey') THEN
+    ALTER TABLE "AiSuggestion" ADD CONSTRAINT "AiSuggestion_aiJobId_fkey" FOREIGN KEY ("aiJobId") REFERENCES "AiJob"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+  END IF;
+END $$;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'AiSuggestion_appliedById_fkey') THEN
+    ALTER TABLE "AiSuggestion" ADD CONSTRAINT "AiSuggestion_appliedById_fkey" FOREIGN KEY ("appliedById") REFERENCES "User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+  END IF;
+END $$;
