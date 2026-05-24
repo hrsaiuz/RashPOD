@@ -3,7 +3,14 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   reactStrictMode: true,
   output: "standalone",
-  transpilePackages: ["@rashpod/ui"],
+  transpilePackages: ["@rashpod/ui", "@rashpod/mockup"],
+  webpack: (config) => {
+    config.resolve.alias = {
+      ...config.resolve.alias,
+      canvas: false,
+    };
+    return config;
+  },
   async headers() {
     return [
       {
