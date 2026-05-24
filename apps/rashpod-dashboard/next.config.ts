@@ -4,9 +4,6 @@ const nextConfig: NextConfig = {
   reactStrictMode: true,
   output: "standalone",
   transpilePackages: ["@rashpod/ui", "@rashpod/mockup"],
-  experimental: {
-    middlewareClientMaxBodySize: 55 * 1024 * 1024,
-  },
   webpack: (config) => {
     config.resolve.alias = {
       ...config.resolve.alias,
