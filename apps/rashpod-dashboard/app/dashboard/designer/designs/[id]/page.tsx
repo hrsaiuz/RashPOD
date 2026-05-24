@@ -16,12 +16,15 @@ import { useAuth } from "../../../../auth/auth-provider";
 import DashboardLayout from "../../../dashboard-layout";
 import {
   api,
+  resolveUploadMimeType,
   uploadToSignedUrl,
   type CommercialRights,
   type Design,
   type DesignWorkflowDetail,
   type UploadUrlResponse,
 } from "../../../../../lib/api";
+
+const MAX_BYTES = 50 * 1024 * 1024;
 
 const STATUS_TIMELINE: Design["status"][] = [
   "DRAFT",
@@ -89,18 +92,27 @@ export default function DesignDetailPage() {
   async function onPickVersion(e: ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0];
     if (!f) return;
+    if (f.size > MAX_BYTES) {
+      setError("File too large (max 50 MB).");
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      return;
+    }
+    const mimeType = resolveUploadMimeType(f);
     setAction("version");
+    setError("");
     try {
       const upload = await api.post<UploadUrlResponse>("/files/upload-url", {
+        purpose: "DESIGN_ORIGINAL",
         filename: f.name,
-        mimeType: f.type || "application/octet-stream",
+        mimeType,
         sizeBytes: f.size,
+        designId: id,
       });
-      await uploadToSignedUrl(upload.url, f, upload.headers);
+      await uploadToSignedUrl(upload.url, f, mimeType, upload.headers);
       await api.post("/files/complete-upload", {
         fileId: upload.fileId,
         uploadedSizeBytes: f.size,
-        uploadedMimeType: f.type,
+        uploadedMimeType: mimeType,
       });
       await api.post(`/designer/designs/${id}/versions`, {
         fileId: upload.fileId,

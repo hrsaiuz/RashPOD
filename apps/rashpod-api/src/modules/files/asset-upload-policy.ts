@@ -1,6 +1,6 @@
 import { BadRequestException } from "@nestjs/common";
 import { AssetAccessPolicy, AssetPurpose } from "@prisma/client";
-import { sanitizeFilename } from "./file-validation";
+import { mimeTypeFromFilename, normalizeMimeType, sanitizeFilename } from "./file-validation";
 
 type BucketKind = "private" | "public";
 
@@ -16,10 +16,13 @@ export type AssetUploadPolicy = {
 const IMAGE_MIME_TYPES = ["image/png", "image/jpeg", "image/webp", "image/svg+xml"] as const;
 const RASTER_IMAGE_MIME_TYPES = ["image/png", "image/jpeg", "image/webp"] as const;
 
+/** Max size for designer original uploads (50 MiB). */
+export const DESIGN_ORIGINAL_MAX_BYTES = 50 * 1024 * 1024;
+
 export const ASSET_UPLOAD_POLICIES: Record<AssetPurpose, AssetUploadPolicy> = {
   DESIGN_ORIGINAL: {
     purpose: AssetPurpose.DESIGN_ORIGINAL,
-    maxSizeBytes: 40_000_000,
+    maxSizeBytes: DESIGN_ORIGINAL_MAX_BYTES,
     allowedMimeTypes: IMAGE_MIME_TYPES,
     accessPolicy: AssetAccessPolicy.PRIVATE_SIGNED_URL,
     bucketKind: "private",
@@ -145,15 +148,33 @@ export function resolveAssetUploadPolicy(purpose: AssetPurpose) {
   return policy;
 }
 
+/** Normalize browser-reported MIME types and fall back to filename extension. */
+export function resolveUploadMimeForAsset(input: { filename: string; mimeType: string; purpose: AssetPurpose }) {
+  const policy = resolveAssetUploadPolicy(input.purpose);
+  const normalized = normalizeMimeType(input.mimeType || "");
+  if (normalized && policy.allowedMimeTypes.includes(normalized as never)) return normalized;
+
+  const fromFilename = mimeTypeFromFilename(input.filename);
+  if (fromFilename && policy.allowedMimeTypes.includes(fromFilename as never)) return fromFilename;
+
+  if (normalized) return normalized;
+  return fromFilename ?? input.mimeType;
+}
+
 export function assertAssetUploadAllowed(input: { purpose: AssetPurpose; filename: string; mimeType: string; sizeBytes: number }) {
   const policy = resolveAssetUploadPolicy(input.purpose);
-  if (!policy.allowedMimeTypes.includes(input.mimeType as never)) {
+  const resolvedMimeType = resolveUploadMimeForAsset({
+    filename: input.filename,
+    mimeType: input.mimeType,
+    purpose: input.purpose,
+  });
+  if (!policy.allowedMimeTypes.includes(resolvedMimeType as never)) {
     throw new BadRequestException(`Unsupported MIME type for ${input.purpose}`);
   }
   if (input.sizeBytes > policy.maxSizeBytes) {
     throw new BadRequestException(`File exceeds ${input.purpose} size limit`);
   }
-  return policy;
+  return { policy, resolvedMimeType };
 }
 
 export function extensionForAsset(filename: string, mimeType: string) {

@@ -24,9 +24,14 @@ export class FilesService {
     }
 
     const purpose = dto.purpose ?? AssetPurpose.DESIGN_ORIGINAL;
-    const policy = assertAssetUploadAllowed({ purpose, filename: dto.filename, mimeType: dto.mimeType, sizeBytes: dto.sizeBytes });
+    const { policy, resolvedMimeType } = assertAssetUploadAllowed({
+      purpose,
+      filename: dto.filename,
+      mimeType: dto.mimeType,
+      sizeBytes: dto.sizeBytes,
+    });
     const fileId = randomUUID();
-    const fileExtension = extensionForAsset(dto.filename, dto.mimeType);
+    const fileExtension = extensionForAsset(dto.filename, resolvedMimeType);
     const objectKey = buildAssetObjectKey({
       ownerId,
       tenantId,
@@ -53,7 +58,7 @@ export class FilesService {
         bucket: policy.bucketKind === "public" ? this.storage.getPublicBucketName() : this.storage.getPrivateBucketName(),
         objectKey,
         publicUrl: policy.bucketKind === "public" ? this.storage.buildPublicUrl(objectKey) : undefined,
-        mimeType: dto.mimeType,
+        mimeType: resolvedMimeType,
         fileExtension,
         sizeBytes: dto.sizeBytes,
         isPublic: policy.bucketKind === "public",
@@ -71,8 +76,8 @@ export class FilesService {
     });
     const signed =
       policy.bucketKind === "public"
-        ? await this.storage.createPublicPresignedUploadUrl({ objectKey, mimeType: dto.mimeType, sizeBytes: dto.sizeBytes })
-        : await this.storage.createPresignedUploadUrl({ objectKey, mimeType: dto.mimeType, sizeBytes: dto.sizeBytes });
+        ? await this.storage.createPublicPresignedUploadUrl({ objectKey, mimeType: resolvedMimeType, sizeBytes: dto.sizeBytes, fileId })
+        : await this.storage.createPresignedUploadUrl({ objectKey, mimeType: resolvedMimeType, sizeBytes: dto.sizeBytes, fileId });
     await this.audit?.log({
       actorId: ownerId,
       action: "asset.upload-url.created",
@@ -85,11 +90,17 @@ export class FilesService {
         storageProvider,
         accessPolicy: policy.accessPolicy,
         sizeBytes: dto.sizeBytes,
-        mimeType: dto.mimeType,
+        mimeType: resolvedMimeType,
         uploadExpiresAt: uploadExpiresAt.toISOString(),
       },
     });
-    return { fileId: file.id, url: signed.uploadUrl, uploadExpiresAt: uploadExpiresAt.toISOString(), ...signed };
+    return {
+      fileId: file.id,
+      url: signed.uploadUrl,
+      uploadExpiresAt: uploadExpiresAt.toISOString(),
+      method: signed.method,
+      headers: signed.headers,
+    };
   }
 
   async completeUpload(ownerId: string, dto: CompleteUploadDto) {
@@ -119,7 +130,11 @@ export class FilesService {
       throw new ForbiddenException("Uploaded file metadata is unavailable");
     }
     const uploadedSizeBytes = objectMetadata?.sizeBytes ?? dto.uploadedSizeBytes;
-    const uploadedMimeType = objectMetadata?.mimeType ?? dto.uploadedMimeType;
+    const metadataMime = objectMetadata?.mimeType?.trim();
+    const uploadedMimeType =
+      metadataMime && metadataMime !== "application/octet-stream"
+        ? metadataMime
+        : dto.uploadedMimeType || file.mimeType;
     const uploadedChecksum = objectMetadata?.checksumMd5Base64 ?? dto.uploadedChecksum;
 
     if (!uploadedSizeBytes || !uploadedMimeType) {
@@ -167,6 +182,24 @@ export class FilesService {
       },
     });
     return updated;
+  }
+
+  async uploadLocalContent(ownerId: string, fileId: string, buffer: Buffer, mimeType?: string) {
+    const file = await this.prisma.fileAsset.findUnique({ where: { id: fileId } });
+    if (!file) throw new NotFoundException("File not found");
+    if (file.ownerId !== ownerId) throw new ForbiddenException("Not your file");
+    if (file.uploadStatus !== "PENDING" && file.status !== AssetLifecycleStatus.PENDING_UPLOAD) {
+      throw new ForbiddenException("File is not in a uploadable state");
+    }
+    if (file.uploadExpiresAt && file.uploadExpiresAt.getTime() < Date.now()) {
+      throw new ForbiddenException("Signed upload URL has expired");
+    }
+    if (buffer.byteLength !== file.sizeBytes) {
+      throw new ForbiddenException("Uploaded size does not match requested size");
+    }
+    const contentType = mimeType?.trim() || file.mimeType;
+    await this.storage.writeLocalObject({ objectKey: file.objectKey, buffer, mimeType: contentType });
+    return { fileId, sizeBytes: buffer.byteLength };
   }
 
   async getSignedReadUrl(ownerId: string, fileId: string) {

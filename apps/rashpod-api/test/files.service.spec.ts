@@ -134,6 +134,37 @@ describe("FilesService completeUpload", () => {
     expect(prisma.fileAsset.update).toHaveBeenCalled();
   });
 
+  it("accepts octet-stream fallback when file was registered with octet-stream", async () => {
+    const prisma: any = {
+      fileAsset: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: "f-octet",
+          ownerId: "u1",
+          objectKey: "design-originals/u1/file.bin",
+          sizeBytes: 200,
+          mimeType: "application/octet-stream",
+          checksum: undefined,
+          uploadStatus: "PENDING",
+        }),
+        update: jest.fn().mockResolvedValue({ id: "f-octet", uploadStatus: "READY" }),
+      },
+    };
+    const storage: any = storageMock();
+    const service = new FilesService(prisma, storage);
+
+    await service.completeUpload("u1", {
+      fileId: "f-octet",
+      uploadedSizeBytes: 200,
+      uploadedMimeType: "application/octet-stream",
+    });
+
+    expect(prisma.fileAsset.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ uploadStatus: "READY", mimeType: "application/octet-stream" }),
+      }),
+    );
+  });
+
   it("blocks non-owner completion", async () => {
     const prisma: any = {
       fileAsset: {

@@ -69,36 +69,79 @@ export const api = {
   delete: <T>(path: string, init?: RequestInit) => request<T>("DELETE", path, undefined, init),
 };
 
+/** Resolve a stable MIME type for signed upload + verification. */
+export function resolveUploadMimeType(file: File): string {
+  const normalize = (value: string) => {
+    const lower = value.trim().toLowerCase();
+    if (lower === "image/jpg" || lower === "image/pjpeg" || lower === "image/x-citrix-jpeg") return "image/jpeg";
+    if (lower === "image/x-png") return "image/png";
+    if (lower === "image/svg" || lower === "text/xml") return "image/svg+xml";
+    return lower;
+  };
+
+  if (file.type) {
+    const normalized = normalize(file.type);
+    if (normalized.startsWith("image/")) return normalized;
+  }
+
+  const ext = file.name.split(".").pop()?.toLowerCase();
+  if (ext === "png") return "image/png";
+  if (ext === "jpg" || ext === "jpeg") return "image/jpeg";
+  if (ext === "svg") return "image/svg+xml";
+  if (ext === "webp") return "image/webp";
+  return file.type ? normalize(file.type) : "application/octet-stream";
+}
+
+function resolveSignedUploadContentType(mimeType: string, headers?: Record<string, string>) {
+  return headers?.["Content-Type"] ?? headers?.["content-type"] ?? mimeType;
+}
+
+function formatDirectUploadError(status: number) {
+  if (status === 0) {
+    return "Direct upload failed (network/CORS). If this persists in production, ask ops to apply gcs-cors.json to the private assets bucket.";
+  }
+  if (status === 403) {
+    return "Direct upload failed (403 forbidden). Storage rejected the upload request.";
+  }
+  return `Direct upload failed (${status})`;
+}
+
 /** Upload a file directly to GCS using a signed PUT URL returned by /files/upload-url. */
-export async function uploadToSignedUrl(url: string, file: File, headers?: Record<string, string>) {
+export async function uploadToSignedUrl(url: string, file: File, mimeType: string, headers?: Record<string, string>) {
+  const contentType = resolveSignedUploadContentType(mimeType, headers);
   const res = await fetch(url, {
     method: "PUT",
     body: file,
     headers: {
-      "Content-Type": file.type || "application/octet-stream",
-      ...(headers ?? {}),
+      "Content-Type": contentType,
     },
   });
   if (!res.ok) {
-    throw new ApiError(`Direct upload failed (${res.status})`, res.status);
+    throw new ApiError(formatDirectUploadError(res.status), res.status);
   }
 }
 
 /** Upload a file directly to GCS with progress callbacks. */
-export async function uploadToSignedUrlWithProgress(url: string, file: File, headers?: Record<string, string>, onProgress?: (percent: number) => void) {
+export async function uploadToSignedUrlWithProgress(
+  url: string,
+  file: File,
+  mimeType: string,
+  headers?: Record<string, string>,
+  onProgress?: (percent: number) => void,
+) {
+  const contentType = resolveSignedUploadContentType(mimeType, headers);
   return new Promise<void>((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     xhr.open("PUT", url);
-    xhr.setRequestHeader("Content-Type", file.type || "application/octet-stream");
-    for (const [key, value] of Object.entries(headers ?? {})) xhr.setRequestHeader(key, value);
+    xhr.setRequestHeader("Content-Type", contentType);
     xhr.upload.onprogress = (event) => {
       if (event.lengthComputable && onProgress) onProgress(Math.round((event.loaded / event.total) * 100));
     };
     xhr.onload = () => {
       if (xhr.status >= 200 && xhr.status < 300) resolve();
-      else reject(new ApiError(`Direct upload failed (${xhr.status})`, xhr.status));
+      else reject(new ApiError(formatDirectUploadError(xhr.status), xhr.status));
     };
-    xhr.onerror = () => reject(new ApiError("Direct upload failed", xhr.status || 0));
+    xhr.onerror = () => reject(new ApiError(formatDirectUploadError(0), xhr.status || 0));
     xhr.send(file);
   });
 }

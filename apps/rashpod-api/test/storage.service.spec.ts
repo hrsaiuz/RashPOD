@@ -9,15 +9,16 @@ describe("StorageService", () => {
     delete process.env.GCS_BUCKET_PUBLIC;
   });
 
-  it("returns local fallback upload URL when GCS client is not configured", async () => {
+  it("returns dashboard upload proxy URL when GCS client is not configured", async () => {
     const service = new StorageService();
     const result = await service.createPresignedUploadUrl({
       objectKey: "design-originals/u1/a.png",
       mimeType: "image/png",
       sizeBytes: 100,
+      fileId: "file-1",
     });
     expect(result.method).toBe("PUT");
-    expect(result.uploadUrl).toContain("storage.local/upload/");
+    expect(result.uploadUrl).toContain("/api/upload/file-1");
   });
 
   it("throws in production when GCS is not configured", async () => {

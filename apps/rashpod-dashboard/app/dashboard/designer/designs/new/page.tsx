@@ -1,7 +1,6 @@
 "use client";
 
 import { ChangeEvent, FormEvent, useState } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   Button,
@@ -11,18 +10,35 @@ import {
   Input,
   Textarea,
 } from "@rashpod/ui";
-import { ArrowLeft, Upload as UploadIcon, FileImage, CheckCircle2, AlertCircle } from "lucide-react";
+import { ArrowLeft, Upload as UploadIcon, FileImage, CheckCircle2, AlertCircle, Send } from "lucide-react";
 import { useAuth } from "../../../../auth/auth-provider";
 import DashboardLayout from "../../../dashboard-layout";
-import { api, uploadToSignedUrlWithProgress, type Design, type UploadUrlResponse } from "../../../../../lib/api";
+import { api, resolveUploadMimeType, uploadToSignedUrlWithProgress, type Design, type UploadUrlResponse } from "../../../../../lib/api";
 
-const ACCEPTED = ["image/png", "image/jpeg", "image/svg+xml", "application/postscript"];
-const MAX_BYTES = 40 * 1024 * 1024;
+const ACCEPTED = ["image/png", "image/jpeg", "image/svg+xml"];
+const MAX_BYTES = 50 * 1024 * 1024;
 
 type Step = "form" | "pending_upload" | "uploading" | "verifying" | "ready" | "failed" | "success";
 
+function uploadStepMessage(step: string, err: unknown): string {
+  const detail = err instanceof Error ? err.message : "Upload failed";
+  switch (step) {
+    case "create-design":
+      return `Could not create design record: ${detail}`;
+    case "upload-url":
+      return `Could not prepare upload: ${detail}`;
+    case "storage-upload":
+      return `Storage upload failed: ${detail}`;
+    case "complete-upload":
+      return `Upload verification failed: ${detail}`;
+    case "create-version":
+      return `Could not attach file to design: ${detail}`;
+    default:
+      return detail;
+  }
+}
+
 export default function NewDesignPage() {
-  const router = useRouter();
   const { user } = useAuth();
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -32,16 +48,18 @@ export default function NewDesignPage() {
   const [uploadPercent, setUploadPercent] = useState(0);
   const [error, setError] = useState("");
   const [createdId, setCreatedId] = useState<string | null>(null);
+  const [submittingForReview, setSubmittingForReview] = useState(false);
+  const [submittedForReview, setSubmittedForReview] = useState(false);
 
   function onPickFile(e: ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0];
     if (!f) return;
-    if (!ACCEPTED.includes(f.type) && !f.name.match(/\.(ai|eps)$/i)) {
-      setError("Unsupported file type. Use PNG, JPEG, SVG, AI, or EPS.");
+    if (!ACCEPTED.includes(f.type) && !f.name.match(/\.(png|jpe?g|svg)$/i)) {
+      setError("Unsupported file type. Use PNG, JPEG, or SVG.");
       return;
     }
     if (f.size > MAX_BYTES) {
-      setError("File too large (max 40 MB).");
+      setError("File too large (max 50 MB).");
       return;
     }
     setError("");
@@ -51,7 +69,7 @@ export default function NewDesignPage() {
   }
 
   async function readImageDimensions(f: File): Promise<{ width: number; height: number } | null> {
-    if (!f.type.startsWith("image/")) return null;
+    if (!f.type.startsWith("image/") && !f.name.match(/\.(png|jpe?g|webp)$/i)) return null;
     return new Promise((resolve) => {
       const img = new Image();
       img.onload = () => resolve({ width: img.naturalWidth, height: img.naturalHeight });
@@ -60,45 +78,81 @@ export default function NewDesignPage() {
     });
   }
 
+  async function submitForModeration() {
+    if (!createdId) return;
+    setSubmittingForReview(true);
+    setError("");
+    try {
+      await api.post(`/designer/designs/${createdId}/submit-for-moderation`);
+      setSubmittedForReview(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Submit for moderation failed");
+    } finally {
+      setSubmittingForReview(false);
+    }
+  }
+
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     if (!user || !file || !title.trim()) return;
     setError("");
     setStep("uploading");
     setUploadPercent(0);
+    const mimeType = resolveUploadMimeType(file);
 
+    let design: Design | null = null;
     try {
-      // 1. Create design (without file yet)
       setProgress("Creating design record…");
-      const design = await api.post<Design>("/designs", {
+      design = await api.post<Design>("/designs", {
         title: title.trim(),
         description: description.trim() || undefined,
       });
+    } catch (err) {
+      setError(uploadStepMessage("create-design", err));
+      setStep("failed");
+      return;
+    }
 
-      // 2. Request signed upload URL
+    let upload: UploadUrlResponse;
+    try {
       setProgress("Preparing upload…");
-      const upload = await api.post<UploadUrlResponse>("/files/upload-url", {
+      upload = await api.post<UploadUrlResponse>("/files/upload-url", {
         purpose: "DESIGN_ORIGINAL",
         filename: file.name,
-        mimeType: file.type || "application/octet-stream",
+        mimeType,
         sizeBytes: file.size,
         designId: design.id,
       });
+    } catch (err) {
+      setError(uploadStepMessage("upload-url", err));
+      setStep("failed");
+      return;
+    }
 
-      // 3. PUT file to GCS
+    try {
       setProgress("Uploading file to storage…");
-      await uploadToSignedUrlWithProgress(upload.url, file, upload.headers, setUploadPercent);
+      await uploadToSignedUrlWithProgress(upload.url, file, mimeType, upload.headers, setUploadPercent);
+    } catch (err) {
+      setError(uploadStepMessage("storage-upload", err));
+      setStep("failed");
+      return;
+    }
 
-      // 4. Mark file ready
+    try {
       setStep("verifying");
       setProgress("Finalising upload…");
       await api.post("/files/complete-upload", {
         fileId: upload.fileId,
         uploadedSizeBytes: file.size,
-        uploadedMimeType: file.type,
+        uploadedMimeType: mimeType,
       });
+    } catch (err) {
+      setError(uploadStepMessage("complete-upload", err));
+      setStep("failed");
+      return;
+    }
 
-      // 5. Create design version
+    try {
       setProgress("Creating version…");
       const dims = await readImageDimensions(file);
       await api.post(`/designs/${design.id}/versions`, {
@@ -107,15 +161,16 @@ export default function NewDesignPage() {
         heightPx: dims?.height ?? 0,
         dpi: 300,
       });
-
-      setStep("ready");
-      setProgress("Verified and ready for moderation.");
-      setCreatedId(design.id);
-      setStep("success");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Upload failed");
+      setError(uploadStepMessage("create-version", err));
       setStep("failed");
+      return;
     }
+
+    setStep("ready");
+    setProgress("Verified and ready for moderation.");
+    setCreatedId(design.id);
+    setStep("success");
   }
 
   return (
@@ -127,7 +182,7 @@ export default function NewDesignPage() {
 
         <div>
           <h1 className="text-3xl font-bold text-brand-ink mb-1">Upload Design</h1>
-          <p className="text-brand-muted">PNG, JPEG, SVG, AI, or EPS. Max 40 MB. Prefer transparent background and 300 DPI.</p>
+          <p className="text-brand-muted">PNG, JPEG, or SVG. Max 50 MB. Prefer transparent background and 300 DPI.</p>
         </div>
 
         {step === "success" && createdId ? (
@@ -136,11 +191,21 @@ export default function NewDesignPage() {
               <CheckCircle2 size={48} className="text-semantic-success mb-3" />
               <h2 className="text-xl font-semibold text-brand-ink mb-2">Design uploaded</h2>
               <p className="text-brand-muted mb-6">
-                It is now in <strong>Draft</strong>. Open it to submit for moderator review.
+                {submittedForReview ? (
+                  <>Your design is now <strong>pending moderation</strong>.</>
+                ) : (
+                  <>It is saved as <strong>Draft</strong>. Submit it for moderator review when ready.</>
+                )}
               </p>
-              <div className="flex gap-3">
+              {error ? <div className="mb-4 w-full"><ErrorState title="Submit failed" description={error} /></div> : null}
+              <div className="flex flex-wrap justify-center gap-3">
+                {!submittedForReview ? (
+                  <Button variant="primaryBlue" loading={submittingForReview} onClick={() => void submitForModeration()}>
+                    <Send size={16} /> Submit for moderation
+                  </Button>
+                ) : null}
                 <Link href={`/dashboard/designer/designs/${createdId}`}>
-                  <Button variant="primaryBlue">Open design</Button>
+                  <Button variant={submittedForReview ? "primaryBlue" : "secondary"}>Open design</Button>
                 </Link>
                 <Link href="/dashboard/designer/designs">
                   <Button variant="secondary">Back to list</Button>
@@ -176,13 +241,13 @@ export default function NewDesignPage() {
                   </div>
                   {file && (
                     <div className="text-xs text-brand-muted">
-                      {(file.size / 1024 / 1024).toFixed(2)} MB · {file.type || "unknown"}
+                      {(file.size / 1024 / 1024).toFixed(2)} MB · {file.type || resolveUploadMimeType(file)}
                     </div>
                   )}
                   <input
                     type="file"
                     className="hidden"
-                    accept=".png,.jpg,.jpeg,.svg,.ai,.eps,image/png,image/jpeg,image/svg+xml"
+                    accept=".png,.jpg,.jpeg,.svg,image/png,image/jpeg,image/svg+xml"
                     onChange={onPickFile}
                   />
                 </label>
@@ -203,7 +268,7 @@ export default function NewDesignPage() {
                 </div>
               )}
 
-              <Button type="submit" loading={step === "uploading"} disabled={!title.trim() || !file}>
+              <Button type="submit" loading={step === "uploading" || step === "verifying"} disabled={!title.trim() || !file}>
                 <UploadIcon size={18} /> Upload design
               </Button>
             </form>
@@ -222,4 +287,3 @@ function uploadLabel(step: Step) {
   if (step === "failed") return "Failed";
   return "Upload";
 }
-

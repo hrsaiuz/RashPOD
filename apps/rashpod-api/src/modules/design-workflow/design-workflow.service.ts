@@ -39,6 +39,13 @@ const REJECTION_REASONS = new Set([
   "OTHER",
 ]);
 
+const MODERATION_QUEUE_TAB_STATUSES: Record<string, DesignStatus[]> = {
+  PENDING_MODERATION: [DesignStatus.SUBMITTED, DesignStatus.PENDING_MODERATION, DesignStatus.NEEDS_FIX],
+  REJECTED: [DesignStatus.REJECTED],
+  APPROVED_LOCAL: [DesignStatus.APPROVED_LOCAL, DesignStatus.APPROVED],
+  APPROVED_GLOBAL: [DesignStatus.APPROVED_GLOBAL],
+};
+
 @Injectable()
 export class DesignWorkflowService {
   constructor(
@@ -51,15 +58,17 @@ export class DesignWorkflowService {
   ) {}
 
   moderationQueue(filters?: { status?: string; q?: string }) {
-    const status = this.mapStatusFilter(filters?.status);
+    const statuses = this.resolveModerationTabStatuses(filters?.status);
     return this.prisma.designAsset.findMany({
       where: {
-        status: status ? status : { in: [DesignStatus.SUBMITTED, DesignStatus.PENDING_MODERATION] },
+        status: statuses.length === 1 ? statuses[0] : { in: statuses },
         ...(filters?.q
           ? {
               OR: [
                 { title: { contains: filters.q, mode: "insensitive" } },
                 { description: { contains: filters.q, mode: "insensitive" } },
+                { designer: { displayName: { contains: filters.q, mode: "insensitive" } } },
+                { designer: { email: { contains: filters.q, mode: "insensitive" } } },
               ],
             }
           : {}),
@@ -566,10 +575,9 @@ export class DesignWorkflowService {
     return setting?.value === true;
   }
 
-  private mapStatusFilter(status?: string) {
-    if (!status || status === "PENDING_MODERATION") return undefined;
-    if (status in DesignStatus) return status as DesignStatus;
-    return undefined;
+  private resolveModerationTabStatuses(status?: string) {
+    if (!status) return MODERATION_QUEUE_TAB_STATUSES.PENDING_MODERATION;
+    return MODERATION_QUEUE_TAB_STATUSES[status] ?? MODERATION_QUEUE_TAB_STATUSES.PENDING_MODERATION;
   }
 
   private normalizePlacement(value: string): PlacementKind {

@@ -22,8 +22,14 @@ export default function ModeratorDesignsPage() {
   const [items, setItems] = useState<ModerationQueueDesign[]>([]);
   const [activeTab, setActiveTab] = useState<(typeof TABS)[number]["key"]>("PENDING_MODERATION");
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setDebouncedSearch(search.trim()), 300);
+    return () => window.clearTimeout(timer);
+  }, [search]);
 
   useEffect(() => {
     if (authLoading) return;
@@ -33,15 +39,16 @@ export default function ModeratorDesignsPage() {
     }
     void load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, authLoading, activeTab]);
+  }, [user, authLoading, activeTab, debouncedSearch]);
 
   async function load() {
     setLoading(true);
     setError("");
     try {
       const params = new URLSearchParams({ status: activeTab });
+      if (debouncedSearch) params.set("q", debouncedSearch);
       const rows = await api.get<ModerationQueueDesign[]>(`/admin/designs/moderation-queue?${params.toString()}`);
-      setItems(rows);
+      setItems(Array.isArray(rows) ? rows : []);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load moderation queue");
     } finally {
@@ -49,16 +56,13 @@ export default function ModeratorDesignsPage() {
     }
   }
 
-  const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    if (!q) return items;
-    return items.filter((item) => {
-      const designer = item.designer?.displayName ?? item.designer?.email ?? "";
-      return [item.title, item.description ?? "", designer].some((value) => value.toLowerCase().includes(q));
-    });
-  }, [items, search]);
+  function onTabChange(tab: (typeof TABS)[number]["key"]) {
+    setActiveTab(tab);
+    setSearch("");
+    setDebouncedSearch("");
+  }
 
-  const columns: DataTableColumn<ModerationQueueDesign>[] = [
+  const columns: DataTableColumn<ModerationQueueDesign>[] = useMemo(() => [
     {
       key: "title",
       header: "Design",
@@ -109,7 +113,7 @@ export default function ModeratorDesignsPage() {
         </div>
       ),
     },
-  ];
+  ], []);
 
   return (
     <DashboardLayout role="moderator">
@@ -132,7 +136,7 @@ export default function ModeratorDesignsPage() {
               return (
                 <button
                   key={tab.key}
-                  onClick={() => setActiveTab(tab.key)}
+                  onClick={() => onTabChange(tab.key)}
                   className={
                     "px-4 h-10 rounded-pill text-sm font-medium transition-colors " +
                     (active ? "bg-brand-blue text-white" : "bg-surface-card text-brand-ink hover:bg-surface-borderSoft")
@@ -159,7 +163,7 @@ export default function ModeratorDesignsPage() {
           ) : (
             <DataTable
               columns={columns}
-              rows={filtered}
+              rows={items}
               loading={loading}
               mobileMode="cards"
               emptyState={

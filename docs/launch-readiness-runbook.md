@@ -127,7 +127,7 @@ Use Cloud Logging and Cloud Monitoring dashboards/alerts for:
 | Payment reconciliation mismatches | High | Finance | Hold payouts, reconcile provider reports. |
 | Mockup/render failures | Medium | Production | Check source assets, Sharp errors, GCS write permissions. |
 | Production file failures | High | Production | Move jobs to blocked state, notify support, retry after fix. |
-| Upload verification failures | Medium | Support/Engineering | Check signed URL expiry, MIME/size mismatch, GCS metadata. |
+| Upload verification failures | Medium | Support/Engineering | Check signed URL expiry, MIME/size mismatch, GCS metadata, and private-bucket CORS for the dashboard origin. |
 | Email/Telegram delivery failures | Medium | Support | Check provider credentials, disabled channels, delivery logs. |
 | AI job failures or budget exhausted | Low/Medium | Ops | Disable AI workflows if noisy; AI suggestions must remain human-approved. |
 | Database connection errors | Critical | Engineering | Check Cloud SQL, connection limits, VPC connector. |
@@ -154,6 +154,18 @@ Storage outage:
 2. Check GCS service account permissions and bucket availability.
 3. Keep production jobs blocked until source assets are readable.
 4. Do not mark assets READY without completion verification.
+
+Designer upload failures (browser PUT to GCS):
+
+1. Confirm the **private** assets bucket has CORS applied from [`gcs-cors.json`](../gcs-cors.json), including `https://dashboard.rashpod.uz`.
+2. Re-apply CORS if the dashboard origin was added after the last deploy:
+
+   ```bash
+   gcloud storage buckets update gs://YOUR_PRIVATE_BUCKET --cors-file=gcs-cors.json
+   ```
+
+3. In browser DevTools, check whether the failure is on the direct GCS `PUT` (status 0 or 403) vs `POST /files/complete-upload` (MIME/size mismatch).
+4. Verify `GCP_PROJECT_ID` and bucket env vars are set on `rashpod-api` so signed URLs target GCS, not local fallbacks.
 
 Worker queue stuck:
 
