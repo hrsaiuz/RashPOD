@@ -2,7 +2,7 @@
 
 import { FormEvent, ReactNode, useEffect, useMemo, useState } from "react";
 import { Button, Card, EmptyState, ErrorState, Input, Select, Skeleton, StatusBadge, Textarea } from "@rashpod/ui";
-import { Activity, BadgePercent, CreditCard, Eye, FileText, Layers, ListChecks, Pencil, Plus, ShieldCheck, SlidersHorizontal, Trash2, X } from "lucide-react";
+import { Activity, BadgePercent, CreditCard, Eye, FileText, Layers, ListChecks, Pencil, Plus, ShieldCheck, SlidersHorizontal, Trash2, Upload, X } from "lucide-react";
 import DashboardLayout from "../dashboard-layout";
 import { api } from "../../../lib/api";
 
@@ -289,19 +289,161 @@ export function ProductTypesScreen() {
 
 const MOCKUP_EMPTY = { baseProductId: "", name: "", baseImageKey: "", lifestyleImageKey: "", closeupImageKey: "", isActive: true, sortOrder: "0" };
 
+type MockupImageField = "baseImageKey" | "lifestyleImageKey" | "closeupImageKey";
+
+type MockupEditingState = typeof MOCKUP_EMPTY & {
+  id?: string;
+  previews: Partial<Record<MockupImageField, string>>;
+};
+
+type MediaAssetRow = { objectKey: string; publicUrl?: string | null };
+
+const MOCKUP_IMAGE_SPECS: Record<MockupImageField, { label: string; required: boolean; description: string; optimal: string }> = {
+  baseImageKey: {
+    label: "Base product image",
+    required: true,
+    description: "The blank product photo the renderer composites the design onto. This is the main mockup canvas for listing image #1.",
+    optimal: "2000×2000 px or larger, PNG or JPG, neutral or transparent background, front-facing view, print area clearly visible, even studio lighting.",
+  },
+  lifestyleImageKey: {
+    label: "Lifestyle image",
+    required: false,
+    description: "A contextual or worn-product shot for the shop gallery. Shown as listing image #2 when present; otherwise the base image is reused.",
+    optimal: "1600×2000 px+, JPG or PNG, model or styled scene, product readable at a glance, minimal clutter, brand-safe background.",
+  },
+  closeupImageKey: {
+    label: "Close-up detail",
+    required: false,
+    description: "A tight crop highlighting print quality, fabric, or finishing. Shown as listing image #3 when present; otherwise the base image is reused.",
+    optimal: "1200×1200 px+, PNG or JPG, sharp focus on print area or texture, high contrast, no heavy filters.",
+  },
+};
+
+async function uploadMockupTemplateImage(file: File, title: string) {
+  const signRes = await fetch("/api/proxy/admin/media/upload-url", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      category: "MOCKUP_TEMPLATE",
+      filename: file.name,
+      mimeType: file.type || "application/octet-stream",
+      sizeBytes: file.size,
+    }),
+  });
+  if (!signRes.ok) throw new Error(`Upload init failed (${signRes.status})`);
+  const signed = (await signRes.json()) as { objectKey: string; uploadUrl: string; method?: string; headers?: Record<string, string> };
+  const putRes = await fetch(signed.uploadUrl, {
+    method: signed.method || "PUT",
+    headers: signed.headers || {},
+    body: file,
+  });
+  if (!putRes.ok) throw new Error(`Upload failed (${putRes.status})`);
+  const completeRes = await fetch("/api/proxy/admin/media/complete", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      objectKey: signed.objectKey,
+      category: "MOCKUP_TEMPLATE",
+      title,
+      mimeType: file.type || "application/octet-stream",
+      sizeBytes: file.size,
+    }),
+  });
+  if (!completeRes.ok) throw new Error(`Finalize failed (${completeRes.status})`);
+  const asset = (await completeRes.json()) as { objectKey: string; publicUrl?: string | null };
+  return { objectKey: signed.objectKey, publicUrl: asset.publicUrl ?? undefined };
+}
+
+function MockupImageUploadField({
+  spec,
+  objectKey,
+  previewUrl,
+  uploading,
+  onUpload,
+  onClear,
+}: {
+  spec: (typeof MOCKUP_IMAGE_SPECS)[MockupImageField];
+  objectKey: string;
+  previewUrl?: string;
+  uploading: boolean;
+  onUpload: (file: File) => void;
+  onClear?: () => void;
+}) {
+  return (
+    <div className="rounded-2xl border border-surface-borderSoft bg-surface-app/40 p-4 space-y-3">
+      <div>
+        <p className="text-sm font-semibold text-brand-ink">
+          {spec.label}
+          {spec.required ? " *" : " (optional)"}
+        </p>
+        <p className="mt-1 text-xs text-brand-muted">{spec.description}</p>
+        <p className="mt-2 text-xs text-brand-ink">
+          <span className="font-semibold">Optimal:</span> {spec.optimal}
+        </p>
+      </div>
+      {previewUrl ? (
+        <div className="overflow-hidden rounded-xl border border-surface-borderSoft bg-white">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={previewUrl} alt={spec.label} className="max-h-48 w-full object-contain" />
+        </div>
+      ) : null}
+      {objectKey ? <p className="truncate font-mono text-[11px] text-brand-muted" title={objectKey}>{objectKey}</p> : null}
+      <div className="flex flex-wrap gap-2">
+        <label className="inline-flex cursor-pointer items-center gap-2 rounded-full bg-brand-blue px-4 py-2 text-sm font-semibold text-white shadow-blueGlow hover:bg-brand-blue/90">
+          <Upload size={16} />
+          {uploading ? "Uploading…" : objectKey ? "Replace image" : "Upload image"}
+          <input
+            type="file"
+            accept="image/png,image/jpeg,image/webp"
+            className="hidden"
+            disabled={uploading}
+            onChange={(event) => {
+              const file = event.target.files?.[0];
+              if (file) onUpload(file);
+              event.target.value = "";
+            }}
+          />
+        </label>
+        {objectKey && onClear ? (
+          <Button type="button" size="sm" variant="ghost" onClick={onClear} disabled={uploading}>
+            Remove
+          </Button>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
 export function MockupTemplatesScreen() {
   const [items, setItems] = useState<MockupTemplate[]>([]);
   const [baseProducts, setBaseProducts] = useState<BaseProduct[]>([]);
+  const [mediaByObjectKey, setMediaByObjectKey] = useState<Map<string, string>>(new Map());
   const [state, setState] = useState<LoadState>("loading");
   const [error, setError] = useState("");
-  const [editing, setEditing] = useState<(typeof MOCKUP_EMPTY & { id?: string }) | null>(null);
+  const [editing, setEditing] = useState<MockupEditingState | null>(null);
   const [saving, setSaving] = useState(false);
+  const [uploadingField, setUploadingField] = useState<MockupImageField | null>(null);
+
+  async function loadMediaPreviews() {
+    try {
+      const data = await api.get<MediaAssetRow[]>("/admin/media?category=MOCKUP_TEMPLATE");
+      const map = new Map<string, string>();
+      for (const row of Array.isArray(data) ? data : []) {
+        if (row.publicUrl) map.set(row.objectKey, row.publicUrl);
+      }
+      setMediaByObjectKey(map);
+    } catch {
+      setMediaByObjectKey(new Map());
+    }
+  }
 
   async function load() {
-    setState("loading"); setError("");
+    setState("loading");
+    setError("");
     const results = await Promise.allSettled([
       api.get<MockupTemplate[]>("/admin/mockup-templates"),
       api.get<BaseProduct[]>("/admin/base-products"),
+      loadMediaPreviews(),
     ]);
     const [templatesResult, basesResult] = results;
     if (templatesResult.status === "fulfilled") {
@@ -315,17 +457,237 @@ export function MockupTemplatesScreen() {
     } else {
       setBaseProducts([]);
       const baseError = errorMessage(basesResult.reason);
-      setError((current) => current ? `${current} · ${baseError}` : baseError);
+      setError((current) => (current ? `${current} · ${baseError}` : baseError));
     }
     setState(templatesResult.status === "fulfilled" || basesResult.status === "fulfilled" ? "ready" : "error");
   }
-  useEffect(() => { void load(); }, []);
-  const baseName = useMemo(() => new Map(baseProducts.map((item) => [item.id, item.name])), [baseProducts]);
-  function open(item?: MockupTemplate) { setEditing(item ? { id: item.id, baseProductId: item.baseProductId, name: item.name, baseImageKey: item.baseImageKey, lifestyleImageKey: item.lifestyleImageKey || "", closeupImageKey: item.closeupImageKey || "", isActive: item.isActive, sortOrder: String(item.sortOrder ?? 0) } : { ...MOCKUP_EMPTY, baseProductId: baseProducts[0]?.id ?? "" }); }
-  async function save(event: FormEvent) { event.preventDefault(); if (!editing) return; setSaving(true); try { const payload = { ...editing, sortOrder: Number(editing.sortOrder), lifestyleImageKey: editing.lifestyleImageKey || undefined, closeupImageKey: editing.closeupImageKey || undefined }; if (editing.id) await api.patch(`/admin/mockup-templates/${editing.id}`, payload); else await api.post("/admin/mockup-templates", payload); setEditing(null); await load(); } catch (err) { setError(errorMessage(err)); } finally { setSaving(false); } }
-  async function remove(item: MockupTemplate) { if (!confirm(`Delete mockup template ${item.name}?`)) return; try { await api.delete(`/admin/mockup-templates/${item.id}`); await load(); } catch (err) { setError(errorMessage(err)); } }
 
-  return <PageShell title="Mockup Templates" description="Manage template image keys used by the local mockup engine and listing image generation." icon={<Layers size={22} />} action={<Button onClick={() => open()} disabled={!baseProducts.length}><Plus size={16} /> New template</Button>}>{error && state !== "error" ? <Notice message={error} /> : null}{state === "loading" ? <Skeleton className="h-64" /> : state === "error" ? <Notice message={error} onRetry={load} /> : items.length === 0 ? <Card><EmptyState icon={<Layers className="text-brand-peach" size={32} />} title="No mockup templates" description="Create a template after adding a base product. Each template should point to the source image keys used by the renderer." /></Card> : <Card className="!p-0 overflow-hidden"><div className="overflow-x-auto"><table className="w-full text-sm"><thead className="bg-surface-app text-brand-muted"><tr><th className="px-5 py-3 text-left">Template</th><th className="px-5 py-3 text-left">Base product</th><th className="px-5 py-3 text-left">Image keys</th><th className="px-5 py-3 text-left">Status</th><th className="px-5 py-3 text-right">Actions</th></tr></thead><tbody className="divide-y divide-surface-borderSoft">{items.map((item) => <tr key={item.id}><td className="px-5 py-4"><p className="font-semibold text-brand-ink">{item.name}</p><p className="text-xs text-brand-muted">Sort {item.sortOrder}</p></td><td className="px-5 py-4">{baseName.get(item.baseProductId) || item.baseProductId}</td><td className="px-5 py-4"><p className="font-mono text-xs">{item.baseImageKey}</p>{item.lifestyleImageKey ? <p className="font-mono text-xs text-brand-muted">{item.lifestyleImageKey}</p> : null}{item.closeupImageKey ? <p className="font-mono text-xs text-brand-muted">{item.closeupImageKey}</p> : null}</td><td className="px-5 py-4"><StatusBadge status={item.isActive ? "ACTIVE" : "INACTIVE"} /></td><td className="px-5 py-4"><RowActions><Button size="sm" variant="secondary" onClick={() => open(item)}><Pencil size={14} /> Edit</Button><Button size="sm" variant="ghost" onClick={() => remove(item)}><Trash2 size={14} /> Delete</Button></RowActions></td></tr>)}</tbody></table></div></Card>}{editing && <Drawer title={editing.id ? "Edit mockup template" : "New mockup template"} onClose={() => setEditing(null)}><form className="space-y-4" onSubmit={save}><Field label="Base product"><Select required value={editing.baseProductId} onChange={(e) => setEditing({ ...editing, baseProductId: e.target.value })}><option value="">Select base product</option>{baseProducts.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</Select></Field><div className="grid grid-cols-1 md:grid-cols-2 gap-4"><Field label="Template name"><Input required value={editing.name} onChange={(e) => setEditing({ ...editing, name: e.target.value })} /></Field><Field label="Sort order"><Input inputMode="numeric" value={editing.sortOrder} onChange={(e) => setEditing({ ...editing, sortOrder: e.target.value })} /></Field></div><Field label="Base image key"><Input required value={editing.baseImageKey} onChange={(e) => setEditing({ ...editing, baseImageKey: e.target.value })} /></Field><Field label="Lifestyle image key"><Input value={editing.lifestyleImageKey} onChange={(e) => setEditing({ ...editing, lifestyleImageKey: e.target.value })} /></Field><Field label="Close-up image key"><Input value={editing.closeupImageKey} onChange={(e) => setEditing({ ...editing, closeupImageKey: e.target.value })} /></Field><ToggleField label="Active" checked={editing.isActive} onChange={(v) => setEditing({ ...editing, isActive: v })} /><div className="flex justify-end gap-3"><Button type="button" variant="secondary" onClick={() => setEditing(null)}>Cancel</Button><Button type="submit" loading={saving}>Save template</Button></div></form></Drawer>}</PageShell>;
+  useEffect(() => {
+    void load();
+  }, []);
+
+  const baseName = useMemo(() => new Map(baseProducts.map((item) => [item.id, item.name])), [baseProducts]);
+
+  function previewFor(field: MockupImageField, key: string, previews?: MockupEditingState["previews"]) {
+    return previews?.[field] || (key ? mediaByObjectKey.get(key) : undefined);
+  }
+
+  function open(item?: MockupTemplate) {
+    if (item) {
+      setEditing({
+        id: item.id,
+        baseProductId: item.baseProductId,
+        name: item.name,
+        baseImageKey: item.baseImageKey,
+        lifestyleImageKey: item.lifestyleImageKey || "",
+        closeupImageKey: item.closeupImageKey || "",
+        isActive: item.isActive,
+        sortOrder: String(item.sortOrder ?? 0),
+        previews: {
+          baseImageKey: previewFor("baseImageKey", item.baseImageKey),
+          lifestyleImageKey: item.lifestyleImageKey ? previewFor("lifestyleImageKey", item.lifestyleImageKey) : undefined,
+          closeupImageKey: item.closeupImageKey ? previewFor("closeupImageKey", item.closeupImageKey) : undefined,
+        },
+      });
+      return;
+    }
+    setEditing({ ...MOCKUP_EMPTY, baseProductId: baseProducts[0]?.id ?? "", previews: {} });
+  }
+
+  async function handleImageUpload(field: MockupImageField, file: File) {
+    if (!editing) return;
+    setUploadingField(field);
+    setError("");
+    try {
+      const title = `${editing.name || "Mockup template"} — ${MOCKUP_IMAGE_SPECS[field].label}`;
+      const uploaded = await uploadMockupTemplateImage(file, title);
+      setMediaByObjectKey((current) => new Map(current).set(uploaded.objectKey, uploaded.publicUrl ?? ""));
+      setEditing((current) =>
+        current
+          ? {
+              ...current,
+              [field]: uploaded.objectKey,
+              previews: { ...current.previews, [field]: uploaded.publicUrl },
+            }
+          : current,
+      );
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
+      setUploadingField(null);
+    }
+  }
+
+  async function save(event: FormEvent) {
+    event.preventDefault();
+    if (!editing) return;
+    if (!editing.baseImageKey) {
+      setError("Upload a base product image before saving.");
+      return;
+    }
+    setSaving(true);
+    setError("");
+    try {
+      const payload = {
+        baseProductId: editing.baseProductId,
+        name: editing.name,
+        baseImageKey: editing.baseImageKey,
+        lifestyleImageKey: editing.lifestyleImageKey || undefined,
+        closeupImageKey: editing.closeupImageKey || undefined,
+        isActive: editing.isActive,
+        sortOrder: Number(editing.sortOrder),
+      };
+      if (editing.id) await api.patch(`/admin/mockup-templates/${editing.id}`, payload);
+      else await api.post("/admin/mockup-templates", payload);
+      setEditing(null);
+      await load();
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function remove(item: MockupTemplate) {
+    if (!confirm(`Delete mockup template ${item.name}?`)) return;
+    try {
+      await api.delete(`/admin/mockup-templates/${item.id}`);
+      await load();
+    } catch (err) {
+      setError(errorMessage(err));
+    }
+  }
+
+  return (
+    <PageShell
+      title="Mockup Templates"
+      description="Upload base, lifestyle, and close-up photos for each product mockup. Images are stored in the media library and referenced by the listing renderer."
+      icon={<Layers size={22} />}
+      action={
+        <Button onClick={() => open()} disabled={!baseProducts.length}>
+          <Plus size={16} /> New template
+        </Button>
+      }
+    >
+      {error && state !== "error" ? <Notice message={error} /> : null}
+      {state === "loading" ? (
+        <Skeleton className="h-64" />
+      ) : state === "error" ? (
+        <Notice message={error} onRetry={load} />
+      ) : items.length === 0 ? (
+        <Card>
+          <EmptyState
+            icon={<Layers className="text-brand-peach" size={32} />}
+            title="No mockup templates"
+            description="Create a template after adding a base product. Upload the three listing images with notes on each role."
+          />
+        </Card>
+      ) : (
+        <Card className="!p-0 overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-surface-app text-brand-muted">
+                <tr>
+                  <th className="px-5 py-3 text-left">Template</th>
+                  <th className="px-5 py-3 text-left">Base product</th>
+                  <th className="px-5 py-3 text-left">Images</th>
+                  <th className="px-5 py-3 text-left">Status</th>
+                  <th className="px-5 py-3 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-surface-borderSoft">
+                {items.map((item) => (
+                  <tr key={item.id}>
+                    <td className="px-5 py-4">
+                      <p className="font-semibold text-brand-ink">{item.name}</p>
+                      <p className="text-xs text-brand-muted">Sort {item.sortOrder}</p>
+                    </td>
+                    <td className="px-5 py-4">{baseName.get(item.baseProductId) || item.baseProductId}</td>
+                    <td className="px-5 py-4">
+                      <div className="flex gap-2">
+                        {[item.baseImageKey, item.lifestyleImageKey, item.closeupImageKey].filter(Boolean).map((key) => {
+                          const url = mediaByObjectKey.get(String(key));
+                          return url ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img key={String(key)} src={url} alt="" className="h-12 w-12 rounded-lg border border-surface-borderSoft object-cover" />
+                          ) : (
+                            <span key={String(key)} className="inline-flex h-12 w-12 items-center justify-center rounded-lg border border-dashed border-surface-borderSoft text-[10px] text-brand-muted">
+                              IMG
+                            </span>
+                          );
+                        })}
+                      </div>
+                    </td>
+                    <td className="px-5 py-4">
+                      <StatusBadge status={item.isActive ? "ACTIVE" : "INACTIVE"} />
+                    </td>
+                    <td className="px-5 py-4">
+                      <RowActions>
+                        <Button size="sm" variant="secondary" onClick={() => open(item)}>
+                          <Pencil size={14} /> Edit
+                        </Button>
+                        <Button size="sm" variant="ghost" onClick={() => remove(item)}>
+                          <Trash2 size={14} /> Delete
+                        </Button>
+                      </RowActions>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+      )}
+      {editing ? (
+        <Drawer title={editing.id ? "Edit mockup template" : "New mockup template"} onClose={() => setEditing(null)}>
+          <form className="space-y-4" onSubmit={save}>
+            <Field label="Base product">
+              <Select required value={editing.baseProductId} onChange={(e) => setEditing({ ...editing, baseProductId: e.target.value })}>
+                <option value="">Select base product</option>
+                {baseProducts.map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.name}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <Field label="Template name">
+                <Input required value={editing.name} onChange={(e) => setEditing({ ...editing, name: e.target.value })} />
+              </Field>
+              <Field label="Sort order">
+                <Input inputMode="numeric" value={editing.sortOrder} onChange={(e) => setEditing({ ...editing, sortOrder: e.target.value })} />
+              </Field>
+            </div>
+            {(Object.keys(MOCKUP_IMAGE_SPECS) as MockupImageField[]).map((field) => (
+              <MockupImageUploadField
+                key={field}
+                spec={MOCKUP_IMAGE_SPECS[field]}
+                objectKey={editing[field]}
+                previewUrl={previewFor(field, editing[field], editing.previews)}
+                uploading={uploadingField === field}
+                onUpload={(file) => void handleImageUpload(field, file)}
+                onClear={
+                  field === "baseImageKey"
+                    ? undefined
+                    : () => setEditing((current) => (current ? { ...current, [field]: "", previews: { ...current.previews, [field]: undefined } } : current))
+                }
+              />
+            ))}
+            <ToggleField label="Active" checked={editing.isActive} onChange={(v) => setEditing({ ...editing, isActive: v })} />
+            <div className="flex justify-end gap-3">
+              <Button type="button" variant="secondary" onClick={() => setEditing(null)}>
+                Cancel
+              </Button>
+              <Button type="submit" loading={saving} disabled={!editing.baseImageKey}>
+                Save template
+              </Button>
+            </div>
+          </form>
+        </Drawer>
+      ) : null}
+    </PageShell>
+  );
 }
 
 const PRINT_AREA_EMPTY = { mockupTemplateId: "", name: "Front print area", x: "300", y: "260", width: "800", height: "900", safeX: "340", safeY: "300", safeWidth: "720", safeHeight: "820", allowMove: true, allowResize: true, allowRotate: false, minScale: "0.1", maxScale: "2" };
