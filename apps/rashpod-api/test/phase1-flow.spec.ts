@@ -21,7 +21,8 @@ describe("Phase1 flow integration-style", () => {
       passwordReset: () => ({ subject: "", html: "", text: "" }),
     } as any;
     const auth = new AuthService(prisma as any, jwt, audit, mailer, emailTemplates);
-    const designs = new DesignsService(prisma as any, audit);
+    const storage = { createSignedReadUrl: jest.fn().mockResolvedValue("https://storage.example/preview.png") } as any;
+    const designs = new DesignsService(prisma as any, audit, storage);
     const files = new FilesService(prisma as any, new StorageService());
     const moderation = new ModerationService(prisma as any, audit);
 
