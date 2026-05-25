@@ -1,10 +1,12 @@
 "use client";
 
-import { FormEvent, ReactNode, useEffect, useMemo, useState } from "react";
+import { FormEvent, ReactNode, useCallback, useEffect, useMemo, useState } from "react";
 import { Button, Card, EmptyState, ErrorState, Input, Select, Skeleton, StatusBadge, Textarea } from "@rashpod/ui";
 import { Activity, BadgePercent, CreditCard, Eye, FileText, Layers, ListChecks, Pencil, Plus, ShieldCheck, SlidersHorizontal, Trash2, Upload, X } from "lucide-react";
+import { suggestDefaultPrintAreaRects, type PrintAreaRect } from "@rashpod/mockup";
 import DashboardLayout from "../dashboard-layout";
 import { api } from "../../../lib/api";
+import { PrintAreaVisualEditor } from "../../../components/mockup/PrintAreaVisualEditorDynamic";
 
 type IdRow = { id: string };
 type ProductType = IdRow & {
@@ -166,10 +168,10 @@ function ToggleField({ label, checked, onChange, helper }: { label: string; chec
   );
 }
 
-function Drawer({ title, children, onClose }: { title: string; children: ReactNode; onClose: () => void }) {
+function Drawer({ title, children, onClose, size = "default" }: { title: string; children: ReactNode; onClose: () => void; size?: "default" | "wide" }) {
   return (
     <div className="fixed inset-0 z-50 flex justify-end bg-black/40 p-4">
-      <div className="flex h-full w-full max-w-2xl flex-col overflow-hidden rounded-[24px] bg-white shadow-card">
+      <div className={`flex h-full w-full flex-col overflow-hidden rounded-[24px] bg-white shadow-card ${size === "wide" ? "max-w-5xl" : "max-w-2xl"}`}>
         <div className="flex items-center justify-between border-b border-surface-borderSoft p-5">
           <h2 className="text-xl font-semibold text-brand-ink">{title}</h2>
           <button aria-label="Close panel" className="rounded-full p-2 text-brand-muted hover:bg-surface-app" onClick={onClose} type="button">
@@ -692,21 +694,351 @@ export function MockupTemplatesScreen() {
 
 const PRINT_AREA_EMPTY = { mockupTemplateId: "", name: "Front print area", x: "300", y: "260", width: "800", height: "900", safeX: "340", safeY: "300", safeWidth: "720", safeHeight: "820", allowMove: true, allowResize: true, allowRotate: false, minScale: "0.1", maxScale: "2" };
 
+type PrintAreaEditingState = typeof PRINT_AREA_EMPTY & { id?: string };
+
+function printAreaFromEditing(editing: PrintAreaEditingState): PrintAreaRect {
+  return {
+    x: Number(editing.x),
+    y: Number(editing.y),
+    width: Number(editing.width),
+    height: Number(editing.height),
+    safeX: Number(editing.safeX),
+    safeY: Number(editing.safeY),
+    safeWidth: Number(editing.safeWidth),
+    safeHeight: Number(editing.safeHeight),
+  };
+}
+
+function editingFromPrintAreaRect(editing: PrintAreaEditingState, rect: PrintAreaRect): PrintAreaEditingState {
+  return {
+    ...editing,
+    x: String(rect.x),
+    y: String(rect.y),
+    width: String(rect.width),
+    height: String(rect.height),
+    safeX: String(rect.safeX),
+    safeY: String(rect.safeY),
+    safeWidth: String(rect.safeWidth),
+    safeHeight: String(rect.safeHeight),
+  };
+}
+
+function shouldSuggestPrintAreaDefaults(editing: PrintAreaEditingState) {
+  const fields = ["x", "y", "width", "height", "safeX", "safeY", "safeWidth", "safeHeight"] as const;
+  const values = fields.map((key) => Number(editing[key]));
+  if (values.some((value) => !Number.isFinite(value) || value <= 0)) return true;
+  return fields.every((key) => editing[key] === PRINT_AREA_EMPTY[key]);
+}
+
 export function PrintAreasScreen() {
   const [items, setItems] = useState<PrintArea[]>([]);
   const [templates, setTemplates] = useState<MockupTemplate[]>([]);
+  const [mediaByObjectKey, setMediaByObjectKey] = useState<Map<string, string>>(new Map());
   const [state, setState] = useState<LoadState>("loading");
   const [error, setError] = useState("");
-  const [editing, setEditing] = useState<(typeof PRINT_AREA_EMPTY & { id?: string }) | null>(null);
+  const [editing, setEditing] = useState<PrintAreaEditingState | null>(null);
   const [saving, setSaving] = useState(false);
-  async function load() { setState("loading"); setError(""); try { const [areas, tmpls] = await Promise.all([api.get<PrintArea[]>("/admin/print-areas"), api.get<MockupTemplate[]>("/admin/mockup-templates")]); setItems(Array.isArray(areas) ? areas : []); setTemplates(Array.isArray(tmpls) ? tmpls : []); setState("ready"); } catch (err) { setError(errorMessage(err)); setState("error"); } }
-  useEffect(() => { void load(); }, []);
+  const [activeLayer, setActiveLayer] = useState<"print" | "safe">("print");
+  const [suggestedForTemplateId, setSuggestedForTemplateId] = useState<string | null>(null);
+
+  async function loadMediaPreviews() {
+    try {
+      const data = await api.get<MediaAssetRow[]>("/admin/media?category=MOCKUP_TEMPLATE");
+      const map = new Map<string, string>();
+      for (const row of Array.isArray(data) ? data : []) {
+        if (row.publicUrl) map.set(row.objectKey, row.publicUrl);
+      }
+      setMediaByObjectKey(map);
+    } catch {
+      setMediaByObjectKey(new Map());
+    }
+  }
+
+  async function load() {
+    setState("loading");
+    setError("");
+    try {
+      const [areas, tmpls] = await Promise.all([
+        api.get<PrintArea[]>("/admin/print-areas"),
+        api.get<MockupTemplate[]>("/admin/mockup-templates"),
+        loadMediaPreviews(),
+      ]);
+      setItems(Array.isArray(areas) ? areas : []);
+      setTemplates(Array.isArray(tmpls) ? tmpls : []);
+      setState("ready");
+    } catch (err) {
+      setError(errorMessage(err));
+      setState("error");
+    }
+  }
+
+  useEffect(() => {
+    void load();
+  }, []);
+
   const templateName = useMemo(() => new Map(templates.map((item) => [item.id, item.name])), [templates]);
-  function open(item?: PrintArea) { setEditing(item ? { id: item.id, mockupTemplateId: item.mockupTemplateId, name: item.name, x: String(item.x), y: String(item.y), width: String(item.width), height: String(item.height), safeX: String(item.safeX), safeY: String(item.safeY), safeWidth: String(item.safeWidth), safeHeight: String(item.safeHeight), allowMove: item.allowMove, allowResize: item.allowResize, allowRotate: item.allowRotate, minScale: String(item.minScale), maxScale: String(item.maxScale) } : { ...PRINT_AREA_EMPTY, mockupTemplateId: templates[0]?.id ?? "" }); }
-  async function save(event: FormEvent) { event.preventDefault(); if (!editing) return; setSaving(true); try { const payload = { ...editing, x: Number(editing.x), y: Number(editing.y), width: Number(editing.width), height: Number(editing.height), safeX: Number(editing.safeX), safeY: Number(editing.safeY), safeWidth: Number(editing.safeWidth), safeHeight: Number(editing.safeHeight), minScale: Number(editing.minScale), maxScale: Number(editing.maxScale) }; if (editing.id) await api.patch(`/admin/print-areas/${editing.id}`, payload); else await api.post("/admin/print-areas", payload); setEditing(null); await load(); } catch (err) { setError(errorMessage(err)); } finally { setSaving(false); } }
-  async function remove(item: PrintArea) { if (!confirm(`Delete print area ${item.name}?`)) return; try { await api.delete(`/admin/print-areas/${item.id}`); await load(); } catch (err) { setError(errorMessage(err)); } }
-  const numberFields: Array<keyof typeof PRINT_AREA_EMPTY> = ["x", "y", "width", "height", "safeX", "safeY", "safeWidth", "safeHeight", "minScale", "maxScale"];
-  return <PageShell title="Print Areas / Safe Zones" description="Define print rectangles, safe rectangles, and allowed transforms for each mockup template." icon={<ListChecks size={22} />} action={<Button onClick={() => open()} disabled={!templates.length}><Plus size={16} /> New print area</Button>}>{error && state !== "error" ? <Notice message={error} /> : null}{state === "loading" ? <Skeleton className="h-64" /> : state === "error" ? <Notice message={error} onRetry={load} /> : items.length === 0 ? <Card><EmptyState icon={<ListChecks className="text-brand-peach" size={32} />} title="No print areas" description="Create print and safe zones before designers can place artwork accurately." /></Card> : <Card className="!p-0 overflow-hidden"><div className="overflow-x-auto"><table className="w-full text-sm"><thead className="bg-surface-app text-brand-muted"><tr><th className="px-5 py-3 text-left">Area</th><th className="px-5 py-3 text-left">Template</th><th className="px-5 py-3 text-left">Print rect</th><th className="px-5 py-3 text-left">Safe rect</th><th className="px-5 py-3 text-left">Transforms</th><th className="px-5 py-3 text-right">Actions</th></tr></thead><tbody className="divide-y divide-surface-borderSoft">{items.map((item) => <tr key={item.id}><td className="px-5 py-4 font-semibold text-brand-ink">{item.name}</td><td className="px-5 py-4">{templateName.get(item.mockupTemplateId) || item.mockupTemplateId}</td><td className="px-5 py-4 font-mono text-xs">{item.x},{item.y} · {item.width}x{item.height}</td><td className="px-5 py-4 font-mono text-xs">{item.safeX},{item.safeY} · {item.safeWidth}x{item.safeHeight}</td><td className="px-5 py-4 text-xs text-brand-muted">{item.allowMove ? "Move " : ""}{item.allowResize ? "Resize " : ""}{item.allowRotate ? "Rotate" : ""}<br />Scale {item.minScale}-{item.maxScale}</td><td className="px-5 py-4"><RowActions><Button size="sm" variant="secondary" onClick={() => open(item)}><Pencil size={14} /> Edit</Button><Button size="sm" variant="ghost" onClick={() => remove(item)}><Trash2 size={14} /> Delete</Button></RowActions></td></tr>)}</tbody></table></div></Card>}{editing && <Drawer title={editing.id ? "Edit print area" : "New print area"} onClose={() => setEditing(null)}><form className="space-y-4" onSubmit={save}><Field label="Mockup template"><Select required value={editing.mockupTemplateId} onChange={(e) => setEditing({ ...editing, mockupTemplateId: e.target.value })}><option value="">Select template</option>{templates.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</Select></Field><Field label="Name"><Input required value={editing.name} onChange={(e) => setEditing({ ...editing, name: e.target.value })} /></Field><div className="grid grid-cols-2 md:grid-cols-4 gap-3">{numberFields.map((key) => <Field key={key} label={key}><Input required inputMode="decimal" value={String(editing[key])} onChange={(e) => setEditing({ ...editing, [key]: e.target.value })} /></Field>)}</div><div className="grid grid-cols-1 md:grid-cols-3 gap-3"><ToggleField label="Allow move" checked={editing.allowMove} onChange={(v) => setEditing({ ...editing, allowMove: v })} /><ToggleField label="Allow resize" checked={editing.allowResize} onChange={(v) => setEditing({ ...editing, allowResize: v })} /><ToggleField label="Allow rotate" checked={editing.allowRotate} onChange={(v) => setEditing({ ...editing, allowRotate: v })} /></div><div className="flex justify-end gap-3"><Button type="button" variant="secondary" onClick={() => setEditing(null)}>Cancel</Button><Button type="submit" loading={saving}>Save print area</Button></div></form></Drawer>}</PageShell>;
+  const selectedTemplate = useMemo(
+    () => templates.find((item) => item.id === editing?.mockupTemplateId),
+    [editing?.mockupTemplateId, templates],
+  );
+  const templateImageUrl = selectedTemplate?.baseImageKey ? mediaByObjectKey.get(selectedTemplate.baseImageKey) ?? null : null;
+  const canSavePrintArea = Boolean(selectedTemplate?.baseImageKey && templateImageUrl);
+
+  function open(item?: PrintArea) {
+    setActiveLayer("print");
+    setSuggestedForTemplateId(null);
+    setEditing(
+      item
+        ? {
+            id: item.id,
+            mockupTemplateId: item.mockupTemplateId,
+            name: item.name,
+            x: String(item.x),
+            y: String(item.y),
+            width: String(item.width),
+            height: String(item.height),
+            safeX: String(item.safeX),
+            safeY: String(item.safeY),
+            safeWidth: String(item.safeWidth),
+            safeHeight: String(item.safeHeight),
+            allowMove: item.allowMove,
+            allowResize: item.allowResize,
+            allowRotate: item.allowRotate,
+            minScale: String(item.minScale),
+            maxScale: String(item.maxScale),
+          }
+        : { ...PRINT_AREA_EMPTY, mockupTemplateId: templates[0]?.id ?? "" },
+    );
+  }
+
+  const applySuggestedDefaults = useCallback(
+    (templateId: string, width: number, height: number) => {
+      setEditing((current) => {
+        if (!current || current.id || current.mockupTemplateId !== templateId) return current;
+        if (!shouldSuggestPrintAreaDefaults(current)) return current;
+        const { print, safe } = suggestDefaultPrintAreaRects(width, height);
+        return {
+          ...current,
+          x: String(print.x),
+          y: String(print.y),
+          width: String(print.width),
+          height: String(print.height),
+          safeX: String(safe.x),
+          safeY: String(safe.y),
+          safeWidth: String(safe.width),
+          safeHeight: String(safe.height),
+        };
+      });
+      setSuggestedForTemplateId(templateId);
+    },
+    [],
+  );
+
+  function handleTemplateChange(mockupTemplateId: string) {
+    if (!editing) return;
+    setSuggestedForTemplateId(null);
+    setEditing({ ...editing, mockupTemplateId });
+  }
+
+  function handleVisualChange(rect: PrintAreaRect) {
+    if (!editing) return;
+    setEditing(editingFromPrintAreaRect(editing, rect));
+  }
+
+  const handleImageDimensions = useCallback(
+    (width: number, height: number) => {
+      if (!editing || editing.id || !editing.mockupTemplateId) return;
+      if (suggestedForTemplateId === editing.mockupTemplateId) return;
+      applySuggestedDefaults(editing.mockupTemplateId, width, height);
+    },
+    [applySuggestedDefaults, editing, suggestedForTemplateId],
+  );
+
+  async function save(event: FormEvent) {
+    event.preventDefault();
+    if (!editing || !canSavePrintArea) return;
+    setSaving(true);
+    try {
+      const payload = {
+        ...editing,
+        x: Number(editing.x),
+        y: Number(editing.y),
+        width: Number(editing.width),
+        height: Number(editing.height),
+        safeX: Number(editing.safeX),
+        safeY: Number(editing.safeY),
+        safeWidth: Number(editing.safeWidth),
+        safeHeight: Number(editing.safeHeight),
+        minScale: Number(editing.minScale),
+        maxScale: Number(editing.maxScale),
+      };
+      if (editing.id) await api.patch(`/admin/print-areas/${editing.id}`, payload);
+      else await api.post("/admin/print-areas", payload);
+      setEditing(null);
+      await load();
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function remove(item: PrintArea) {
+    if (!confirm(`Delete print area ${item.name}?`)) return;
+    try {
+      await api.delete(`/admin/print-areas/${item.id}`);
+      await load();
+    } catch (err) {
+      setError(errorMessage(err));
+    }
+  }
+
+  const numberFields: Array<keyof typeof PRINT_AREA_EMPTY> = [
+    "x",
+    "y",
+    "width",
+    "height",
+    "safeX",
+    "safeY",
+    "safeWidth",
+    "safeHeight",
+    "minScale",
+    "maxScale",
+  ];
+
+  return (
+    <PageShell
+      title="Print Areas / Safe Zones"
+      description="Define print rectangles, safe rectangles, and allowed transforms for each mockup template."
+      icon={<ListChecks size={22} />}
+      action={
+        <Button onClick={() => open()} disabled={!templates.length}>
+          <Plus size={16} /> New print area
+        </Button>
+      }
+    >
+      {error && state !== "error" ? <Notice message={error} /> : null}
+      {state === "loading" ? (
+        <Skeleton className="h-64" />
+      ) : state === "error" ? (
+        <Notice message={error} onRetry={load} />
+      ) : items.length === 0 ? (
+        <Card>
+          <EmptyState
+            icon={<ListChecks className="text-brand-peach" size={32} />}
+            title="No print areas"
+            description="Create print and safe zones before designers can place artwork accurately."
+          />
+        </Card>
+      ) : (
+        <Card className="!p-0 overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-surface-app text-brand-muted">
+                <tr>
+                  <th className="px-5 py-3 text-left">Area</th>
+                  <th className="px-5 py-3 text-left">Template</th>
+                  <th className="px-5 py-3 text-left">Print rect</th>
+                  <th className="px-5 py-3 text-left">Safe rect</th>
+                  <th className="px-5 py-3 text-left">Transforms</th>
+                  <th className="px-5 py-3 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-surface-borderSoft">
+                {items.map((item) => (
+                  <tr key={item.id}>
+                    <td className="px-5 py-4 font-semibold text-brand-ink">{item.name}</td>
+                    <td className="px-5 py-4">{templateName.get(item.mockupTemplateId) || item.mockupTemplateId}</td>
+                    <td className="px-5 py-4 font-mono text-xs">
+                      {item.x},{item.y} · {item.width}x{item.height}
+                    </td>
+                    <td className="px-5 py-4 font-mono text-xs">
+                      {item.safeX},{item.safeY} · {item.safeWidth}x{item.safeHeight}
+                    </td>
+                    <td className="px-5 py-4 text-xs text-brand-muted">
+                      {item.allowMove ? "Move " : ""}
+                      {item.allowResize ? "Resize " : ""}
+                      {item.allowRotate ? "Rotate" : ""}
+                      <br />
+                      Scale {item.minScale}-{item.maxScale}
+                    </td>
+                    <td className="px-5 py-4">
+                      <RowActions>
+                        <Button size="sm" variant="secondary" onClick={() => open(item)}>
+                          <Pencil size={14} /> Edit
+                        </Button>
+                        <Button size="sm" variant="ghost" onClick={() => remove(item)}>
+                          <Trash2 size={14} /> Delete
+                        </Button>
+                      </RowActions>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+      )}
+      {editing ? (
+        <Drawer title={editing.id ? "Edit print area" : "New print area"} onClose={() => setEditing(null)} size="wide">
+          <form className="space-y-4" onSubmit={save}>
+            <Field label="Mockup template">
+              <Select required value={editing.mockupTemplateId} onChange={(e) => handleTemplateChange(e.target.value)}>
+                <option value="">Select template</option>
+                {templates.map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.name}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+            <Field label="Name">
+              <Input required value={editing.name} onChange={(e) => setEditing({ ...editing, name: e.target.value })} />
+            </Field>
+            <PrintAreaVisualEditor
+              imageUrl={templateImageUrl}
+              value={printAreaFromEditing(editing)}
+              onChange={handleVisualChange}
+              activeLayer={activeLayer}
+              onActiveLayerChange={setActiveLayer}
+              onImageDimensions={handleImageDimensions}
+            />
+            <details className="rounded-2xl border border-surface-borderSoft bg-surface-app/40 p-4">
+              <summary className="cursor-pointer text-sm font-semibold text-brand-ink">Advanced coordinates</summary>
+              <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-4">
+                {numberFields.map((key) => (
+                  <Field key={key} label={key}>
+                    <Input
+                      required
+                      inputMode="decimal"
+                      value={String(editing[key])}
+                      onChange={(e) => setEditing({ ...editing, [key]: e.target.value })}
+                    />
+                  </Field>
+                ))}
+              </div>
+            </details>
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+              <ToggleField label="Allow move" checked={editing.allowMove} onChange={(v) => setEditing({ ...editing, allowMove: v })} />
+              <ToggleField label="Allow resize" checked={editing.allowResize} onChange={(v) => setEditing({ ...editing, allowResize: v })} />
+              <ToggleField label="Allow rotate" checked={editing.allowRotate} onChange={(v) => setEditing({ ...editing, allowRotate: v })} />
+            </div>
+            {!canSavePrintArea ? (
+              <p className="text-sm text-brand-muted">Upload a base image on the selected mockup template before saving this print area.</p>
+            ) : null}
+            <div className="flex justify-end gap-3">
+              <Button type="button" variant="secondary" onClick={() => setEditing(null)}>
+                Cancel
+              </Button>
+              <Button type="submit" loading={saving} disabled={!canSavePrintArea}>
+                Save print area
+              </Button>
+            </div>
+          </form>
+        </Drawer>
+      ) : null}
+    </PageShell>
+  );
 }
 
 const ROYALTY_EMPTY = { scope: "DEFAULT", basis: "NET_PROFIT_PERCENT", value: "15", isActive: true, effectiveAt: new Date().toISOString().slice(0, 10) };
