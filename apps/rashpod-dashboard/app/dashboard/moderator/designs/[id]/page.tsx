@@ -1052,8 +1052,8 @@ function createGlobalSelection(templates: PrintfulTemplateOption[], presets: Pla
     placementPresetId: preset?.id ?? "",
     technique: defaultTechnique(template),
     targetMarketplaces: ["ETSY"],
-    selectedVariantIds: variantIds.slice(0, 1),
     ...globalDefaultsFromPreset(preset),
+    selectedVariantIds: variantIds.slice(0, 1),
   };
 }
 
@@ -1093,7 +1093,7 @@ function localDefaultsFromPreset(preset?: PlacementPresetOption, area?: PrintAre
   };
 }
 
-function globalDefaultsFromPreset(preset?: PlacementPresetOption): Omit<GlobalSelectionForm, "id" | "printfulProductTemplateId" | "placementPresetId" | "technique" | "targetMarketplaces"> {
+function globalDefaultsFromPreset(preset?: PlacementPresetOption): Omit<GlobalSelectionForm, "id" | "printfulProductTemplateId" | "placementPresetId" | "technique" | "targetMarketplaces" | "selectedVariantIds" | "previewTaskKey" | "previewUrls" | "previewLoading"> {
   return {
     widthIn: stringValue(preset?.defaultWidthIn, "4"),
     heightIn: stringValue(preset?.defaultHeightIn, "4"),
