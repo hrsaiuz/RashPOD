@@ -2,10 +2,7 @@ import {
   LocalProductionMethod,
   LocalProductType,
   NecklineType,
-  PipelineType,
-  PlacementAlignment,
   PlacementKind,
-  PlacementUnits,
   PrismaClient,
   ProviderType,
   SleeveType,
@@ -22,6 +19,7 @@ import {
   TenantType,
 } from "@prisma/client";
 import * as bcrypt from "bcryptjs";
+import { seedPlacementPresets } from "./seed-placement-presets";
 
 const prisma = new PrismaClient();
 const DEFAULT_TENANT_ID = "00000000-0000-4000-8000-000000000100";
@@ -566,7 +564,7 @@ async function upsertLocalPipelineProduct(input: {
 }
 
 async function seedPipelineTemplates() {
-  const classicTee = await upsertLocalPipelineProduct({
+  await upsertLocalPipelineProduct({
     productTypeSlug: "t-shirt",
     name: "Classic short sleeve crew neck T-shirt",
     slug: "classic-short-sleeve-crew-neck-t-shirt",
@@ -587,7 +585,7 @@ async function seedPipelineTemplates() {
     ],
   });
 
-  const longSleeve = await upsertLocalPipelineProduct({
+  await upsertLocalPipelineProduct({
     productTypeSlug: "long-sleeve-crew-neck-t-shirt",
     name: "Long sleeve crew neck T-shirt",
     slug: "long-sleeve-crew-neck-t-shirt",
@@ -608,7 +606,28 @@ async function seedPipelineTemplates() {
     ],
   });
 
-  const mug = await upsertLocalPipelineProduct({
+  await upsertLocalPipelineProduct({
+    productTypeSlug: "hoodie",
+    name: "Classic pullover hoodie",
+    slug: "classic-pullover-hoodie",
+    skuPrefix: "LCHD",
+    localProductType: LocalProductType.HOODIE,
+    neckline: NecklineType.HOODIE,
+    sleeveType: SleeveType.LONG,
+    productionMethod: LocalProductionMethod.DTF,
+    baseCost: "120000",
+    defaultPrice: "329000",
+    colors: ["black", "gray", "navy"],
+    sizes: ["S", "M", "L", "XL"],
+    templateName: "Front and back",
+    templateSlug: "classic-hoodie",
+    areas: [
+      { name: "Hoodie front", placement: PlacementKind.FRONT, x: 280, y: 280, width: 500, height: 580, widthCm: 28, heightCm: 32 },
+      { name: "Hoodie back", placement: PlacementKind.BACK, x: 280, y: 270, width: 520, height: 620, widthCm: 30, heightCm: 34 },
+    ],
+  });
+
+  await upsertLocalPipelineProduct({
     productTypeSlug: "mug",
     name: "Ceramic mug",
     slug: "ceramic-mug",
@@ -616,7 +635,7 @@ async function seedPipelineTemplates() {
     localProductType: LocalProductType.MUG,
     neckline: NecklineType.NONE,
     sleeveType: SleeveType.NONE,
-    productionMethod: LocalProductionMethod.SUBLIMATION,
+    productionMethod: LocalProductionMethod.UV_DTF,
     baseCost: "28000",
     defaultPrice: "79000",
     colors: ["white"],
@@ -626,34 +645,23 @@ async function seedPipelineTemplates() {
     areas: [{ name: "Mug center", placement: PlacementKind.FULL_WRAP, x: 220, y: 290, width: 760, height: 330, widthCm: 20, heightCm: 8.5 }],
   });
 
-  const presets = [
-    { name: "Center chest", product: classicTee, placement: PlacementKind.FRONT, widthCm: 24, heightCm: 24, alignment: PlacementAlignment.CENTER },
-    { name: "Large front", product: classicTee, placement: PlacementKind.FRONT, widthCm: 30, heightCm: 34, alignment: PlacementAlignment.TOP_CENTER },
-    { name: "Back center", product: classicTee, placement: PlacementKind.BACK, widthCm: 30, heightCm: 34, alignment: PlacementAlignment.CENTER },
-    { name: "Center chest", product: longSleeve, placement: PlacementKind.FRONT, widthCm: 24, heightCm: 24, alignment: PlacementAlignment.CENTER },
-    { name: "Mug center", product: mug, placement: PlacementKind.FULL_WRAP, widthCm: 10, heightCm: 7, alignment: PlacementAlignment.CENTER },
-  ];
-
-  for (const preset of presets) {
-    if (!preset.product) continue;
-    const existing = await prisma.placementPreset.findFirst({
-      where: { pipeline: PipelineType.LOCAL, localBaseProductId: preset.product.id, name: preset.name, placement: preset.placement },
-    });
-    const data = {
-      name: preset.name,
-      pipeline: PipelineType.LOCAL,
-      localBaseProductId: preset.product.id,
-      placement: preset.placement,
-      defaultWidthCm: preset.widthCm,
-      defaultHeightCm: preset.heightCm,
-      defaultScale: 1,
-      alignment: preset.alignment,
-      units: PlacementUnits.CM,
-      active: true,
-    };
-    if (existing) await prisma.placementPreset.update({ where: { id: existing.id }, data });
-    else await prisma.placementPreset.create({ data });
-  }
+  await upsertLocalPipelineProduct({
+    productTypeSlug: "poster",
+    name: "Art poster",
+    slug: "art-poster",
+    skuPrefix: "LCPS",
+    localProductType: LocalProductType.POSTER,
+    neckline: NecklineType.NONE,
+    sleeveType: SleeveType.NONE,
+    productionMethod: LocalProductionMethod.UV_DTF,
+    baseCost: "35000",
+    defaultPrice: "99000",
+    colors: ["white"],
+    sizes: ["A3"],
+    templateName: "Front print",
+    templateSlug: "art-poster",
+    areas: [{ name: "Poster front", placement: PlacementKind.FRONT, x: 120, y: 120, width: 960, height: 1360, widthCm: 42, heightCm: 59.4 }],
+  });
 
   const printfulTemplates = [
     {
@@ -703,7 +711,7 @@ async function seedPipelineTemplates() {
   ];
 
   for (const item of printfulTemplates) {
-    const template = await prisma.printfulProductTemplate.upsert({
+    await prisma.printfulProductTemplate.upsert({
       where: {
         provider_printfulCatalogProductId_displayName: {
           provider: ProviderType.PRINTFUL,
@@ -744,24 +752,10 @@ async function seedPipelineTemplates() {
       },
     });
 
-    const existingPreset = await prisma.placementPreset.findFirst({
-      where: { pipeline: PipelineType.GLOBAL_PRINTFUL, productTemplateId: template.id, name: "Center front" },
-    });
-    const presetData = {
-      name: "Center front",
-      pipeline: PipelineType.GLOBAL_PRINTFUL,
-      productTemplateId: template.id,
-      placement: PlacementKind.FRONT,
-      defaultWidthIn: item.rashpodProductType === "mug" ? 3.5 : 10,
-      defaultHeightIn: item.rashpodProductType === "mug" ? 3 : 12,
-      defaultScale: 1,
-      alignment: PlacementAlignment.CENTER,
-      units: PlacementUnits.INCH,
-      active: true,
-    };
-    if (existingPreset) await prisma.placementPreset.update({ where: { id: existingPreset.id }, data: presetData });
-    else await prisma.placementPreset.create({ data: presetData });
   }
+
+  const presetCounts = await seedPlacementPresets(prisma);
+  console.log(`Placement presets: ${presetCounts.local} local, ${presetCounts.global} global.`);
 }
 
 async function main() {
