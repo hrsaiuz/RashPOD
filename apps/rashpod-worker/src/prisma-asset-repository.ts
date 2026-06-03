@@ -465,6 +465,7 @@ export class PrismaAssetRepository implements WorkerRepository {
     currency: string;
     previewImageUrl?: string | null;
     printfulStoreId?: string | null;
+    printAreasJson?: unknown;
     metadataJson?: unknown;
   }) {
     const item = await this.prisma.printfulProductTemplate.upsert({
