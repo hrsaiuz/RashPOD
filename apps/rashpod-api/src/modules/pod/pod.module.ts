@@ -13,6 +13,6 @@ import { PrintifyProviderAdapter } from "./provider-adapters/printify-provider.a
   imports: [AuditModule, FilesModule, WorkerJobsModule, PrintfulModule],
   controllers: [PodController],
   providers: [PodService, PodPlacementTransformService, PrintfulProviderAdapter, PrintifyProviderAdapter],
-  exports: [PodService],
+  exports: [PodService, PodPlacementTransformService],
 })
 export class PodModule {}

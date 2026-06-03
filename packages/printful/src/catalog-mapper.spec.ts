@@ -7,7 +7,10 @@ describe("printful catalog mapper", () => {
     const mapped = mapCatalogProductToTemplate({
       allowlistItem: { catalogProductId: 71, rashpodProductType: "classic_crew_neck_tshirt", defaultTechnique: "dtg", defaultPlacement: "front" },
       product: { id: 71, title: "Unisex Staple T-Shirt", image: "https://example.com/tee.jpg", variants: [{ id: 4011 }, { id: 4012 }] },
-      printfiles: { variant_printfiles: [{ printfiles: [{ placement: "front" }] }], available_techniques: { dtg: {} } },
+      printfiles: {
+        variant_printfiles: [{ printfiles: [{ placement: "front", print_area_width: 12, print_area_height: 16 }] }],
+        available_techniques: { dtg: {} },
+      },
       storeId: "12345",
     });
 
@@ -15,6 +18,7 @@ describe("printful catalog mapper", () => {
     assert.deepEqual(mapped.printfulVariantIds, ["4011", "4012"]);
     assert.equal(mapped.defaultPlacement, "front");
     assert.equal(mapped.previewImageUrl, "https://example.com/tee.jpg");
+    assert.equal(mapped.printAreasJson?.front?.printAreaWidthIn, 12);
   });
 
   it("parses catalog allowlist from platform settings", () => {

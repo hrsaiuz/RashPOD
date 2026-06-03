@@ -1,16 +1,17 @@
 "use client";
 
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { AlertTriangle, ArrowLeft, ChevronDown, ChevronUp, Globe2, MapPin, Plus, Trash2, XCircle } from "lucide-react";
+import { AlertTriangle, ArrowLeft, ChevronDown, ChevronUp, Globe2, Loader2, MapPin, Plus, Trash2, XCircle } from "lucide-react";
 import { Button, Card, EmptyState, ErrorState, Input, ProductPickerGrid, StatusBadge } from "@rashpod/ui";
 import DashboardLayout from "../../../dashboard-layout";
 import { api, ApiError, type DesignWorkflowDetail } from "../../../../../lib/api";
 import { useAuth } from "../../../../auth/auth-provider";
 import { ModeratorListingWizard } from "../../moderator-listing-wizard";
-import { LocalSelectionMockupEditor } from "../../../../../components/mockup";
+import { GlobalSelectionMockupEditor, LocalSelectionMockupEditor } from "../../../../../components/mockup";
 import { DesignPreviewCard } from "../../../../../components/design/DesignPreviewCard";
+import { MockupErrorHint, PlacementChips, ReadinessChecklist } from "../../moderator-pipeline-helpers";
 
 const REJECTION_REASONS = [
   ["COPYRIGHT_RISK", "Copyright or trademark risk"],
@@ -98,7 +99,13 @@ type PrintfulTemplateOption = {
   previewImageUrl?: string | null;
   active?: boolean;
   defaultTechnique?: string | null;
+  defaultPlacement?: string | null;
+  rashpodProductType?: string | null;
   allowedTechniques?: unknown;
+  allowedPlacements?: unknown;
+  allowedColorVariantIds?: unknown;
+  allowedSizeVariantIds?: unknown;
+  printfulVariantIds?: unknown;
 };
 
 type PipelineMode = "uzbek" | "global";
@@ -134,6 +141,10 @@ type GlobalSelectionForm = {
   scale: string;
   technique: string;
   targetMarketplaces: string[];
+  selectedVariantIds: string[];
+  previewTaskKey?: string;
+  previewUrls?: string[];
+  previewLoading?: boolean;
 };
 
 export default function Page() {
@@ -160,7 +171,10 @@ export default function Page() {
   const [notes, setNotes] = useState("");
   const [pipelineMode, setPipelineMode] = useState<PipelineMode>("uzbek");
   const [expandedLocal, setExpandedLocal] = useState<Record<string, boolean>>({});
-  const [expandedGlobal, setExpandedGlobal] = useState<Record<string, boolean>>({});
+  const [expandedGlobalNumeric, setExpandedGlobalNumeric] = useState<Record<string, boolean>>({});
+  const [highlightMockups, setHighlightMockups] = useState(false);
+  const mockupSectionRef = useRef<HTMLDivElement>(null);
+  const prevMockupPending = useRef(false);
 
   const activeBaseProducts = useMemo(() => baseProducts.filter((item) => item.isActive !== false), [baseProducts]);
   const activeMockupTemplates = useMemo(() => mockupTemplates.filter((item) => item.isActive !== false), [mockupTemplates]);
@@ -196,6 +210,16 @@ export default function Page() {
     return () => window.clearInterval(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mockupPending, params.id]);
+
+  useEffect(() => {
+    if (prevMockupPending.current && !mockupPending && detail?.productSelections?.length) {
+      setHighlightMockups(true);
+      mockupSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      const timer = window.setTimeout(() => setHighlightMockups(false), 4000);
+      return () => window.clearTimeout(timer);
+    }
+    prevMockupPending.current = mockupPending;
+  }, [mockupPending, detail?.productSelections?.length]);
 
   async function load() {
     setLoading(true);
@@ -271,10 +295,15 @@ export default function Page() {
   }
 
   function selectLocalProduct(index: number, productId: string) {
-    const preset = localPresetsFor(productId)[0];
+    const presets = localPresetsFor(productId);
+    const preset = presets.find((item) => item.name.toLowerCase().includes("center")) ?? presets[0];
     const template = localTemplatesFor(productId)[0];
     const area = template ? printAreasFor(template.id, preset?.id ?? "")[0] : undefined;
     updateLocalSelection(index, { ...localDefaultsFromPreset(preset, area), localBaseProductId: productId, placementPresetId: preset?.id ?? "", mockupTemplateId: template?.id ?? "", printAreaId: area?.id ?? "" });
+  }
+
+  function selectLocalPlacementChip(index: number, presetId: string) {
+    selectLocalPreset(index, presetId);
   }
 
   function selectLocalPreset(index: number, presetId: string) {
@@ -302,12 +331,107 @@ export default function Page() {
   function selectPrintfulTemplate(index: number, templateId: string) {
     const preset = globalPresetsFor(templateId)[0];
     const template = printfulTemplates.find((item) => item.id === templateId);
-    updateGlobalSelection(index, { ...globalDefaultsFromPreset(preset), printfulProductTemplateId: templateId, placementPresetId: preset?.id ?? "", technique: defaultTechnique(template) });
+    const variantIds = variantIdsFromTemplate(template);
+    updateGlobalSelection(index, {
+      ...globalDefaultsFromPreset(preset),
+      printfulProductTemplateId: templateId,
+      placementPresetId: preset?.id ?? "",
+      technique: defaultTechnique(template),
+      selectedVariantIds: variantIds.slice(0, 1),
+      previewUrls: undefined,
+      previewTaskKey: undefined,
+    });
   }
 
   function selectGlobalPreset(index: number, presetId: string) {
     const preset = placementPresets.find((item) => item.id === presetId);
     updateGlobalSelection(index, { ...globalDefaultsFromPreset(preset), placementPresetId: presetId });
+  }
+
+  function toggleVariant(index: number, variantId: string) {
+    setGlobalSelections((current) => current.map((selection, currentIndex) => {
+      if (currentIndex !== index) return selection;
+      const selectedVariantIds = selection.selectedVariantIds.includes(variantId)
+        ? selection.selectedVariantIds.filter((item) => item !== variantId)
+        : [...selection.selectedVariantIds, variantId];
+      return { ...selection, selectedVariantIds: selectedVariantIds.length ? selectedVariantIds : [variantId] };
+    }));
+  }
+
+  async function copyPlacementFromLocal(globalIndex: number, localIndex: number) {
+    const local = localSelections[localIndex];
+    const global = globalSelections[globalIndex];
+    if (!local?.printAreaId || !global?.printfulProductTemplateId) return;
+    try {
+      const suggested = await api.post<{ widthIn: number; heightIn: number; leftIn: number; topIn: number; scale: number }>(
+        `/admin/designs/${params.id}/suggest-printful-placement`,
+        {
+          printfulProductTemplateId: global.printfulProductTemplateId,
+          placement: presetPlacement(global.placementPresetId),
+          printAreaId: local.printAreaId,
+          localBaseProductId: local.localBaseProductId,
+          unit: local.unit,
+          position: local.unit === "PX"
+            ? { widthPx: numberValue(local.widthPx), heightPx: numberValue(local.heightPx), xPx: numberValue(local.xPx), yPx: numberValue(local.yPx), scale: numberValue(local.scale), rotation: numberValue(local.rotation) }
+            : { widthCm: numberValue(local.widthCm), heightCm: numberValue(local.heightCm), xCm: numberValue(local.xCm), yCm: numberValue(local.yCm), scale: numberValue(local.scale), rotation: numberValue(local.rotation) },
+        },
+      );
+      updateGlobalSelection(globalIndex, {
+        widthIn: String(suggested.widthIn),
+        heightIn: String(suggested.heightIn),
+        leftIn: String(suggested.leftIn),
+        topIn: String(suggested.topIn),
+        scale: String(suggested.scale ?? 1),
+      });
+    } catch (e) {
+      setActionError(e instanceof Error ? e.message : "Failed to copy placement");
+    }
+  }
+
+  async function previewPrintfulMockup(index: number) {
+    const selection = globalSelections[index];
+    if (!selection?.printfulProductTemplateId) return;
+    updateGlobalSelection(index, { previewLoading: true, previewUrls: undefined });
+    try {
+      const started = await api.post<{ taskKey: string; status: string }>(`/admin/designs/${params.id}/printful-mockup-preview`, {
+        printfulProductTemplateId: selection.printfulProductTemplateId,
+        placement: presetPlacement(selection.placementPresetId),
+        technique: selection.technique,
+        selectedVariantIds: selection.selectedVariantIds,
+        position: {
+          widthIn: numberValue(selection.widthIn),
+          heightIn: numberValue(selection.heightIn),
+          leftIn: numberValue(selection.leftIn),
+          topIn: numberValue(selection.topIn),
+          scale: numberValue(selection.scale),
+        },
+      });
+      updateGlobalSelection(index, { previewTaskKey: started.taskKey });
+      await pollPrintfulPreview(index, started.taskKey);
+    } catch (e) {
+      updateGlobalSelection(index, { previewLoading: false });
+      setActionError(e instanceof Error ? e.message : "Printful preview failed");
+    }
+  }
+
+  async function pollPrintfulPreview(index: number, taskKey: string, attempt = 0) {
+    if (attempt > 12) {
+      updateGlobalSelection(index, { previewLoading: false });
+      setActionError("Printful preview timed out");
+      return;
+    }
+    const result = await api.get<{ status: string; mockupUrls: string[] }>(`/admin/designs/printful/mockup-tasks/${taskKey}`);
+    if ((result.status === "completed" || result.mockupUrls.length > 0) && result.mockupUrls.length) {
+      updateGlobalSelection(index, { previewLoading: false, previewUrls: result.mockupUrls });
+      return;
+    }
+    if (result.status === "failed") {
+      updateGlobalSelection(index, { previewLoading: false });
+      setActionError("Printful preview failed");
+      return;
+    }
+    await new Promise((resolve) => window.setTimeout(resolve, Math.min(5000, 1000 * (attempt + 1))));
+    await pollPrintfulPreview(index, taskKey, attempt + 1);
   }
 
   function toggleMarketplace(index: number, marketplace: string) {
@@ -356,6 +480,7 @@ export default function Page() {
       placement: presetPlacement(selection.placementPresetId),
       technique: selection.technique,
       targetMarketplaces: selection.targetMarketplaces,
+      selectedVariantIds: selection.selectedVariantIds,
       position: {
         widthIn: numberValue(selection.widthIn),
         heightIn: numberValue(selection.heightIn),
@@ -409,6 +534,20 @@ export default function Page() {
   }
 
   const latest = detail?.versions?.[0];
+
+  const localReady = useMemo(
+    () => localSelections.every((selection) =>
+      selection.localBaseProductId && selection.mockupTemplateId && selection.printAreaId && selection.placementPresetId),
+    [localSelections],
+  );
+
+  const globalReady = useMemo(
+    () => globalSelections.every((selection) =>
+      selection.printfulProductTemplateId && selection.placementPresetId && selection.selectedVariantIds.length),
+    [globalSelections],
+  );
+
+  const designResolutionOk = Boolean(latest?.widthPx && latest?.heightPx && latest.widthPx >= 800 && latest.heightPx >= 800);
 
   return (
     <DashboardLayout role="moderator">
@@ -519,10 +658,29 @@ export default function Page() {
                               emptyLabel="No active base products configured."
                             />
                           </div>
+                          <div className="mt-4">
+                            <p className="mb-2 text-sm font-medium text-brand-ink">Placement area</p>
+                            <PlacementChips
+                              presets={localPresetsFor(selection.localBaseProductId)}
+                              selectedId={selection.placementPresetId}
+                              onSelect={(presetId) => selectLocalPlacementChip(index, presetId)}
+                            />
+                          </div>
                           <div className="mt-4 grid gap-3 md:grid-cols-2">
-                            <SelectField label="Placement" value={selection.placementPresetId} onChange={(value) => selectLocalPreset(index, value)} options={localPresetsFor(selection.localBaseProductId).map((item) => ({ value: item.id, label: `${item.name} - ${item.placement}` }))} />
+                            <SelectField label="Placement preset" value={selection.placementPresetId} onChange={(value) => selectLocalPreset(index, value)} options={localPresetsFor(selection.localBaseProductId).map((item) => ({ value: item.id, label: `${item.name} - ${item.placement}` }))} />
                             <SelectField label="Mockup template" value={selection.mockupTemplateId} onChange={(value) => selectLocalTemplate(index, value)} options={localTemplatesFor(selection.localBaseProductId).map((item) => ({ value: item.id, label: item.name }))} />
                             <SelectField label="Print area / safe zone" value={selection.printAreaId} onChange={(value) => selectPrintArea(index, value)} options={printAreasFor(selection.mockupTemplateId, selection.placementPresetId).map((item) => ({ value: item.id, label: `${item.name} - safe ${item.safeWidth}x${item.safeHeight}px` }))} />
+                          </div>
+                          <div className="mt-4">
+                            <ReadinessChecklist
+                              items={[
+                                { label: "Base product selected", ok: Boolean(selection.localBaseProductId) },
+                                { label: "Mockup template selected", ok: Boolean(selection.mockupTemplateId) },
+                                { label: "Print area configured", ok: Boolean(selection.printAreaId) },
+                                { label: "Placement preset selected", ok: Boolean(selection.placementPresetId) },
+                                { label: "Design resolution adequate (800px+)", ok: designResolutionOk, warn: !designResolutionOk && Boolean(latest?.widthPx) },
+                              ]}
+                            />
                           </div>
                           {selection.localBaseProductId && selection.mockupTemplateId && selection.printAreaId && selection.placementPresetId && params.id ? (
                             <div className="mt-4">
@@ -599,7 +757,7 @@ export default function Page() {
                                 id: item.id,
                                 name: item.displayName,
                                 imageUrl: item.previewImageUrl,
-                                subtitle: "Printful catalog",
+                                subtitle: `${item.rashpodProductType ?? "Printful"} · ${stringArray(item.allowedPlacements).length} placements · ${item.defaultTechnique ?? "dtg"}`,
                                 badge: "Printful",
                               }))}
                               selectedId={selection.printfulProductTemplateId}
@@ -607,27 +765,94 @@ export default function Page() {
                               emptyLabel="No active Printful templates configured."
                             />
                           </div>
-                          <button
-                            type="button"
-                            className="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-brand-blue"
-                            onClick={() => setExpandedGlobal((current) => ({ ...current, [selection.id]: !current[selection.id] }))}
-                          >
-                            {expandedGlobal[selection.id] ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                            Advanced placement
-                          </button>
-                          {expandedGlobal[selection.id] ? (
+                          {selection.printfulProductTemplateId ? (
                             <>
-                              <div className="mt-3 grid gap-3 md:grid-cols-2">
-                                <SelectField label="Placement" value={selection.placementPresetId} onChange={(value) => selectGlobalPreset(index, value)} options={globalPresetsFor(selection.printfulProductTemplateId).map((item) => ({ value: item.id, label: `${item.name} - ${item.placement}` }))} />
+                              <div className="mt-4">
+                                <p className="mb-2 text-sm font-medium text-brand-ink">Placement area</p>
+                                <PlacementChips
+                                  presets={globalPresetsFor(selection.printfulProductTemplateId)}
+                                  selectedId={selection.placementPresetId}
+                                  onSelect={(presetId) => selectGlobalPreset(index, presetId)}
+                                />
                               </div>
-                              <div className="mt-3 grid gap-3 sm:grid-cols-3 lg:grid-cols-6">
-                                <NumberField label="Width in" value={selection.widthIn} onChange={(value) => updateGlobalSelection(index, { widthIn: value })} />
-                                <NumberField label="Height in" value={selection.heightIn} onChange={(value) => updateGlobalSelection(index, { heightIn: value })} />
-                                <NumberField label="Left in" value={selection.leftIn} onChange={(value) => updateGlobalSelection(index, { leftIn: value })} />
-                                <NumberField label="Top in" value={selection.topIn} onChange={(value) => updateGlobalSelection(index, { topIn: value })} />
-                                <NumberField label="Scale" value={selection.scale} onChange={(value) => updateGlobalSelection(index, { scale: value })} />
-                                <TextField label="Technique" value={selection.technique} onChange={(value) => updateGlobalSelection(index, { technique: value })} />
+                              <div className="mt-4 grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+                                <SelectField label="Placement preset" value={selection.placementPresetId} onChange={(value) => selectGlobalPreset(index, value)} options={globalPresetsFor(selection.printfulProductTemplateId).map((item) => ({ value: item.id, label: `${item.name} - ${item.placement}` }))} />
+                                <SelectField label="Technique" value={selection.technique} onChange={(value) => updateGlobalSelection(index, { technique: value })} options={techniqueOptionsFor(selection.printfulProductTemplateId, printfulTemplates)} />
                               </div>
+                              <div className="mt-4">
+                                <p className="mb-2 text-sm font-medium text-brand-ink">Variants for mockup</p>
+                                <div className="flex flex-wrap gap-2">
+                                  {variantIdsFromTemplate(printfulTemplates.find((item) => item.id === selection.printfulProductTemplateId)).map((variantId) => (
+                                    <label key={variantId} className="flex min-h-10 items-center gap-2 rounded-pill border border-surface-borderSoft px-3 text-xs text-brand-ink">
+                                      <input type="checkbox" checked={selection.selectedVariantIds.includes(variantId)} onChange={() => toggleVariant(index, variantId)} />
+                                      <span>Variant {variantId}</span>
+                                    </label>
+                                  ))}
+                                </div>
+                              </div>
+                              {localSelections.length ? (
+                                <div className="mt-3 flex flex-wrap gap-2">
+                                  {localSelections.map((local, localIndex) => (
+                                    <Button key={local.id} size="sm" variant="secondary" onClick={() => copyPlacementFromLocal(index, localIndex)}>
+                                      Copy placement from local {localIndex + 1}
+                                    </Button>
+                                  ))}
+                                </div>
+                              ) : null}
+                              {selection.printfulProductTemplateId && selection.placementPresetId && params.id ? (
+                                <div className="mt-4">
+                                  <p className="mb-2 text-sm font-medium text-brand-ink">Visual placement</p>
+                                  <GlobalSelectionMockupEditor
+                                    designId={String(params.id)}
+                                    selection={{
+                                      printfulProductTemplateId: selection.printfulProductTemplateId,
+                                      placementPresetId: selection.placementPresetId,
+                                      placement: presetPlacement(selection.placementPresetId),
+                                    }}
+                                    onPlacementChange={(payload) =>
+                                      updateGlobalSelection(index, {
+                                        widthIn: String(payload.widthIn),
+                                        heightIn: String(payload.heightIn),
+                                        leftIn: String(payload.leftIn),
+                                        topIn: String(payload.topIn),
+                                        scale: String(payload.scale),
+                                      })
+                                    }
+                                  />
+                                </div>
+                              ) : null}
+                              <div className="mt-4 flex flex-wrap gap-2">
+                                <Button size="sm" variant="secondary" onClick={() => previewPrintfulMockup(index)} disabled={selection.previewLoading || submitting} loading={selection.previewLoading}>
+                                  Preview Printful mockup
+                                </Button>
+                              </div>
+                              {selection.previewUrls?.length ? (
+                                <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                                  {selection.previewUrls.map((url) => (
+                                    <div key={url} className="overflow-hidden rounded-xl border border-surface-borderSoft bg-white">
+                                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                                      <img src={url} alt="Printful preview" className="h-full w-full object-contain" />
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : null}
+                              <button
+                                type="button"
+                                className="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-brand-blue"
+                                onClick={() => setExpandedGlobalNumeric((current) => ({ ...current, [selection.id]: !current[selection.id] }))}
+                              >
+                                {expandedGlobalNumeric[selection.id] ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                                Numeric placement debug
+                              </button>
+                              {expandedGlobalNumeric[selection.id] ? (
+                                <div className="mt-3 grid gap-3 sm:grid-cols-3 lg:grid-cols-6">
+                                  <NumberField label="Width in" value={selection.widthIn} onChange={(value) => updateGlobalSelection(index, { widthIn: value })} />
+                                  <NumberField label="Height in" value={selection.heightIn} onChange={(value) => updateGlobalSelection(index, { heightIn: value })} />
+                                  <NumberField label="Left in" value={selection.leftIn} onChange={(value) => updateGlobalSelection(index, { leftIn: value })} />
+                                  <NumberField label="Top in" value={selection.topIn} onChange={(value) => updateGlobalSelection(index, { topIn: value })} />
+                                  <NumberField label="Scale" value={selection.scale} onChange={(value) => updateGlobalSelection(index, { scale: value })} />
+                                </div>
+                              ) : null}
                             </>
                           ) : null}
                           <div className="mt-4 flex flex-wrap gap-2">
@@ -648,8 +873,19 @@ export default function Page() {
                   ) : null}
                 </div>
 
-                <div className="mt-5">
-                  <Button onClick={submitApproval} disabled={submitting || configLoading || !localSelections.length || (pipelineMode === "global" && !globalSelections.length)} loading={submitting}>
+                <div className="mt-5 space-y-3">
+                  <ReadinessChecklist
+                    items={[
+                      { label: "Local product selections ready", ok: localReady },
+                      { label: pipelineMode === "global" ? "Printful selections ready" : "Printful not required (Uzbek only)", ok: pipelineMode === "uzbek" || globalReady },
+                      { label: "Design resolution adequate", ok: designResolutionOk, warn: !designResolutionOk },
+                    ]}
+                  />
+                  <Button
+                    onClick={submitApproval}
+                    disabled={submitting || configLoading || !localSelections.length || !localReady || (pipelineMode === "global" && (!globalSelections.length || !globalReady))}
+                    loading={submitting}
+                  >
                     <MapPin size={18} /> Approve & Generate Mockups
                   </Button>
                 </div>
@@ -675,8 +911,11 @@ export default function Page() {
                 )}
               </Card>
 
-              <Card>
+              <Card ref={mockupSectionRef} className={highlightMockups ? "ring-2 ring-brand-blue/40" : undefined}>
                 <h2 className="mb-4 text-xl font-semibold text-brand-ink">Mockup & Listing Pipeline</h2>
+                {mockupPending ? (
+                  <p className="mb-4 flex items-center gap-2 text-sm text-brand-muted"><Loader2 size={16} className="animate-spin" /> Generating mockups...</p>
+                ) : null}
                 {detail.productSelections?.length ? (
                   <div className="space-y-4">
                     {detail.productSelections.map((selection) => (
@@ -684,7 +923,12 @@ export default function Page() {
                         <div className="flex flex-wrap items-center justify-between gap-3">
                           <div>
                             <p className="font-semibold text-brand-ink">{selection.pipeline} · {selection.placement}</p>
-                            {selection.errorMessage ? <p className="mt-1 text-sm text-status-danger">{selection.errorMessage}</p> : null}
+                            {selection.errorMessage ? (
+                              <>
+                                <p className="mt-1 text-sm text-status-danger">{selection.errorMessage}</p>
+                                <MockupErrorHint code={selection.errorMessage} />
+                              </>
+                            ) : null}
                           </div>
                           <div className="flex items-center gap-2">
                             <StatusBadge status={selection.status} />
@@ -801,7 +1045,35 @@ function createLocalSelection(products: BaseProductOption[], presets: PlacementP
 function createGlobalSelection(templates: PrintfulTemplateOption[], presets: PlacementPresetOption[]): GlobalSelectionForm {
   const template = templates.find((item) => item.active !== false);
   const preset = presets.find((item) => item.active !== false && item.pipeline === "GLOBAL_PRINTFUL" && (!item.productTemplateId || item.productTemplateId === template?.id));
-  return { id: crypto.randomUUID(), printfulProductTemplateId: template?.id ?? "", placementPresetId: preset?.id ?? "", technique: defaultTechnique(template), targetMarketplaces: ["ETSY"], ...globalDefaultsFromPreset(preset) };
+  const variantIds = variantIdsFromTemplate(template);
+  return {
+    id: crypto.randomUUID(),
+    printfulProductTemplateId: template?.id ?? "",
+    placementPresetId: preset?.id ?? "",
+    technique: defaultTechnique(template),
+    targetMarketplaces: ["ETSY"],
+    selectedVariantIds: variantIds.slice(0, 1),
+    ...globalDefaultsFromPreset(preset),
+  };
+}
+
+function variantIdsFromTemplate(template?: PrintfulTemplateOption) {
+  const color = stringArray(template?.allowedColorVariantIds);
+  const size = stringArray(template?.allowedSizeVariantIds);
+  const all = stringArray(template?.printfulVariantIds);
+  const merged = [...new Set([...color, ...size, ...all])];
+  return merged.length ? merged : all;
+}
+
+function stringArray(value: unknown) {
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
+}
+
+function techniqueOptionsFor(templateId: string, templates: PrintfulTemplateOption[]) {
+  const template = templates.find((item) => item.id === templateId);
+  const techniques = stringArray(template?.allowedTechniques);
+  const values = techniques.length ? techniques : [defaultTechnique(template)];
+  return values.map((value) => ({ value, label: value }));
 }
 
 function localDefaultsFromPreset(preset?: PlacementPresetOption, area?: PrintAreaOption): Omit<LocalSelectionForm, "id" | "localBaseProductId" | "mockupTemplateId" | "printAreaId" | "placementPresetId"> {

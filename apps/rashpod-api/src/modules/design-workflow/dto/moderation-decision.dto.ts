@@ -111,6 +111,10 @@ export class GlobalPrintfulSelectionDto {
   @IsArray()
   @IsOptional()
   targetMarketplaces?: string[];
+
+  @IsArray()
+  @IsOptional()
+  selectedVariantIds?: string[];
 }
 
 export class SubmitModerationDecisionDto {

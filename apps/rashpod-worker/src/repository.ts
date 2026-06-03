@@ -32,6 +32,7 @@ export interface PipelineSelectionRecord {
   design?: { id: string; title: string; designerId: string };
   latestDesignVersion?: { id: string; fileKey: string; widthPx?: number | null; heightPx?: number | null; dpi?: number | null; hasTransparency?: boolean | null } | null;
   placement?: string;
+  technique?: string | null;
   width?: number | null;
   height?: number | null;
   x?: number | null;
@@ -221,6 +222,7 @@ export interface WorkerRepository {
     currency: string;
     previewImageUrl?: string | null;
     printfulStoreId?: string | null;
+    printAreasJson?: unknown;
     metadataJson?: unknown;
   }): Promise<{ id: string; displayName: string }>;
   ensurePrintfulPlacementPreset?(productTemplateId: string, rashpodProductType: string): Promise<{ created: boolean }>;

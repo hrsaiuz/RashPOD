@@ -26,12 +26,13 @@ export function buildPrintfulMockupTaskBody(input: {
   placement?: string | null;
   technique?: string | null;
   position: PrintfulPlacementInput;
+  variantIds?: string[] | null;
 }) {
   const placement = input.placement || input.template.defaultPlacement;
   const technique = input.technique || input.template.defaultTechnique;
   const allowedPlacements = stringArray(input.template.allowedPlacements);
   const allowedTechniques = stringArray(input.template.allowedTechniques);
-  const variantIds = stringArray(input.template.printfulVariantIds);
+  const variantIds = input.variantIds?.length ? input.variantIds : stringArray(input.template.printfulVariantIds);
 
   if (!allowedPlacements.includes(placement)) throw new Error("INVALID_PLACEMENT");
   if (!allowedTechniques.includes(technique)) throw new Error("INVALID_PRINTFUL_TECHNIQUE");

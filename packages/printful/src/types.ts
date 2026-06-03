@@ -33,6 +33,7 @@ export type PrintfulTemplateUpsertInput = {
   currency: string;
   previewImageUrl?: string | null;
   printfulStoreId?: string | null;
+  printAreasJson?: import("./print-area-parser").PrintfulPrintAreasMap;
   metadataJson?: Record<string, unknown>;
 };
 

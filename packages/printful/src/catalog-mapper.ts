@@ -1,4 +1,5 @@
 import type { PrintfulCatalogAllowlistItem, PrintfulTemplateUpsertInput } from "./types";
+import { parsePrintfulPrintAreas } from "./print-area-parser";
 
 function asRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
@@ -50,6 +51,7 @@ export function mapCatalogProductToTemplate(input: {
   const displayName = input.allowlistItem.displayName ?? String(input.product.title ?? input.product.name ?? `Printful product ${input.allowlistItem.catalogProductId}`);
   const image = String(input.product.image ?? input.product.thumbnail_url ?? "");
   const price = input.product.price ?? input.product.default_price;
+  const printAreasJson = parsePrintfulPrintAreas(input.printfiles, defaultTechnique);
 
   return {
     rashpodProductType: input.allowlistItem.rashpodProductType,
@@ -68,12 +70,17 @@ export function mapCatalogProductToTemplate(input: {
     currency: "USD",
     previewImageUrl: image || null,
     printfulStoreId: input.storeId ?? null,
+    printAreasJson,
     metadataJson: {
       printfulRaw: { product: input.product, printfiles: input.printfiles },
+      printAreasJson,
       syncedAt: new Date().toISOString(),
     },
   };
 }
+
+export { parsePrintfulPrintAreas, resolvePrintfulPrintArea } from "./print-area-parser";
+export type { PrintfulPrintAreaEntry, PrintfulPrintAreasMap } from "./print-area-parser";
 
 export function parsePrintfulSettings(value: unknown) {
   const record = asRecord(value);

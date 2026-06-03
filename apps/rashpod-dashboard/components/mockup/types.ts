@@ -1,4 +1,4 @@
-import type { EditorPlacementState, PlacementConstraints, PrintAreaRect } from "@rashpod/mockup";
+import type { EditorPlacementState, PlacementConstraints, PrintAreaRect, PrintAreaInches } from "@rashpod/mockup";
 
 export interface MockupEditorContextResponse {
   templateWidthPx: number;
@@ -11,4 +11,8 @@ export interface MockupEditorContextResponse {
   preset: { id: string; name: string; alignment?: unknown };
 }
 
-export type { EditorPlacementState, PlacementConstraints, PrintAreaRect };
+export interface PrintfulMockupEditorContextResponse extends MockupEditorContextResponse {
+  printAreaInches: PrintAreaInches;
+}
+
+export type { EditorPlacementState, PlacementConstraints, PrintAreaRect, PrintAreaInches };

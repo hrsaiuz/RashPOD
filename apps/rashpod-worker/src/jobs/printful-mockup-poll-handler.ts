@@ -113,10 +113,13 @@ export class PrintfulMockupStartHelper {
       return { fileId: String(fileId), printfulUrl: response.result?.url ?? null };
     });
 
+    const placementConfig = selection.placementConfigJson as { selectedVariantIds?: string[] } | null;
     const body = buildPrintfulMockupTaskBody({
       template: selection.printfulProductTemplate,
       fileId: file.printfulFileId,
       placement: selection.placement?.toLowerCase(),
+      technique: selection.technique ?? undefined,
+      variantIds: placementConfig?.selectedVariantIds,
       position: {
         width: selection.width,
         height: selection.height,

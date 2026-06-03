@@ -35,6 +35,8 @@ export interface PlacementConstraints {
 export interface PlacementPresetDefaults {
   defaultWidthCm?: number | null;
   defaultHeightCm?: number | null;
+  defaultWidthIn?: number | null;
+  defaultHeightIn?: number | null;
   defaultX?: number | null;
   defaultY?: number | null;
   defaultScale?: number | null;
