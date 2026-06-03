@@ -19,7 +19,7 @@ function createService(prismaOverrides: any = {}) {
     createPublicSignedReadUrl: jest.fn(),
     createSignedReadUrl: jest.fn(),
   } as any;
-  return { service: new DesignWorkflowService(prisma, audit, jobs, new PlacementCalculationService(), new MarketplaceComplianceService(), storage), prisma, audit, jobs };
+  return { service: new DesignWorkflowService(prisma, audit, jobs, new PlacementCalculationService(), new MarketplaceComplianceService(), storage, {} as any, {} as any, {} as any, {} as any), prisma, audit, jobs };
 }
 
 describe("DesignWorkflowService workflow actions", () => {

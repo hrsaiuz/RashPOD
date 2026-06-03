@@ -282,19 +282,19 @@ export class DesignWorkflowService {
         try {
           const localPosition = unit === "PX"
             ? {
-                width: dto.position.widthPx ?? dto.position.width,
-                height: dto.position.heightPx ?? dto.position.height,
-                x: dto.position.xPx ?? dto.position.x,
-                y: dto.position.yPx ?? dto.position.y,
+                width: dto.position.widthPx ?? 0,
+                height: dto.position.heightPx ?? 0,
+                x: dto.position.xPx ?? 0,
+                y: dto.position.yPx ?? 0,
                 scale: dto.position.scale ?? 1,
                 rotation: dto.position.rotation ?? 0,
                 units: PlacementUnits.PX,
               }
             : {
-                width: dto.position.widthCm ?? dto.position.width,
-                height: dto.position.heightCm ?? dto.position.height,
-                x: dto.position.xCm ?? dto.position.x,
-                y: dto.position.yCm ?? dto.position.y,
+                width: dto.position.widthCm ?? 0,
+                height: dto.position.heightCm ?? 0,
+                x: dto.position.xCm ?? 0,
+                y: dto.position.yCm ?? 0,
                 scale: dto.position.scale ?? 1,
                 rotation: dto.position.rotation ?? 0,
                 units: PlacementUnits.CM,
@@ -334,10 +334,10 @@ export class DesignWorkflowService {
 
     const localWidth = unit === "PX" ? printArea?.width ?? 2000 : printArea?.widthCm ?? 30;
     const localHeight = unit === "PX" ? printArea?.height ?? 2000 : printArea?.heightCm ?? 40;
-    const sourceWidth = unit === "PX" ? (dto.position.widthPx ?? dto.position.width ?? localWidth * 0.8) : (dto.position.widthCm ?? dto.position.width ?? localWidth * 0.8);
-    const sourceHeight = unit === "PX" ? (dto.position.heightPx ?? dto.position.height ?? localHeight * 0.8) : (dto.position.heightCm ?? dto.position.height ?? localHeight * 0.8);
-    const sourceX = unit === "PX" ? (dto.position.xPx ?? dto.position.x ?? printArea?.safeX ?? 0) : (dto.position.xCm ?? dto.position.x ?? 0);
-    const sourceY = unit === "PX" ? (dto.position.yPx ?? dto.position.y ?? printArea?.safeY ?? 0) : (dto.position.yCm ?? dto.position.y ?? 0);
+    const sourceWidth = unit === "PX" ? (dto.position.widthPx ?? localWidth * 0.8) : (dto.position.widthCm ?? localWidth * 0.8);
+    const sourceHeight = unit === "PX" ? (dto.position.heightPx ?? localHeight * 0.8) : (dto.position.heightCm ?? localHeight * 0.8);
+    const sourceX = unit === "PX" ? (dto.position.xPx ?? printArea?.safeX ?? 0) : (dto.position.xCm ?? 0);
+    const sourceY = unit === "PX" ? (dto.position.yPx ?? printArea?.safeY ?? 0) : (dto.position.yCm ?? 0);
 
     const safeX = printArea?.safeX ?? 0;
     const safeY = printArea?.safeY ?? 0;

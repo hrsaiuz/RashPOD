@@ -23,6 +23,10 @@ function createService(overrides?: { prisma?: Record<string, unknown> }) {
     {} as any,
     {} as any,
     storage as any,
+    {} as any,
+    {} as any,
+    {} as any,
+    {} as any,
   );
   return { service, prisma, storage };
 }
