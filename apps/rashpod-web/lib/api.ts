@@ -41,6 +41,30 @@ export const api = {
   delete: <T>(path: string, init?: RequestInit) => request<T>("DELETE", path, undefined, init),
 };
 
+export async function postFormData<T>(path: string, formData: FormData, init?: RequestInit): Promise<T> {
+  const fullPath = path.startsWith("/api/proxy") ? path : `/api/proxy${path.startsWith("/") ? "" : "/"}${path}`;
+  const res = await fetch(fullPath, {
+    method: "POST",
+    credentials: "include",
+    body: formData,
+    ...init,
+  });
+  let parsed: unknown = null;
+  const text = await res.text();
+  if (text) {
+    try { parsed = JSON.parse(text); } catch { parsed = text; }
+  }
+  if (!res.ok) {
+    let msg = `Request failed (${res.status})`;
+    if (parsed && typeof parsed === "object") {
+      if ("message" in parsed) msg = String((parsed as { message: unknown }).message);
+      else if ("error" in parsed) msg = String((parsed as { error: unknown }).error);
+    } else if (typeof parsed === "string" && parsed) msg = parsed;
+    throw new ApiError(msg, res.status, parsed);
+  }
+  return parsed as T;
+}
+
 export async function uploadToSignedUrl(url: string, file: File, headers?: Record<string, string>) {
   const res = await fetch(url, {
     method: "PUT",

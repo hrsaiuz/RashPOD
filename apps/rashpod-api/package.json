@@ -17,8 +17,6 @@
     "seed": "tsx prisma/seed.ts"
   },
   "dependencies": {
-    "@rashpod/mockup": "*",
-    "@rashpod/printful": "*",
     "@google-cloud/storage": "7.16.0",
     "@nestjs/common": "11.1.6",
     "@nestjs/config": "4.0.2",
@@ -26,6 +24,8 @@
     "@nestjs/jwt": "11.0.1",
     "@nestjs/platform-express": "11.1.6",
     "@prisma/client": "6.7.0",
+    "@rashpod/mockup": "*",
+    "@rashpod/printful": "*",
     "archiver": "^5.3.2",
     "bcryptjs": "2.4.3",
     "class-transformer": "0.5.1",
@@ -44,6 +44,7 @@
     "@types/bcryptjs": "2.4.6",
     "@types/express": "5.0.1",
     "@types/jest": "29.5.14",
+    "@types/multer": "^2.1.0",
     "@types/node": "22.15.18",
     "@types/qrcode": "^1.5.5",
     "@types/supertest": "6.0.3",

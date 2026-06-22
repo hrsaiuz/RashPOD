@@ -66,5 +66,118 @@
     "title": "About RashPOD",
     "mission": "Our Mission",
     "values": "Our Values"
+  },
+  "toolbox": {
+    "eyebrow": "Designer tools",
+    "title": "Designer Toolbox",
+    "subtitle": "Fast visual tools for preparing product images, banners, catalog assets, and marketplace content.",
+    "activeLabel": "Active",
+    "openLabel": "Open",
+    "tools": {
+      "batchCrop": {
+        "title": "Batch Crop",
+        "description": "Crop multiple product images to consistent marketplace-ready frames."
+      },
+      "backgroundRemover": {
+        "title": "Background Remover",
+        "description": "Prepare transparent PNG cutouts for listings, banners, and mockups."
+      }
+    },
+    "batchCrop": {
+      "title": "Batch Crop Tool",
+      "subtitle": "Upload multiple images, adjust each crop, and export a ZIP in one pass.",
+      "uploadLabel": "Upload images",
+      "exportZip": "Export ZIP",
+      "exporting": "Exporting...",
+      "zipProgress": "Creating ZIP: {value}%",
+      "uploadSuccess": "{count, number} images added.",
+      "exportSuccess": "{count, number} cropped images exported.",
+      "applyToAllSuccess": "Applied the current crop transform to all images.",
+      "emptyTitle": "Upload images to start cropping",
+      "emptyDescription": "Use JPG, JPEG, PNG, or WEBP files. Up to 50 files, 20 MB each.",
+      "emptyEditorTitle": "Select an image to edit",
+      "emptyEditorDescription": "Your crop workspace will appear here after upload.",
+      "editorHint": "Move the image behind the fixed frame, then export from the original file.",
+      "settingsTitle": "Crop settings",
+      "presetLabel": "Frame preset",
+      "widthLabel": "Output width (px)",
+      "heightLabel": "Output height (px)",
+      "formatLabel": "Output format",
+      "jpegQualityLabel": "JPEG quality: {value}%",
+      "transparentBackgroundLabel": "Keep transparent background",
+      "backgroundLabel": "Solid background",
+      "bulkActionsTitle": "Bulk actions",
+      "applyToAll": "Apply current crop to all images",
+      "zoomLabel": "Zoom",
+      "rotate": "Rotate 90°",
+      "reset": "Reset",
+      "fit": "Fit image",
+      "fill": "Fill frame",
+      "previousImage": "Previous",
+      "nextImage": "Next",
+      "filesTitle": "Uploaded files",
+      "imageIndex": "Image {index}",
+      "presets": {
+        "square": "1:1 Square",
+        "productPortrait": "4:5 Product Portrait",
+        "portrait": "3:4 Portrait",
+        "banner": "16:9 Banner",
+        "story": "9:16 Story",
+        "a4Portrait": "A4 Portrait",
+        "a4Landscape": "A4 Landscape",
+        "custom": "Custom"
+      },
+      "errors": {
+        "empty": "Choose at least one image.",
+        "tooMany": "Batch Crop supports up to 50 images at a time.",
+        "tooLarge": "Each crop image must be 20 MB or smaller.",
+        "invalidType": "Only JPG, JPEG, PNG, and WEBP images are supported.",
+        "loadFailed": "One or more images could not be loaded.",
+        "invalidCustomSize": "Custom width and height must be greater than zero.",
+        "cropNotReady": "Crop data is still loading. Adjust the image and try again.",
+        "exportFailed": "Could not export the cropped ZIP.",
+        "noReadyFiles": "Upload images before exporting."
+      }
+    },
+    "backgroundRemover": {
+      "title": "Background Remover Tool",
+      "subtitle": "Upload product shots and process transparent PNG cutouts when the backend service is available.",
+      "uploadLabel": "Upload images",
+      "processAll": "Process all",
+      "downloadAll": "Download all",
+      "downloadOne": "Download PNG",
+      "zipProgress": "Creating ZIP: {value}%",
+      "zipSuccess": "Processed PNG files exported as ZIP.",
+      "uploadSuccess": "{count, number} images added.",
+      "processSuccess": "Background removal completed.",
+      "filesTitle": "Uploaded files",
+      "previewTitle": "Preview",
+      "originalLabel": "Original image",
+      "resultLabel": "Result image",
+      "originalAlt": "Original preview for {filename}",
+      "resultAlt": "Background removed preview for {filename}",
+      "emptyTitle": "Upload images for background removal",
+      "emptyDescription": "Use JPG, JPEG, PNG, or WEBP files. Up to 20 files, 15 MB each.",
+      "emptyPreviewTitle": "Select a file",
+      "emptyPreviewDescription": "Original and processed previews will appear here.",
+      "resultPendingTitle": "Result not available yet",
+      "resultPendingDescription": "Process an image to preview the transparent PNG output.",
+      "configErrorTitle": "Background remover unavailable",
+      "status": {
+        "ready": "Ready",
+        "processing": "Processing",
+        "done": "Done",
+        "error": "Error"
+      },
+      "errors": {
+        "empty": "Choose at least one image.",
+        "tooMany": "Background Remover supports up to 20 images at a time.",
+        "tooLarge": "Each background removal image must be 15 MB or smaller.",
+        "invalidType": "Only JPG, JPEG, PNG, and WEBP images are supported.",
+        "processingFailed": "Background removal failed.",
+        "unexpectedResult": "The background remover did not return a usable PNG result.",
+        "zipFailed": "Could not export the processed ZIP."
+      }
+    }
   }
 }

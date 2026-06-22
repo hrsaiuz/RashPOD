@@ -26,11 +26,20 @@ async function handle(req: NextRequest, params: { path: string[] }, method: stri
   const apiPath = params.path.join("/");
   const url = new URL(req.url);
   const target = `${API_URL}/${apiPath}${url.search}`;
-  const headers: HeadersInit = { "Content-Type": req.headers.get("Content-Type") || "application/json" };
+  const incomingContentType = req.headers.get("Content-Type") || "";
+  const headers: HeadersInit = {};
   if (token) (headers as Record<string, string>).Authorization = `Bearer ${token}`;
 
   let body: BodyInit | null = null;
-  if (method !== "GET" && method !== "DELETE") body = await req.text();
+  if (method !== "GET" && method !== "DELETE") {
+    if (incomingContentType.startsWith("multipart/form-data")) {
+      body = await req.formData();
+    } else {
+      if (incomingContentType) (headers as Record<string, string>)["Content-Type"] = incomingContentType;
+      else (headers as Record<string, string>)["Content-Type"] = "application/json";
+      body = await req.text();
+    }
+  }
 
   try {
     const res = await fetch(target, { method, headers, body });

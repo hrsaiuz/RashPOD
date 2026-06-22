@@ -66,5 +66,118 @@
     "title": "RashPOD ҳақида",
     "mission": "Биз миссиямиз",
     "values": "Биз қадриятларимиз"
+  },
+  "toolbox": {
+    "eyebrow": "Designer tools",
+    "title": "Designer Toolbox",
+    "subtitle": "Маҳсулот расмлари, баннерлар, каталог материаллари ва маркетплейс контентини тайёрлаш учун тез визуал воситалар.",
+    "activeLabel": "Active",
+    "openLabel": "Open",
+    "tools": {
+      "batchCrop": {
+        "title": "Batch Crop",
+        "description": "Бир нечта расмни бир хил маркетплейс форматларига тез тайёрланг."
+      },
+      "backgroundRemover": {
+        "title": "Background Remover",
+        "description": "Листинглар, баннерлар ва мокаплар учун шаффоф PNG кесмаларини тайёрланг."
+      }
+    },
+    "batchCrop": {
+      "title": "Batch Crop Tool",
+      "subtitle": "Бир нечта расм юкланг, ҳар бирини алоҳида созланг ва ZIP сифатида экспорт қилинг.",
+      "uploadLabel": "Расм юклаш",
+      "exportZip": "ZIP экспорт",
+      "exporting": "Экспорт...",
+      "zipProgress": "ZIP тайёрланмоқда: {value}%",
+      "uploadSuccess": "{count, number} та расм қўшилди.",
+      "exportSuccess": "{count, number} та кесилган расм экспорт қилинди.",
+      "applyToAllSuccess": "Жорий crop созламаси барча расмларга қўлланди.",
+      "emptyTitle": "Crop қилиш учун расм юкланг",
+      "emptyDescription": "JPG, JPEG, PNG ва WEBP қўллаб-қувватланади. 50 тагача файл, ҳар бири 20 МБ.",
+      "emptyEditorTitle": "Таҳрирлаш учун расм танланг",
+      "emptyEditorDescription": "Юкланганидан кейин crop майдони шу ерда очилади.",
+      "editorHint": "Расмни фикс рамка ортида ҳаракатлантиринг. Экспорт асл файлдан олинади.",
+      "settingsTitle": "Crop созламалари",
+      "presetLabel": "Рамка пресети",
+      "widthLabel": "Кенглик (px)",
+      "heightLabel": "Баландлик (px)",
+      "formatLabel": "Чиқиш формати",
+      "jpegQualityLabel": "JPEG сифати: {value}%",
+      "transparentBackgroundLabel": "Шаффоф фонни сақлаш",
+      "backgroundLabel": "Тўлиқ фон",
+      "bulkActionsTitle": "Оммавий амаллар",
+      "applyToAll": "Жорий crop ни ҳаммасига қўллаш",
+      "zoomLabel": "Яқинлаштириш",
+      "rotate": "90° буриш",
+      "reset": "Тиклаш",
+      "fit": "Сиғдириш",
+      "fill": "Тўлдириш",
+      "previousImage": "Олдинги",
+      "nextImage": "Кейинги",
+      "filesTitle": "Юкланган файллар",
+      "imageIndex": "{index}-расм",
+      "presets": {
+        "square": "1:1 Квадрат",
+        "productPortrait": "4:5 Маҳсулот портрет",
+        "portrait": "3:4 Портрет",
+        "banner": "16:9 Баннер",
+        "story": "9:16 Story",
+        "a4Portrait": "A4 Портрет",
+        "a4Landscape": "A4 Landscape",
+        "custom": "Custom"
+      },
+      "errors": {
+        "empty": "Камида битта расм танланг.",
+        "tooMany": "Batch Crop бир вақтда 50 тагача расмни қўллайди.",
+        "tooLarge": "Ҳар бир расм 20 МБ дан кичик бўлиши керак.",
+        "invalidType": "Фақат JPG, JPEG, PNG ва WEBP қўлланади.",
+        "loadFailed": "Бир ёки бир нечта расм юкланмади.",
+        "invalidCustomSize": "Custom кенглик ва баландлик нолдан катта бўлиши керак.",
+        "cropNotReady": "Crop маълумоти ҳали тайёр эмас. Расмни созлаб, яна уриниб кўринг.",
+        "exportFailed": "Кесилган ZIP ни экспорт қилиб бўлмади.",
+        "noReadyFiles": "Экспортдан олдин расм юкланг."
+      }
+    },
+    "backgroundRemover": {
+      "title": "Background Remover Tool",
+      "subtitle": "Сервер хизмати тайёр бўлганда маҳсулот расмларидан шаффоф PNG тайёрланг.",
+      "uploadLabel": "Расм юклаш",
+      "processAll": "Ҳаммасини ишлаш",
+      "downloadAll": "Ҳаммасини юклаш",
+      "downloadOne": "PNG юклаш",
+      "zipProgress": "ZIP тайёрланмоқда: {value}%",
+      "zipSuccess": "Ишланган PNG файллар ZIP га жойланди.",
+      "uploadSuccess": "{count, number} та расм қўшилди.",
+      "processSuccess": "Фонни олиб ташлаш якунланди.",
+      "filesTitle": "Юкланган файллар",
+      "previewTitle": "Preview",
+      "originalLabel": "Асл расм",
+      "resultLabel": "Натижа",
+      "originalAlt": "{filename} учун асл preview",
+      "resultAlt": "{filename} учун фонсиз preview",
+      "emptyTitle": "Фонни олиб ташлаш учун расм юкланг",
+      "emptyDescription": "JPG, JPEG, PNG ва WEBP қўллаб-қувватланади. 20 тагача файл, ҳар бири 15 МБ.",
+      "emptyPreviewTitle": "Файл танланг",
+      "emptyPreviewDescription": "Асл ва қайта ишланган preview шу ерда кўринади.",
+      "resultPendingTitle": "Натижа ҳали мавжуд эмас",
+      "resultPendingDescription": "Шаффоф PNG preview кўриш учун файлни ишланг.",
+      "configErrorTitle": "Фонни олиб ташлаш хизмати мавжуд эмас",
+      "status": {
+        "ready": "Ready",
+        "processing": "Processing",
+        "done": "Done",
+        "error": "Error"
+      },
+      "errors": {
+        "empty": "Камида битта расм танланг.",
+        "tooMany": "Background Remover бир вақтда 20 тагача расмни қўллайди.",
+        "tooLarge": "Ҳар бир файл 15 МБ дан кичик бўлиши керак.",
+        "invalidType": "Фақат JPG, JPEG, PNG ва WEBP қўлланади.",
+        "processingFailed": "Фонни олиб ташлаш муваффақиятсиз бўлди.",
+        "unexpectedResult": "Хизмат яроқли PNG натижа қайтармади.",
+        "zipFailed": "Ишланган ZIP ни экспорт қилиб бўлмади."
+      }
+    }
   }
 }

@@ -42,6 +42,7 @@ import { WorkshopModule } from "./modules/workshop/workshop.module";
 import { TenantsModule } from "./modules/tenants/tenants.module";
 import { SuperAdminPlatformModule } from "./modules/super-admin-platform/super-admin-platform.module";
 import { HealthController } from "./health.controller";
+import { StorefrontToolboxModule } from "./modules/storefront-toolbox/storefront-toolbox.module";
 
 @Module({
   imports: [
@@ -84,6 +85,7 @@ import { HealthController } from "./health.controller";
     WorkshopModule,
     TenantsModule,
     SuperAdminPlatformModule,
+    StorefrontToolboxModule,
     IntakeModule,
     DesignWorkflowModule,
     PrintfulModule,

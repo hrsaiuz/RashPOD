@@ -66,5 +66,118 @@
     "title": "О RashPOD",
     "mission": "Наша миссия",
     "values": "Наши ценности"
+  },
+  "toolbox": {
+    "eyebrow": "Инструменты дизайнера",
+    "title": "Designer Toolbox",
+    "subtitle": "Быстрые визуальные инструменты для подготовки изображений товаров, баннеров, каталогов и маркетплейс-контента.",
+    "activeLabel": "Активно",
+    "openLabel": "Открыть",
+    "tools": {
+      "batchCrop": {
+        "title": "Batch Crop",
+        "description": "Обрезайте сразу несколько изображений в одинаковые форматы для каталога и маркетплейсов."
+      },
+      "backgroundRemover": {
+        "title": "Background Remover",
+        "description": "Готовьте прозрачные PNG-вырезки для листингов, баннеров и мокапов."
+      }
+    },
+    "batchCrop": {
+      "title": "Batch Crop Tool",
+      "subtitle": "Загрузите несколько изображений, настройте обрезку каждого и экспортируйте ZIP за один проход.",
+      "uploadLabel": "Загрузить изображения",
+      "exportZip": "Экспорт ZIP",
+      "exporting": "Экспорт...",
+      "zipProgress": "Создание ZIP: {value}%",
+      "uploadSuccess": "Добавлено изображений: {count, number}.",
+      "exportSuccess": "Экспортировано обрезанных изображений: {count, number}.",
+      "applyToAllSuccess": "Текущие параметры обрезки применены ко всем изображениям.",
+      "emptyTitle": "Загрузите изображения для обрезки",
+      "emptyDescription": "Поддерживаются JPG, JPEG, PNG и WEBP. До 50 файлов, по 20 МБ каждый.",
+      "emptyEditorTitle": "Выберите изображение для редактирования",
+      "emptyEditorDescription": "После загрузки здесь появится рабочая область обрезки.",
+      "editorHint": "Двигайте изображение под фиксированной рамкой. Экспорт идёт из исходного файла.",
+      "settingsTitle": "Настройки обрезки",
+      "presetLabel": "Пресет рамки",
+      "widthLabel": "Ширина (px)",
+      "heightLabel": "Высота (px)",
+      "formatLabel": "Формат вывода",
+      "jpegQualityLabel": "Качество JPEG: {value}%",
+      "transparentBackgroundLabel": "Сохранить прозрачный фон",
+      "backgroundLabel": "Сплошной фон",
+      "bulkActionsTitle": "Групповые действия",
+      "applyToAll": "Применить текущую обрезку ко всем",
+      "zoomLabel": "Масштаб",
+      "rotate": "Повернуть на 90°",
+      "reset": "Сброс",
+      "fit": "Вписать",
+      "fill": "Заполнить",
+      "previousImage": "Назад",
+      "nextImage": "Вперёд",
+      "filesTitle": "Загруженные файлы",
+      "imageIndex": "Изображение {index}",
+      "presets": {
+        "square": "1:1 Квадрат",
+        "productPortrait": "4:5 Портрет товара",
+        "portrait": "3:4 Портрет",
+        "banner": "16:9 Баннер",
+        "story": "9:16 Сторис",
+        "a4Portrait": "A4 Портрет",
+        "a4Landscape": "A4 Альбом",
+        "custom": "Свои размеры"
+      },
+      "errors": {
+        "empty": "Выберите хотя бы одно изображение.",
+        "tooMany": "Batch Crop поддерживает до 50 изображений за раз.",
+        "tooLarge": "Каждое изображение должно быть не больше 20 МБ.",
+        "invalidType": "Поддерживаются только JPG, JPEG, PNG и WEBP.",
+        "loadFailed": "Не удалось загрузить одно или несколько изображений.",
+        "invalidCustomSize": "Пользовательская ширина и высота должны быть больше нуля.",
+        "cropNotReady": "Данные обрезки ещё загружаются. Подправьте изображение и попробуйте снова.",
+        "exportFailed": "Не удалось экспортировать ZIP с обрезанными файлами.",
+        "noReadyFiles": "Загрузите изображения перед экспортом."
+      }
+    },
+    "backgroundRemover": {
+      "title": "Background Remover Tool",
+      "subtitle": "Загрузите продуктовые изображения и подготовьте прозрачные PNG, когда серверная обработка будет доступна.",
+      "uploadLabel": "Загрузить изображения",
+      "processAll": "Обработать все",
+      "downloadAll": "Скачать все",
+      "downloadOne": "Скачать PNG",
+      "zipProgress": "Создание ZIP: {value}%",
+      "zipSuccess": "Обработанные PNG экспортированы в ZIP.",
+      "uploadSuccess": "Добавлено изображений: {count, number}.",
+      "processSuccess": "Удаление фона завершено.",
+      "filesTitle": "Загруженные файлы",
+      "previewTitle": "Предпросмотр",
+      "originalLabel": "Оригинал",
+      "resultLabel": "Результат",
+      "originalAlt": "Исходный файл {filename}",
+      "resultAlt": "Результат удаления фона для {filename}",
+      "emptyTitle": "Загрузите изображения для удаления фона",
+      "emptyDescription": "Поддерживаются JPG, JPEG, PNG и WEBP. До 20 файлов, по 15 МБ каждый.",
+      "emptyPreviewTitle": "Выберите файл",
+      "emptyPreviewDescription": "Здесь появятся исходный и обработанный превью.",
+      "resultPendingTitle": "Результат пока недоступен",
+      "resultPendingDescription": "Обработайте изображение, чтобы увидеть прозрачный PNG.",
+      "configErrorTitle": "Сервис удаления фона недоступен",
+      "status": {
+        "ready": "Готово",
+        "processing": "Обработка",
+        "done": "Готово",
+        "error": "Ошибка"
+      },
+      "errors": {
+        "empty": "Выберите хотя бы одно изображение.",
+        "tooMany": "Background Remover поддерживает до 20 изображений за раз.",
+        "tooLarge": "Каждый файл должен быть не больше 15 МБ.",
+        "invalidType": "Поддерживаются только JPG, JPEG, PNG и WEBP.",
+        "processingFailed": "Удаление фона не удалось.",
+        "unexpectedResult": "Сервис не вернул пригодный PNG-результат.",
+        "zipFailed": "Не удалось экспортировать ZIP с обработанными файлами."
+      }
+    }
   }
 }
