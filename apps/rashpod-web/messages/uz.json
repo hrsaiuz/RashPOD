@@ -67,6 +67,22 @@
     "mission": "Биз миссиямиз",
     "values": "Биз қадриятларимиз"
   },
+  "storyPage": {
+    "eyebrow": "Дизайн ҳикояси",
+    "byDesigner": "Муаллиф: {designer}",
+    "fallbackNotice": "Асосий тилдаги матн кўрсатилмоқда",
+    "audioTitle": "Ҳикояни тингланг",
+    "audioUnavailable": "Бу тил учун аудио ҳали мавжуд эмас.",
+    "audioUnsupported": "Браузерингиз аудиони қўллаб-қувватламайди.",
+    "qrTitle": "Ҳикоя QR коди",
+    "qrAlt": "{title} учун QR код",
+    "coverMissing": "Муқова расми тез орада қўшилади.",
+    "videoTitle": "Ҳикоя видеоси",
+    "videoUnsupported": "Браузерингиз видеони қўллаб-қувватламайди.",
+    "listingsEyebrow": "Шу дизайн асосида",
+    "listingsTitle": "Боғланган листинглар",
+    "listingsEmpty": "Бу дизайн билан боғланган нашр қилинган листинглар ҳали йўқ."
+  },
   "toolbox": {
     "eyebrow": "Designer tools",
     "title": "Designer Toolbox",

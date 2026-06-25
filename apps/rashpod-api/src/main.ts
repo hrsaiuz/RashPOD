@@ -2,7 +2,7 @@ import { ValidationPipe } from "@nestjs/common";
 import { NestFactory } from "@nestjs/core";
 import { json, raw } from "express";
 import { AppModule } from "./app.module";
-import { DESIGN_ORIGINAL_MAX_BYTES } from "./modules/files/asset-upload-policy";
+import { DIRECT_UPLOAD_MAX_BYTES } from "./modules/files/asset-upload-policy";
 import { assertEnvironment } from "./common/config/platform-config.service";
 import { SafeExceptionFilter } from "./common/observability/safe-exception.filter";
 import { requestContextMiddleware } from "./common/observability/request-context.middleware";
@@ -15,7 +15,7 @@ async function bootstrap() {
   app.use(requestContextMiddleware);
   app.use(securityHeadersMiddleware);
   app.use(createRateLimitMiddleware());
-  app.use("/files/local-upload", raw({ type: "*/*", limit: DESIGN_ORIGINAL_MAX_BYTES + 1024 * 1024 }));
+  app.use("/files/local-upload", raw({ type: "*/*", limit: DIRECT_UPLOAD_MAX_BYTES + 1024 * 1024 }));
   app.use(json({ limit: "2mb" }));
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true, forbidNonWhitelisted: true }));
   app.useGlobalFilters(new SafeExceptionFilter());

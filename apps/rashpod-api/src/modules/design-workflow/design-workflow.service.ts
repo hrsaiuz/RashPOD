@@ -101,6 +101,7 @@ export class DesignWorkflowService {
           moderationAudits: { orderBy: { createdAt: "desc" }, take: 10 },
           productSelections: { include: { mockupAssets: true, localBaseProduct: true, printfulProductTemplate: true, placementPreset: true } },
           listings: { include: { marketplacePublications: true } },
+          story: true,
         },
       }),
       this.prisma.aiJob.findMany({

@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
+import Link from "next/link";
 import { useParams } from "next/navigation";
 import { Button, Card, EmptyState, ErrorState, FormField, Input, Skeleton, StatusBadge } from "@rashpod/ui";
 import { Gift, Store, UserRound } from "lucide-react";
@@ -128,7 +129,7 @@ export default function AdminDesignerDetailPage() {
             </Card>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-              <Card><h2 className="text-lg font-semibold text-brand-ink mb-4">Recent designs</h2><div className="space-y-2">{designer.designAssets.map((design) => <div key={design.id} className="flex items-center justify-between gap-3 text-sm"><span className="text-brand-ink truncate">{design.title}</span><StatusBadge status={design.status} /></div>)}</div></Card>
+              <Card><h2 className="text-lg font-semibold text-brand-ink mb-4">Recent designs</h2><div className="space-y-2">{designer.designAssets.map((design) => <div key={design.id} className="flex items-center justify-between gap-3 text-sm"><div className="min-w-0"><p className="truncate text-brand-ink">{design.title}</p><Link href={`/dashboard/moderator/designs/${design.id}`} className="text-xs font-semibold text-brand-blue">Open story review</Link></div><StatusBadge status={design.status} /></div>)}</div></Card>
               <Card><h2 className="text-lg font-semibold text-brand-ink mb-4">Recent bonuses</h2>{designer.bonuses.length === 0 ? <p className="text-sm text-brand-muted">No bonuses yet.</p> : <div className="space-y-2">{designer.bonuses.map((bonus) => <div key={bonus.id} className="flex items-center justify-between gap-3 text-sm"><span className="text-brand-ink truncate">{bonus.reason}</span><span className="font-semibold text-brand-ink">{Number(bonus.amountUzs).toLocaleString()} UZS</span></div>)}</div>}</Card>
             </div>
           </>

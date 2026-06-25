@@ -3,6 +3,8 @@ import { CurrentUser, RequestUser } from "../../common/auth/current-user.decorat
 import { JwtAuthGuard } from "../../common/auth/jwt-auth.guard";
 import { PermissionGuard } from "../../common/auth/permission.guard";
 import { RequirePermission } from "../../common/auth/permission.decorator";
+import { DesignStoriesService } from "../design-stories/design-stories.service";
+import { AttachDesignStoryMediaDto, UpsertDesignStoryDraftDto } from "../design-stories/dto/design-story.dto";
 import { SupportRequestDto, UpdateCustomerProfileDto, UpdateDesignerProfileDto } from "./dto/self-service.dto";
 import { AddWishlistItemDto, CreateCustomerAddressDto, UpdateCustomerAddressDto } from "./dto/customer-address.dto";
 import { SelfServiceService } from "./self-service.service";
@@ -10,7 +12,10 @@ import { SelfServiceService } from "./self-service.service";
 @Controller()
 @UseGuards(JwtAuthGuard, PermissionGuard)
 export class SelfServiceController {
-  constructor(private readonly selfService: SelfServiceService) {}
+  constructor(
+    private readonly selfService: SelfServiceService,
+    private readonly designStories: DesignStoriesService,
+  ) {}
 
   @Get("customer/dashboard")
   @RequirePermission("customer:dashboard-read")
@@ -130,6 +135,36 @@ export class SelfServiceController {
   @RequirePermission("designer:designs-archive-own")
   archiveDesignerDesign(@CurrentUser() user: RequestUser, @Param("id") id: string) {
     return this.selfService.archiveDesignerDesign(user.sub, id);
+  }
+
+  @Get("designer/designs/:id/story")
+  @RequirePermission("designer:designs-read-own")
+  designerDesignStory(@CurrentUser() user: RequestUser, @Param("id") id: string) {
+    return this.designStories.getDesignerStory(user.sub, id);
+  }
+
+  @Post("designer/designs/:id/story")
+  @RequirePermission("designer:designs-read-own")
+  upsertDesignerDesignStory(@CurrentUser() user: RequestUser, @Param("id") id: string, @Body() dto: UpsertDesignStoryDraftDto) {
+    return this.designStories.upsertDraft(user.sub, id, dto);
+  }
+
+  @Post("designer/designs/:id/story/media")
+  @RequirePermission("designer:designs-read-own")
+  attachDesignerDesignStoryMedia(@CurrentUser() user: RequestUser, @Param("id") id: string, @Body() dto: AttachDesignStoryMediaDto) {
+    return this.designStories.attachMedia(user.sub, id, dto);
+  }
+
+  @Post("designer/designs/:id/story/request-publish")
+  @RequirePermission("designer:designs-read-own")
+  requestDesignerDesignStoryPublish(@CurrentUser() user: RequestUser, @Param("id") id: string) {
+    return this.designStories.requestPublish(user.sub, id);
+  }
+
+  @Post("designer/designs/:id/story/regenerate-qr")
+  @RequirePermission("designer:designs-read-own")
+  regenerateDesignerDesignStoryQr(@CurrentUser() user: RequestUser, @Param("id") id: string) {
+    return this.designStories.regenerateQr(user.sub, id);
   }
 
   @Get("designer/listings")

@@ -57,6 +57,10 @@ export class StorageService {
     return `${dashboardUrl.replace(/\/$/, "")}/api/upload/${fileId}`;
   }
 
+  private localPublicUrl(objectKey: string) {
+    return `https://storage.local/public/${encodeURIComponent(objectKey)}`;
+  }
+
   getPublicBucketName() {
     return this.publicBucketName;
   }
@@ -91,12 +95,12 @@ export class StorageService {
     if (!input.fileId) {
       throw new ServiceUnavailableException("Local upload requires a file id");
     }
-    return {
-      method: "PUT" as const,
-      uploadUrl: this.localUploadUrl(input.fileId),
-      headers: { "Content-Type": input.mimeType },
-      publicUrl: `https://storage.local/public/${encodeURIComponent(input.objectKey)}`,
-    };
+      return {
+        method: "PUT" as const,
+        uploadUrl: this.localUploadUrl(input.fileId),
+        headers: { "Content-Type": input.mimeType },
+        publicUrl: this.localPublicUrl(input.objectKey),
+      };
   }
 
   async deletePublicObject(objectKey: string) {
@@ -237,6 +241,29 @@ export class StorageService {
       return url;
     }
     return `https://storage.local/public-read/${encodeURIComponent(input.objectKey)}?exp=${input.expiresSeconds}`;
+  }
+
+  async writePublicObject(input: { objectKey: string; buffer: Buffer; mimeType: string }) {
+    const storage = this.getStorage();
+    if (!storage) {
+      const stored = await this.writeLocalObject(input);
+      return {
+        bucket: this.publicBucketName,
+        sizeBytes: stored.sizeBytes,
+        storageProvider: "LOCAL_DEV" as const,
+        publicUrl: this.localPublicUrl(input.objectKey),
+      };
+    }
+    await storage.bucket(this.publicBucketName).file(input.objectKey).save(input.buffer, {
+      contentType: input.mimeType,
+      resumable: input.buffer.byteLength > 5_000_000,
+    });
+    return {
+      bucket: this.publicBucketName,
+      sizeBytes: input.buffer.byteLength,
+      storageProvider: "GCS" as const,
+      publicUrl: this.buildPublicUrl(input.objectKey),
+    };
   }
 
   async writePrivateObject(input: { objectKey: string; buffer: Buffer; mimeType: string }) {

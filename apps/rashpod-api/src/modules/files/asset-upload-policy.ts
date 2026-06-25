@@ -15,9 +15,12 @@ export type AssetUploadPolicy = {
 
 const IMAGE_MIME_TYPES = ["image/png", "image/jpeg", "image/webp", "image/svg+xml"] as const;
 const RASTER_IMAGE_MIME_TYPES = ["image/png", "image/jpeg", "image/webp"] as const;
+const AUDIO_MIME_TYPES = ["audio/mpeg", "audio/mp3", "audio/wav", "audio/x-wav", "audio/webm", "audio/mp4", "audio/aac", "audio/ogg"] as const;
+const VIDEO_MIME_TYPES = ["video/mp4", "video/webm", "video/quicktime", "video/x-m4v", "video/ogg"] as const;
 
 /** Max size for designer original uploads (50 MiB). */
 export const DESIGN_ORIGINAL_MAX_BYTES = 50 * 1024 * 1024;
+export const DIRECT_UPLOAD_MAX_BYTES = 300 * 1024 * 1024;
 
 export const ASSET_UPLOAD_POLICIES: Record<AssetPurpose, AssetUploadPolicy> = {
   DESIGN_ORIGINAL: {
@@ -140,6 +143,38 @@ export const ASSET_UPLOAD_POLICIES: Record<AssetPurpose, AssetUploadPolicy> = {
     bucketKind: "private",
     pathSegment: "print-area-previews",
   },
+  STORY_COVER_IMAGE: {
+    purpose: AssetPurpose.STORY_COVER_IMAGE,
+    maxSizeBytes: 25_000_000,
+    allowedMimeTypes: RASTER_IMAGE_MIME_TYPES,
+    accessPolicy: AssetAccessPolicy.PUBLIC_READ,
+    bucketKind: "public",
+    pathSegment: "story-cover-images",
+  },
+  STORY_AUDIO: {
+    purpose: AssetPurpose.STORY_AUDIO,
+    maxSizeBytes: 60_000_000,
+    allowedMimeTypes: AUDIO_MIME_TYPES,
+    accessPolicy: AssetAccessPolicy.PUBLIC_READ,
+    bucketKind: "public",
+    pathSegment: "story-audio",
+  },
+  STORY_VIDEO: {
+    purpose: AssetPurpose.STORY_VIDEO,
+    maxSizeBytes: DIRECT_UPLOAD_MAX_BYTES,
+    allowedMimeTypes: VIDEO_MIME_TYPES,
+    accessPolicy: AssetAccessPolicy.PUBLIC_READ,
+    bucketKind: "public",
+    pathSegment: "story-video",
+  },
+  STORY_QR: {
+    purpose: AssetPurpose.STORY_QR,
+    maxSizeBytes: 5_000_000,
+    allowedMimeTypes: ["image/png"],
+    accessPolicy: AssetAccessPolicy.PUBLIC_READ,
+    bucketKind: "public",
+    pathSegment: "story-qr",
+  },
 };
 
 export function resolveAssetUploadPolicy(purpose: AssetPurpose) {
@@ -187,6 +222,16 @@ export function extensionForAsset(filename: string, mimeType: string) {
   if (mimeType === "image/svg+xml") return "svg";
   if (mimeType === "image/tiff") return "tiff";
   if (mimeType === "application/pdf") return "pdf";
+  if (mimeType === "audio/mpeg" || mimeType === "audio/mp3") return "mp3";
+  if (mimeType === "audio/wav" || mimeType === "audio/x-wav") return "wav";
+  if (mimeType === "audio/webm") return "webm";
+  if (mimeType === "audio/mp4" || mimeType === "audio/aac") return "m4a";
+  if (mimeType === "audio/ogg") return "ogg";
+  if (mimeType === "video/mp4") return "mp4";
+  if (mimeType === "video/webm") return "webm";
+  if (mimeType === "video/quicktime") return "mov";
+  if (mimeType === "video/x-m4v") return "m4v";
+  if (mimeType === "video/ogg") return "ogv";
   return "bin";
 }
 
@@ -233,6 +278,14 @@ export function buildAssetObjectKey(input: {
       return `${prefix}templates/${input.baseProductId ?? "base"}/${input.mockupTemplateId ?? "template"}/${input.assetId}.${ext}`;
     case AssetPurpose.PRINT_AREA_PREVIEW:
       return `${prefix}print-area-previews/${input.printAreaId ?? "print-area"}/${input.assetId}.${ext}`;
+    case AssetPurpose.STORY_COVER_IMAGE:
+      return `${prefix}stories/${input.designId ?? "unassigned"}/cover/${input.assetId}.${ext}`;
+    case AssetPurpose.STORY_AUDIO:
+      return `${prefix}stories/${input.designId ?? "unassigned"}/audio/${input.assetId}.${ext}`;
+    case AssetPurpose.STORY_VIDEO:
+      return `${prefix}stories/${input.designId ?? "unassigned"}/video/${input.assetId}.${ext}`;
+    case AssetPurpose.STORY_QR:
+      return `${prefix}stories/${input.designId ?? "unassigned"}/qr/${input.assetId}.${ext}`;
     default:
       return `${prefix}${policy.pathSegment}/${input.assetId}.${ext}`;
   }

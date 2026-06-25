@@ -67,6 +67,22 @@
     "mission": "Our Mission",
     "values": "Our Values"
   },
+  "storyPage": {
+    "eyebrow": "Design story",
+    "byDesigner": "By {designer}",
+    "fallbackNotice": "Showing source-language content",
+    "audioTitle": "Listen to the story",
+    "audioUnavailable": "Audio is not available in this language yet.",
+    "audioUnsupported": "Your browser does not support audio playback.",
+    "qrTitle": "Story QR",
+    "qrAlt": "QR code for {title}",
+    "coverMissing": "Cover image coming soon.",
+    "videoTitle": "Story video",
+    "videoUnsupported": "Your browser does not support video playback.",
+    "listingsEyebrow": "From this design",
+    "listingsTitle": "Shop the related listings",
+    "listingsEmpty": "No published listings are connected to this design yet."
+  },
   "toolbox": {
     "eyebrow": "Designer tools",
     "title": "Designer Toolbox",

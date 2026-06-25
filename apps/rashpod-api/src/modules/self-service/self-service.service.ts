@@ -275,7 +275,7 @@ export class SelfServiceService {
   async designerDesigns(designerId: string, status?: string) {
     const designs = await this.prisma.designAsset.findMany({
       where: { designerId, ...(status ? { status: status as DesignStatus } : {}) },
-      include: { versions: { orderBy: { createdAt: "desc" }, take: 1 }, listings: { select: { id: true, title: true, status: true, slug: true } } },
+      include: { versions: { orderBy: { createdAt: "desc" }, take: 1 }, listings: { select: { id: true, title: true, status: true, slug: true } }, story: true },
       orderBy: { updatedAt: "desc" },
     });
     return designs.map((design) => this.toDesignerDesignSummary(design));
@@ -291,6 +291,7 @@ export class SelfServiceService {
         commercialRights: true,
         productSelections: { include: { mockupAssets: true, localBaseProduct: true, printfulProductTemplate: true, placementPreset: true } },
         listings: { include: { orderItems: { select: { quantity: true, totalPrice: true } } } },
+        story: true,
       },
     });
     if (!design) throw new NotFoundException("Design not found");
@@ -541,6 +542,19 @@ export class SelfServiceService {
       nextAction: this.designNextAction(design),
       latestVersion: design.versions?.[0] ? { id: design.versions[0].id, createdAt: design.versions[0].createdAt, widthPx: design.versions[0].widthPx, heightPx: design.versions[0].heightPx, dpi: design.versions[0].dpi } : null,
       listings: (design.listings ?? []).map((listing: any) => ({ id: listing.id, title: listing.title, status: listing.status, slug: listing.slug, publicUrl: `/product/${listing.slug}` })),
+      story: design.story
+        ? {
+            id: design.story.id,
+            title: design.story.title,
+            slug: design.story.slug,
+            status: design.story.status,
+            publicUrl: design.story.publicUrl,
+            qrCodeImageUrl: design.story.qrCodeImageUrl,
+            requestedPublishAt: design.story.requestedPublishAt,
+            publishedAt: design.story.publishedAt,
+            reviewNotes: design.story.reviewNotes,
+          }
+        : null,
       updatedAt: design.updatedAt,
       createdAt: design.createdAt,
     };

@@ -67,6 +67,22 @@
     "mission": "Наша миссия",
     "values": "Наши ценности"
   },
+  "storyPage": {
+    "eyebrow": "История дизайна",
+    "byDesigner": "Автор: {designer}",
+    "fallbackNotice": "Показан текст на исходном языке",
+    "audioTitle": "Послушать историю",
+    "audioUnavailable": "Аудио для этого языка пока недоступно.",
+    "audioUnsupported": "Ваш браузер не поддерживает аудио.",
+    "qrTitle": "QR истории",
+    "qrAlt": "QR-код для {title}",
+    "coverMissing": "Обложка скоро появится.",
+    "videoTitle": "Видео истории",
+    "videoUnsupported": "Ваш браузер не поддерживает видео.",
+    "listingsEyebrow": "Из этого дизайна",
+    "listingsTitle": "Связанные товары",
+    "listingsEmpty": "С этим дизайном пока не связано опубликованных товаров."
+  },
   "toolbox": {
     "eyebrow": "Инструменты дизайнера",
     "title": "Designer Toolbox",

@@ -100,6 +100,14 @@ enum DesignStatus {
   PUBLISHED
 }
 
+enum DesignStoryStatus {
+  DRAFT
+  PENDING_REVIEW
+  NEEDS_CHANGES
+  PUBLISHED
+  UNPUBLISHED
+}
+
 enum ModerationDecision {
   APPROVE
   REJECT
@@ -135,6 +143,10 @@ enum AssetPurpose {
   TEMPLATE_IMAGE
   PRINT_AREA_PREVIEW
   EXTERNAL_ORDER_IMPORT
+  STORY_COVER_IMAGE
+  STORY_AUDIO
+  STORY_VIDEO
+  STORY_QR
 }
 
 enum AssetStorageProvider {
@@ -1111,6 +1123,7 @@ model DesignAsset {
   mockupAssets     MockupAsset[]
   printfulFileMappings PrintfulFileMapping[]
   listings         CommerceListing[]
+  story            DesignStory?
   supportRequests  SupportRequest[]
   filmConsentEvents FilmConsentEvent[]
   externalOrderIntakeItems ExternalOrderIntakeItem[]
@@ -1118,6 +1131,36 @@ model DesignAsset {
 
   @@index([tenantId, status, createdAt])
   @@index([tenantId, designerId])
+}
+
+model DesignStory {
+  id                    String            @id @default(uuid())
+  designAssetId         String            @unique
+  title                 String
+  slug                  String            @unique
+  status                DesignStoryStatus @default(DRAFT)
+  sourceLocale          String            @default("uz")
+  publicUrl             String?
+  qrCodeFileId          String?
+  qrCodeImageUrl        String?
+  coverImageFileId      String?
+  titleTranslationsJson Json?
+  bodyTranslationsJson  Json?
+  audioFileIdsJson      Json?
+  videoFileIdsJson      Json?
+  translationMetaJson   Json?
+  reviewNotes           String?
+  requestedPublishAt    DateTime?
+  publishedAt           DateTime?
+  unpublishedAt         DateTime?
+  reviewedAt            DateTime?
+  reviewedById          String?
+  createdAt             DateTime          @default(now())
+  updatedAt             DateTime          @updatedAt
+
+  designAsset DesignAsset @relation(fields: [designAssetId], references: [id], onDelete: Cascade)
+
+  @@index([status, updatedAt])
 }
 
 model DesignVersion {

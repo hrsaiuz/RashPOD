@@ -39,6 +39,35 @@ export interface FilmListing {
   designer: { displayName: string; handle: string };
 }
 
+export interface StoryListingSummary {
+  id: string;
+  slug: string;
+  title: string;
+  price: number;
+  currency: string;
+  imageUrl?: string | null;
+  designer?: { displayName?: string | null; handle?: string | null };
+}
+
+export interface PublicDesignStory {
+  id: string;
+  slug: string;
+  title: string;
+  body: string;
+  locale: string;
+  sourceLocale: string;
+  fallbackUsed: boolean;
+  publicUrl: string;
+  qrCodeImageUrl?: string | null;
+  coverImageUrl?: string | null;
+  audioUrl?: string | null;
+  videoUrl?: string | null;
+  publishedAt?: string | null;
+  designer?: { id?: string; displayName?: string | null; handle?: string | null } | null;
+  design?: { id?: string; title?: string | null } | null;
+  listings: StoryListingSummary[];
+}
+
 function getApiUrl() {
   return process.env.NEXT_PUBLIC_API_URL || process.env.API_URL || "";
 }
@@ -233,4 +262,18 @@ export async function fetchShopListings(params: Record<string, string> = {}) {
   const items = normalizeProducts(data);
   const meta = data.meta ?? null;
   return { items, meta };
+}
+
+export async function fetchStoryBySlug(slug: string, locale?: string) {
+  const apiUrl = getApiUrl();
+  if (!apiUrl) return null;
+
+  const search = new URLSearchParams();
+  if (locale) search.set("locale", locale);
+  const suffix = search.toString() ? `?${search.toString()}` : "";
+  const res = await fetch(`${apiUrl}/shop/stories/${encodeURIComponent(slug)}${suffix}`, {
+    next: { revalidate: CATALOG_REVALIDATE_SECONDS },
+  });
+  if (!res.ok) return null;
+  return (await res.json()) as PublicDesignStory;
 }

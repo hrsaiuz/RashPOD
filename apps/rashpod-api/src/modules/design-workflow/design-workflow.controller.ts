@@ -3,6 +3,8 @@ import { CurrentUser, RequestUser } from "../../common/auth/current-user.decorat
 import { JwtAuthGuard } from "../../common/auth/jwt-auth.guard";
 import { PermissionGuard } from "../../common/auth/permission.guard";
 import { RequirePermission } from "../../common/auth/permission.decorator";
+import { DesignStoriesService } from "../design-stories/design-stories.service";
+import { RejectDesignStoryDto } from "../design-stories/dto/design-story.dto";
 import { DesignWorkflowService } from "./design-workflow.service";
 import { MockupEditorContextQueryDto } from "./dto/mockup-editor-context-query.dto";
 import { PrintfulMockupEditorContextQueryDto } from "./dto/printful-mockup-editor-context-query.dto";
@@ -13,7 +15,10 @@ import { SuggestPrintfulPlacementDto } from "./dto/suggest-printful-placement.dt
 @Controller("admin/designs")
 @UseGuards(JwtAuthGuard, PermissionGuard)
 export class DesignWorkflowController {
-  constructor(private readonly workflow: DesignWorkflowService) {}
+  constructor(
+    private readonly workflow: DesignWorkflowService,
+    private readonly designStories: DesignStoriesService,
+  ) {}
 
   @Get("moderation-queue")
   @RequirePermission("design:moderate")
@@ -67,5 +72,29 @@ export class DesignWorkflowController {
   @RequirePermission("design:moderate")
   workflowStatus(@Param("id") id: string) {
     return this.workflow.workflow(id);
+  }
+
+  @Get(":id/story-review")
+  @RequirePermission("design:moderate")
+  storyReview(@Param("id") id: string) {
+    return this.designStories.getReviewStory(id);
+  }
+
+  @Post(":id/story-approve")
+  @RequirePermission("design:moderate")
+  approveStory(@CurrentUser() user: RequestUser, @Param("id") id: string) {
+    return this.designStories.approvePublish(user.sub, id);
+  }
+
+  @Post(":id/story-reject")
+  @RequirePermission("design:moderate")
+  rejectStory(@CurrentUser() user: RequestUser, @Param("id") id: string, @Body() dto: RejectDesignStoryDto) {
+    return this.designStories.rejectPublish(user.sub, id, dto.notes);
+  }
+
+  @Post(":id/story-unpublish")
+  @RequirePermission("design:moderate")
+  unpublishStory(@CurrentUser() user: RequestUser, @Param("id") id: string) {
+    return this.designStories.unpublish(user.sub, id);
   }
 }

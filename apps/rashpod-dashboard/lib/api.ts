@@ -230,6 +230,58 @@ export interface DesignWorkflowDetail extends Design {
   moderationAudits?: ModerationAudit[];
   productSelections?: DesignProductSelection[];
   listings?: Listing[];
+  story?: DesignStorySummary | null;
+}
+
+export type StoryLocale = "uz" | "ru" | "en";
+export type DesignStoryStatus = "DRAFT" | "PENDING_REVIEW" | "NEEDS_CHANGES" | "PUBLISHED" | "UNPUBLISHED";
+
+export interface DesignStorySummary {
+  id: string;
+  title: string;
+  slug: string;
+  status: DesignStoryStatus;
+  publicUrl?: string | null;
+  qrCodeImageUrl?: string | null;
+  requestedPublishAt?: string | null;
+  publishedAt?: string | null;
+  reviewNotes?: string | null;
+}
+
+export interface DesignStoryDetail extends DesignStorySummary {
+  designAssetId: string;
+  sourceLocale: StoryLocale;
+  qrCodeFileId?: string | null;
+  coverImageFileId?: string | null;
+  coverImageUrl?: string | null;
+  titleTranslations: Partial<Record<StoryLocale, string>>;
+  bodyTranslations: Partial<Record<StoryLocale, string>>;
+  audioFileIds: Partial<Record<StoryLocale, string>>;
+  audioUrls?: Partial<Record<StoryLocale, string | null>>;
+  videoFileIds: Partial<Record<StoryLocale, string>>;
+  videoUrls?: Partial<Record<StoryLocale, string | null>>;
+  translationMeta?: Record<string, unknown>;
+  unpublishedAt?: string | null;
+  reviewedAt?: string | null;
+  reviewedById?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface DesignerStoryResponse {
+  designId: string;
+  designTitle: string;
+  designStatus: DesignStatus;
+  story: DesignStoryDetail | null;
+  listings: Array<{ id: string; title: string; slug: string; status: ListingStatus; publicUrl?: string | null }>;
+}
+
+export interface StoryReviewResponse {
+  designId: string;
+  designTitle: string;
+  designer?: { id: string; displayName?: string | null; email?: string | null } | null;
+  story: DesignStoryDetail | null;
+  listings: Array<{ id: string; title: string; slug: string; status: ListingStatus }>;
 }
 
 export interface MarketplacePublicationSummary {

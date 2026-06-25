@@ -10,5 +10,6 @@ import { AiService } from "./ai.service";
   imports: [AdminOpsModule, AuditModule],
   controllers: [AiController, AiAdminController, AiModerationController],
   providers: [AiService],
+  exports: [AiService],
 })
 export class AiModule {}

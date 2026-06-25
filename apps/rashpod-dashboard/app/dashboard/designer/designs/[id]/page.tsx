@@ -15,6 +15,7 @@ import { ArrowLeft, Boxes, Globe2, Image as ImageIcon, Send, ShieldCheck, Shoppi
 import { useAuth } from "../../../../auth/auth-provider";
 import DashboardLayout from "../../../dashboard-layout";
 import { DesignPreviewCard } from "../../../../../components/design/DesignPreviewCard";
+import { DesignerDesignStoryPanel } from "../../../../../components/design-story/DesignerDesignStoryPanel";
 import {
   api,
   resolveUploadMimeType,
@@ -225,6 +226,8 @@ export default function DesignDetailPage() {
             </Card>
 
             <PipelineOverview design={design} />
+
+            <DesignerDesignStoryPanel designId={id} designTitle={design.title} storySummary={design.story} />
 
             <Card>
               <h2 className="text-lg font-semibold text-brand-ink mb-4">Commercial rights</h2>

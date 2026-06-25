@@ -11,6 +11,7 @@ import { useAuth } from "../../../../auth/auth-provider";
 import { ModeratorListingWizard } from "../../moderator-listing-wizard";
 import { GlobalSelectionMockupEditor, LocalSelectionMockupEditor } from "../../../../../components/mockup";
 import { DesignPreviewCard } from "../../../../../components/design/DesignPreviewCard";
+import { ModeratorDesignStoryReview } from "../../../../../components/design-story/ModeratorDesignStoryReview";
 import { MockupErrorHint, PlacementChips, ReadinessChecklist } from "../../moderator-pipeline-helpers";
 
 const REJECTION_REASONS = [
@@ -602,6 +603,8 @@ export default function Page() {
                   <Info label="Transparency" value={latest?.hasTransparency ? "Detected" : "Unknown"} />
                 </div>
               </Card>
+
+              <ModeratorDesignStoryReview designId={String(params.id)} />
 
               {canModerate ? (
               <Card>

@@ -43,6 +43,7 @@ import { TenantsModule } from "./modules/tenants/tenants.module";
 import { SuperAdminPlatformModule } from "./modules/super-admin-platform/super-admin-platform.module";
 import { HealthController } from "./health.controller";
 import { StorefrontToolboxModule } from "./modules/storefront-toolbox/storefront-toolbox.module";
+import { DesignStoriesModule } from "./modules/design-stories/design-stories.module";
 
 @Module({
   imports: [
@@ -86,6 +87,7 @@ import { StorefrontToolboxModule } from "./modules/storefront-toolbox/storefront
     TenantsModule,
     SuperAdminPlatformModule,
     StorefrontToolboxModule,
+    DesignStoriesModule,
     IntakeModule,
     DesignWorkflowModule,
     PrintfulModule,
