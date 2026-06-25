@@ -43,6 +43,8 @@ export function DesignerDesignStoryPanel({ designId, designTitle }: Props) {
   const story = payload?.story ?? null;
   const canEditBody = title.trim().length > 0 && slug.trim().length > 0;
   const publishDisabled = !story || !body.trim() || saving || requesting;
+  const selectedPublicUrl = buildStoryUrl(slug, sourceLocale);
+  const qrPreviewUrl = canEditBody ? buildQrPreviewUrl(selectedPublicUrl) : null;
 
   useEffect(() => {
     void load();
@@ -56,6 +58,11 @@ export function DesignerDesignStoryPanel({ designId, designTitle }: Props) {
     setSourceLocale(story.sourceLocale);
     setBody(story.bodyTranslations?.[story.sourceLocale] ?? "");
   }, [story]);
+
+  useEffect(() => {
+    if (!story) return;
+    setBody(story.bodyTranslations?.[sourceLocale] ?? (sourceLocale === story.sourceLocale ? story.bodyTranslations?.[story.sourceLocale] ?? "" : ""));
+  }, [sourceLocale, story]);
 
   async function load() {
     setLoading(true);
@@ -116,6 +123,9 @@ export function DesignerDesignStoryPanel({ designId, designTitle }: Props) {
     setRegeneratingQr(true);
     setError("");
     try {
+      if (!story && canEditBody) {
+        await saveDraft();
+      }
       const next = await api.post<DesignStoryDetail>(`/designer/designs/${designId}/story/regenerate-qr`);
       setPayload((current) => current ? { ...current, story: next } : null);
       setMessage("QR code regenerated.");
@@ -211,10 +221,10 @@ export function DesignerDesignStoryPanel({ designId, designTitle }: Props) {
             <div className="space-y-3">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.18em] text-brand-muted">Public URL</p>
-                <p className="mt-2 break-all text-sm text-brand-ink">{story?.publicUrl ?? previewUrl(slug)}</p>
+                <p className="mt-2 break-all text-sm text-brand-ink">{selectedPublicUrl}</p>
               </div>
               <div className="flex flex-wrap gap-2">
-                <Button variant="secondary" onClick={() => void navigator.clipboard.writeText(story?.publicUrl ?? previewUrl(slug))} disabled={!canEditBody}>
+                <Button variant="secondary" onClick={() => void navigator.clipboard.writeText(selectedPublicUrl)} disabled={!canEditBody}>
                   <Copy size={16} />
                   Copy URL
                 </Button>
@@ -227,13 +237,15 @@ export function DesignerDesignStoryPanel({ designId, designTitle }: Props) {
             <div className="rounded-2xl border border-dashed border-brand-line bg-white p-4">
               <div className="mb-3 flex items-center justify-between">
                 <p className="text-sm font-semibold text-brand-ink">QR code</p>
-                <Button variant="ghost" size="sm" onClick={regenerateQr} loading={regeneratingQr} disabled={!story}>
+                <Button variant="ghost" size="sm" onClick={regenerateQr} loading={regeneratingQr} disabled={!canEditBody}>
                   <RefreshCw size={14} />
                   Refresh
                 </Button>
               </div>
-              {story?.qrCodeImageUrl ? (
+              {story?.qrCodeImageUrl && sourceLocale === story.sourceLocale ? (
                 <img src={story.qrCodeImageUrl} alt={`QR code for ${story.title}`} className="mx-auto h-40 w-40 rounded-2xl border border-brand-line bg-white object-contain p-2" />
+              ) : qrPreviewUrl ? (
+                <img src={qrPreviewUrl} alt={`QR preview for ${selectedPublicUrl}`} className="mx-auto h-40 w-40 rounded-2xl border border-brand-line bg-white object-contain p-2" />
               ) : (
                 <div className="flex h-40 items-center justify-center rounded-2xl border border-brand-line bg-surface-card text-brand-muted">
                   <QrCode size={28} />
@@ -380,9 +392,14 @@ function LocalizedUploadCard(props: {
   );
 }
 
-function previewUrl(slug: string) {
+function buildStoryUrl(slug: string, locale: StoryLocale) {
   const clean = slug.trim().replace(/^\//, "");
-  return clean ? `https://rashpod.uz/story/${clean}` : "https://rashpod.uz/story/your-slug";
+  if (!clean) return locale === "uz" ? "https://rashpod.uz/story/your-slug" : `https://rashpod.uz/${locale}/story/your-slug`;
+  return locale === "uz" ? `https://rashpod.uz/story/${clean}` : `https://rashpod.uz/${locale}/story/${clean}`;
+}
+
+function buildQrPreviewUrl(url: string) {
+  return `https://api.qrserver.com/v1/create-qr-code/?size=320x320&data=${encodeURIComponent(url)}`;
 }
 
 function localeLabel(locale: StoryLocale) {

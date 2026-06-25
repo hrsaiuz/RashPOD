@@ -29,7 +29,6 @@ export function StorefrontHeader({
       shopUrl="/shop"
       designersUrl="/designers"
       filmsUrl="/film"
-      aboutUrl="/about"
       logoUrl={logoUrl}
       brandName={brandName}
       cartItemCount={itemCount}
@@ -41,7 +40,6 @@ export function StorefrontHeader({
         films: t("films"),
         sellOnRashpod: t("sellOnRashpod"),
         customOrder: t("customOrder"),
-        about: t("about"),
         signIn: t("signIn"),
         startSelling: t("startSelling"),
       }}

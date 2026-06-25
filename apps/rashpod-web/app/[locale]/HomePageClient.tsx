@@ -23,10 +23,11 @@ export interface HomeBrandingMedia {
 }
 
 const MARKETPLACES = [
-  { src: "/marketplaces/amazon.svg", name: "Amazon", width: 150, height: 49 },
-  { src: "/marketplaces/etsy.svg", name: "Etsy", width: 126, height: 50 },
-  { src: "/marketplaces/uzum.svg", name: "Uzum", width: 136, height: 52 },
-  { src: "/marketplaces/wildberries.svg", name: "Wildberries", width: 158, height: 52 },
+  { src: "https://storage.googleapis.com/rashpod-assets/media/ui_asset/1782409856866-Slide1.JPG", name: "Amazon", width: 150, height: 49 },
+  { src: "https://storage.googleapis.com/rashpod-assets/media/ui_asset/1782409873743-Slide2.JPG", name: "Etsy", width: 126, height: 50 },
+  { src: "https://storage.googleapis.com/rashpod-assets/media/ui_asset/1782409879648-Slide3.JPG", name: "eBay", width: 126, height: 50 },
+  { src: "https://storage.googleapis.com/rashpod-assets/media/ui_asset/1782409885447-Slide4.JPG", name: "Uzum Market", width: 136, height: 52 },
+  { src: "https://storage.googleapis.com/rashpod-assets/media/ui_asset/1782409891181-Slide5.JPG", name: "Wildberries", width: 158, height: 52 },
 ];
 
 const HOME_MAX = "max-w-storefront";

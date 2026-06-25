@@ -11,7 +11,6 @@ export interface PublicHeaderProps {
   shopUrl?: string;
   designersUrl?: string;
   filmsUrl?: string;
-  aboutUrl?: string;
   signInUrl?: string;
   startSellingUrl?: string;
   logoUrl?: string | null;
@@ -27,7 +26,6 @@ export interface PublicHeaderProps {
     films?: string;
     sellOnRashpod?: string;
     customOrder?: string;
-    about?: string;
     signIn?: string;
     startSelling?: string;
   };
@@ -38,7 +36,6 @@ export const PublicHeader: React.FC<PublicHeaderProps> = ({
   shopUrl = "/shop",
   designersUrl = "/designers",
   filmsUrl = "/films",
-  aboutUrl = "/about",
   signInUrl,
   startSellingUrl,
   logoUrl,
@@ -60,7 +57,6 @@ export const PublicHeader: React.FC<PublicHeaderProps> = ({
     { href: filmsUrl, label: navLabels?.films ?? "Films" },
     { href: "/sell-on-rashpod", label: navLabels?.sellOnRashpod ?? "Sell on RashPOD" },
     { href: "/custom-order", label: navLabels?.customOrder ?? "Custom order" },
-    { href: aboutUrl, label: navLabels?.about ?? "About Us" },
   ];
 
   return (
