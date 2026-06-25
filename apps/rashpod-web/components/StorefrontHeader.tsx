@@ -41,7 +41,6 @@ export function StorefrontHeader({
         films: t("films"),
         sellOnRashpod: t("sellOnRashpod"),
         customOrder: t("customOrder"),
-        business: t("business"),
         about: t("about"),
         signIn: t("signIn"),
         startSelling: t("startSelling"),

@@ -27,7 +27,6 @@ export interface PublicHeaderProps {
     films?: string;
     sellOnRashpod?: string;
     customOrder?: string;
-    business?: string;
     about?: string;
     signIn?: string;
     startSelling?: string;
@@ -61,7 +60,6 @@ export const PublicHeader: React.FC<PublicHeaderProps> = ({
     { href: filmsUrl, label: navLabels?.films ?? "Films" },
     { href: "/sell-on-rashpod", label: navLabels?.sellOnRashpod ?? "Sell on RashPOD" },
     { href: "/custom-order", label: navLabels?.customOrder ?? "Custom order" },
-    { href: "/business", label: navLabels?.business ?? "Start Your Business", hasChevron: true },
     { href: aboutUrl, label: navLabels?.about ?? "About Us" },
   ];
 
@@ -93,7 +91,6 @@ export const PublicHeader: React.FC<PublicHeaderProps> = ({
                 className="inline-flex items-center gap-2 text-[13px] font-medium text-black transition-colors hover:text-brand-blue"
               >
                 {link.label}
-                {link.hasChevron && <ChevronDown size={14} strokeWidth={2.2} aria-hidden="true" />}
               </Link>
             ))}
           </nav>
@@ -167,7 +164,6 @@ export const PublicHeader: React.FC<PublicHeaderProps> = ({
               onClick={() => setMobileMenuOpen(false)}
             >
               <span>{link.label}</span>
-              {link.hasChevron && <ChevronDown size={16} aria-hidden="true" />}
             </Link>
           ))}
           <div className="border-t border-surface-borderSoft pt-4 mt-4 flex flex-col gap-3">
