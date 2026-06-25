@@ -296,14 +296,28 @@ function HomepageProductCarousel({
 }
 
 function MarketplaceLogoStrip() {
+  const slidingLogos = [...MARKETPLACES, ...MARKETPLACES];
+
   return (
-    <section className="overflow-x-auto bg-white py-7">
-      <div className="mx-auto flex w-max min-w-full max-w-[1063px] items-center justify-between gap-9 px-5">
-        {MARKETPLACES.map((logo) => (
-          <div key={logo.name} className="grid h-[71px] min-w-[110px] place-items-center drop-shadow-[2px_3px_0_rgba(120,138,224,0.22)]">
-            <Image src={logo.src} alt={logo.name} width={logo.width} height={logo.height} className="h-auto max-h-[56px] w-auto object-contain" />
-          </div>
-        ))}
+    <section className="overflow-hidden bg-white py-7 md:py-8">
+      <div className="relative mx-auto max-w-[1440px]">
+        <motion.div
+          className="flex w-max items-center gap-8 px-5 md:gap-10"
+          animate={{ x: ["0%", "-50%"] }}
+          transition={{ duration: 22, ease: "linear", repeat: Infinity }}
+        >
+          {slidingLogos.map((logo, index) => (
+            <div key={`${logo.name}-${index}`} className="grid h-[92px] min-w-[180px] place-items-center md:min-w-[210px]">
+              <Image
+                src={logo.src}
+                alt={logo.name}
+                width={logo.width}
+                height={logo.height}
+                className="h-auto max-h-[72px] w-auto object-contain md:max-h-[82px]"
+              />
+            </div>
+          ))}
+        </motion.div>
       </div>
     </section>
   );
