@@ -3,6 +3,7 @@ FROM node:20-alpine AS deps
 WORKDIR /app
 
 COPY package*.json ./
+COPY packages/config/package*.json ./packages/config/
 COPY packages/ui/package*.json ./packages/ui/
 COPY packages/mockup/package*.json ./packages/mockup/
 COPY apps/rashpod-dashboard/package*.json ./apps/rashpod-dashboard/

@@ -3,6 +3,7 @@ FROM node:20-alpine AS deps
 WORKDIR /app
 
 COPY package*.json tsconfig.base.json ./
+COPY packages/config/package*.json ./packages/config/
 COPY packages/ui/package*.json ./packages/ui/
 COPY packages/mockup/package*.json ./packages/mockup/
 COPY packages/printful/package*.json ./packages/printful/
@@ -32,6 +33,7 @@ WORKDIR /app/apps/rashpod-api
 ENV NODE_ENV=production
 
 COPY --from=builder /app/node_modules /app/node_modules
+COPY --from=builder /app/packages/config /app/packages/config
 COPY --from=builder /app/packages/mockup /app/packages/mockup
 COPY --from=builder /app/packages/printful /app/packages/printful
 COPY --from=deps /app/apps/rashpod-api/node_modules ./node_modules
