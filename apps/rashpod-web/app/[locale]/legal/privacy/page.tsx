@@ -121,7 +121,7 @@ export default function PrivacyPage() {
       <section>
         <h2>11. Contact</h2>
         <p className="mt-4">
-          Privacy questions or data requests can be sent to hello@rashpod.uz, Telegram @rashpod, or +998 50 270 00 00.
+          Privacy questions or data requests can be sent to hello@rashpod.uz, Telegram @therashpod, or +998 50 270 00 00.
         </p>
       </section>
     </LegalPage>

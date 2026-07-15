@@ -8,7 +8,13 @@
     "business": "Biznesingizni boshlang",
     "about": "Biz haqimizda",
     "signIn": "Kirish",
-    "startSelling": "Sotishni boshlash"
+    "startSelling": "Sotishni boshlash",
+    "allProducts": "Барча маҳсулотлар",
+    "newArrivals": "Янгилар",
+    "bestsellers": "Энг кўп сотилганлар",
+    "designerCollections": "Дизайнер тўпламлари",
+    "filmReady": "Плёнка учун",
+    "shopMenu": "Дўкон менюси"
   },
   "home": {
     "hero": {
@@ -41,7 +47,24 @@
     "newest": "Янгилар",
     "popular": "Машҳурлар",
     "priceAsc": "Нарх: паст-юқори",
-    "priceDesc": "Нарх: юқори-паст"
+    "priceDesc": "Нарх: юқори-паст",
+    "reset": "Тозалаш",
+    "apply": "Қўллаш",
+    "search": "Қидириш",
+    "searchPlaceholder": "Маҳсулотларни қидириш",
+    "minimumPrice": "Минимал нарх",
+    "maximumPrice": "Максимал нарх",
+    "min": "Мин",
+    "max": "Макс",
+    "availability": "Мавжудлик",
+    "results": "{total} тадан {shown} таси",
+    "loadErrorTitle": "Маҳсулотларни юклаб бўлмади",
+    "loadErrorDescription": "Уланишни текшириб, қайта урининг.",
+    "retry": "Қайта уриниш",
+    "emptyTitle": "Маҳсулотлар топилмади",
+    "emptyDescription": "Филтрларни ўзгартиринг ёки тозаланг.",
+    "previous": "Олдинги",
+    "next": "Кейинги"
   },
   "product": {
     "addToCart": "Саватга қўшиш",
@@ -56,7 +79,13 @@
     "subtitle": "DTF/UV-DTF принтинг учун дизайнларни лицензиялаш",
     "licenseFilm": "Лицензия олиш",
     "notAvailable": "Ҳозирча мавжуд эмас",
-    "perLicense": "лицензия учун"
+    "perLicense": "лицензия учун",
+    "searchPlaceholder": "Плёнкаларни қидириш",
+    "customFilm": "Ўз плёнкангизни юкланг",
+    "loadErrorTitle": "Плёнкаларни юклаб бўлмади",
+    "loadErrorDescription": "Уланишни текшириб, қайта урининг.",
+    "emptyTitle": "Плёнкалар топилмади",
+    "emptyDescription": "Филтрларни ўзгартиринг ёки тозаланг."
   },
   "designers": {
     "title": "Дизайнерлар",
@@ -66,6 +95,13 @@
     "title": "RashPOD ҳақида",
     "mission": "Биз миссиямиз",
     "values": "Биз қадриятларимиз"
+  },
+  "customOrderCards": {
+    "mug": { "label": "Keramika", "title": "Krujka", "alt": "RashPOD krujkasi" },
+    "postal-card": { "label": "Bosma", "title": "Otkritka", "alt": "RashPOD otkritkasi" },
+    "hat": { "label": "Kiyim", "title": "Kepka", "alt": "RashPOD kepkasi" },
+    "hoodie": { "label": "Kiyim", "title": "Hudi", "alt": "RashPOD hudisi" },
+    "imageUnavailable": "{product} rasmi tez orada qo‘shiladi"
   },
   "storyPage": {
     "eyebrow": "Дизайн ҳикояси",
@@ -82,6 +118,31 @@
     "listingsEyebrow": "Шу дизайн асосида",
     "listingsTitle": "Боғланган листинглар",
     "listingsEmpty": "Бу дизайн билан боғланган нашр қилинган листинглар ҳали йўқ."
+  },
+  "designerInvitation": {
+    "title": "Siz RashPOD dizayneri bo‘lishga taklif qilindingiz",
+    "invitedBy": "{name} sizni RashPOD ijodkorlar hamjamiyatiga taklif qildi.",
+    "expires": "{date} gacha amal qiladi",
+    "whatYouCanDo": "RashPOD dizayneri sifatida",
+    "upload": "Original dizaynlarni yuklash va mahsulot e’lonlarini tayyorlash.",
+    "rights": "Mahsulot, plyonka, marketpleys va korporativ huquqlarni boshqarish.",
+    "royalties": "Savdo, royalti va to‘lovlarni kuzatish.",
+    "displayName": "Ko‘rinadigan ism",
+    "password": "Parol yarating",
+    "agreements": "RashPOD dizayner shartlarini qabul qilaman va yuklaydigan ishlarimga huquqim borligini tasdiqlayman.",
+    "accept": "Taklifni qabul qilish",
+    "signedInConfirm": "{email} hisobida davom eting.",
+    "acceptError": "Taklifni qabul qilib bo‘lmadi.",
+    "invalid": "Taklif havolasi yaroqsiz.",
+    "invalidTitle": "Taklif mavjud emas",
+    "invalidDescription": "Taklif havolasi yaroqsiz.",
+    "expiredTitle": "Taklif muddati tugagan",
+    "expiredDescription": "RashPOD administratoridan taklifni qayta yuborishni so‘rang.",
+    "revokedTitle": "Taklif bekor qilingan",
+    "revokedDescription": "Administrator bu taklifni bekor qilgan.",
+    "acceptedTitle": "Taklif qabul qilindi",
+    "acceptedDescription": "Dizayner ruxsati tayyor. Boshqaruv paneliga o‘ting.",
+    "openDashboard": "Dizayner panelini ochish"
   },
   "toolbox": {
     "eyebrow": "Designer tools",

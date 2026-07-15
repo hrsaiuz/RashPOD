@@ -107,10 +107,32 @@ export class ListingsController {
   shopList(
     @Query("type") type?: string,
     @Query("q") q?: string,
+    @Query("categories") categories?: string,
+    @Query("designers") designers?: string,
+    @Query("priceMin") priceMin?: string,
+    @Query("priceMax") priceMax?: string,
+    @Query("hasFilm") hasFilm?: string,
+    @Query("sort") sort?: string,
+    @Query("page") page?: string,
     @Query("limit") limit?: string,
   ) {
-    const parsed = limit ? Number(limit) : undefined;
-    return this.listings.shopList(type, q, Number.isFinite(parsed) ? parsed : undefined);
+    return this.listings.shopList({
+      type,
+      q,
+      categories: splitCsv(categories),
+      designers: splitCsv(designers),
+      priceMin: finiteNumber(priceMin),
+      priceMax: finiteNumber(priceMax),
+      hasFilm: hasFilm === "true",
+      sort,
+      page: finiteNumber(page),
+      limit: finiteNumber(limit),
+    });
+  }
+
+  @Get("shop/categories")
+  shopCategories() {
+    return this.listings.shopCategories();
   }
 
   @Get("shop/designers")
@@ -128,4 +150,14 @@ export class ListingsController {
   byDesigner(@Param("handle") handle: string) {
     return this.listings.shopByDesigner(handle);
   }
+}
+
+function finiteNumber(value?: string) {
+  if (!value) return undefined;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+function splitCsv(value?: string) {
+  return value?.split(",").map((item) => item.trim()).filter(Boolean) ?? [];
 }

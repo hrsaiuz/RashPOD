@@ -8,7 +8,13 @@
     "business": "Start Your Business",
     "about": "About Us",
     "signIn": "Sign in",
-    "startSelling": "Start Selling"
+    "startSelling": "Start Selling",
+    "allProducts": "All products",
+    "newArrivals": "New arrivals",
+    "bestsellers": "Bestsellers",
+    "designerCollections": "Designer collections",
+    "filmReady": "Film ready",
+    "shopMenu": "Shop menu"
   },
   "home": {
     "hero": {
@@ -41,7 +47,24 @@
     "newest": "Newest",
     "popular": "Most Popular",
     "priceAsc": "Price: Low to High",
-    "priceDesc": "Price: High to Low"
+    "priceDesc": "Price: High to Low",
+    "reset": "Reset",
+    "apply": "Apply",
+    "search": "Search",
+    "searchPlaceholder": "Search products",
+    "minimumPrice": "Minimum price",
+    "maximumPrice": "Maximum price",
+    "min": "Min",
+    "max": "Max",
+    "availability": "Availability",
+    "results": "Showing {shown} of {total}",
+    "loadErrorTitle": "Products could not be loaded",
+    "loadErrorDescription": "Check your connection and try again.",
+    "retry": "Retry",
+    "emptyTitle": "No products found",
+    "emptyDescription": "Adjust or clear the filters to see more products.",
+    "previous": "Previous",
+    "next": "Next"
   },
   "product": {
     "addToCart": "Add to cart",
@@ -56,7 +79,13 @@
     "subtitle": "License high-quality designs for DTF/UV-DTF printing",
     "licenseFilm": "License this film",
     "notAvailable": "Not yet available for licensing",
-    "perLicense": "per license"
+    "perLicense": "per license",
+    "searchPlaceholder": "Search films",
+    "customFilm": "Upload custom film",
+    "loadErrorTitle": "Films could not be loaded",
+    "loadErrorDescription": "Check your connection and try again.",
+    "emptyTitle": "No films found",
+    "emptyDescription": "Adjust or clear the filters to see more films."
   },
   "designers": {
     "title": "Designers",
@@ -66,6 +95,13 @@
     "title": "About RashPOD",
     "mission": "Our Mission",
     "values": "Our Values"
+  },
+  "customOrderCards": {
+    "mug": { "label": "Ceramics", "title": "Mug", "alt": "RashPOD mug" },
+    "postal-card": { "label": "Prints", "title": "Postal card", "alt": "RashPOD postal card" },
+    "hat": { "label": "Clothing", "title": "Hat", "alt": "RashPOD hat" },
+    "hoodie": { "label": "Clothing", "title": "Hoodie", "alt": "RashPOD hoodie" },
+    "imageUnavailable": "{product} image coming soon"
   },
   "storyPage": {
     "eyebrow": "Design story",
@@ -82,6 +118,31 @@
     "listingsEyebrow": "From this design",
     "listingsTitle": "Shop the related listings",
     "listingsEmpty": "No published listings are connected to this design yet."
+  },
+  "designerInvitation": {
+    "title": "You're invited to join RashPOD as a designer",
+    "invitedBy": "{name} invited you to join the RashPOD creator community.",
+    "expires": "Expires {date}",
+    "whatYouCanDo": "As a RashPOD designer you can",
+    "upload": "Upload original designs and prepare product listings.",
+    "rights": "Control product, film, marketplace, and corporate rights.",
+    "royalties": "Track approved sales, royalties, and payouts.",
+    "displayName": "Display name",
+    "password": "Create password",
+    "agreements": "I accept the required RashPOD designer terms and confirm I own or may license the work I submit.",
+    "accept": "Accept invitation",
+    "signedInConfirm": "Continue with the signed-in account for {email}.",
+    "acceptError": "The invitation could not be accepted.",
+    "invalid": "This invitation link is invalid.",
+    "invalidTitle": "Invitation unavailable",
+    "invalidDescription": "This invitation link is invalid.",
+    "expiredTitle": "Invitation expired",
+    "expiredDescription": "Ask a RashPOD administrator to resend the invitation.",
+    "revokedTitle": "Invitation revoked",
+    "revokedDescription": "This invitation has been revoked by an administrator.",
+    "acceptedTitle": "Invitation accepted",
+    "acceptedDescription": "Your designer access is ready. Continue to your dashboard.",
+    "openDashboard": "Open designer dashboard"
   },
   "toolbox": {
     "eyebrow": "Designer tools",

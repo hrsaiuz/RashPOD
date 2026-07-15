@@ -34,9 +34,9 @@ import {
   Bell,
   CheckCircle,
   Landmark,
-  ChevronDown,
   Banknote,
   ShieldCheck,
+  MailPlus,
 } from "lucide-react";
 
 const ROLE_LINKS: Record<string, Array<{ href: string; label: string; icon?: any; group?: string }>> = {
@@ -114,8 +114,10 @@ const ROLE_LINKS: Record<string, Array<{ href: string; label: string; icon?: any
     { href: "/dashboard/admin/listings", label: "Listings", icon: Tag, group: "Catalog" },
     { href: "/dashboard/admin/media-library", label: "Media Library", icon: Images, group: "Catalog" },
     { href: "/dashboard/admin/branding", label: "Branding", icon: Palette, group: "Catalog" },
+    { href: "/dashboard/admin/custom-order-products", label: "Custom Order Cards", icon: ImageIcon, group: "Catalog" },
     { href: "/dashboard/admin/tenant", label: "Tenant", icon: Landmark, group: "Governance" },
     { href: "/dashboard/admin/designers", label: "Designers", icon: Users, group: "People" },
+    { href: "/dashboard/admin/designer-invitations", label: "Designer Invitations", icon: MailPlus, group: "People" },
     { href: "/dashboard/admin/customers", label: "Customers", icon: Users, group: "People" },
     { href: "/dashboard/admin/corporate-clients", label: "Corporate Clients", icon: Building2, group: "People" },
     { href: "/dashboard/admin/users", label: "Users", icon: Users, group: "People" },
@@ -160,18 +162,6 @@ interface PublicBranding {
   theme?: { storeName?: string };
 }
 
-type TenantMembership = {
-  id: string;
-  roleKey: string;
-  tenant: {
-    id: string;
-    name: string;
-    slug: string;
-    status: string;
-    plan?: { name: string; code: string } | null;
-  };
-};
-
 const API_URL = process.env.NEXT_PUBLIC_API_URL || process.env.API_URL;
 
 export default function DashboardLayout({ children, role }: { children: ReactNode; role: string }) {
@@ -179,8 +169,6 @@ export default function DashboardLayout({ children, role }: { children: ReactNod
   const router = useRouter();
   const { user, clearSession } = useAuth();
   const [branding, setBranding] = useState<PublicBranding | null>(null);
-  const [tenants, setTenants] = useState<TenantMembership[]>([]);
-  const [tenantError, setTenantError] = useState("");
 
   useEffect(() => {
     if (!API_URL) return;
@@ -197,22 +185,6 @@ export default function DashboardLayout({ children, role }: { children: ReactNod
 
     return () => controller.abort();
   }, []);
-
-  useEffect(() => {
-    if (!user) return;
-
-    const controller = new AbortController();
-    fetch("/api/proxy/tenants/my", { signal: controller.signal })
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data) => setTenants(Array.isArray(data?.items) ? data.items : []))
-      .catch((error) => {
-        if (error instanceof Error && error.name !== "AbortError") {
-          setTenantError("Tenant context unavailable");
-        }
-      });
-
-    return () => controller.abort();
-  }, [user]);
 
   const navRole = useMemo(() => {
     const actualRole = (user?.role || "").toUpperCase().replace("-", "_");
@@ -266,7 +238,6 @@ export default function DashboardLayout({ children, role }: { children: ReactNod
     isElevated &&
     viewingRole !== actualRole &&
     !(actualRole === "SUPER_ADMIN" && viewingRole === "ADMIN");
-  const activeTenant = tenants[0]?.tenant;
 
   return (
     <DashboardShell
@@ -296,23 +267,6 @@ export default function DashboardLayout({ children, role }: { children: ReactNod
           </button>
         </div>
       )}
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-brand-line bg-white px-4 py-3 shadow-soft">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-wide text-brand-muted">Workspace</p>
-          <p className="text-sm font-semibold text-brand-ink">
-            {activeTenant ? activeTenant.name : tenantError || "RashPOD"}
-            {activeTenant?.plan ? <span className="ml-2 font-normal text-brand-muted">· {activeTenant.plan.name}</span> : null}
-          </p>
-        </div>
-        {tenants.length > 1 ? (
-          <button
-            onClick={() => router.push("/dashboard/admin/tenant")}
-            className="inline-flex items-center gap-2 rounded-pill border border-brand-blue/30 px-3 py-2 text-xs font-semibold text-brand-blue hover:bg-brand-blue/5"
-          >
-            Switch workspace <ChevronDown size={14} />
-          </button>
-        ) : null}
-      </div>
       {children}
     </DashboardShell>
   );

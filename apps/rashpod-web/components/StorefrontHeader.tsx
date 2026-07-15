@@ -11,6 +11,7 @@ type StorefrontHeaderProps = {
   startSellingUrl: string;
   logoUrl?: string | null;
   brandName?: string;
+  shopCategories?: Array<{ name: string; slug: string; category: string }>;
 };
 
 export function StorefrontHeader({
@@ -18,6 +19,7 @@ export function StorefrontHeader({
   startSellingUrl,
   logoUrl,
   brandName,
+  shopCategories,
 }: StorefrontHeaderProps) {
   const t = useTranslations("nav");
   const { openCart, itemCount } = useCart();
@@ -31,6 +33,7 @@ export function StorefrontHeader({
       filmsUrl="/film"
       logoUrl={logoUrl}
       brandName={brandName}
+      shopCategories={shopCategories}
       cartItemCount={itemCount}
       onCartOpen={openCart}
       cartIcon={<ShoppingBag size={22} />}
@@ -42,6 +45,12 @@ export function StorefrontHeader({
         customOrder: t("customOrder"),
         signIn: t("signIn"),
         startSelling: t("startSelling"),
+        allProducts: t("allProducts"),
+        newArrivals: t("newArrivals"),
+        bestsellers: t("bestsellers"),
+        designerCollections: t("designerCollections"),
+        filmReady: t("filmReady"),
+        shopMenu: t("shopMenu"),
       }}
       localeSwitcher={<LanguageSwitcher />}
     />

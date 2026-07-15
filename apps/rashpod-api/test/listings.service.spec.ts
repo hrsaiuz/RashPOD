@@ -316,4 +316,12 @@ describe("ListingsService lifecycle", () => {
     expect(result?.imageUrl).toBe("mockups/main.png");
     expect(result?.images).toEqual(["mockups/main.png", "mockups/lifestyle.png", "mockups/detail.png"]);
   });
+
+  it("applies storefront filters, sort, and pagination at the database layer", async () => {
+    const prisma: any = { commerceListing: { findMany: jest.fn().mockResolvedValue([]), count: jest.fn().mockResolvedValue(0) } };
+    const service = new ListingsService(prisma, { log: jest.fn() } as any);
+    await service.shopList({ q: "mug", categories: ["mug"], designers: ["alice"], priceMin: 100, priceMax: 500, hasFilm: true, sort: "price_asc", page: 2, limit: 12 });
+    expect(prisma.commerceListing.findMany).toHaveBeenCalledWith(expect.objectContaining({ skip: 12, take: 12, orderBy: { price: "asc" }, where: expect.objectContaining({ status: ListingStatus.PUBLISHED, designer: { handle: { in: ["alice"] } }, price: { gte: 100, lte: 500 } }) }));
+    expect(prisma.commerceListing.count).toHaveBeenCalled();
+  });
 });

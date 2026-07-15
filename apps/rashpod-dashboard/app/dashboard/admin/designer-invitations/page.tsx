@@ -1,0 +1,31 @@
+"use client";
+
+import { FormEvent, useEffect, useState } from "react";
+import { Button, Card, EmptyState, Input, Modal, Select, StatusBadge, Textarea } from "@rashpod/ui";
+import { Copy, MailPlus, RefreshCw, UserX } from "lucide-react";
+import DashboardLayout from "../../dashboard-layout";
+
+type Invitation = { id: string; email: string; displayName?: string | null; locale: string; status: "PENDING" | "ACCEPTED" | "EXPIRED" | "REVOKED"; createdAt: string; expiresAt: string; acceptedAt?: string | null; invitationUrl?: string; invitedBy: { displayName: string; email: string } };
+
+export default function DesignerInvitationsPage() {
+  const [items, setItems] = useState<Invitation[]>([]);
+  const [form, setForm] = useState({ email: "", displayName: "", locale: "uz", personalMessage: "" });
+  const [submitting, setSubmitting] = useState(false);
+  const [notice, setNotice] = useState("");
+  const [revokeId, setRevokeId] = useState<string | null>(null);
+  useEffect(() => { void load(); }, []);
+  async function load() { const response = await fetch("/api/proxy/admin/designer-invitations"); setItems(response.ok ? await response.json() : []); }
+  async function submit(event: FormEvent) { event.preventDefault(); setSubmitting(true); setNotice(""); const response = await fetch("/api/proxy/admin/designer-invitations", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(form) }); if (response.ok) { const invitation = await response.json(); setForm({ email: "", displayName: "", locale: "uz", personalMessage: "" }); setNotice("Invitation queued. The link is ready to copy."); await copy(invitation.invitationUrl); await load(); } else setNotice("The invitation could not be created."); setSubmitting(false); }
+  async function copy(url?: string) { if (!url) return; await navigator.clipboard.writeText(url); setNotice("Invitation link copied."); }
+  async function resend(id: string) { const response = await fetch(`/api/proxy/admin/designer-invitations/${id}/resend`, { method: "POST" }); if (response.ok) { const invitation = await response.json(); await copy(invitation.invitationUrl); await load(); } }
+  async function revoke() { if (!revokeId) return; const response = await fetch(`/api/proxy/admin/designer-invitations/${revokeId}/revoke`, { method: "POST" }); if (response.ok) { setNotice("Invitation revoked."); await load(); } setRevokeId(null); }
+
+  return <DashboardLayout role="admin"><div className="space-y-6">
+    <div><p className="text-xs font-bold uppercase tracking-wide text-brand-peach">People</p><h1 className="mt-1 text-3xl font-bold text-brand-ink">Designer invitations</h1><p className="mt-1 text-sm text-brand-muted">Invite designers securely and track acceptance, expiry, and revocation.</p></div>
+    <Card><form onSubmit={submit} className="grid gap-4 lg:grid-cols-2"><label className="text-sm font-semibold text-brand-ink">Email address<Input type="email" required autoComplete="email" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} className="mt-2" /></label><label className="text-sm font-semibold text-brand-ink">Display name (optional)<Input value={form.displayName} maxLength={120} onChange={(event) => setForm({ ...form, displayName: event.target.value })} className="mt-2" /></label><label className="text-sm font-semibold text-brand-ink">Email locale<Select value={form.locale} onChange={(event) => setForm({ ...form, locale: event.target.value })} className="mt-2"><option value="uz">O‘zbek</option><option value="ru">Русский</option><option value="en">English</option></Select></label><label className="text-sm font-semibold text-brand-ink lg:row-span-2">Personal message (optional)<Textarea value={form.personalMessage} maxLength={1000} onChange={(event) => setForm({ ...form, personalMessage: event.target.value })} className="mt-2 min-h-28" /></label><div className="flex items-end"><Button type="submit" loading={submitting} disabled={submitting}><MailPlus size={17} /> Send invitation</Button></div></form>{notice ? <p role="status" className="mt-4 text-sm text-brand-muted">{notice}</p> : null}</Card>
+    {!items.length ? <Card><EmptyState title="No designer invitations" description="Create the first invitation using the form above." /></Card> : <div className="grid gap-4">{items.map((item) => <Card key={item.id} className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between"><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><h2 className="font-bold text-brand-ink">{item.displayName || item.email}</h2><StatusBadge status={item.status} /></div><p className="text-sm text-brand-muted">{item.email}</p><dl className="mt-3 grid gap-x-6 gap-y-2 text-xs text-brand-muted sm:grid-cols-2 xl:grid-cols-4"><div><dt className="font-bold uppercase">Invited by</dt><dd>{item.invitedBy.displayName}</dd></div><div><dt className="font-bold uppercase">Created</dt><dd>{date(item.createdAt)}</dd></div><div><dt className="font-bold uppercase">Expires</dt><dd>{date(item.expiresAt)}</dd></div>{item.acceptedAt ? <div><dt className="font-bold uppercase">Accepted</dt><dd>{date(item.acceptedAt)}</dd></div> : null}</dl></div><div className="flex flex-wrap gap-2">{item.invitationUrl ? <Button size="sm" variant="secondary" onClick={() => copy(item.invitationUrl)}><Copy size={15} /> Copy link</Button> : null}{item.status === "PENDING" || item.status === "EXPIRED" ? <Button size="sm" variant="secondary" onClick={() => resend(item.id)}><RefreshCw size={15} /> Resend & copy</Button> : null}{item.status === "PENDING" ? <Button size="sm" variant="danger" onClick={() => setRevokeId(item.id)}><UserX size={15} /> Revoke</Button> : null}</div></Card>)}</div>}
+    <Modal open={Boolean(revokeId)} onClose={() => setRevokeId(null)} title="Revoke designer invitation" footer={<div className="flex justify-end gap-3"><Button variant="secondary" onClick={() => setRevokeId(null)}>Cancel</Button><Button variant="danger" onClick={revoke}>Revoke invitation</Button></div>}><p className="text-sm text-brand-muted">The existing link will stop working immediately. This action is recorded in the audit log.</p></Modal>
+  </div></DashboardLayout>;
+}
+
+function date(value: string) { return new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(new Date(value)); }

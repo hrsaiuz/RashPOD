@@ -2,6 +2,7 @@
 
 import { FormEvent, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { ProductTypeTile, StorePage, UnderlineInput, UnderlineSelect, UploadButton } from "../storefront-ui";
 import type { ShopSettings } from "../../../lib/shop-settings";
 import { uploadIntakeFiles } from "../../../lib/intake-upload";
@@ -20,8 +21,18 @@ function buildDeliveryOptions(shopSettings: ShopSettings) {
   return options.length > 0 ? Array.from(new Set(options)) : DEFAULT_DELIVERY_OPTIONS;
 }
 
-export default function CustomOrderPageClient({ shopSettings }: { shopSettings: ShopSettings }) {
+type CustomOrderProduct = { key: string; label: string; title: string; imageUrl: string | null; altText: string };
+
+const FALLBACK_PRODUCTS: CustomOrderProduct[] = [
+  { key: "mug", label: "ceramics", title: "mug", imageUrl: null, altText: "RashPOD mug" },
+  { key: "postal-card", label: "prints", title: "postal card", imageUrl: null, altText: "RashPOD postal card" },
+  { key: "hat", label: "clothes", title: "hat", imageUrl: null, altText: "RashPOD hat" },
+  { key: "hoodie", label: "clothes", title: "hoodie", imageUrl: null, altText: "RashPOD hoodie" },
+];
+
+export default function CustomOrderPageClient({ shopSettings, productTypes }: { shopSettings: ShopSettings; productTypes: CustomOrderProduct[] }) {
   const router = useRouter();
+  const t = useTranslations("customOrderCards");
   const deliveryOptions = useMemo(() => buildDeliveryOptions(shopSettings), [shopSettings]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
@@ -72,10 +83,9 @@ export default function CustomOrderPageClient({ shopSettings }: { shopSettings: 
       <section className="mt-20">
         <h2 className="mb-10 text-[16px] font-bold text-black">See what we can make</h2>
         <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
-          <ProductTypeTile label="ceramics" title="mug" />
-          <ProductTypeTile label="prints" title="postal card" />
-          <ProductTypeTile label="clothes" title="hat" />
-          <ProductTypeTile label="clothes" title="hoodie" />
+          {(productTypes.length ? productTypes : FALLBACK_PRODUCTS).map((product) => (
+            <ProductTypeTile key={product.key} label={t(`${product.key}.label`)} title={t(`${product.key}.title`)} img={product.imageUrl} alt={product.altText || t(`${product.key}.alt`)} fallbackLabel={t("imageUnavailable", { product: t(`${product.key}.title`) })} onClick={() => setForm((current) => ({ ...current, productNeed: product.title }))} />
+          ))}
         </div>
       </section>
 

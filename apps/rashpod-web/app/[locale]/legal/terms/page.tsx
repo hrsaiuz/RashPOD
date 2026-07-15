@@ -128,7 +128,7 @@ export default function TermsPage() {
       <section>
         <h2>11. Contact</h2>
         <p className="mt-4">
-          Questions about these Terms can be sent to hello@rashpod.uz, Telegram @rashpod, or +998 50 270 00 00.
+          Questions about these Terms can be sent to hello@rashpod.uz, Telegram @therashpod, or +998 50 270 00 00.
         </p>
       </section>
     </LegalPage>

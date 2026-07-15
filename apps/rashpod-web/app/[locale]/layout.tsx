@@ -12,6 +12,7 @@ import { getStorefrontBranding } from "../../lib/branding";
 import { getShopSettings, resolveFreeDeliveryThreshold } from "../../lib/shop-settings";
 import { OrganizationJsonLd } from "../../components/seo/OrganizationJsonLd";
 import { routing, type AppLocale } from "../../i18n/routing";
+import { fetchShopCategories } from "../../lib/catalog";
 
 import "../globals.css";
 
@@ -66,7 +67,7 @@ export default async function LocaleLayout({
   setRequestLocale(locale);
   const messages = await getMessages();
   const dashboardUrl = getDashboardUrl();
-  const [branding, shopSettings] = await Promise.all([getStorefrontBranding(), getShopSettings()]);
+  const [branding, shopSettings, shopCategories] = await Promise.all([getStorefrontBranding(), getShopSettings(), fetchShopCategories()]);
   const brandName = branding?.theme?.storeName || "RashPOD";
   const freeDeliveryThreshold = resolveFreeDeliveryThreshold(shopSettings);
 
@@ -85,6 +86,7 @@ export default async function LocaleLayout({
                 startSellingUrl={`${dashboardUrl}/auth/register?role=designer`}
                 logoUrl={branding?.storefrontLogoUrl ?? null}
                 brandName={brandName}
+                shopCategories={shopCategories}
               />
               <main id="main-content" className="min-h-screen bg-brand-bg">
                 {children}

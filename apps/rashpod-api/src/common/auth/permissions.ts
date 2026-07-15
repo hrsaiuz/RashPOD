@@ -183,6 +183,7 @@ export const permissions = {
   "media:manage": ["ADMIN", "SUPER_ADMIN", "OPERATIONS_MANAGER"],
   "branding:manage": ["ADMIN", "SUPER_ADMIN"],
   "user:manage": ["ADMIN", "SUPER_ADMIN"],
+  "designer-invitations:manage": ["ADMIN", "SUPER_ADMIN"],
   "intake:manage": ["ADMIN", "SUPER_ADMIN", "OPERATIONS_MANAGER", "SUPPORT_STAFF"],
   "super-admin:rbac-manage": ["SUPER_ADMIN"],
   "super-admin:secrets-manage": ["SUPER_ADMIN"],

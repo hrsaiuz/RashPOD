@@ -8,7 +8,13 @@
     "business": "Начать бизнес",
     "about": "О нас",
     "signIn": "Войти",
-    "startSelling": "Начать продавать"
+    "startSelling": "Начать продавать",
+    "allProducts": "Все товары",
+    "newArrivals": "Новинки",
+    "bestsellers": "Бестселлеры",
+    "designerCollections": "Коллекции дизайнеров",
+    "filmReady": "Для плёнки",
+    "shopMenu": "Меню магазина"
   },
   "home": {
     "hero": {
@@ -41,7 +47,24 @@
     "newest": "Новинки",
     "popular": "Популярные",
     "priceAsc": "Цена: по возрастанию",
-    "priceDesc": "Цена: по убыванию"
+    "priceDesc": "Цена: по убыванию",
+    "reset": "Сбросить",
+    "apply": "Применить",
+    "search": "Поиск",
+    "searchPlaceholder": "Поиск товаров",
+    "minimumPrice": "Минимальная цена",
+    "maximumPrice": "Максимальная цена",
+    "min": "От",
+    "max": "До",
+    "availability": "Доступность",
+    "results": "Показано {shown} из {total}",
+    "loadErrorTitle": "Не удалось загрузить товары",
+    "loadErrorDescription": "Проверьте подключение и попробуйте снова.",
+    "retry": "Повторить",
+    "emptyTitle": "Товары не найдены",
+    "emptyDescription": "Измените или сбросьте фильтры.",
+    "previous": "Назад",
+    "next": "Далее"
   },
   "product": {
     "addToCart": "Добавить в корзину",
@@ -56,7 +79,13 @@
     "subtitle": "Лицензирование дизайнов для DTF/UV-DTF печати",
     "licenseFilm": "Лицензировать плёнку",
     "notAvailable": "Пока недоступно",
-    "perLicense": "за лицензию"
+    "perLicense": "за лицензию",
+    "searchPlaceholder": "Поиск плёнок",
+    "customFilm": "Загрузить свою плёнку",
+    "loadErrorTitle": "Не удалось загрузить плёнки",
+    "loadErrorDescription": "Проверьте подключение и попробуйте снова.",
+    "emptyTitle": "Плёнки не найдены",
+    "emptyDescription": "Измените или сбросьте фильтры."
   },
   "designers": {
     "title": "Дизайнеры",
@@ -66,6 +95,13 @@
     "title": "О RashPOD",
     "mission": "Наша миссия",
     "values": "Наши ценности"
+  },
+  "customOrderCards": {
+    "mug": { "label": "Керамика", "title": "Кружка", "alt": "Кружка RashPOD" },
+    "postal-card": { "label": "Печать", "title": "Открытка", "alt": "Открытка RashPOD" },
+    "hat": { "label": "Одежда", "title": "Кепка", "alt": "Кепка RashPOD" },
+    "hoodie": { "label": "Одежда", "title": "Худи", "alt": "Худи RashPOD" },
+    "imageUnavailable": "Изображение «{product}» скоро появится"
   },
   "storyPage": {
     "eyebrow": "История дизайна",
@@ -82,6 +118,31 @@
     "listingsEyebrow": "Из этого дизайна",
     "listingsTitle": "Связанные товары",
     "listingsEmpty": "С этим дизайном пока не связано опубликованных товаров."
+  },
+  "designerInvitation": {
+    "title": "Вас приглашают стать дизайнером RashPOD",
+    "invitedBy": "{name} приглашает вас в сообщество авторов RashPOD.",
+    "expires": "Действует до {date}",
+    "whatYouCanDo": "Как дизайнер RashPOD вы сможете",
+    "upload": "Загружать оригинальные дизайны и готовить товары.",
+    "rights": "Управлять правами на товары, плёнки, маркетплейсы и корпоративные заказы.",
+    "royalties": "Отслеживать продажи, роялти и выплаты.",
+    "displayName": "Отображаемое имя",
+    "password": "Создайте пароль",
+    "agreements": "Я принимаю условия для дизайнеров RashPOD и подтверждаю права на загружаемые работы.",
+    "accept": "Принять приглашение",
+    "signedInConfirm": "Продолжить с аккаунтом {email}.",
+    "acceptError": "Не удалось принять приглашение.",
+    "invalid": "Ссылка приглашения недействительна.",
+    "invalidTitle": "Приглашение недоступно",
+    "invalidDescription": "Ссылка приглашения недействительна.",
+    "expiredTitle": "Срок приглашения истёк",
+    "expiredDescription": "Попросите администратора RashPOD отправить приглашение повторно.",
+    "revokedTitle": "Приглашение отозвано",
+    "revokedDescription": "Администратор отозвал это приглашение.",
+    "acceptedTitle": "Приглашение принято",
+    "acceptedDescription": "Доступ дизайнера готов. Перейдите в панель управления.",
+    "openDashboard": "Открыть панель дизайнера"
   },
   "toolbox": {
     "eyebrow": "Инструменты дизайнера",

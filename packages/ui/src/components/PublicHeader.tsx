@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { cn } from "../lib/utils";
 import { ChevronDown, Menu } from "lucide-react";
 import { Drawer } from "./Drawer";
@@ -20,6 +21,7 @@ export interface PublicHeaderProps {
   onCartOpen?: () => void;
   cartIcon?: React.ReactNode;
   localeSwitcher?: React.ReactNode;
+  shopCategories?: Array<{ name: string; slug: string; category: string }>;
   navLabels?: {
     shop?: string;
     categories?: string;
@@ -28,6 +30,12 @@ export interface PublicHeaderProps {
     customOrder?: string;
     signIn?: string;
     startSelling?: string;
+    allProducts?: string;
+    newArrivals?: string;
+    bestsellers?: string;
+    designerCollections?: string;
+    filmReady?: string;
+    shopMenu?: string;
   };
 }
 
@@ -45,19 +53,46 @@ export const PublicHeader: React.FC<PublicHeaderProps> = ({
   onCartOpen,
   cartIcon,
   localeSwitcher,
+  shopCategories = [],
   navLabels,
 }) => {
   const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false);
+  const [shopMenuOpen, setShopMenuOpen] = React.useState(false);
+  const [mobileShopOpen, setMobileShopOpen] = React.useState(false);
+  const menuRef = React.useRef<HTMLDivElement>(null);
+  const closeTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pathname = usePathname();
   const finalSignInUrl = signInUrl || `${dashboardUrl}/auth/login`;
   const finalStartSellingUrl = startSellingUrl || `${dashboardUrl}/auth/register`;
 
   const navLinks = [
-    { href: shopUrl, label: navLabels?.shop ?? "Shop" },
-    { href: `${shopUrl}#categories`, label: navLabels?.categories ?? "Categories" },
     { href: filmsUrl, label: navLabels?.films ?? "Films" },
     { href: "/sell-on-rashpod", label: navLabels?.sellOnRashpod ?? "Sell on RashPOD" },
     { href: "/custom-order", label: navLabels?.customOrder ?? "Custom order" },
   ];
+  const categoryGroups = React.useMemo(() => {
+    const groups = new Map<string, typeof shopCategories>();
+    shopCategories.forEach((item) => groups.set(item.category, [...(groups.get(item.category) ?? []), item]));
+    return [...groups.entries()];
+  }, [shopCategories]);
+  const closeShopMenu = React.useCallback(() => setShopMenuOpen(false), []);
+  const scheduleClose = React.useCallback(() => {
+    if (closeTimer.current) clearTimeout(closeTimer.current);
+    closeTimer.current = setTimeout(closeShopMenu, 140);
+  }, [closeShopMenu]);
+  const keepOpen = React.useCallback(() => {
+    if (closeTimer.current) clearTimeout(closeTimer.current);
+    setShopMenuOpen(true);
+  }, []);
+
+  React.useEffect(() => closeShopMenu(), [pathname, closeShopMenu]);
+  React.useEffect(() => {
+    const onKey = (event: KeyboardEvent) => { if (event.key === "Escape") closeShopMenu(); };
+    const onPointer = (event: MouseEvent) => { if (!menuRef.current?.contains(event.target as Node)) closeShopMenu(); };
+    document.addEventListener("keydown", onKey);
+    document.addEventListener("mousedown", onPointer);
+    return () => { document.removeEventListener("keydown", onKey); document.removeEventListener("mousedown", onPointer); if (closeTimer.current) clearTimeout(closeTimer.current); };
+  }, [closeShopMenu]);
 
   return (
     <>
@@ -80,6 +115,41 @@ export const PublicHeader: React.FC<PublicHeaderProps> = ({
 
           {/* Desktop Nav */}
           <nav className="hidden items-center gap-9 lg:flex" aria-label="Main navigation">
+            <div ref={menuRef} className="relative" onPointerEnter={keepOpen} onPointerLeave={scheduleClose}>
+              <button
+                type="button"
+                className={cn("inline-flex min-h-11 items-center gap-1.5 text-[13px] font-medium transition-colors hover:text-brand-blue focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue", pathname.includes("/shop") && "text-brand-blue")}
+                aria-haspopup="menu"
+                aria-expanded={shopMenuOpen}
+                aria-controls="shop-mega-menu"
+                onClick={() => setShopMenuOpen((open) => !open)}
+                onFocus={keepOpen}
+                onKeyDown={(event) => {
+                  if (event.key === "ArrowDown") { event.preventDefault(); keepOpen(); requestAnimationFrame(() => menuRef.current?.querySelector<HTMLAnchorElement>("[role=menuitem]")?.focus()); }
+                }}
+              >
+                {navLabels?.shop ?? "Shop"}<ChevronDown size={14} aria-hidden="true" className={cn("transition-transform", shopMenuOpen && "rotate-180")} />
+              </button>
+              {shopMenuOpen ? (
+                <div id="shop-mega-menu" role="menu" aria-label={navLabels?.shopMenu ?? "Shop menu"} className="absolute left-1/2 top-full z-dropdown mt-2 w-[min(900px,calc(100vw-3rem))] -translate-x-1/3 rounded-2xl border border-surface-borderSoft bg-white p-6 shadow-lift" onPointerEnter={keepOpen} onPointerLeave={scheduleClose}>
+                  <div className="grid gap-7 lg:grid-cols-[1.05fr_2fr_1fr]">
+                    <MegaGroup title={navLabels?.shop ?? "Shop"} links={[
+                      { href: shopUrl, label: navLabels?.allProducts ?? "All products" },
+                      { href: `${shopUrl}?sort=newest`, label: navLabels?.newArrivals ?? "New arrivals" },
+                      { href: `${shopUrl}?sort=popular`, label: navLabels?.bestsellers ?? "Bestsellers" },
+                      { href: designersUrl, label: navLabels?.designerCollections ?? "Designer collections" },
+                    ]} onNavigate={closeShopMenu} />
+                    <div>
+                      <p className="mb-3 text-[11px] font-bold uppercase tracking-[0.12em] text-brand-muted">{navLabels?.categories ?? "Categories"}</p>
+                      <div className="grid grid-cols-2 gap-x-6 gap-y-4">
+                        {categoryGroups.map(([group, categories]) => <MegaGroup key={group} title={group} links={categories.map((category) => ({ href: `${shopUrl}?categories=${encodeURIComponent(category.slug)}`, label: category.name }))} onNavigate={closeShopMenu} compact />)}
+                      </div>
+                    </div>
+                    <MegaGroup title={navLabels?.filmReady ?? "Film ready"} links={[{ href: filmsUrl, label: navLabels?.films ?? "Films" }, { href: "/custom-order", label: navLabels?.customOrder ?? "Custom order" }]} onNavigate={closeShopMenu} />
+                  </div>
+                </div>
+              ) : null}
+            </div>
             {navLinks.map((link) => (
               <Link
                 key={link.href}
@@ -152,6 +222,14 @@ export const PublicHeader: React.FC<PublicHeaderProps> = ({
       {/* Mobile Drawer — portaled to body so it isn't clipped by sticky header */}
       <Drawer open={mobileMenuOpen} onClose={() => setMobileMenuOpen(false)} side="right">
         <nav className="flex flex-col gap-4" aria-label="Mobile navigation">
+          <button type="button" className="flex min-h-11 items-center justify-between text-left text-base font-medium text-brand-ink" onClick={() => setMobileShopOpen((open) => !open)} aria-expanded={mobileShopOpen} aria-controls="mobile-shop-links">
+            <span>{navLabels?.shop ?? "Shop"}</span><ChevronDown size={18} className={cn("transition-transform", mobileShopOpen && "rotate-180")} />
+          </button>
+          {mobileShopOpen ? (
+            <div id="mobile-shop-links" className="space-y-1 border-l-2 border-brand-blueLight pl-4">
+              {[{ href: shopUrl, label: navLabels?.allProducts ?? "All products" }, { href: `${shopUrl}?sort=newest`, label: navLabels?.newArrivals ?? "New arrivals" }, { href: `${shopUrl}?sort=popular`, label: navLabels?.bestsellers ?? "Bestsellers" }, ...shopCategories.map((category) => ({ href: `${shopUrl}?categories=${encodeURIComponent(category.slug)}`, label: category.name }))].map((link) => <Link role="menuitem" key={link.href} href={link.href} className="flex min-h-11 items-center text-sm text-brand-text hover:text-brand-blue" onClick={() => setMobileMenuOpen(false)}>{link.label}</Link>)}
+            </div>
+          ) : null}
           {navLinks.map((link) => (
             <Link
               key={link.href}
@@ -181,3 +259,9 @@ export const PublicHeader: React.FC<PublicHeaderProps> = ({
   );
 };
 PublicHeader.displayName = "PublicHeader";
+
+function MegaGroup({ title, links, onNavigate, compact = false }: { title: string; links: Array<{ href: string; label: string }>; onNavigate: () => void; compact?: boolean }) {
+  return <div><p className="mb-3 text-[11px] font-bold uppercase tracking-[0.12em] text-brand-muted">{title}</p><div className={cn("space-y-1", compact && "space-y-0")}>
+    {links.map((link) => <Link role="menuitem" key={link.href} href={link.href} onClick={onNavigate} className="flex min-h-10 items-center rounded-lg px-2 text-sm font-medium text-brand-ink transition-colors hover:bg-brand-blueLight/30 hover:text-brand-blue focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue">{link.label}</Link>)}
+  </div></div>;
+}

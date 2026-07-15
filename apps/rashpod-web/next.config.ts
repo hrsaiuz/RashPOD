@@ -6,7 +6,7 @@ const withNextIntl = createNextIntlPlugin("./i18n/request.ts");
 const nextConfig: NextConfig = {
   reactStrictMode: true,
   output: "standalone",
-  transpilePackages: ["@rashpod/ui"],
+  transpilePackages: ["@rashpod/ui", "@rashpod/config"],
   async headers() {
     return [
       {

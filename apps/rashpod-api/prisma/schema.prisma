@@ -100,6 +100,13 @@ enum DesignStatus {
   PUBLISHED
 }
 
+enum DesignerInvitationStatus {
+  PENDING
+  ACCEPTED
+  EXPIRED
+  REVOKED
+}
+
 enum DesignStoryStatus {
   DRAFT
   PENDING_REVIEW
@@ -815,6 +822,7 @@ model Tenant {
   emailTemplates EmailTemplate[]
   mediaAssets MediaAsset[]
   designerApplications DesignerApplication[]
+  designerInvitations DesignerInvitation[]
 
   @@index([status, tenantType])
   @@index([ownerUserId])
@@ -1031,6 +1039,8 @@ model User {
   ownedTenants Tenant[] @relation("TenantOwner")
   tenantMemberships TenantMember[] @relation("TenantMemberUser")
   tenantInvitationsSent TenantMember[] @relation("TenantMemberInviter")
+  designerInvitationsSent DesignerInvitation[] @relation("DesignerInvitationInviter")
+  designerInvitationsAccepted DesignerInvitation[] @relation("DesignerInvitationAcceptedUser")
   entitlementOverridesCreated TenantEntitlementOverride[] @relation("TenantEntitlementOverrideCreator")
   customerAddresses CustomerAddress[]
   wishlistItems WishlistItem[]
@@ -3801,6 +3811,33 @@ model MediaAsset {
   @@index([tenantId, category, isActive])
   @@index([category, isActive])
   @@index([category, sortOrder])
+}
+
+model DesignerInvitation {
+  id             String                   @id @default(uuid())
+  tenantId       String?
+  email          String
+  displayName    String?
+  locale         String                   @default("uz")
+  personalMessage String?
+  tokenHash      String                   @unique
+  status         DesignerInvitationStatus @default(PENDING)
+  invitedById    String
+  acceptedById   String?
+  expiresAt      DateTime
+  acceptedAt     DateTime?
+  revokedAt      DateTime?
+  lastSentAt     DateTime?
+  createdAt      DateTime                 @default(now())
+  updatedAt      DateTime                 @updatedAt
+
+  tenant     Tenant? @relation(fields: [tenantId], references: [id], onDelete: SetNull)
+  invitedBy  User    @relation("DesignerInvitationInviter", fields: [invitedById], references: [id], onDelete: Restrict)
+  acceptedBy User?   @relation("DesignerInvitationAcceptedUser", fields: [acceptedById], references: [id], onDelete: SetNull)
+
+  @@index([email, status])
+  @@index([tenantId, status, createdAt])
+  @@index([invitedById, createdAt])
 }
 
 model DesignerApplication {

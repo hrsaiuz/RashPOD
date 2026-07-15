@@ -15,6 +15,14 @@ const BRANDING_SINGLETON_CATEGORIES = new Set<MediaCategory>([
   MediaCategory.BRANDING_FAVICON,
 ]);
 
+const CUSTOM_ORDER_PRODUCTS = [
+  { key: "mug", label: "ceramics", title: "mug" },
+  { key: "postal-card", label: "prints", title: "postal card" },
+  { key: "hat", label: "clothes", title: "hat" },
+  { key: "hoodie", label: "clothes", title: "hoodie" },
+] as const;
+const CUSTOM_ORDER_SETTING_KEY = "storefront.customOrderProducts";
+
 function sanitizeFilename(name: string) {
   return name.replace(/[^a-zA-Z0-9._-]+/g, "-").slice(0, 200);
 }
@@ -180,6 +188,7 @@ export class MediaService {
       const value = themeRaw[key];
       return typeof value === "string" && value.trim().length > 0 ? value : null;
     };
+    const customOrderProductTypes = await this.customOrderProducts();
     return {
       storefrontLogoUrl: pick(MediaCategory.BRANDING_LOGO_WEB),
       dashboardLogoUrl: pick(MediaCategory.BRANDING_LOGO_DASHBOARD),
@@ -191,7 +200,59 @@ export class MediaService {
       homeDesignerSectionImageUrl: themeString("homeDesignerSectionImageUrl"),
       homeDesignerSectionImageAlt: themeString("homeDesignerSectionImageAlt"),
       theme: themeRaw,
+      customOrderProductTypes,
     };
+  }
+
+  async customOrderProducts() {
+    const setting = await this.prisma.platformSetting.findUnique({ where: { key: CUSTOM_ORDER_SETTING_KEY } });
+    const configured = Array.isArray(setting?.value) ? (setting.value as Array<Record<string, unknown>>) : [];
+    const ids = configured.map((item) => typeof item.mediaAssetId === "string" ? item.mediaAssetId : "").filter(Boolean);
+    const assets = ids.length ? await this.prisma.mediaAsset.findMany({ where: { id: { in: ids }, isActive: true } }) : [];
+    const byId = new Map(assets.map((asset) => [asset.id, asset]));
+    return CUSTOM_ORDER_PRODUCTS.map((product) => {
+      const row = configured.find((item) => item.key === product.key);
+      const mediaAssetId = typeof row?.mediaAssetId === "string" ? row.mediaAssetId : null;
+      const asset = mediaAssetId ? byId.get(mediaAssetId) : null;
+      return {
+        ...product,
+        mediaAssetId: asset?.id ?? null,
+        imageUrl: asset?.publicUrl ?? null,
+        mimeType: asset?.mimeType ?? null,
+        width: asset?.width ?? null,
+        height: asset?.height ?? null,
+        altText: typeof row?.altText === "string" && row.altText.trim() ? row.altText.trim() : `RashPOD ${product.title}`,
+      };
+    });
+  }
+
+  async updateCustomOrderProducts(actorId: string, items: Array<{ key?: string; mediaAssetId?: string | null; altText?: string | null }>) {
+    const allowedKeys = new Set<string>(CUSTOM_ORDER_PRODUCTS.map((product) => product.key));
+    const normalized = items.filter((item) => item.key && allowedKeys.has(item.key)).map((item) => ({
+      key: item.key!,
+      mediaAssetId: item.mediaAssetId || null,
+      altText: typeof item.altText === "string" ? item.altText.trim().slice(0, 160) : null,
+    }));
+    const ids = normalized.map((item) => item.mediaAssetId).filter((id): id is string => Boolean(id));
+    if (ids.length) {
+      const assets = await this.prisma.mediaAsset.findMany({ where: { id: { in: ids }, isActive: true } });
+      if (assets.length !== new Set(ids).size || assets.some((asset) => !["image/png", "image/jpeg", "image/webp", "image/svg+xml"].includes(asset.mimeType))) {
+        throw new BadRequestException("Custom Order images must reference active PNG, JPEG, WebP, or SVG media assets");
+      }
+    }
+    await this.prisma.platformSetting.upsert({
+      where: { key: CUSTOM_ORDER_SETTING_KEY },
+      create: { key: CUSTOM_ORDER_SETTING_KEY, value: normalized as unknown as Prisma.InputJsonValue },
+      update: { value: normalized as unknown as Prisma.InputJsonValue },
+    });
+    await this.audit.log({
+      actorId,
+      action: "storefront.custom-order-products.update",
+      entityType: "PlatformSetting",
+      entityId: CUSTOM_ORDER_SETTING_KEY,
+      metadata: { keys: normalized.map((item) => item.key) },
+    });
+    return this.customOrderProducts();
   }
 
   async publicUiAssets(keys?: string[]) {

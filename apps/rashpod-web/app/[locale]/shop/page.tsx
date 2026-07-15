@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { fetchDesigners, fetchShopListings } from "../../../lib/catalog";
+import { fetchDesigners, fetchShopCategories, fetchShopListings } from "../../../lib/catalog";
 import ShopPageClient from "./ShopPageClient";
 
 export const metadata: Metadata = {
@@ -33,9 +33,10 @@ export default async function ShopPage({
   const params = await searchParams;
   const listingParams = buildListingParams(params);
 
-  const [{ items, meta }, designers] = await Promise.all([
+  const [{ items, meta }, designers, categories] = await Promise.all([
     fetchShopListings(listingParams),
     fetchDesigners(50),
+    fetchShopCategories(),
   ]);
 
   const initialListings = items.map((item) => ({
@@ -59,6 +60,7 @@ export default async function ShopPage({
         handle: designer.handle,
         displayName: designer.displayName,
       }))}
+      initialCategories={categories}
     />
   );
 }

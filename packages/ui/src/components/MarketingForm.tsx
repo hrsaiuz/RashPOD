@@ -4,6 +4,7 @@ import * as React from "react";
 import Link from "next/link";
 import { Check, Upload } from "lucide-react";
 import { cn } from "../lib/utils";
+import { MediaImage } from "./MediaImage";
 
 export function MarketingInput({
   label,
@@ -147,20 +148,20 @@ export function MarketingProductTypeTile({
   label,
   title,
   img,
+  alt,
+  fallbackLabel,
+  onClick,
 }: {
   label: string;
   title: string;
-  img?: string;
+  img?: string | null;
+  alt?: string;
+  fallbackLabel?: string;
+  onClick?: () => void;
 }) {
-  return (
-    <div className="relative min-h-[200px] overflow-hidden rounded-md bg-brand-ink p-5 text-white sm:min-h-[236px] sm:p-6">
-      <p className="text-lg font-bold lowercase text-white/80 sm:text-h3">{label}</p>
-      <h3 className="text-2xl font-black lowercase leading-none sm:text-h2">{title}</h3>
-      {img ? (
-        <img src={img} alt="" className="absolute bottom-4 right-4 max-h-[120px] max-w-[140px] object-contain sm:max-h-[140px] sm:max-w-[170px]" />
-      ) : null}
-    </div>
-  );
+  const content = <><div className="relative z-10"><p className="text-sm font-bold uppercase tracking-[0.1em] text-white/65">{label}</p><h3 className="mt-1 text-3xl font-black lowercase leading-none text-white">{title}</h3></div><MediaImage src={img} alt={alt ?? `RashPOD ${title}`} fallbackLabel={fallbackLabel ?? title} containerClassName="absolute inset-x-5 bottom-4 top-[82px]" className="object-contain transition-transform duration-200 motion-safe:group-hover:scale-[1.03]" loading="lazy" /></>;
+  const classes = "group relative min-h-[260px] w-full overflow-hidden rounded-[24px] bg-brand-ink p-5 text-left text-white shadow-soft transition motion-safe:hover:-translate-y-1 hover:shadow-lift focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand-peach/35 sm:min-h-[300px] sm:p-6";
+  return onClick ? <button type="button" onClick={onClick} className={classes}>{content}</button> : <div className={classes}>{content}</div>;
 }
 
 export function MarketingSimpleCta() {

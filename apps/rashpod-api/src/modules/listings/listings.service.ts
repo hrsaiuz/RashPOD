@@ -213,19 +213,94 @@ export class ListingsService {
     return updated;
   }
 
-  async shopList(type?: string, q?: string, limit?: number) {
-    const take = Math.min(Math.max(limit ?? 100, 1), 100);
-    const rows = await this.prisma.commerceListing.findMany({
-      where: {
-        status: ListingStatus.PUBLISHED,
-        ...(type ? { type: type as any } : {}),
-        ...(q ? { title: { contains: q, mode: "insensitive" } } : {}),
-      },
-      orderBy: { publishedAt: "desc" },
-      take,
-      include: { designer: { select: { id: true, displayName: true } } },
+  async shopList(filters: {
+    type?: string;
+    q?: string;
+    categories?: string[];
+    designers?: string[];
+    priceMin?: number;
+    priceMax?: number;
+    hasFilm?: boolean;
+    sort?: string;
+    page?: number;
+    limit?: number;
+  }) {
+    const take = Math.min(Math.max(Math.trunc(filters.limit ?? 24), 1), 100);
+    const page = Math.max(Math.trunc(filters.page ?? 1), 1);
+    const categories = filters.categories?.filter(Boolean) ?? [];
+    const designers = filters.designers?.filter(Boolean) ?? [];
+    const and: Prisma.CommerceListingWhereInput[] = [];
+    if (filters.q) {
+      and.push({
+        OR: [
+          { title: { contains: filters.q, mode: "insensitive" } },
+          { description: { contains: filters.q, mode: "insensitive" } },
+        ],
+      });
+    }
+    if (categories.length) {
+      and.push({
+        OR: [
+          { productType: { in: categories, mode: "insensitive" } },
+          { localBaseProduct: { productType: { name: { in: categories, mode: "insensitive" } } } },
+          { localBaseProduct: { productType: { slug: { in: categories } } } },
+          { localBaseProduct: { productType: { category: { in: categories, mode: "insensitive" } } } },
+        ],
+      });
+    }
+    const where: Prisma.CommerceListingWhereInput = {
+      status: ListingStatus.PUBLISHED,
+      ...(and.length ? { AND: and } : {}),
+      ...(filters.type && Object.values(ListingType).includes(filters.type as ListingType)
+        ? { type: filters.type as ListingType }
+        : {}),
+      ...(designers.length ? { designer: { handle: { in: designers } } } : {}),
+      ...(filters.priceMin != null || filters.priceMax != null
+        ? {
+            price: {
+              ...(filters.priceMin != null ? { gte: filters.priceMin } : {}),
+              ...(filters.priceMax != null ? { lte: filters.priceMax } : {}),
+            },
+          }
+        : {}),
+      ...(filters.hasFilm
+        ? { designAsset: { commercialRights: { is: { allowFilmSales: true, filmConsentRevokedAt: null } } } }
+        : {}),
+    };
+    const orderBy: Prisma.CommerceListingOrderByWithRelationInput =
+      filters.sort === "price_asc"
+        ? { price: "asc" }
+        : filters.sort === "price_desc"
+          ? { price: "desc" }
+          : filters.sort === "popular"
+            ? { orderItems: { _count: "desc" } }
+            : { publishedAt: "desc" };
+
+    const [rows, total] = await Promise.all([
+      this.prisma.commerceListing.findMany({
+        where,
+        orderBy,
+        skip: (page - 1) * take,
+        take,
+        include: {
+          designer: { select: { id: true, displayName: true, handle: true } },
+          localBaseProduct: { include: { productType: true } },
+        },
+      }),
+      this.prisma.commerceListing.count({ where }),
+    ]);
+    return {
+      items: rows.map((row) => this.toShopListingDto(row)),
+      meta: { total, page, perPage: take, totalPages: Math.max(1, Math.ceil(total / take)) },
+    };
+  }
+
+  async shopCategories() {
+    return this.prisma.productType.findMany({
+      where: { isActive: true, availableInShop: true },
+      select: { id: true, name: true, slug: true, category: true },
+      orderBy: [{ category: "asc" }, { name: "asc" }],
     });
-    return rows.map((row) => this.toShopListingDto(row));
   }
 
   async shopDesignersList(limit?: number) {
@@ -293,7 +368,9 @@ export class ListingsService {
     publishedAt: Date | null;
     imagesJson: any;
     designerId: string;
-    designer: { id: string; displayName: string };
+    designer: { id: string; displayName: string; handle?: string | null };
+    productType?: string | null;
+    localBaseProduct?: { productType?: { name: string; slug: string; category: string } | null } | null;
   }) {
     const images = Array.isArray(row.imagesJson)
       ? (row.imagesJson as unknown[]).filter((v): v is string => typeof v === "string")
@@ -309,10 +386,20 @@ export class ListingsService {
       publishedAt: row.publishedAt,
       imageUrl: images[0] ?? null,
       images,
+      category: row.localBaseProduct?.productType?.category ?? row.productType ?? null,
+      productType: row.localBaseProduct?.productType
+        ? {
+            name: row.localBaseProduct.productType.name,
+            slug: row.localBaseProduct.productType.slug,
+            category: row.localBaseProduct.productType.category,
+          }
+        : row.productType
+          ? { name: row.productType, slug: row.productType, category: row.productType }
+          : null,
       designer: {
         id: row.designer.id,
         displayName: row.designer.displayName,
-        handle: this.toHandle(row.designer.displayName, row.designer.id),
+        handle: row.designer.handle ?? this.toHandle(row.designer.displayName, row.designer.id),
       },
     };
   }

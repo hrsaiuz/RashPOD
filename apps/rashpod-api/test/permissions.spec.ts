@@ -16,4 +16,8 @@ describe("permissions matrix", () => {
     expect(permissions["tenants:read-all"]).toEqual(["SUPER_ADMIN"]);
     expect(permissions["entitlements:override"]).toEqual(["SUPER_ADMIN"]);
   });
+
+  it("limits designer invitation management to admin roles", () => {
+    expect(permissions["designer-invitations:manage"]).toEqual(["ADMIN", "SUPER_ADMIN"]);
+  });
 });

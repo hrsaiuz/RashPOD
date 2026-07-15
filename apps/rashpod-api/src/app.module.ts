@@ -44,6 +44,7 @@ import { SuperAdminPlatformModule } from "./modules/super-admin-platform/super-a
 import { HealthController } from "./health.controller";
 import { StorefrontToolboxModule } from "./modules/storefront-toolbox/storefront-toolbox.module";
 import { DesignStoriesModule } from "./modules/design-stories/design-stories.module";
+import { DesignerInvitationsModule } from "./modules/designer-invitations/designer-invitations.module";
 
 @Module({
   imports: [
@@ -88,6 +89,7 @@ import { DesignStoriesModule } from "./modules/design-stories/design-stories.mod
     SuperAdminPlatformModule,
     StorefrontToolboxModule,
     DesignStoriesModule,
+    DesignerInvitationsModule,
     IntakeModule,
     DesignWorkflowModule,
     PrintfulModule,

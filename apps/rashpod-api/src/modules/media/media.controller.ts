@@ -65,6 +65,21 @@ export class AdminBrandingController {
   updateTheme(@CurrentUser() user: RequestUser, @Body() body: Record<string, unknown>) {
     return this.service.updateBrandingTheme(user.sub, body || {});
   }
+
+  @Get("custom-order-products")
+  @RequirePermission("branding:manage")
+  customOrderProducts() {
+    return this.service.customOrderProducts();
+  }
+
+  @Patch("custom-order-products")
+  @RequirePermission("branding:manage")
+  updateCustomOrderProducts(
+    @CurrentUser() user: RequestUser,
+    @Body() body: { items?: Array<{ key?: string; mediaAssetId?: string | null; altText?: string | null }> },
+  ) {
+    return this.service.updateCustomOrderProducts(user.sub, body?.items ?? []);
+  }
 }
 
 @Controller("branding")

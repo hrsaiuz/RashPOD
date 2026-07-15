@@ -8,6 +8,7 @@
     "start": "next start -p 3000"
   },
   "dependencies": {
+    "@rashpod/config": "*",
     "@rashpod/ui": "*",
     "autoprefixer": "^10.5.0",
     "clsx": "^2.1.1",

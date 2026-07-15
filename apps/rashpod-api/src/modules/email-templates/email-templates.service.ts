@@ -1,4 +1,5 @@
 import { Injectable } from "@nestjs/common";
+import { officialSocialAccessibleNames, officialSocialLinks } from "@rashpod/config";
 
 interface BrandConfig {
   storeName: string;
@@ -44,8 +45,8 @@ export class EmailTemplatesService {
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <meta name="x-apple-disable-message-reformatting" />
 <meta http-equiv="X-UA-Compatible" content="IE=edge" />
-<meta name="color-scheme" content="light" />
-<meta name="supported-color-schemes" content="light" />
+<meta name="color-scheme" content="light dark" />
+<meta name="supported-color-schemes" content="light dark" />
 <title>${escapeHtml(b.storeName)}</title>
 <!--[if mso]><style type="text/css">body,table,td,a{font-family:Arial,Helvetica,sans-serif !important;}</style><![endif]-->
 </head>
@@ -74,6 +75,9 @@ export class EmailTemplatesService {
         </tr>
         <tr>
           <td align="center" style="padding:4px 24px 16px 24px;font-family:'DM Sans','Helvetica Neue',Arial,sans-serif;font-size:11px;color:#9CA3AF;">
+            <a href="${officialSocialLinks.instagram}" target="_blank" rel="noopener noreferrer" aria-label="${officialSocialAccessibleNames.instagram}" style="color:${b.primaryColor};text-decoration:none;">Instagram</a>
+            &nbsp;·&nbsp;
+            <a href="${officialSocialLinks.telegram}" target="_blank" rel="noopener noreferrer" aria-label="${officialSocialAccessibleNames.telegram}" style="color:${b.primaryColor};text-decoration:none;">Telegram</a><br/>
             © ${new Date().getFullYear()} ${escapeHtml(b.storeName)}. Tashkent, Uzbekistan.
           </td>
         </tr>
@@ -211,6 +215,20 @@ ${this.p(`This link is valid for 24 hours. If you didn't create a ${b.storeName}
       html: this.layout(content, `Confirm your email address to finish setting up your account.`),
       text: `Confirm your email by visiting: ${params.link}\n\nValid for 24 hours.`,
     };
+  }
+
+  designerInvitation(params: { recipientName?: string | null; inviterName?: string | null; personalMessage?: string | null; invitationUrl: string; expiresAt: Date; locale?: string | null }): RenderedEmail {
+    const b = this.brand();
+    const locale = params.locale === "ru" || params.locale === "en" ? params.locale : "uz";
+    const copy = {
+      en: { subject: `You're invited to join ${b.storeName} as a designer`, greeting: params.recipientName ? `Hi ${params.recipientName},` : "Hello,", intro: `${params.inviterName || "The RashPOD team"} invited you to join RashPOD as a designer.`, ability: "Upload original designs, create product listings, manage commercial rights, and earn royalties from approved sales.", cta: "Accept invitation", expires: "This single-use invitation expires", security: "If you were not expecting this invitation, you can safely ignore this email." },
+      ru: { subject: `Вас приглашают стать дизайнером ${b.storeName}`, greeting: params.recipientName ? `Здравствуйте, ${params.recipientName}!` : "Здравствуйте!", intro: `${params.inviterName || "Команда RashPOD"} приглашает вас присоединиться к RashPOD в качестве дизайнера.`, ability: "Загружайте оригинальные дизайны, создавайте товары, управляйте коммерческими правами и получайте роялти с одобренных продаж.", cta: "Принять приглашение", expires: "Одноразовое приглашение действительно до", security: "Если вы не ожидали это приглашение, просто проигнорируйте письмо." },
+      uz: { subject: `${b.storeName} dizayneri bo‘lish uchun taklif`, greeting: params.recipientName ? `Salom, ${params.recipientName}!` : "Salom!", intro: `${params.inviterName || "RashPOD jamoasi"} sizni RashPOD platformasiga dizayner sifatida taklif qildi.`, ability: "Original dizaynlarni yuklang, mahsulot e’lonlarini yarating, tijorat huquqlarini boshqaring va tasdiqlangan savdolardan royalti oling.", cta: "Taklifni qabul qilish", expires: "Bir martalik taklifning amal qilish muddati", security: "Agar bu taklifni kutmagan bo‘lsangiz, xatni e’tiborsiz qoldirishingiz mumkin." },
+    }[locale];
+    const expiry = params.expiresAt.toLocaleString(locale === "ru" ? "ru-RU" : locale === "uz" ? "uz-UZ" : "en-US", { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Tashkent" });
+    const message = params.personalMessage ? `<div style="margin:18px 0;padding:16px 18px;border-left:4px solid ${b.peachColor};background:#FFF6F1;border-radius:10px;color:#374151;">${escapeHtml(params.personalMessage)}</div>` : "";
+    const content = `${this.h1(copy.subject)}${this.p(escapeHtml(copy.greeting))}${this.p(escapeHtml(copy.intro))}${message}${this.p(escapeHtml(copy.ability))}${this.button(params.invitationUrl, copy.cta, b.peachColor)}${this.p(`${escapeHtml(copy.expires)}: <strong>${escapeHtml(expiry)}</strong>.`)}${this.p(`URL: <a href="${params.invitationUrl}" style="color:${b.primaryColor};word-break:break-all;">${escapeHtml(params.invitationUrl)}</a>`)}${this.p(escapeHtml(copy.security))}`;
+    return { subject: copy.subject, html: this.layout(content, copy.subject), text: `${copy.greeting}\n\n${copy.intro}\n\n${params.personalMessage ? `${params.personalMessage}\n\n` : ""}${copy.ability}\n\n${copy.cta}: ${params.invitationUrl}\n\n${copy.expires}: ${expiry}.\n\n${copy.security}` };
   }
 
   passwordReset(params: { name: string; link: string }): RenderedEmail {

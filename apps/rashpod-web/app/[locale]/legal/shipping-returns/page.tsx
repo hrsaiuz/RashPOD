@@ -118,7 +118,7 @@ export default function ShippingReturnsPage() {
       <section>
         <h2>11. Contact</h2>
         <p className="mt-4">
-          For delivery, return, or order issue questions, contact hello@rashpod.uz, Telegram @rashpod, or +998 50 270 00 00 with your order number and details.
+          For delivery, return, or order issue questions, contact hello@rashpod.uz, Telegram @therashpod, or +998 50 270 00 00 with your order number and details.
         </p>
       </section>
     </LegalPage>

@@ -39,6 +39,13 @@ export interface FilmListing {
   designer: { displayName: string; handle: string };
 }
 
+export interface ShopCategory {
+  id: string;
+  name: string;
+  slug: string;
+  category: string;
+}
+
 export interface StoryListingSummary {
   id: string;
   slug: string;
@@ -262,6 +269,15 @@ export async function fetchShopListings(params: Record<string, string> = {}) {
   const items = normalizeProducts(data);
   const meta = data.meta ?? null;
   return { items, meta };
+}
+
+export async function fetchShopCategories() {
+  const apiUrl = getApiUrl();
+  if (!apiUrl) return [] as ShopCategory[];
+  const res = await fetch(`${apiUrl}/shop/categories`, { next: { revalidate: CATALOG_REVALIDATE_SECONDS } });
+  if (!res.ok) return [] as ShopCategory[];
+  const data = await res.json();
+  return Array.isArray(data) ? (data as ShopCategory[]) : [];
 }
 
 export async function fetchStoryBySlug(slug: string, locale?: string) {

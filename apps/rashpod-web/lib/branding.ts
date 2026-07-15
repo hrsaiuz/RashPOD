@@ -9,6 +9,7 @@ export type StorefrontBranding = {
   homeDesignerSectionImageUrl?: string | null;
   homeDesignerSectionImageAlt?: string | null;
   theme: { storeName?: string; storeTagline?: string };
+  customOrderProductTypes: Array<{ key: string; label: string; title: string; mediaAssetId: string | null; imageUrl: string | null; altText: string }>;
 };
 
 const getOptionalString = (value: unknown) =>
@@ -68,6 +69,9 @@ export async function getStorefrontBranding(): Promise<StorefrontBranding | null
         getOptionalString(theme.homeDesignerSectionImageAlt) ??
         null,
       theme: theme as StorefrontBranding["theme"],
+      customOrderProductTypes: Array.isArray(data.customOrderProductTypes)
+        ? (data.customOrderProductTypes as StorefrontBranding["customOrderProductTypes"])
+        : [],
     };
   } catch {
     return null;

@@ -3,7 +3,9 @@
 import * as React from "react";
 import Link from "next/link";
 import { Camera, Send } from "lucide-react";
+import { officialSocialAccessibleNames, officialSocialLinks } from "@rashpod/config";
 import { cn } from "../lib/utils";
+import { MediaImage } from "./MediaImage";
 
 export interface PublicFooterLink {
   href: string;
@@ -67,10 +69,10 @@ export const PublicFooter: React.FC<PublicFooterProps> = ({
             <p className="mb-2 text-[18px] font-semibold tracking-[0.16em] text-black">Be the first to get the next drop</p>
             <p className="text-[16px] text-black">Receive a mystery design every month</p>
             <div className="mt-[68px] flex gap-7">
-              <a href="https://t.me/rashpod" target="_blank" rel="noopener noreferrer" aria-label="Telegram" className="text-black transition-transform hover:scale-110">
+              <a href={officialSocialLinks.telegram} target="_blank" rel="noopener noreferrer" aria-label={officialSocialAccessibleNames.telegram} className="text-black transition-transform hover:scale-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue">
                 <Send size={32} strokeWidth={2.3} />
               </a>
-              <a href="https://instagram.com/rashpod" target="_blank" rel="noopener noreferrer" aria-label="Instagram" className="text-black transition-transform hover:scale-110">
+              <a href={officialSocialLinks.instagram} target="_blank" rel="noopener noreferrer" aria-label={officialSocialAccessibleNames.instagram} className="text-black transition-transform hover:scale-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue">
                 <Camera size={32} strokeWidth={2.3} />
               </a>
             </div>
@@ -86,8 +88,15 @@ export const PublicFooter: React.FC<PublicFooterProps> = ({
 
         <div className="pointer-events-none mx-auto mt-[68px] max-w-storefront overflow-hidden">
           {logoUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={logoUrl} alt={`${brandName} footer logo`} className="mx-auto h-auto max-h-[180px] w-auto max-w-full select-none object-contain" />
+            <MediaImage
+              src={logoUrl}
+              alt={`${brandName} footer logo`}
+              fallbackLabel={brandName}
+              containerClassName="mx-auto aspect-[5/1] min-h-[72px] w-full max-w-[1200px]"
+              className="select-none object-contain"
+              loading="lazy"
+              decoding="async"
+            />
           ) : (
             <p className="select-none text-center text-[clamp(102px,15.3vw,209px)] font-black lowercase leading-[0.75] tracking-[-0.09em] text-brand-peach">
               {brandName}
