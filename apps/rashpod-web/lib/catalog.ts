@@ -71,7 +71,7 @@ export interface PublicDesignStory {
   videoUrl?: string | null;
   publishedAt?: string | null;
   designer?: { id?: string; displayName?: string | null; handle?: string | null } | null;
-  design?: { id?: string; title?: string | null } | null;
+  design?: { id?: string; title?: string | null; description?: string | null } | null;
   listings: StoryListingSummary[];
 }
 

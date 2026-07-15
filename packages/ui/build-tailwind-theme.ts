@@ -44,6 +44,17 @@ export function buildRashpodTailwindExtend() {
         darkShell: colors.surfaces.darkShell,
         darkPanel: colors.surfaces.darkPanel,
       },
+      backoffice: {
+        canvas: colors.backoffice.canvas,
+        surface: colors.backoffice.surface,
+        muted: colors.backoffice.surfaceMuted,
+        border: colors.backoffice.border,
+        accent: colors.backoffice.accent,
+        accentSoft: colors.backoffice.accentSoft,
+        text: colors.backoffice.text,
+        subtle: colors.backoffice.muted,
+        focus: colors.backoffice.focus,
+      },
       semantic: {
         success: colors.semantic.success,
         successBg: colors.semantic.successBg,

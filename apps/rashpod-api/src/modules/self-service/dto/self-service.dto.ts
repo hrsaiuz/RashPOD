@@ -1,4 +1,12 @@
-import { IsIn, IsOptional, IsString, MaxLength } from "class-validator";
+import { IsBoolean, IsIn, IsOptional, IsString, MaxLength } from "class-validator";
+
+export class UpdateStoryEngagementDto {
+  @IsBoolean()
+  liked!: boolean;
+
+  @IsBoolean()
+  bookmarked!: boolean;
+}
 
 export class SupportRequestDto {
   @IsString()

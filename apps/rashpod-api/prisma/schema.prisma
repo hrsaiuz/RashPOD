@@ -1044,6 +1044,7 @@ model User {
   entitlementOverridesCreated TenantEntitlementOverride[] @relation("TenantEntitlementOverrideCreator")
   customerAddresses CustomerAddress[]
   wishlistItems WishlistItem[]
+  storyEngagements StoryEngagement[]
 }
 
 model CustomerAddress {
@@ -1169,8 +1170,26 @@ model DesignStory {
   updatedAt             DateTime          @updatedAt
 
   designAsset DesignAsset @relation(fields: [designAssetId], references: [id], onDelete: Cascade)
+  engagements StoryEngagement[]
 
   @@index([status, updatedAt])
+}
+
+model StoryEngagement {
+  id            String   @id @default(uuid())
+  userId        String
+  designStoryId String
+  liked         Boolean  @default(false)
+  bookmarked    Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  designStory DesignStory @relation(fields: [designStoryId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, designStoryId])
+  @@index([userId, bookmarked, updatedAt])
+  @@index([designStoryId])
 }
 
 model DesignVersion {

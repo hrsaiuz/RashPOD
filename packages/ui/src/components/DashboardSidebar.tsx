@@ -4,7 +4,7 @@ import * as React from "react";
 import Link from "next/link";
 import { motion as m } from "framer-motion";
 import { cn } from "../lib/utils";
-import { ChevronDown, LucideIcon } from "lucide-react";
+import { ChevronDown, LucideIcon, PanelLeftClose, PanelLeftOpen } from "lucide-react";
 
 export interface DashboardLink {
   href: string;
@@ -28,18 +28,20 @@ export interface DashboardSidebarProps {
   onNavigate?: () => void;
   logoUrl?: string | null;
   brandName?: string;
+  compact?: boolean;
+  onCompactChange?: (compact: boolean) => void;
 }
 
 const ACCENT_BY_ROLE: Record<string, NonNullable<DashboardSidebarProps["accent"]>> = {
   designer: "peach",
-  customer: "blue",
-  corporate: "blue",
+  customer: "peach",
+  corporate: "peach",
   moderator: "peach",
-  production: "green",
-  finance: "blue",
-  support: "blue",
-  admin: "ink",
-  "super admin": "ink",
+  production: "peach",
+  finance: "peach",
+  support: "peach",
+  admin: "peach",
+  "super admin": "peach",
 };
 
 const ACCENT_CLASSES: Record<NonNullable<DashboardSidebarProps["accent"]>, {
@@ -103,6 +105,8 @@ export const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
   onNavigate,
   logoUrl,
   brandName = "RashPOD",
+  compact = false,
+  onCompactChange,
 }) => {
   const resolvedAccent: NonNullable<DashboardSidebarProps["accent"]> =
     accent ?? ACCENT_BY_ROLE[role.toLowerCase()] ?? "blue";
@@ -152,7 +156,7 @@ export const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
     });
   }, [activePath, groupedLinks]);
 
-  const renderLink = (link: DashboardLink, compact = false) => {
+  const renderLink = (link: DashboardLink, nested = false, iconOnly = false) => {
     const isActive = isLinkActive(link, activePath);
     const Icon = link.icon;
 
@@ -177,15 +181,15 @@ export const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
           className={cn(
             "flex min-h-11 items-center gap-3 rounded-[16px] text-sm font-medium transition-colors focus:outline-none focus:ring-2",
             a.ring,
-            compact ? "px-3 py-2.5 pl-4" : "px-4 py-3",
+            iconOnly ? "mx-auto h-12 w-12 justify-center p-0" : nested ? "px-3 py-2.5 pl-4" : "px-4 py-3",
             isActive
               ? cn(a.activeBg, a.activeText, "font-semibold shadow-soft")
               : "text-brand-text hover:bg-surface-borderSoft"
           )}
         >
-          {Icon && <Icon size={compact ? 18 : 20} aria-hidden="true" className="shrink-0" />}
-          <span className="flex-1 truncate">{link.label}</span>
-          {link.badge !== undefined && (
+          {Icon ? <Icon size={iconOnly ? 20 : nested ? 18 : 20} aria-hidden="true" className="shrink-0" /> : iconOnly ? <span className="text-xs font-bold" aria-hidden="true">{link.label.slice(0, 1)}</span> : null}
+          <span className={cn("flex-1 truncate", iconOnly && "sr-only")}>{link.label}</span>
+          {!iconOnly && link.badge !== undefined && (
             <span
               className={cn(
                 "inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full text-[11px] font-semibold tabular-nums",
@@ -203,29 +207,30 @@ export const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
   return (
     <aside
       className={cn(
-        "w-[260px] bg-white/92 backdrop-blur-md border-r border-surface-borderSoft h-full md:h-screen md:sticky md:top-0 overflow-y-auto shadow-soft",
+        "h-full border-r border-backoffice-border bg-backoffice-surface transition-[width] duration-200 motion-reduce:transition-none md:sticky md:top-0 md:h-screen",
+        compact ? "w-[72px] overflow-x-hidden overflow-y-auto" : "w-[248px] overflow-y-auto",
         className
       )}
       aria-label={`${role} navigation`}
     >
-      <div className="p-6">
-        <div className="mb-8 flex items-center gap-3">
-          <Link href="/" className="flex items-center gap-2 text-2xl font-bold text-brand-blue tracking-tight focus:outline-none focus:ring-2 focus:ring-brand-blue/30 rounded">
+      <div className={compact ? "px-2 py-4" : "p-5"}>
+        <div className={cn("flex items-center", compact ? "mb-5 justify-center" : "mb-7 gap-3")}>
+          <Link href="/" aria-label={brandName} className="flex items-center gap-2 rounded text-2xl font-bold tracking-tight text-brand-blue focus:outline-none focus:ring-2 focus:ring-brand-blue/30">
             {logoUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={logoUrl} alt={brandName} className="max-h-10 w-auto max-w-[172px] object-contain" />
+              <img src={logoUrl} alt={brandName} className={cn("object-contain", compact ? "h-9 w-9" : "max-h-10 w-auto max-w-[172px]")} />
             ) : (
               <>
                 <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-brand-blue text-base text-white shadow-blueGlow">
                   R
                 </span>
-                <span>{brandName}</span>
+                {!compact ? <span>{brandName}</span> : null}
               </>
             )}
           </Link>
         </div>
 
-        <div className="mb-4 flex items-center gap-2">
+        <div className={cn("mb-4 flex items-center gap-2", compact && "sr-only")}>
           <span className={cn("inline-block h-2.5 w-2.5 rounded-full", a.dot)} aria-hidden="true" />
           <span className="text-[11px] uppercase tracking-[0.08em] font-semibold text-brand-muted">
             {role}
@@ -233,9 +238,10 @@ export const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
         </div>
 
         <nav className="space-y-1.5" aria-label="Primary">
-          {!hasGroups && links.map((link) => renderLink(link))}
+          {compact ? links.map((link) => <div key={link.href} title={link.label}>{renderLink(link, false, true)}</div>) : null}
+          {!compact && !hasGroups && links.map((link) => renderLink(link))}
 
-          {hasGroups && (
+          {!compact && hasGroups && (
             <>
               {topLevelLinks.map((link) => renderLink(link))}
               <div className="my-3 h-px bg-surface-borderSoft" aria-hidden="true" />
@@ -288,6 +294,9 @@ export const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
             </>
           )}
         </nav>
+        {onCompactChange ? <button type="button" onClick={() => onCompactChange(!compact)} aria-label={compact ? "Expand navigation" : "Collapse navigation"} className={cn("mt-5 flex min-h-11 items-center rounded-xl text-backoffice-subtle hover:bg-backoffice-muted hover:text-backoffice-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-backoffice-focus", compact ? "mx-auto w-12 justify-center" : "w-full gap-3 px-4")}>
+          {compact ? <PanelLeftOpen size={20} /> : <PanelLeftClose size={20} />} {!compact ? <span className="text-sm font-medium">Collapse</span> : null}
+        </button> : null}
       </div>
     </aside>
   );

@@ -20,6 +20,13 @@
     "dev:dashboard": "npm run dev -w @rashpod/dashboard",
     "dev:worker": "npm run dev -w @rashpod/worker",
     "build": "npm run build -ws",
-    "test": "npm run test -ws"
+    "test": "npm run test -ws",
+    "test:ui": "vitest run --config vitest.config.ts"
+  },
+  "devDependencies": {
+    "@testing-library/jest-dom": "^6.6.3",
+    "@testing-library/react": "^16.3.0",
+    "jsdom": "^26.1.0",
+    "vitest": "^3.2.4"
   }
 }

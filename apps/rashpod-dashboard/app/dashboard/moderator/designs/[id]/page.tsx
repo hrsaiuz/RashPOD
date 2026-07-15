@@ -13,6 +13,7 @@ import { GlobalSelectionMockupEditor, LocalSelectionMockupEditor } from "../../.
 import { DesignPreviewCard } from "../../../../../components/design/DesignPreviewCard";
 import { ModeratorDesignStoryReview } from "../../../../../components/design-story/ModeratorDesignStoryReview";
 import { MockupErrorHint, PlacementChips, ReadinessChecklist } from "../../moderator-pipeline-helpers";
+import { buildModerationDecisionPayload } from "./moderation-decision-payload";
 
 const REJECTION_REASONS = [
   ["COPYRIGHT_RISK", "Copyright or trademark risk"],
@@ -170,6 +171,7 @@ export default function Page() {
   const [selectedReasons, setSelectedReasons] = useState<string[]>([]);
   const [customReason, setCustomReason] = useState("");
   const [notes, setNotes] = useState("");
+  const [pendingDecision, setPendingDecision] = useState<"APPROVE_LOCAL" | "APPROVE_GLOBAL" | "REJECT" | null>(null);
   const [pipelineMode, setPipelineMode] = useState<PipelineMode>("uzbek");
   const [expandedLocal, setExpandedLocal] = useState<Record<string, boolean>>({});
   const [expandedGlobalNumeric, setExpandedGlobalNumeric] = useState<Record<string, boolean>>({});
@@ -492,27 +494,27 @@ export default function Page() {
     }));
   }
 
-  async function submitApproval() {
-    const decision = pipelineMode === "global" ? "APPROVE_GLOBAL" : "APPROVE_LOCAL";
+  function submitApproval(decisionOverride?: "APPROVE_LOCAL" | "APPROVE_GLOBAL") {
+    const decision = decisionOverride ?? (pipelineMode === "global" ? "APPROVE_GLOBAL" : "APPROVE_LOCAL");
     if (decision === "APPROVE_GLOBAL" && (!localSelections.length || !globalSelections.length)) {
       setActionError("Global pipeline requires at least one local product and one Printful template.");
       return;
     }
-    await submitDecision(decision);
+    setPendingDecision(decision);
   }
 
   async function submitDecision(decision: "APPROVE_LOCAL" | "APPROVE_GLOBAL" | "REJECT") {
     setSubmitting(true);
     setActionError("");
     try {
-      const payload = decision === "REJECT"
-        ? { decision, rejectionReasons: selectedReasons, customRejectionReason: customReason || undefined, moderatorNotes: notes || undefined }
-        : {
-            decision,
-            localSelections: toLocalPayload(),
-            globalPrintfulSelections: decision === "APPROVE_GLOBAL" ? toGlobalPayload() : undefined,
-            moderatorNotes: notes || undefined,
-          };
+      const payload = buildModerationDecisionPayload({
+        decision,
+        localSelections: toLocalPayload(),
+        globalPrintfulSelections: toGlobalPayload(),
+        rejectionReasons: selectedReasons,
+        customRejectionReason: customReason,
+        moderatorNotes: notes,
+      });
       setDetail(await api.post<DesignWorkflowDetail>(`/admin/designs/${params.id}/moderation-decision`, payload));
     } catch (e) {
       setActionError(e instanceof Error ? e.message : "Failed to submit moderation decision");
@@ -557,7 +559,13 @@ export default function Page() {
           <Link href="/dashboard/moderator/designs">
             <Button variant="ghost"><ArrowLeft size={18} /> Back to queue</Button>
           </Link>
-          {detail ? <StatusBadge status={detail.status} /> : null}
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            {detail?.previewImageUrl ? <a href={detail.previewImageUrl} target="_blank" rel="noopener noreferrer"><Button variant="secondary" size="sm">Download file</Button></a> : null}
+            {detail && canModerate ? <Button variant="secondary" size="sm" onClick={() => document.getElementById("moderation-rejection")?.scrollIntoView({ behavior: "smooth", block: "start" })}>Internal notes</Button> : null}
+            {detail && canModerate ? <Button variant="danger" size="sm" onClick={() => document.getElementById("moderation-rejection")?.scrollIntoView({ behavior: "smooth", block: "start" })}>Reject design</Button> : null}
+            {detail && canModerate ? <Button variant="primaryPeach" size="sm" onClick={() => document.getElementById("pipeline-approval")?.scrollIntoView({ behavior: "smooth", block: "start" })}>Approve</Button> : null}
+            {detail ? <StatusBadge status={detail.status} /> : null}
+          </div>
         </div>
 
         {loadError ? <ErrorState title="Moderation issue" description={loadError} retry={<Button onClick={load}>Retry</Button>} /> : null}
@@ -568,7 +576,7 @@ export default function Page() {
         ) : loadNotFound ? (
           <EmptyState title="Design not found" description="This moderation item is no longer available." />
         ) : !detail ? null : (
-          <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_420px]">
+          <div className="grid gap-6">
             {configError ? (
               <Card className="xl:col-span-2 border-status-warning/30 bg-status-warning/5">
                 <div className="flex flex-wrap items-center justify-between gap-3">
@@ -581,6 +589,7 @@ export default function Page() {
               </Card>
             ) : null}
             <div className="space-y-6">
+              <div className="grid items-start gap-6 lg:grid-cols-[minmax(280px,0.72fr)_minmax(0,1.28fr)]">
               <DesignPreviewCard
                 title="Design artwork"
                 src={detail.previewImageUrl}
@@ -603,11 +612,12 @@ export default function Page() {
                   <Info label="Transparency" value={latest?.hasTransparency ? "Detected" : "Unknown"} />
                 </div>
               </Card>
+              </div>
 
               <ModeratorDesignStoryReview designId={String(params.id)} />
 
               {canModerate ? (
-              <Card>
+              <Card id="pipeline-approval" className="scroll-mt-24">
                 <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
                   <div>
                     <h2 className="text-xl font-semibold text-brand-ink">Pipeline Approval</h2>
@@ -641,7 +651,7 @@ export default function Page() {
                   </button>
                 </div>
 
-                <div className="space-y-5">
+                <div className="grid items-start gap-5 2xl:grid-cols-2">
                   <DecisionSection icon={<MapPin size={20} />} title={pipelineMode === "global" ? "Uzbek Base Products" : "Select Base Products"}>
                     <div className="space-y-4">
                       {localSelections.map((selection, index) => (
@@ -745,10 +755,16 @@ export default function Page() {
                       <Button variant="secondary" size="sm" onClick={() => setLocalSelections((current) => [...current, createLocalSelection(baseProducts, placementPresets, mockupTemplates, printAreas)])} disabled={configLoading}>
                         <Plus size={16} /> Add Local Product
                       </Button>
+                      <Button
+                        onClick={() => submitApproval("APPROVE_LOCAL")}
+                        disabled={submitting || configLoading || !localSelections.length || !localReady}
+                        loading={submitting && pendingDecision === "APPROVE_LOCAL"}
+                      >
+                        <MapPin size={18} /> Approve Local & Generate Mockups
+                      </Button>
                     </div>
                   </DecisionSection>
 
-                  {pipelineMode === "global" ? (
                   <DecisionSection icon={<Globe2 size={20} />} title="Printful Products">
                     <div className="space-y-4">
                       {globalSelections.map((selection, index) => (
@@ -871,9 +887,15 @@ export default function Page() {
                       <Button variant="secondary" size="sm" onClick={() => setGlobalSelections((current) => [...current, createGlobalSelection(printfulTemplates, placementPresets)])} disabled={configLoading}>
                         <Plus size={16} /> Add Printful Product
                       </Button>
+                      <Button
+                        onClick={() => submitApproval("APPROVE_GLOBAL")}
+                        disabled={submitting || configLoading || !localSelections.length || !localReady || !globalSelections.length || !globalReady}
+                        loading={submitting && pendingDecision === "APPROVE_GLOBAL"}
+                      >
+                        <Globe2 size={18} /> Approve Global & Generate Mockups
+                      </Button>
                     </div>
                   </DecisionSection>
-                  ) : null}
                 </div>
 
                 <div className="mt-5 space-y-3">
@@ -884,13 +906,6 @@ export default function Page() {
                       { label: "Design resolution adequate", ok: designResolutionOk, warn: !designResolutionOk },
                     ]}
                   />
-                  <Button
-                    onClick={submitApproval}
-                    disabled={submitting || configLoading || !localSelections.length || !localReady || (pipelineMode === "global" && (!globalSelections.length || !globalReady))}
-                    loading={submitting}
-                  >
-                    <MapPin size={18} /> Approve & Generate Mockups
-                  </Button>
                 </div>
               </Card>
               ) : null}
@@ -1003,7 +1018,7 @@ export default function Page() {
             </div>
 
             {canModerate ? (
-            <Card>
+            <Card id="moderation-rejection" className="scroll-mt-24 border-semantic-danger/20">
               <div className="mb-4 flex items-center gap-2">
                 <AlertTriangle size={20} className="text-status-danger" />
                 <h2 className="text-xl font-semibold text-brand-ink">Reject Design</h2>
@@ -1025,7 +1040,7 @@ export default function Page() {
               />
               <label className="mt-4 block text-sm font-medium text-brand-ink" htmlFor="notes">Internal notes</label>
               <Input id="notes" value={notes} onChange={(event) => setNotes(event.target.value)} placeholder="Optional moderator note" className="mt-2" />
-              <Button className="mt-5 w-full" variant="danger" onClick={() => submitDecision("REJECT")} disabled={submitting} loading={submitting}>
+              <Button className="mt-5 w-full" variant="danger" onClick={() => setPendingDecision("REJECT")} disabled={submitting || (!selectedReasons.length && !customReason.trim())} loading={submitting && pendingDecision === "REJECT"}>
                 <XCircle size={18} /> Submit Rejection
               </Button>
             </Card>
@@ -1033,6 +1048,21 @@ export default function Page() {
           </div>
         )}
       </div>
+      <ConfirmationDialog
+        open={pendingDecision !== null}
+        title={pendingDecision === "REJECT" ? "Reject this design?" : "Approve and generate mockups?"}
+        description={pendingDecision === "REJECT" ? "The designer will receive the selected rejection reasons. This action is recorded in the moderation audit." : `This will approve the ${pendingDecision === "APPROVE_GLOBAL" ? "local and global" : "local"} pipeline and start mockup generation.`}
+        confirmLabel={pendingDecision === "REJECT" ? "Reject design" : "Approve & generate"}
+        destructive={pendingDecision === "REJECT"}
+        busy={submitting}
+        onCancel={() => setPendingDecision(null)}
+        onConfirm={async () => {
+          if (!pendingDecision) return;
+          const decision = pendingDecision;
+          await submitDecision(decision);
+          setPendingDecision(null);
+        }}
+      />
     </DashboardLayout>
   );
 }
@@ -1136,6 +1166,30 @@ function Info({ label, value }: { label: string; value: string }) {
       <p className="mt-1 text-sm font-semibold text-brand-ink">{value}</p>
     </div>
   );
+}
+
+function ConfirmationDialog({ open, title, description, confirmLabel, destructive, busy, onCancel, onConfirm }: { open: boolean; title: string; description: string; confirmLabel: string; destructive?: boolean; busy: boolean; onCancel: () => void; onConfirm: () => void | Promise<void> }) {
+  const dialogRef = useRef<HTMLDivElement | null>(null);
+  const confirmRef = useRef<HTMLButtonElement | null>(null);
+  const returnFocusRef = useRef<HTMLElement | null>(null);
+  useEffect(() => {
+    if (!open) return;
+    returnFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    confirmRef.current?.focus();
+    return () => returnFocusRef.current?.focus();
+  }, [open]);
+  if (!open) return null;
+  function handleKeyDown(event: React.KeyboardEvent<HTMLDivElement>) {
+    if (event.key === "Escape" && !busy) { event.preventDefault(); onCancel(); return; }
+    if (event.key !== "Tab") return;
+    const focusable = dialogRef.current?.querySelectorAll<HTMLElement>("button:not([disabled]), [href], input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex='-1'])");
+    if (!focusable?.length) return;
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+    else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+  }
+  return <div className="fixed inset-0 z-modal grid place-items-center bg-brand-ink/50 p-4" role="presentation" onMouseDown={(event) => { if (event.currentTarget === event.target && !busy) onCancel(); }}><div ref={dialogRef} onKeyDown={handleKeyDown} role="alertdialog" aria-modal="true" aria-labelledby="moderation-confirm-title" aria-describedby="moderation-confirm-description" className="w-full max-w-md rounded-2xl border border-backoffice-border bg-backoffice-surface p-6 shadow-lg"><h2 id="moderation-confirm-title" className="text-xl font-bold text-backoffice-text">{title}</h2><p id="moderation-confirm-description" className="mt-2 text-sm leading-6 text-backoffice-subtle">{description}</p><div className="mt-6 flex flex-wrap justify-end gap-3"><Button variant="secondary" onClick={onCancel} disabled={busy}>Cancel</Button><Button ref={confirmRef} variant={destructive ? "danger" : "primaryPeach"} onClick={() => void onConfirm()} loading={busy}>{confirmLabel}</Button></div></div></div>;
 }
 
 function DecisionSection({ icon, title, children }: { icon: ReactNode; title: string; children: ReactNode }) {

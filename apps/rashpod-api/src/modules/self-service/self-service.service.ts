@@ -1,9 +1,9 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
-import { DesignStatus, ListingStatus, ListingType, OrderStatus, PaymentStatus, Prisma, ProductionJobStatus, SupportMessageVisibility, SupportPriority, SupportRequestStatus, UserRole } from "@prisma/client";
+import { DesignStatus, DesignStoryStatus, ListingStatus, ListingType, OrderStatus, PaymentStatus, Prisma, ProductionJobStatus, SupportMessageVisibility, SupportPriority, SupportRequestStatus, UserRole } from "@prisma/client";
 import { PrismaService } from "../../prisma/prisma.service";
 import { AuditService } from "../audit/audit.service";
 import { PaymentsService } from "../payments/payments.service";
-import { SupportRequestDto, UpdateCustomerProfileDto, UpdateDesignerProfileDto } from "./dto/self-service.dto";
+import { SupportRequestDto, UpdateCustomerProfileDto, UpdateDesignerProfileDto, UpdateStoryEngagementDto } from "./dto/self-service.dto";
 import { AddWishlistItemDto, CreateCustomerAddressDto, UpdateCustomerAddressDto } from "./dto/customer-address.dto";
 
 type CustomerStatus =
@@ -279,6 +279,50 @@ export class SelfServiceService {
       orderBy: { updatedAt: "desc" },
     });
     return designs.map((design) => this.toDesignerDesignSummary(design));
+  }
+
+  async getStoryEngagement(userId: string, storyId: string) {
+    await this.requirePublishedStory(storyId);
+    const engagement = await this.prisma.storyEngagement.findUnique({
+      where: { userId_designStoryId: { userId, designStoryId: storyId } },
+    });
+    return { storyId, liked: engagement?.liked ?? false, bookmarked: engagement?.bookmarked ?? false };
+  }
+
+  async updateStoryEngagement(userId: string, storyId: string, dto: UpdateStoryEngagementDto) {
+    await this.requirePublishedStory(storyId);
+    const key = { userId_designStoryId: { userId, designStoryId: storyId } };
+    const existing = await this.prisma.storyEngagement.findUnique({ where: key });
+
+    if (!dto.liked && !dto.bookmarked) {
+      if (existing) await this.prisma.storyEngagement.delete({ where: { id: existing.id } });
+      if (existing?.liked || existing?.bookmarked) {
+        await this.audit.log({ actorId: userId, action: "story.engagement.cleared", entityType: "DesignStory", entityId: storyId });
+      }
+      return { storyId, liked: false, bookmarked: false };
+    }
+
+    const engagement = await this.prisma.storyEngagement.upsert({
+      where: key,
+      create: { userId, designStoryId: storyId, liked: dto.liked, bookmarked: dto.bookmarked },
+      update: { liked: dto.liked, bookmarked: dto.bookmarked },
+    });
+    if (!existing || existing.liked !== dto.liked || existing.bookmarked !== dto.bookmarked) {
+      await this.audit.log({
+        actorId: userId,
+        action: "story.engagement.updated",
+        entityType: "DesignStory",
+        entityId: storyId,
+        metadata: { liked: dto.liked, bookmarked: dto.bookmarked },
+      });
+    }
+    return { storyId, liked: engagement.liked, bookmarked: engagement.bookmarked };
+  }
+
+  private async requirePublishedStory(storyId: string) {
+    const story = await this.prisma.designStory.findUnique({ where: { id: storyId }, select: { status: true } });
+    if (!story) throw new NotFoundException("Story not found");
+    if (story.status !== DesignStoryStatus.PUBLISHED) throw new BadRequestException("Story is not available");
   }
 
   async designerDesign(designerId: string, designId: string) {

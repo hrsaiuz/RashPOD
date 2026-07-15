@@ -35,7 +35,7 @@ export const DashboardTopbar: React.FC<DashboardTopbarProps> = ({
       </a>
       <header
         className={cn(
-          "h-[76px] bg-white/90 backdrop-blur-md border-b border-surface-borderSoft flex items-center justify-between px-6 sticky top-0 z-10",
+          "h-16 bg-backoffice-surface border-b border-backoffice-border flex items-center justify-between px-4 sm:px-6 sticky top-0 z-10",
           className
         )}
         role="banner"
@@ -57,7 +57,7 @@ export const DashboardTopbar: React.FC<DashboardTopbarProps> = ({
                 type="search"
                 placeholder="Search..."
                 aria-label="Search dashboard"
-                className="w-80 h-11 pl-10 pr-4 rounded-[16px] border border-surface-borderSoft bg-white/80 text-sm text-brand-text placeholder:text-brand-subtle shadow-xs focus:outline-none focus:ring-4 focus:ring-brand-blue/20 focus:border-brand-blue"
+              className="h-10 w-64 rounded-xl border border-backoffice-border bg-backoffice-muted pl-10 pr-4 text-sm text-backoffice-text placeholder:text-backoffice-subtle focus:outline-none focus:ring-2 focus:ring-backoffice-focus"
               />
             </div>
           )}
@@ -65,7 +65,7 @@ export const DashboardTopbar: React.FC<DashboardTopbarProps> = ({
 
         <div className="flex items-center gap-3">
           <button
-            className="p-2 rounded-xl hover:bg-surface-borderSoft transition-colors relative"
+            className="relative grid h-11 w-11 place-items-center rounded-xl hover:bg-backoffice-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-backoffice-focus"
             aria-label="Notifications"
           >
             <Bell size={20} className="text-brand-muted" />
@@ -75,7 +75,7 @@ export const DashboardTopbar: React.FC<DashboardTopbarProps> = ({
           <div className="relative">
             <button
               onClick={() => setUserMenuOpen(!userMenuOpen)}
-              className="flex items-center gap-2 p-2 rounded-xl hover:bg-surface-borderSoft transition-colors"
+              className="flex min-h-11 items-center gap-2 rounded-xl px-2 hover:bg-backoffice-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-backoffice-focus"
               aria-label="User menu"
               aria-expanded={userMenuOpen}
             >

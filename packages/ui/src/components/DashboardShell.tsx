@@ -40,17 +40,20 @@ export const DashboardShell: React.FC<DashboardShellProps> = ({
   brandName,
 }) => {
   const [mobileSidebarOpen, setMobileSidebarOpen] = React.useState(false);
+  const [sidebarCompact, setSidebarCompact] = React.useState(true);
+
+  React.useEffect(() => {
+    const stored = window.localStorage.getItem("rashpod.dashboard.sidebar-compact");
+    if (stored !== null) setSidebarCompact(stored !== "false");
+  }, []);
+
+  function updateSidebarCompact(value: boolean) {
+    setSidebarCompact(value);
+    window.localStorage.setItem("rashpod.dashboard.sidebar-compact", String(value));
+  }
 
   return (
-    <div className="flex min-h-screen bg-brand-bg text-brand-text">
-      <div
-        aria-hidden="true"
-        className="pointer-events-none fixed inset-0 opacity-60"
-        style={{
-          background:
-            "radial-gradient(circle at 18% 8%, rgba(207, 214, 250, 0.55), transparent 28%), radial-gradient(circle at 88% 18%, rgba(255, 214, 198, 0.5), transparent 24%)",
-        }}
-      />
+    <div className="backoffice-shell flex min-h-screen bg-backoffice-canvas text-backoffice-text">
       {/* Desktop Sidebar */}
       <div className="relative hidden md:block">
         <DashboardSidebar
@@ -60,6 +63,8 @@ export const DashboardShell: React.FC<DashboardShellProps> = ({
           accent={sidebarAccent}
           logoUrl={sidebarLogoUrl}
           brandName={brandName}
+          compact={sidebarCompact}
+          onCompactChange={updateSidebarCompact}
         />
       </div>
 
@@ -79,6 +84,7 @@ export const DashboardShell: React.FC<DashboardShellProps> = ({
           brandName={brandName}
           onNavigate={() => setMobileSidebarOpen(false)}
           className="!w-full !border-r-0"
+          compact={false}
         />
       </Drawer>
 
@@ -91,11 +97,11 @@ export const DashboardShell: React.FC<DashboardShellProps> = ({
 
         <main
           id="main-content"
-          className={cn("flex-1 w-full max-w-dashboard mx-auto px-4 sm:px-6 md:px-8 py-6 md:py-8", className)}
+          className={cn("flex-1 w-full max-w-dashboard mx-auto px-4 py-5 sm:px-6 md:px-8 md:py-6", className)}
           tabIndex={-1}
         >
           {breadcrumbs && breadcrumbs.length > 0 && (
-            <div className="mb-6">
+            <div className="mb-4">
               <Breadcrumbs items={breadcrumbs} />
             </div>
           )}

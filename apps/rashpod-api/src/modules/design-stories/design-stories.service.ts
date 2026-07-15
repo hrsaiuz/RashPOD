@@ -367,7 +367,7 @@ export class DesignStoriesService {
       videoUrl,
       publishedAt: story.publishedAt,
       designer: story.designAsset.designer,
-      design: { id: story.designAsset.id, title: story.designAsset.title },
+      design: { id: story.designAsset.id, title: story.designAsset.title, description: story.designAsset.description },
       listings: story.designAsset.listings.map((listing) => ({
         id: listing.id,
         slug: listing.slug,

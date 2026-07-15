@@ -1,11 +1,11 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } from "@nestjs/common";
+import { Body, Controller, Delete, Get, Param, Patch, Post, Put, Query, UseGuards } from "@nestjs/common";
 import { CurrentUser, RequestUser } from "../../common/auth/current-user.decorator";
 import { JwtAuthGuard } from "../../common/auth/jwt-auth.guard";
 import { PermissionGuard } from "../../common/auth/permission.guard";
 import { RequirePermission } from "../../common/auth/permission.decorator";
 import { DesignStoriesService } from "../design-stories/design-stories.service";
 import { AttachDesignStoryMediaDto, UpsertDesignStoryDraftDto } from "../design-stories/dto/design-story.dto";
-import { SupportRequestDto, UpdateCustomerProfileDto, UpdateDesignerProfileDto } from "./dto/self-service.dto";
+import { SupportRequestDto, UpdateCustomerProfileDto, UpdateDesignerProfileDto, UpdateStoryEngagementDto } from "./dto/self-service.dto";
 import { AddWishlistItemDto, CreateCustomerAddressDto, UpdateCustomerAddressDto } from "./dto/customer-address.dto";
 import { SelfServiceService } from "./self-service.service";
 
@@ -111,6 +111,18 @@ export class SelfServiceController {
   @RequirePermission("customer:dashboard-read")
   wishlistStatus(@CurrentUser() user: RequestUser, @Param("listingId") listingId: string) {
     return this.selfService.isListingWishlisted(user.sub, listingId);
+  }
+
+  @Get("customer/stories/:storyId/engagement")
+  @RequirePermission("story:engage")
+  storyEngagement(@CurrentUser() user: RequestUser, @Param("storyId") storyId: string) {
+    return this.selfService.getStoryEngagement(user.sub, storyId);
+  }
+
+  @Put("customer/stories/:storyId/engagement")
+  @RequirePermission("story:engage")
+  updateStoryEngagement(@CurrentUser() user: RequestUser, @Param("storyId") storyId: string, @Body() dto: UpdateStoryEngagementDto) {
+    return this.selfService.updateStoryEngagement(user.sub, storyId, dto);
   }
 
   @Get("designer/dashboard")

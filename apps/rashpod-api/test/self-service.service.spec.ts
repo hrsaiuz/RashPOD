@@ -1,5 +1,5 @@
 import { BadRequestException, ForbiddenException } from "@nestjs/common";
-import { DesignStatus, ListingStatus, OrderStatus, PaymentStatus, Prisma, ProductionJobStatus, UserRole } from "@prisma/client";
+import { DesignStatus, DesignStoryStatus, ListingStatus, OrderStatus, PaymentStatus, Prisma, ProductionJobStatus, UserRole } from "@prisma/client";
 import { SelfServiceService } from "../src/modules/self-service/self-service.service";
 
 const decimal = (value: number) => new Prisma.Decimal(value);
@@ -35,6 +35,8 @@ function makeService() {
     supportRequest: { create: jest.fn().mockImplementation(({ data }: any) => Promise.resolve({ id: "support-1", ...data })) },
     designAsset: { findMany: jest.fn().mockResolvedValue([]), findUnique: jest.fn(), groupBy: jest.fn().mockResolvedValue([]), update: jest.fn() },
     commerceListing: { findMany: jest.fn().mockResolvedValue([]), findUnique: jest.fn(), groupBy: jest.fn().mockResolvedValue([]) },
+    designStory: { findUnique: jest.fn() },
+    storyEngagement: { findUnique: jest.fn(), upsert: jest.fn(), delete: jest.fn() },
     orderItem: { aggregate: jest.fn().mockResolvedValue({ _sum: { totalPrice: decimal(0), quantity: 0 } }) },
     royaltyLedgerEntry: { groupBy: jest.fn().mockResolvedValue([]) },
     payout: { aggregate: jest.fn().mockResolvedValue({ _sum: { amount: decimal(0) } }) },
@@ -116,5 +118,52 @@ describe("SelfServiceService", () => {
     const { service, prisma } = makeService();
     prisma.commerceListing.findUnique.mockResolvedValue({ id: "listing-1", designerId: "designer-2", status: ListingStatus.PUBLISHED });
     await expect(service.createDesignerSupportRequest("designer-1", { category: "listing", listingId: "listing-1", message: "Help" })).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
+  it("returns an empty engagement state for a published story", async () => {
+    const { service, prisma } = makeService();
+    prisma.designStory.findUnique.mockResolvedValue({ status: DesignStoryStatus.PUBLISHED });
+    prisma.storyEngagement.findUnique.mockResolvedValue(null);
+
+    await expect(service.getStoryEngagement("customer-1", "story-1")).resolves.toEqual({
+      storyId: "story-1",
+      liked: false,
+      bookmarked: false,
+    });
+  });
+
+  it("upserts story engagement idempotently", async () => {
+    const { service, prisma, audit } = makeService();
+    prisma.designStory.findUnique.mockResolvedValue({ status: DesignStoryStatus.PUBLISHED });
+    prisma.storyEngagement.findUnique.mockResolvedValue({ id: "engagement-1", liked: true, bookmarked: false });
+    prisma.storyEngagement.upsert.mockResolvedValue({ id: "engagement-1", liked: true, bookmarked: false });
+
+    await expect(service.updateStoryEngagement("customer-1", "story-1", { liked: true, bookmarked: false })).resolves.toEqual({
+      storyId: "story-1",
+      liked: true,
+      bookmarked: false,
+    });
+    expect(prisma.storyEngagement.upsert).toHaveBeenCalledTimes(1);
+    expect(audit.log).not.toHaveBeenCalled();
+  });
+
+  it("deletes empty engagement rows", async () => {
+    const { service, prisma, audit } = makeService();
+    prisma.designStory.findUnique.mockResolvedValue({ status: DesignStoryStatus.PUBLISHED });
+    prisma.storyEngagement.findUnique.mockResolvedValue({ id: "engagement-1", liked: true, bookmarked: true });
+
+    await expect(service.updateStoryEngagement("customer-1", "story-1", { liked: false, bookmarked: false })).resolves.toEqual({
+      storyId: "story-1",
+      liked: false,
+      bookmarked: false,
+    });
+    expect(prisma.storyEngagement.delete).toHaveBeenCalledWith({ where: { id: "engagement-1" } });
+    expect(audit.log).toHaveBeenCalledWith(expect.objectContaining({ action: "story.engagement.cleared" }));
+  });
+
+  it("rejects engagement with an unpublished story", async () => {
+    const { service, prisma } = makeService();
+    prisma.designStory.findUnique.mockResolvedValue({ status: DesignStoryStatus.DRAFT });
+    await expect(service.getStoryEngagement("customer-1", "story-1")).rejects.toBeInstanceOf(BadRequestException);
   });
 });
