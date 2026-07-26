@@ -1,4 +1,4 @@
-import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException, ServiceUnavailableException } from "@nestjs/common";
 import { AIEntityType, AIJobStatus, AIProvider, AISuggestionSeverity, AISuggestionStatus, AISuggestionType, AIWorkflow, Prisma } from "@prisma/client";
 import { createHash } from "crypto";
 import { PrismaService } from "../../prisma/prisma.service";
@@ -204,7 +204,12 @@ export class AiService {
     const targetLanguage = this.normalizeLanguage(input.targetLanguage);
     if (!settings.allowedLanguages.includes(targetLanguage)) throw new BadRequestException("AI translation language is not enabled");
     const providerText = await this.runOpenAiText({ workflow: AIWorkflow.TRANSLATION, actorId, user: `Translate to ${targetLanguage}: ${input.text}` });
-    const payload = validateTranslationPayload({ sourceText: input.text, targetLanguage, translatedText: providerText || `[${targetLanguage}] ${input.text}` });
+    if (!providerText) {
+      throw new ServiceUnavailableException(
+        "AI translation is temporarily unavailable. Retry later or enter the translation manually.",
+      );
+    }
+    const payload = validateTranslationPayload({ sourceText: input.text, targetLanguage, translatedText: providerText });
     const job = await this.createJob(actorId, {
       workflow: AIWorkflow.TRANSLATION,
       entityType: input.entityType ?? AIEntityType.LISTING,

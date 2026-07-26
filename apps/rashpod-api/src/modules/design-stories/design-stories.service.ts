@@ -1,13 +1,18 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
-import { AIEntityType, AssetAccessPolicy, AssetLifecycleStatus, AssetPurpose, AssetStorageProvider, DesignStoryStatus, ListingStatus, Prisma } from "@prisma/client";
+import { AssetAccessPolicy, AssetLifecycleStatus, AssetPurpose, AssetStorageProvider, DesignStoryStatus, ListingStatus, Prisma } from "@prisma/client";
 import { randomUUID } from "crypto";
 import * as QRCode from "qrcode";
 import { PrismaService } from "../../prisma/prisma.service";
 import { AuditService } from "../audit/audit.service";
 import { StorageService } from "../files/storage.service";
 import { buildAssetObjectKey } from "../files/asset-upload-policy";
-import { AiService } from "../ai/ai.service";
 import { AttachDesignStoryMediaDto, UpsertDesignStoryDraftDto } from "./dto/design-story.dto";
+import {
+  clearNonSourceTranslations,
+  hasCompleteStoryTranslations,
+  storySourceFingerprint,
+  storyTranslationsAreCurrent,
+} from "./design-story-translation-state";
 
 type SupportedLocale = "uz" | "ru" | "en";
 type LocalizedStringMap = Partial<Record<SupportedLocale, string>>;
@@ -21,7 +26,6 @@ export class DesignStoriesService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly storage: StorageService,
-    private readonly ai: AiService,
   ) {}
 
   async getDesignerStory(userId: string, designId: string) {
@@ -57,8 +61,55 @@ export class DesignStoriesService {
 
     const titleTranslations = this.jsonToLocalizedStringMap(existing?.titleTranslationsJson ?? null);
     const bodyTranslations = this.jsonToLocalizedStringMap(existing?.bodyTranslationsJson ?? null);
-    titleTranslations[sourceLocale] = dto.source?.title?.trim() || dto.title.trim();
-    bodyTranslations[sourceLocale] = dto.source?.body?.trim() || "";
+    const previousSourceLocale = this.normalizeLocale(existing?.sourceLocale ?? sourceLocale);
+    const previousSourceTitle =
+      titleTranslations[previousSourceLocale] || existing?.title || "";
+    const previousSourceBody = bodyTranslations[previousSourceLocale] || "";
+    const previousSourceFingerprint = existing
+      ? storySourceFingerprint(
+          previousSourceLocale,
+          previousSourceTitle,
+          previousSourceBody,
+        )
+      : null;
+    const sourceTitle = dto.source?.title?.trim() || dto.title.trim();
+    const sourceBody = dto.source?.body?.trim() || "";
+    const sourceFingerprint = storySourceFingerprint(
+      sourceLocale,
+      sourceTitle,
+      sourceBody,
+    );
+    const sourceChanged =
+      Boolean(existing) && previousSourceFingerprint !== sourceFingerprint;
+    const translationMeta = this.objectJson(existing?.translationMetaJson ?? null);
+
+    titleTranslations[sourceLocale] = sourceTitle;
+    bodyTranslations[sourceLocale] = sourceBody;
+    if (sourceChanged) {
+      clearNonSourceTranslations(
+        titleTranslations,
+        bodyTranslations,
+        sourceLocale,
+      );
+    } else {
+      this.mergeLocalizedText(
+        titleTranslations,
+        bodyTranslations,
+        dto.translations,
+      );
+    }
+    titleTranslations[sourceLocale] = sourceTitle;
+    bodyTranslations[sourceLocale] = sourceBody;
+
+    translationMeta.sourceFingerprint = sourceFingerprint;
+    if (
+      !sourceChanged &&
+      hasCompleteStoryTranslations(titleTranslations, bodyTranslations)
+    ) {
+      translationMeta.translationsSourceFingerprint = sourceFingerprint;
+    } else {
+      delete translationMeta.translationsSourceFingerprint;
+    }
 
     const audioFileIds = { ...this.jsonToLocalizedFileMap(existing?.audioFileIdsJson ?? null), ...this.compactLocalizedFiles(dto.audioFileIds) };
     const videoFileIds = { ...this.jsonToLocalizedFileMap(existing?.videoFileIdsJson ?? null), ...this.compactLocalizedFiles(dto.videoFileIds) };
@@ -75,8 +126,13 @@ export class DesignStoriesService {
             coverImageFileId: dto.coverImageFileId ?? existing.coverImageFileId,
             titleTranslationsJson: titleTranslations as Prisma.InputJsonValue,
             bodyTranslationsJson: bodyTranslations as Prisma.InputJsonValue,
+            translationMetaJson: translationMeta as Prisma.InputJsonValue,
             audioFileIdsJson: audioFileIds as Prisma.InputJsonValue,
             videoFileIdsJson: videoFileIds as Prisma.InputJsonValue,
+            qrCodeFileId:
+              existing.slug === slug ? existing.qrCodeFileId : null,
+            qrCodeImageUrl:
+              existing.slug === slug ? existing.qrCodeImageUrl : null,
             reviewNotes: existing.status === DesignStoryStatus.NEEDS_CHANGES ? existing.reviewNotes : null,
             status: existing.status === DesignStoryStatus.NEEDS_CHANGES ? DesignStoryStatus.DRAFT : existing.status,
           },
@@ -91,14 +147,11 @@ export class DesignStoriesService {
             coverImageFileId: dto.coverImageFileId,
             titleTranslationsJson: titleTranslations as Prisma.InputJsonValue,
             bodyTranslationsJson: bodyTranslations as Prisma.InputJsonValue,
+            translationMetaJson: translationMeta as Prisma.InputJsonValue,
             audioFileIdsJson: audioFileIds as Prisma.InputJsonValue,
             videoFileIdsJson: videoFileIds as Prisma.InputJsonValue,
           },
         });
-
-    if (!story.qrCodeImageUrl || existing?.slug !== slug) {
-      await this.generateQrAsset(story, design.designerId, design.tenantId ?? undefined);
-    }
 
     await this.audit.log({
       actorId: userId,
@@ -160,36 +213,18 @@ export class DesignStoriesService {
     if (!sourceBody.trim()) throw new BadRequestException("Story text is required before requesting publish.");
 
     const translationMeta = this.objectJson(story.translationMetaJson);
-    for (const locale of SUPPORTED_LOCALES) {
-      if (locale === sourceLocale) continue;
-      if (!titleTranslations[locale]) {
-        try {
-          const translated = await this.ai.translate(userId, {
-            text: sourceTitle,
-            targetLanguage: locale,
-            entityType: AIEntityType.DESIGN,
-            entityId: designId,
-          });
-          titleTranslations[locale] = translated.translatedText;
-          translationMeta[`title:${locale}`] = { generatedAt: new Date().toISOString(), aiGenerated: true };
-        } catch (error) {
-          translationMeta[`title:${locale}`] = { generatedAt: new Date().toISOString(), aiGenerated: false, error: error instanceof Error ? error.message : "Translation failed" };
-        }
-      }
-      if (!bodyTranslations[locale]) {
-        try {
-          const translated = await this.ai.translate(userId, {
-            text: sourceBody,
-            targetLanguage: locale,
-            entityType: AIEntityType.DESIGN,
-            entityId: designId,
-          });
-          bodyTranslations[locale] = translated.translatedText;
-          translationMeta[`body:${locale}`] = { generatedAt: new Date().toISOString(), aiGenerated: true };
-        } catch (error) {
-          translationMeta[`body:${locale}`] = { generatedAt: new Date().toISOString(), aiGenerated: false, error: error instanceof Error ? error.message : "Translation failed" };
-        }
-      }
+    const sourceFingerprint = storySourceFingerprint(
+      sourceLocale,
+      sourceTitle,
+      sourceBody,
+    );
+    if (
+      !hasCompleteStoryTranslations(titleTranslations, bodyTranslations) ||
+      !storyTranslationsAreCurrent(translationMeta, sourceFingerprint)
+    ) {
+      throw new BadRequestException(
+        "Current Uzbek, Russian, and English story translations are required before requesting review.",
+      );
     }
 
     const updated = await this.prisma.designStory.update({
@@ -200,7 +235,6 @@ export class DesignStoriesService {
         reviewNotes: null,
         titleTranslationsJson: titleTranslations as Prisma.InputJsonValue,
         bodyTranslationsJson: bodyTranslations as Prisma.InputJsonValue,
-        translationMetaJson: translationMeta as Prisma.InputJsonValue,
       },
     });
     await this.audit.log({
@@ -209,13 +243,6 @@ export class DesignStoriesService {
       entityType: "DesignStory",
       entityId: story.id,
       metadata: { designAssetId: designId, sourceLocale },
-    });
-    await this.audit.log({
-      actorId: userId,
-      action: "design-story.ai-translation.generated",
-      entityType: "DesignStory",
-      entityId: story.id,
-      metadata: { locales: SUPPORTED_LOCALES.filter((locale) => locale !== sourceLocale) },
     });
     return this.toDesignerStoryDto(updated);
   }
@@ -421,25 +448,51 @@ export class DesignStoriesService {
     createdAt: Date;
     updatedAt: Date;
   }) {
+    const sourceLocale = this.normalizeLocale(story.sourceLocale);
+    const titleTranslations = this.jsonToLocalizedStringMap(
+      story.titleTranslationsJson,
+    );
+    const bodyTranslations = this.jsonToLocalizedStringMap(
+      story.bodyTranslationsJson,
+    );
+    const audioFileIds = this.jsonToLocalizedFileMap(story.audioFileIdsJson);
+    const videoFileIds = this.jsonToLocalizedFileMap(story.videoFileIdsJson);
+    const translationMeta = this.objectJson(story.translationMetaJson);
+    const sourceFingerprint = storySourceFingerprint(
+      sourceLocale,
+      titleTranslations[sourceLocale] || story.title,
+      bodyTranslations[sourceLocale] || "",
+    );
+    const [coverImageUrl, audioUrls, videoUrls] = await Promise.all([
+      story.coverImageFileId
+        ? this.publicUrlForFile(story.coverImageFileId)
+        : Promise.resolve(null),
+      this.localizedUrlsForFiles(audioFileIds),
+      this.localizedUrlsForFiles(videoFileIds),
+    ]);
+
     return {
       id: story.id,
       designAssetId: story.designAssetId,
       title: story.title,
       slug: story.slug,
       status: story.status,
-      sourceLocale: this.normalizeLocale(story.sourceLocale),
+      sourceLocale,
       publicUrl: story.publicUrl || this.buildCanonicalStoryUrl(story.slug),
       qrCodeFileId: story.qrCodeFileId,
       qrCodeImageUrl: story.qrCodeImageUrl,
       coverImageFileId: story.coverImageFileId,
-      coverImageUrl: story.coverImageFileId ? await this.publicUrlForFile(story.coverImageFileId) : null,
-      titleTranslations: this.jsonToLocalizedStringMap(story.titleTranslationsJson),
-      bodyTranslations: this.jsonToLocalizedStringMap(story.bodyTranslationsJson),
-      audioFileIds: this.jsonToLocalizedFileMap(story.audioFileIdsJson),
-      audioUrls: await this.localizedUrlsForFiles(this.jsonToLocalizedFileMap(story.audioFileIdsJson)),
-      videoFileIds: this.jsonToLocalizedFileMap(story.videoFileIdsJson),
-      videoUrls: await this.localizedUrlsForFiles(this.jsonToLocalizedFileMap(story.videoFileIdsJson)),
-      translationMeta: this.objectJson(story.translationMetaJson),
+      coverImageUrl,
+      titleTranslations,
+      bodyTranslations,
+      audioFileIds,
+      audioUrls,
+      videoFileIds,
+      videoUrls,
+      translationMeta,
+      translationsCurrent:
+        hasCompleteStoryTranslations(titleTranslations, bodyTranslations) &&
+        storyTranslationsAreCurrent(translationMeta, sourceFingerprint),
       reviewNotes: story.reviewNotes,
       requestedPublishAt: story.requestedPublishAt,
       publishedAt: story.publishedAt,
@@ -516,6 +569,32 @@ export class DesignStoriesService {
       if (typeof fileId === "string" && fileId.trim()) output[locale] = fileId.trim();
     }
     return output;
+  }
+
+  private mergeLocalizedText(
+    titleTranslations: LocalizedStringMap,
+    bodyTranslations: LocalizedStringMap,
+    value?: {
+      en?: { title?: string; body?: string };
+      uz?: { title?: string; body?: string };
+      ru?: { title?: string; body?: string };
+    },
+  ) {
+    if (!value) return;
+    for (const locale of SUPPORTED_LOCALES) {
+      const localized = value[locale];
+      if (!localized) continue;
+      if (typeof localized.title === "string") {
+        const title = localized.title.trim();
+        if (title) titleTranslations[locale] = title;
+        else delete titleTranslations[locale];
+      }
+      if (typeof localized.body === "string") {
+        const body = localized.body.trim();
+        if (body) bodyTranslations[locale] = body;
+        else delete bodyTranslations[locale];
+      }
+    }
   }
 
   private objectJson(value: Prisma.JsonValue | null) {
@@ -620,10 +699,14 @@ export class DesignStoriesService {
   }
 
   private async localizedUrlsForFiles(files: LocalizedFileMap) {
-    const output: Partial<Record<SupportedLocale, string | null>> = {};
-    for (const locale of SUPPORTED_LOCALES) {
-      output[locale] = files[locale] ? await this.publicUrlForFile(files[locale]!) : null;
-    }
-    return output;
+    const entries = await Promise.all(
+      SUPPORTED_LOCALES.map(async (locale) => [
+        locale,
+        files[locale] ? await this.publicUrlForFile(files[locale]!) : null,
+      ] as const),
+    );
+    return Object.fromEntries(entries) as Partial<
+      Record<SupportedLocale, string | null>
+    >;
   }
 }

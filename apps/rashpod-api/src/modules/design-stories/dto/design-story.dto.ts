@@ -9,6 +9,7 @@ export class DesignStoryLocaleTextDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(20000)
   body?: string;
 }
 
@@ -26,13 +27,30 @@ export class DesignStoryMediaRefsDto {
   ru?: string;
 }
 
+export class DesignStoryTranslationsDto {
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => DesignStoryLocaleTextDto)
+  uz?: DesignStoryLocaleTextDto;
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => DesignStoryLocaleTextDto)
+  ru?: DesignStoryLocaleTextDto;
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => DesignStoryLocaleTextDto)
+  en?: DesignStoryLocaleTextDto;
+}
+
 export class UpsertDesignStoryDraftDto {
   @IsString()
   @MaxLength(160)
   title!: string;
 
   @IsString()
-  @MaxLength(180)
+  @MaxLength(160)
   slug!: string;
 
   @IsOptional()
@@ -48,6 +66,11 @@ export class UpsertDesignStoryDraftDto {
   @ValidateNested()
   @Type(() => DesignStoryLocaleTextDto)
   source?: DesignStoryLocaleTextDto;
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => DesignStoryTranslationsDto)
+  translations?: DesignStoryTranslationsDto;
 
   @IsOptional()
   @ValidateNested()

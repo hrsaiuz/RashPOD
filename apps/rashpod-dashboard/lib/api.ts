@@ -261,6 +261,7 @@ export interface DesignStoryDetail extends DesignStorySummary {
   videoFileIds: Partial<Record<StoryLocale, string>>;
   videoUrls?: Partial<Record<StoryLocale, string | null>>;
   translationMeta?: Record<string, unknown>;
+  translationsCurrent?: boolean;
   unpublishedAt?: string | null;
   reviewedAt?: string | null;
   reviewedById?: string | null;
