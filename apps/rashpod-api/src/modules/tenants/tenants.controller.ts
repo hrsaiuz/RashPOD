@@ -1,5 +1,4 @@
 import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from "@nestjs/common";
-import { TenantStatus } from "@prisma/client";
 import { CurrentUser, RequestUser } from "../../common/auth/current-user.decorator";
 import { JwtAuthGuard } from "../../common/auth/jwt-auth.guard";
 import { PermissionGuard } from "../../common/auth/permission.guard";
@@ -9,6 +8,7 @@ import {
   CreateInvoiceDto,
   CreatePlanDto,
   CreateTenantDto,
+  ListTenantsQueryDto,
   MarkInvoicePaidDto,
   SwitchTenantDto,
   UpdatePlanDto,
@@ -94,8 +94,8 @@ export class TenantsController {
 
   @Get("super-admin/tenants")
   @RequirePermission("tenants:read-all")
-  listTenants(@Query("search") search?: string, @Query("status") status?: TenantStatus) {
-    return this.tenants.listTenants({ search, status });
+  listTenants(@Query() query: ListTenantsQueryDto) {
+    return this.tenants.listTenants(query);
   }
 
   @Post("super-admin/tenants")

@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
-import { DesignerStatus, UserRole } from "@prisma/client";
+import { DesignerStatus, Prisma, UserRole } from "@prisma/client";
 import { RbacService } from "../../common/auth/rbac.service";
 import { PermissionKey } from "../../common/auth/permissions";
 import { PlatformConfigService } from "../../common/config/platform-config.service";
@@ -7,6 +7,7 @@ import { PrismaService } from "../../prisma/prisma.service";
 import { AuditService } from "../audit/audit.service";
 import { AdminOpsService } from "../admin-ops/admin-ops.service";
 import { UpdateAdminSettingsDto } from "../admin-ops/dto/update-admin-settings.dto";
+import { randomUUID } from "node:crypto";
 
 const SECRETS_KEY = "integrations.secrets";
 
@@ -41,7 +42,13 @@ export class SuperAdminPlatformService {
   async updatePermissions(actorId: string, overrides: Partial<Record<PermissionKey, UserRole[]>>) {
     try {
       const result = await this.rbac.updateOverrides(actorId, overrides);
-      await this.audit.log({ actorId, action: "rbac.overrides.update", entityType: "PlatformSetting", entityId: "rbac.permissionOverrides" });
+      await this.audit.log({
+        actorId,
+        action: "rbac.overrides.update",
+        entityType: "PlatformSetting",
+        entityId: "rbac.permissionOverrides",
+        metadata: { overriddenPermissions: Object.keys(overrides).sort(), overrideCount: Object.keys(overrides).length },
+      });
       return result;
     } catch (error) {
       throw new BadRequestException(error instanceof Error ? error.message : "Invalid RBAC overrides");
@@ -75,7 +82,19 @@ export class SuperAdminPlatformService {
   async updateUserRole(actorId: string, userId: string, role: UserRole) {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
     if (!user) throw new NotFoundException("User not found");
-    const updated = await this.prisma.user.update({ where: { id: userId }, data: { role } });
+    if (user.role === role) return user;
+    if (actorId === userId && role !== UserRole.SUPER_ADMIN) {
+      throw new BadRequestException("You cannot demote your own super admin account");
+    }
+    const updated = await this.prisma.$transaction(async (tx) => {
+      if (user.role === UserRole.SUPER_ADMIN && role !== UserRole.SUPER_ADMIN) {
+        const superAdminCount = await tx.user.count({ where: { role: UserRole.SUPER_ADMIN } });
+        if (superAdminCount <= 1) {
+          throw new BadRequestException("The final super admin account cannot be demoted");
+        }
+      }
+      return tx.user.update({ where: { id: userId }, data: { role } });
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
     await this.audit.log({ actorId, action: "user.role.update", entityType: "User", entityId: userId, metadata: { from: user.role, to: role } });
     return updated;
   }
@@ -91,43 +110,62 @@ export class SuperAdminPlatformService {
 
   async listSecrets() {
     const row = await this.prisma.platformSetting.findUnique({ where: { key: SECRETS_KEY } });
-    const value = row?.value;
+    return this.parseSecrets(row?.value);
+  }
+
+  private parseSecrets(value: unknown) {
     return Array.isArray(value) ? (value as SecretReference[]) : [];
   }
 
-  private async saveSecrets(secrets: SecretReference[]) {
-    await this.prisma.platformSetting.upsert({
-      where: { key: SECRETS_KEY },
-      create: { key: SECRETS_KEY, value: secrets as object[] },
-      update: { value: secrets as object[] },
-    });
-    return secrets;
+  private async mutateSecrets<T>(mutate: (secrets: SecretReference[]) => T) {
+    return this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT "key" FROM "PlatformSetting" WHERE "key" = ${SECRETS_KEY} FOR UPDATE`;
+      const row = await tx.platformSetting.findUnique({ where: { key: SECRETS_KEY } });
+      const secrets = [...this.parseSecrets(row?.value)];
+      const result = mutate(secrets);
+      await tx.platformSetting.upsert({
+        where: { key: SECRETS_KEY },
+        create: { key: SECRETS_KEY, value: secrets as object[] },
+        update: { value: secrets as object[] },
+      });
+      return result;
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
   }
 
   async createSecret(actorId: string, input: Omit<SecretReference, "id">) {
-    const secrets = await this.listSecrets();
-    const item: SecretReference = { ...input, id: `sec_${Date.now()}` };
-    secrets.unshift(item);
-    await this.saveSecrets(secrets);
+    const item = await this.mutateSecrets((secrets) => {
+      if (secrets.some((secret) => secret.envVar === input.envVar)) {
+        throw new BadRequestException(`A reference for ${input.envVar} already exists`);
+      }
+      const created: SecretReference = { ...input, id: `sec_${randomUUID()}` };
+      secrets.unshift(created);
+      return created;
+    });
     await this.audit.log({ actorId, action: "secret-reference.create", entityType: "PlatformSetting", entityId: item.id });
     return item;
   }
 
   async updateSecret(actorId: string, id: string, input: Partial<Omit<SecretReference, "id">>) {
-    const secrets = await this.listSecrets();
-    const index = secrets.findIndex((item) => item.id === id);
-    if (index < 0) throw new NotFoundException("Secret reference not found");
-    secrets[index] = { ...secrets[index], ...input, id };
-    await this.saveSecrets(secrets);
+    const updated = await this.mutateSecrets((secrets) => {
+      const index = secrets.findIndex((item) => item.id === id);
+      if (index < 0) throw new NotFoundException("Secret reference not found");
+      if (input.envVar && secrets.some((secret) => secret.id !== id && secret.envVar === input.envVar)) {
+        throw new BadRequestException(`A reference for ${input.envVar} already exists`);
+      }
+      secrets[index] = { ...secrets[index], ...input, id };
+      return secrets[index];
+    });
     await this.audit.log({ actorId, action: "secret-reference.update", entityType: "PlatformSetting", entityId: id });
-    return secrets[index];
+    return updated;
   }
 
   async deleteSecret(actorId: string, id: string) {
-    const secrets = await this.listSecrets();
-    const next = secrets.filter((item) => item.id !== id);
-    if (next.length === secrets.length) throw new NotFoundException("Secret reference not found");
-    await this.saveSecrets(next);
+    await this.mutateSecrets((secrets) => {
+      const index = secrets.findIndex((item) => item.id === id);
+      if (index < 0) throw new NotFoundException("Secret reference not found");
+      secrets.splice(index, 1);
+      return true;
+    });
     await this.audit.log({ actorId, action: "secret-reference.delete", entityType: "PlatformSetting", entityId: id });
     return { deleted: true };
   }

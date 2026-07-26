@@ -93,15 +93,19 @@ const ROLE_LINKS: Record<string, Array<{ href: string; label: string; icon?: any
     { href: "/dashboard/support/crm", label: "CRM", icon: Users },
     { href: "/dashboard/notifications", label: "Notifications", icon: Bell },
   ],
-  admin: [
-    { href: "/dashboard/admin", label: "Overview", icon: LayoutDashboard },
+  "super-admin": [
+    { href: "/dashboard/super-admin", label: "Platform overview", icon: LayoutDashboard },
     { href: "/dashboard/super-admin/tenants", label: "Tenants", icon: Landmark, group: "Platform" },
     { href: "/dashboard/super-admin/plans", label: "Plans", icon: CreditCard, group: "Platform" },
-    { href: "/dashboard/super-admin/roles", label: "Roles", icon: Users, group: "Platform" },
-    { href: "/dashboard/super-admin/permissions", label: "Permissions", icon: ShieldCheck, group: "Platform" },
-    { href: "/dashboard/super-admin/secrets", label: "Secrets", icon: Settings, group: "Platform" },
-    { href: "/dashboard/super-admin/system", label: "System", icon: CloudCog, group: "Platform" },
-    { href: "/dashboard/super-admin/audit-logs", label: "Platform Audit Logs", icon: ClipboardList, group: "Platform" },
+    { href: "/dashboard/super-admin/roles", label: "Roles", icon: Users, group: "Access control" },
+    { href: "/dashboard/super-admin/permissions", label: "Permissions", icon: ShieldCheck, group: "Access control" },
+    { href: "/dashboard/super-admin/secrets", label: "Secret references", icon: Settings, group: "Operations" },
+    { href: "/dashboard/super-admin/system", label: "System health", icon: CloudCog, group: "Operations" },
+    { href: "/dashboard/super-admin/audit-logs", label: "Audit logs", icon: ClipboardList, group: "Governance" },
+    { href: "/dashboard/admin", label: "Open admin workspace", icon: Boxes, group: "Workspaces" },
+  ],
+  admin: [
+    { href: "/dashboard/admin", label: "Overview", icon: LayoutDashboard },
     { href: "/dashboard/admin/orders", label: "Orders", icon: Package, group: "Operations" },
     { href: "/dashboard/admin/external-sales", label: "External Sales", icon: ClipboardList, group: "Operations" },
     { href: "/dashboard/admin/production", label: "Production", icon: Factory, group: "Operations" },
@@ -189,19 +193,21 @@ export default function DashboardLayout({ children, role }: { children: ReactNod
   }, []);
 
   const navRole = useMemo(() => {
-    const actualRole = (user?.role || "").toUpperCase().replace("-", "_");
-    if (actualRole === "SUPER_ADMIN") return "admin";
     return role;
-  }, [role, user?.role]);
+  }, [role]);
 
   const links: DashboardLink[] = useMemo(() => {
-    return (ROLE_LINKS[navRole] ?? []).map((l) => ({
+    const roleLinks = [...(ROLE_LINKS[navRole] ?? [])];
+    if ((user?.role || "").toUpperCase() === "SUPER_ADMIN" && navRole === "admin") {
+      roleLinks.unshift({ href: "/dashboard/super-admin", label: "Platform governance", icon: ShieldCheck, group: "Workspaces" });
+    }
+    return roleLinks.map((l) => ({
       href: l.href,
       label: l.label,
       icon: l.icon,
       group: l.group,
     }));
-  }, [navRole]);
+  }, [navRole, user?.role]);
 
   const breadcrumbs: BreadcrumbItem[] = useMemo(() => {
     const segments = pathname.split("/").filter(Boolean);

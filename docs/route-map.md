@@ -82,16 +82,9 @@
 /dashboard/production/qc
 ```
 
-## Admin Dashboard (Super Admin uses the same grouped sidebar)
+## Admin Dashboard
 ```text
 /dashboard/admin
-/dashboard/super-admin/tenants         → Platform group in admin sidebar
-/dashboard/super-admin/plans
-/dashboard/super-admin/roles
-/dashboard/super-admin/permissions
-/dashboard/super-admin/secrets
-/dashboard/super-admin/system
-/dashboard/super-admin/audit-logs
 /dashboard/admin/users
 /dashboard/admin/designers
 /dashboard/admin/customers
@@ -120,10 +113,19 @@
 /dashboard/admin/audit-logs
 ```
 
-## Super Admin legacy overview
+## Super Admin Dashboard
 ```text
 /dashboard/super-admin
+/dashboard/super-admin/tenants
+/dashboard/super-admin/plans
+/dashboard/super-admin/roles
+/dashboard/super-admin/permissions
+/dashboard/super-admin/secrets
+/dashboard/super-admin/system
+/dashboard/super-admin/audit-logs
 ```
+
+Super admin uses a focused platform-governance sidebar. A separate link opens the broader admin workspace for catalog, commerce, and operations work.
 
 ## Page Rules
 - Public storefront: playful, product-first, soft, brand-heavy.

@@ -1,4 +1,4 @@
-import { ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
 import { JwtService } from "@nestjs/jwt";
 import { Prisma, TenantStatus, UserRole } from "@prisma/client";
 import { AuthSessionStore } from "../auth/auth-session.store";
@@ -167,20 +167,36 @@ export class TenantsService {
     };
   }
 
-  async listTenants(filters: { search?: string; status?: TenantStatus }) {
-    return this.prisma.tenant.findMany({
-      where: {
-        ...(filters.status ? { status: filters.status } : {}),
-        ...(filters.search ? { OR: [{ name: { contains: filters.search, mode: "insensitive" } }, { slug: { contains: filters.search, mode: "insensitive" } }] } : {}),
-      },
-      include: { plan: true, billingAccount: true, branding: true, _count: { select: { members: true, orders: true, commerceListings: true } } },
-      orderBy: { createdAt: "desc" },
-      take: 100,
-    });
+  async listTenants(filters: { search?: string; status?: TenantStatus; page?: number; limit?: number }) {
+    const page = Math.max(1, filters.page ?? 1);
+    const limit = Math.min(100, Math.max(1, filters.limit ?? 25));
+    const where: Prisma.TenantWhereInput = {
+      ...(filters.status ? { status: filters.status } : {}),
+      ...(filters.search ? { OR: [{ name: { contains: filters.search, mode: "insensitive" } }, { slug: { contains: filters.search, mode: "insensitive" } }] } : {}),
+    };
+    const [items, total] = await Promise.all([
+      this.prisma.tenant.findMany({
+        where,
+        include: { plan: true, billingAccount: true, branding: true, _count: { select: { members: true, orders: true, commerceListings: true } } },
+        orderBy: { createdAt: "desc" },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      this.prisma.tenant.count({ where }),
+    ]);
+    return {
+      items,
+      pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
+    };
   }
 
   async createTenant(actorId: string, dto: CreateTenantDto) {
     const slug = dto.slug ?? this.slugify(dto.name);
+    if (dto.planId) {
+      const plan = await this.prisma.saaSPlan.findUnique({ where: { id: dto.planId }, select: { status: true } });
+      if (!plan) throw new NotFoundException("Plan not found");
+      if (plan.status === "DISABLED") throw new BadRequestException("Disabled plans cannot be assigned to tenants");
+    }
     const tenant = await this.prisma.tenant.create({
       data: {
         name: dto.name,
@@ -190,6 +206,7 @@ export class TenantsService {
         ownerUserId: dto.ownerUserId,
         planId: dto.planId,
         country: dto.country ?? "UZ",
+        region: dto.region,
         defaultCurrency: dto.defaultCurrency ?? "UZS",
         defaultLocale: dto.defaultLocale ?? "uz-Latn",
         timezone: dto.timezone ?? "Asia/Tashkent",
@@ -238,13 +255,25 @@ export class TenantsService {
   }
 
   async setTenantStatus(actorId: string, tenantId: string, status: TenantStatus) {
+    const before = await this.prisma.tenant.findUnique({ where: { id: tenantId }, select: { status: true } });
+    if (!before) throw new NotFoundException("Tenant not found");
+    if (before.status === status) return this.prisma.tenant.findUniqueOrThrow({ where: { id: tenantId } });
     const tenant = await this.prisma.tenant.update({ where: { id: tenantId }, data: { status } });
-    await this.audit.log({ actorId, action: `tenant.${status.toLowerCase()}`, entityType: "Tenant", entityId: tenant.id });
+    await this.audit.log({
+      actorId,
+      action: `tenant.${status.toLowerCase()}`,
+      entityType: "Tenant",
+      entityId: tenant.id,
+      metadata: { from: before.status, to: status },
+    });
     return tenant;
   }
 
   async listPlans() {
-    return this.prisma.saaSPlan.findMany({ orderBy: [{ status: "asc" }, { price: "asc" }] });
+    return this.prisma.saaSPlan.findMany({
+      include: { _count: { select: { tenants: true, subscriptions: true } } },
+      orderBy: [{ status: "asc" }, { price: "asc" }],
+    });
   }
 
   async createPlan(actorId: string, dto: CreatePlanDto) {
@@ -284,11 +313,27 @@ export class TenantsService {
   }
 
   async assignPlan(actorId: string, tenantId: string, dto: AssignPlanDto) {
-    const subscription = await this.prisma.subscription.create({
-      data: { tenantId, planId: dto.planId, status: dto.status ?? "ACTIVE", currentPeriodStart: new Date(), manualBilling: true, notes: dto.notes },
+    const subscription = await this.prisma.$transaction(async (tx) => {
+      const plan = await tx.saaSPlan.findUnique({ where: { id: dto.planId }, select: { status: true } });
+      if (!plan) throw new NotFoundException("Plan not found");
+      if (plan.status === "DISABLED") throw new BadRequestException("Disabled plans cannot be assigned to tenants");
+      await tx.subscription.updateMany({
+        where: { tenantId, status: { in: ["TRIALING", "ACTIVE", "PAST_DUE"] } },
+        data: { status: "CANCELED", currentPeriodEnd: new Date() },
+      });
+      const created = await tx.subscription.create({
+        data: { tenantId, planId: dto.planId, status: dto.status ?? "ACTIVE", currentPeriodStart: new Date(), manualBilling: true, notes: dto.notes },
+      });
+      await tx.tenant.update({ where: { id: tenantId }, data: { planId: dto.planId } });
+      return created;
     });
-    await this.prisma.tenant.update({ where: { id: tenantId }, data: { planId: dto.planId } });
-    await this.audit.log({ actorId, action: "tenant.plan.assign", entityType: "Subscription", entityId: subscription.id });
+    await this.audit.log({
+      actorId,
+      action: "tenant.plan.assign",
+      entityType: "Subscription",
+      entityId: subscription.id,
+      metadata: { tenantId, planId: dto.planId, status: dto.status ?? "ACTIVE" },
+    });
     return subscription;
   }
 

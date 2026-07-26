@@ -82,7 +82,22 @@ export class AdminUsersService {
     if (dto.role === UserRole.SUPER_ADMIN && actorRole !== UserRole.SUPER_ADMIN) {
       throw new BadRequestException("Only super admins can assign the SUPER_ADMIN role");
     }
-    const updated = await this.prisma.user.update({ where: { id }, data: { role: dto.role } });
+    if (user.role === UserRole.SUPER_ADMIN && actorRole !== UserRole.SUPER_ADMIN) {
+      throw new BadRequestException("Only super admins can change another super admin account");
+    }
+    if (user.role === dto.role) return user;
+    if (actorId === id && dto.role !== UserRole.SUPER_ADMIN) {
+      throw new BadRequestException("You cannot demote your own super admin account");
+    }
+    const updated = await this.prisma.$transaction(async (tx) => {
+      if (user.role === UserRole.SUPER_ADMIN && dto.role !== UserRole.SUPER_ADMIN) {
+        const superAdminCount = await tx.user.count({ where: { role: UserRole.SUPER_ADMIN } });
+        if (superAdminCount <= 1) {
+          throw new BadRequestException("The final super admin account cannot be demoted");
+        }
+      }
+      return tx.user.update({ where: { id }, data: { role: dto.role } });
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
     await this.audit.log({
       actorId,
       action: "user.role.update",

@@ -445,7 +445,10 @@ export class AdminOpsService implements OnModuleInit {
   }
 
   async getAuditLog(id: string) {
-    const log = await this.prisma.auditLog.findUnique({ where: { id } });
+    const log = await this.prisma.auditLog.findUnique({
+      where: { id },
+      include: { actor: { select: { id: true, email: true, displayName: true, role: true } } },
+    });
     if (!log) throw new NotFoundException("Audit log not found");
     return log;
   }

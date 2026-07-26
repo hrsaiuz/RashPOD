@@ -30,7 +30,7 @@ const INITIAL_SETTINGS: CropSettings = {
   outputFormat: "png",
   jpegQuality: 0.92,
   transparentBackground: true,
-  backgroundColor: "#FFFFFF",
+  backgroundColor: "white",
 };
 
 export function BatchCropTool({

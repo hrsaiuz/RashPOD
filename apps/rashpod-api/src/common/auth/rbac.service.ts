@@ -4,6 +4,12 @@ import { PrismaService } from "../../prisma/prisma.service";
 import { PermissionKey, permissions } from "./permissions";
 
 const OVERRIDES_KEY = "rbac.permissionOverrides";
+const RECOVERY_PERMISSIONS: PermissionKey[] = [
+  "super-admin:rbac-manage",
+  "super-admin:users-manage",
+  "super-admin:secrets-manage",
+  "super-admin:system-manage",
+];
 
 @Injectable()
 export class RbacService implements OnModuleInit {
@@ -62,15 +68,28 @@ export class RbacService implements OnModuleInit {
         throw new Error(`Invalid roles for permission: ${key}`);
       }
     }
+    for (const permission of RECOVERY_PERMISSIONS) {
+      const effectiveRoles = (next[permission] ?? permissions[permission]) as readonly UserRole[];
+      if (!effectiveRoles.includes(UserRole.SUPER_ADMIN)) {
+        throw new Error(`${permission} must remain available to SUPER_ADMIN`);
+      }
+    }
   }
 
   private parseOverrides(value: unknown): Partial<Record<PermissionKey, UserRole[]>> {
     if (!value || typeof value !== "object" || Array.isArray(value)) return {};
     const result: Partial<Record<PermissionKey, UserRole[]>> = {};
+    const validRoles = new Set(Object.values(UserRole));
     for (const [key, roles] of Object.entries(value as Record<string, unknown>)) {
       if (!(key in permissions)) continue;
       if (!Array.isArray(roles)) continue;
-      result[key as PermissionKey] = roles.filter((role): role is UserRole => typeof role === "string") as UserRole[];
+      result[key as PermissionKey] = roles.filter((role): role is UserRole => validRoles.has(role as UserRole));
+    }
+    for (const permission of RECOVERY_PERMISSIONS) {
+      const override = result[permission];
+      if (override && !override.includes(UserRole.SUPER_ADMIN)) {
+        result[permission] = [...override, UserRole.SUPER_ADMIN];
+      }
     }
     return result;
   }

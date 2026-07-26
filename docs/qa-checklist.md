@@ -110,6 +110,19 @@
 - [ ] Email templates work.
 - [ ] Admin changes audit logged.
 
+## Super Admin Governance
+- [ ] Critical recovery permissions cannot remove `SUPER_ADMIN`.
+- [ ] A super admin cannot demote their own account.
+- [ ] The final super admin cannot be demoted through any role endpoint.
+- [ ] Tenant results paginate with an explicit total.
+- [ ] Tenant create/edit/suspend/reactivate flows work and are audit logged.
+- [ ] Tenant plan assignment is atomic and requires confirmation.
+- [ ] Plan create/edit/status changes require confirmation.
+- [ ] Secret reference mutations never expose or store raw credentials.
+- [ ] Audit logs support filtering, pagination, and event detail.
+- [ ] Mutation success and failure feedback is announced to assistive technology.
+- [ ] Super admin drawers and confirmation dialogs trap and restore keyboard focus.
+
 ## AI
 - [ ] Listing title generated.
 - [ ] Description generated.

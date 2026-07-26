@@ -56,7 +56,7 @@ export function CropImageEditor({
       </div>
 
       <div className="mt-5 grid gap-4 xl:grid-cols-[minmax(0,1fr)_220px]">
-        <div className="relative h-[420px] overflow-hidden rounded-[24px] bg-[radial-gradient(circle_at_top,#EEF1FF,transparent_50%),linear-gradient(180deg,#F7F8FF_0%,#FFFFFF_100%)]">
+        <div className="relative h-[420px] overflow-hidden rounded-[24px] bg-rash-surface">
           <Cropper
             image={item.objectUrl}
             crop={item.crop}

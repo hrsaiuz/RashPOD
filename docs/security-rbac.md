@@ -8,6 +8,8 @@
 - Production files and corporate attachments are private.
 - Payment webhooks must be verified and idempotent.
 - Store sensitive credentials in Secret Manager.
+- Critical `super-admin:*` permissions must always retain `SUPER_ADMIN` as a recovery role.
+- A super admin cannot demote their own account or demote the final remaining super admin.
 
 ## Roles
 ```text
@@ -69,6 +71,8 @@ Production staff can view job files and update statuses, but cannot change royal
 Moderators can review and decide moderation, but cannot override designer film consent.
 
 Admins manage operations/settings. Sensitive actions require audit logs.
+
+Role demotion safeguards must be enforced transactionally by every role-management endpoint, not only by the dashboard.
 
 ## Audit Required
 Audit moderation decisions, design suspension, listing publication/archive, commercial rights changes, film consent changes, admin overrides, royalty changes, payment/delivery/email/AI settings, commercial offer sending, and payout marking.

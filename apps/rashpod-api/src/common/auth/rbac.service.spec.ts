@@ -30,9 +30,30 @@ describe("RbacService", () => {
     expect(service.getAllowedRoles("design:create")).toEqual(permissions["design:create"]);
   });
 
+  it("repairs persisted overrides that would remove the super admin recovery path", async () => {
+    (prisma.platformSetting.findUnique as jest.Mock).mockResolvedValue({
+      key: "rbac.permissionOverrides",
+      value: { "super-admin:rbac-manage": ["ADMIN", "NOT_A_ROLE"] },
+    });
+    await service.reload();
+    expect(service.getAllowedRoles("super-admin:rbac-manage")).toEqual(["ADMIN", "SUPER_ADMIN"]);
+  });
+
   it("rejects unknown permission keys on update", async () => {
     await expect(service.updateOverrides("actor", { "not-a-permission": ["ADMIN"] } as never)).rejects.toThrow(
       "Unknown permission",
     );
+  });
+
+  it.each([
+    "super-admin:rbac-manage",
+    "super-admin:users-manage",
+    "super-admin:secrets-manage",
+    "super-admin:system-manage",
+  ] as const)("preserves the SUPER_ADMIN recovery path for %s", async (permission) => {
+    await expect(service.updateOverrides("actor", { [permission]: ["ADMIN"] })).rejects.toThrow(
+      `${permission} must remain available to SUPER_ADMIN`,
+    );
+    expect(prisma.platformSetting.upsert).not.toHaveBeenCalled();
   });
 });

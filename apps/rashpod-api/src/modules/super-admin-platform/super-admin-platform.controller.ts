@@ -1,11 +1,17 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } from "@nestjs/common";
-import { UserRole, DesignerStatus } from "@prisma/client";
 import { CurrentUser, RequestUser } from "../../common/auth/current-user.decorator";
 import { JwtAuthGuard } from "../../common/auth/jwt-auth.guard";
 import { PermissionGuard } from "../../common/auth/permission.guard";
-import { PermissionKey } from "../../common/auth/permissions";
 import { RequirePermission } from "../../common/auth/permission.decorator";
 import { UpdateAdminSettingsDto } from "../admin-ops/dto/update-admin-settings.dto";
+import {
+  CreateSecretReferenceDto,
+  ListPlatformUsersQueryDto,
+  UpdatePermissionsDto,
+  UpdatePlatformDesignerStatusDto,
+  UpdatePlatformUserRoleDto,
+  UpdateSecretReferenceDto,
+} from "./dto/super-admin-platform.dto";
 import { SuperAdminPlatformService } from "./super-admin-platform.service";
 
 @Controller("super-admin")
@@ -21,30 +27,25 @@ export class SuperAdminPlatformController {
 
   @Patch("rbac/permissions")
   @RequirePermission("super-admin:rbac-manage")
-  updatePermissions(@CurrentUser() user: RequestUser, @Body() body: { overrides: Partial<Record<PermissionKey, UserRole[]>> }) {
+  updatePermissions(@CurrentUser() user: RequestUser, @Body() body: UpdatePermissionsDto) {
     return this.service.updatePermissions(user.sub, body.overrides ?? {});
   }
 
   @Get("users")
   @RequirePermission("super-admin:users-manage")
-  listUsers(
-    @Query("search") search?: string,
-    @Query("role") role?: UserRole,
-    @Query("limit") limit?: string,
-    @Query("page") page?: string,
-  ) {
-    return this.service.listUsers({ search, role, limit: limit ? Number(limit) : undefined, page: page ? Number(page) : undefined });
+  listUsers(@Query() query: ListPlatformUsersQueryDto) {
+    return this.service.listUsers(query);
   }
 
   @Patch("users/:id/role")
   @RequirePermission("super-admin:users-manage")
-  updateUserRole(@CurrentUser() user: RequestUser, @Param("id") id: string, @Body() body: { role: UserRole }) {
+  updateUserRole(@CurrentUser() user: RequestUser, @Param("id") id: string, @Body() body: UpdatePlatformUserRoleDto) {
     return this.service.updateUserRole(user.sub, id, body.role);
   }
 
   @Patch("users/:id/designer-status")
   @RequirePermission("super-admin:users-manage")
-  updateDesignerStatus(@CurrentUser() user: RequestUser, @Param("id") id: string, @Body() body: { designerStatus: DesignerStatus }) {
+  updateDesignerStatus(@CurrentUser() user: RequestUser, @Param("id") id: string, @Body() body: UpdatePlatformDesignerStatusDto) {
     return this.service.updateDesignerStatus(user.sub, id, body.designerStatus);
   }
 
@@ -56,13 +57,13 @@ export class SuperAdminPlatformController {
 
   @Post("secrets")
   @RequirePermission("super-admin:secrets-manage")
-  createSecret(@CurrentUser() user: RequestUser, @Body() body: { name: string; envVar: string; secretManagerRef?: string; service: string; lastRotatedAt?: string; notes?: string }) {
+  createSecret(@CurrentUser() user: RequestUser, @Body() body: CreateSecretReferenceDto) {
     return this.service.createSecret(user.sub, body);
   }
 
   @Patch("secrets/:id")
   @RequirePermission("super-admin:secrets-manage")
-  updateSecret(@CurrentUser() user: RequestUser, @Param("id") id: string, @Body() body: { name?: string; envVar?: string; secretManagerRef?: string; service?: string; lastRotatedAt?: string; notes?: string }) {
+  updateSecret(@CurrentUser() user: RequestUser, @Param("id") id: string, @Body() body: UpdateSecretReferenceDto) {
     return this.service.updateSecret(user.sub, id, body);
   }
 
