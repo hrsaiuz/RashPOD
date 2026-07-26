@@ -3,6 +3,37 @@ import { DesignStoriesService } from "./design-stories.service";
 import { storySourceFingerprint } from "./design-story-translation-state";
 
 describe("DesignStoriesService publication validation", () => {
+  it.each([
+    ["approve", "DRAFT"],
+    ["reject", "NEEDS_CHANGES"],
+    ["unpublish", "PENDING_REVIEW"],
+  ] as const)("blocks %s outside its allowed lifecycle state", async (action, status) => {
+    const prisma = {
+      designStory: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: "story-1",
+          designAssetId: "design-1",
+          status,
+        }),
+        update: jest.fn(),
+      },
+    };
+    const service = new DesignStoriesService(
+      prisma as never,
+      { log: jest.fn() } as never,
+      {} as never,
+    );
+
+    const operation = action === "approve"
+      ? service.approvePublish("moderator-1", "design-1")
+      : action === "reject"
+        ? service.rejectPublish("moderator-1", "design-1", "Needs work")
+        : service.unpublish("moderator-1", "design-1");
+
+    await expect(operation).rejects.toBeInstanceOf(BadRequestException);
+    expect(prisma.designStory.update).not.toHaveBeenCalled();
+  });
+
   it("invalidates Russian and English text when the Uzbek source changes", async () => {
     const existing = {
       id: "story-1",

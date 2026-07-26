@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Button, Card, EmptyState, ErrorState, Skeleton, StatusBadge, Textarea } from "@rashpod/ui";
 import { Globe2, Languages, QrCode } from "lucide-react";
 import { api, type StoryLocale, type StoryReviewResponse } from "../../lib/api";
+import { ModeratorActionDialog } from "../moderator/ModeratorActionDialog";
 
 export function ModeratorDesignStoryReview({ designId }: { designId: string }) {
   const [loading, setLoading] = useState(true);
@@ -11,6 +12,7 @@ export function ModeratorDesignStoryReview({ designId }: { designId: string }) {
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const [notes, setNotes] = useState("");
+  const [pendingAction, setPendingAction] = useState<"" | "approve" | "reject" | "unpublish">("");
   const [payload, setPayload] = useState<StoryReviewResponse | null>(null);
 
   useEffect(() => {
@@ -41,14 +43,24 @@ export function ModeratorDesignStoryReview({ designId }: { designId: string }) {
       await api.post(`/admin/designs/${designId}/${path}`, kind === "reject" ? { notes } : undefined);
       await load();
       setMessage(kind === "approve" ? "Story published." : kind === "reject" ? "Story returned for changes." : "Story unpublished.");
+      return true;
     } catch (err) {
       setError(err instanceof Error ? err.message : "Action failed");
+      return false;
     } finally {
       setSaving("");
     }
   }
 
   const story = payload?.story ?? null;
+  const canReview = story?.status === "PENDING_REVIEW";
+  const canUnpublish = story?.status === "PUBLISHED";
+  const incompleteLocales = story
+    ? (["uz", "ru", "en"] as StoryLocale[]).filter(
+        (locale) => !story.titleTranslations?.[locale]?.trim() || !story.bodyTranslations?.[locale]?.trim(),
+      )
+    : [];
+  const canApprove = canReview && story?.translationsCurrent !== false && incompleteLocales.length === 0;
 
   return (
     <Card>
@@ -62,8 +74,8 @@ export function ModeratorDesignStoryReview({ designId }: { designId: string }) {
 
       {loading ? <Skeleton className="h-72" /> : error && !payload ? <ErrorState title="Could not load story review" description={error} retry={<Button onClick={load}>Retry</Button>} /> : !story ? <EmptyState title="No story draft yet" description="The designer has not created a story for this design." /> : (
         <div className="space-y-5">
-          {error ? <p className="rounded-2xl border border-semantic-error/20 bg-semantic-error/5 px-4 py-3 text-sm text-semantic-error">{error}</p> : null}
-          {message ? <p className="rounded-2xl border border-semantic-success/20 bg-semantic-success/5 px-4 py-3 text-sm text-semantic-success">{message}</p> : null}
+          {error ? <p role="alert" className="rounded-2xl border border-semantic-error/20 bg-semantic-error/5 px-4 py-3 text-sm text-semantic-error">{error}</p> : null}
+          {message ? <p aria-live="polite" className="rounded-2xl border border-semantic-success/20 bg-semantic-success/5 px-4 py-3 text-sm text-semantic-success">{message}</p> : null}
 
           <div className="grid gap-4 lg:grid-cols-[1fr_280px]">
             <div className="rounded-2xl border border-brand-line bg-surface-card p-4">
@@ -83,12 +95,34 @@ export function ModeratorDesignStoryReview({ designId }: { designId: string }) {
                 <Languages size={14} />
                 <span>Publish controls</span>
               </div>
-              <Textarea value={notes} onChange={(event) => setNotes(event.target.value)} placeholder="Reviewer notes for rejection or later reference." rows={6} />
-              <div className="mt-4 grid gap-2">
-                <Button variant="primaryBlue" loading={saving === "approve"} onClick={() => void runAction("approve")}>Approve and publish</Button>
-                <Button variant="secondary" loading={saving === "reject"} onClick={() => void runAction("reject")} disabled={!notes.trim()}>Return for changes</Button>
-                <Button variant="ghost" loading={saving === "unpublish"} onClick={() => void runAction("unpublish")}>Unpublish</Button>
-              </div>
+              {canReview ? (
+                <>
+                  {!canApprove ? (
+                    <p role="alert" className="mb-4 rounded-xl border border-semantic-warning/25 bg-semantic-warning/5 px-3 py-3 text-sm text-semantic-warningText">
+                      {incompleteLocales.length
+                        ? `Cannot publish: ${incompleteLocales.map(localeLabel).join(", ")} content is incomplete.`
+                        : "Cannot publish: translations no longer match the current Uzbek source."}
+                    </p>
+                  ) : null}
+                  <label htmlFor="story-review-notes" className="block text-sm font-medium text-brand-ink">Reviewer notes</label>
+                  <Textarea id="story-review-notes" value={notes} onChange={(event) => setNotes(event.target.value)} placeholder="Explain what the designer should change." rows={6} className="mt-2" />
+                  <p className="mt-2 text-xs text-brand-muted">Notes are required when returning a story for changes.</p>
+                  <div className="mt-4 grid gap-2">
+                    <Button variant="primaryBlue" onClick={() => setPendingAction("approve")} disabled={!canApprove}>Approve and publish</Button>
+                    <Button variant="secondary" onClick={() => setPendingAction("reject")} disabled={!notes.trim()}>Return for changes</Button>
+                  </div>
+                </>
+              ) : canUnpublish ? (
+                <Button variant="danger" className="w-full" onClick={() => setPendingAction("unpublish")}>Unpublish story</Button>
+              ) : (
+                <p className="rounded-xl bg-surface-app px-3 py-3 text-sm leading-6 text-brand-muted">
+                  {story.status === "NEEDS_CHANGES"
+                    ? "Waiting for the designer to revise and resubmit this story."
+                    : story.status === "UNPUBLISHED"
+                      ? "This story is offline. The designer must submit it for review before it can be published again."
+                      : "The designer has not submitted this draft for review yet."}
+                </p>
+              )}
             </div>
           </div>
 
@@ -124,6 +158,20 @@ export function ModeratorDesignStoryReview({ designId }: { designId: string }) {
           </div>
         </div>
       )}
+      <ModeratorActionDialog
+        open={pendingAction !== ""}
+        title={storyActionTitle(pendingAction)}
+        description={storyActionDescription(pendingAction)}
+        confirmLabel={pendingAction === "approve" ? "Publish story" : pendingAction === "reject" ? "Return for changes" : "Unpublish story"}
+        destructive={pendingAction !== "approve"}
+        busy={saving !== ""}
+        onCancel={() => setPendingAction("")}
+        onConfirm={async () => {
+          const action = pendingAction;
+          if (!action) return;
+          if (await runAction(action)) setPendingAction("");
+        }}
+      />
     </Card>
   );
 }
@@ -132,4 +180,16 @@ function localeLabel(locale: StoryLocale) {
   if (locale === "uz") return "Uzbek";
   if (locale === "ru") return "Russian";
   return "English";
+}
+
+function storyActionTitle(action: "" | "approve" | "reject" | "unpublish") {
+  if (action === "approve") return "Publish this story?";
+  if (action === "reject") return "Return this story for changes?";
+  return "Unpublish this story?";
+}
+
+function storyActionDescription(action: "" | "approve" | "reject" | "unpublish") {
+  if (action === "approve") return "The story will become publicly visible immediately. Confirm that all three language versions and media are ready.";
+  if (action === "reject") return "The designer will need to address the reviewer notes and submit the story again.";
+  return "The public story page will go offline until the designer submits it for review and a moderator approves it again.";
 }

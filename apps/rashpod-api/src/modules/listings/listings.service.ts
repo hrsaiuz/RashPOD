@@ -84,6 +84,48 @@ export class ListingsService {
     });
   }
 
+  async adminListPage(filters: { status?: ListingStatus; type?: ListingType; q?: string; limit?: number; page?: number }) {
+    const take = Math.min(Math.max(Math.trunc(filters.limit ?? 25), 1), 100);
+    const page = Math.max(Math.trunc(filters.page ?? 1), 1);
+    const where: Prisma.CommerceListingWhereInput = {
+      ...(filters.status ? { status: filters.status } : {}),
+      ...(filters.type ? { type: filters.type } : {}),
+      ...(filters.q
+        ? {
+            OR: [
+              { title: { contains: filters.q, mode: "insensitive" } },
+              { slug: { contains: filters.q, mode: "insensitive" } },
+              { designer: { displayName: { contains: filters.q, mode: "insensitive" } } },
+              { designer: { email: { contains: filters.q, mode: "insensitive" } } },
+            ],
+          }
+        : {}),
+    };
+    const [items, total] = await Promise.all([
+      this.prisma.commerceListing.findMany({
+        where,
+        orderBy: { updatedAt: "desc" },
+        skip: (page - 1) * take,
+        take,
+        include: {
+          designer: { select: { id: true, email: true, displayName: true, handle: true } },
+          designAsset: { select: { id: true, title: true, status: true } },
+          marketplacePublications: { orderBy: { createdAt: "desc" }, take: 5 },
+        },
+      }),
+      this.prisma.commerceListing.count({ where }),
+    ]);
+    return {
+      items,
+      pagination: {
+        page,
+        limit: take,
+        total,
+        totalPages: Math.max(1, Math.ceil(total / take)),
+      },
+    };
+  }
+
   async byId(user: RequestUser, id: string) {
     const listing = await this.prisma.commerceListing.findUnique({ where: { id } });
     if (!listing) throw new NotFoundException("Listing not found");
@@ -187,7 +229,12 @@ export class ListingsService {
     return updated;
   }
 
-  async adminSetStatus(user: RequestUser, id: string, status: ListingStatus) {
+  async adminSetStatus(
+    user: RequestUser,
+    id: string,
+    status: ListingStatus,
+    moderation?: { reason?: string; notes?: string },
+  ) {
     const listing = await this.prisma.commerceListing.findUnique({ where: { id } });
     if (!listing) throw new NotFoundException("Listing not found");
     if (!this.isAdminRole(user.role)) throw new ForbiddenException("Not allowed");
@@ -208,7 +255,12 @@ export class ListingsService {
       action: "listing.admin-status.update",
       entityType: "CommerceListing",
       entityId: id,
-      metadata: { beforeStatus: listing.status, afterStatus: status },
+      metadata: {
+        beforeStatus: listing.status,
+        afterStatus: status,
+        reason: moderation?.reason?.trim() || null,
+        notes: moderation?.notes?.trim() || null,
+      },
     });
     return updated;
   }

@@ -163,7 +163,7 @@ describe("ListingsService lifecycle", () => {
     const audit: any = { log: jest.fn().mockResolvedValue(undefined) };
     const service = new ListingsService(prisma, audit);
 
-    await expect(service.publish(user as any, "lst-blocked")).rejects.toBeInstanceOf(ForbiddenException);
+    await expect(service.publish(admin as any, "lst-blocked")).rejects.toBeInstanceOf(ForbiddenException);
 
     expect(prisma.commerceListing.update).not.toHaveBeenCalled();
     expect(audit.log).toHaveBeenCalledWith(expect.objectContaining({ action: "listing.publication.blocked", entityId: "lst-blocked" }));
@@ -187,7 +187,7 @@ describe("ListingsService lifecycle", () => {
     const audit: any = { log: jest.fn().mockResolvedValue(undefined) };
     const service = new ListingsService(prisma, audit);
 
-    await expect(service.publish(user as any, "lst-no-main")).rejects.toThrow("ready main image");
+    await expect(service.publish(admin as any, "lst-no-main")).rejects.toThrow("ready main image");
 
     expect(prisma.commerceListing.update).not.toHaveBeenCalled();
     expect(audit.log).toHaveBeenCalledWith(expect.objectContaining({ action: "listing.publication.blocked" }));
@@ -211,7 +211,7 @@ describe("ListingsService lifecycle", () => {
     const prisma: any = { commerceListing: { findUnique: jest.fn().mockResolvedValue(listing), update: jest.fn() } };
     const service = new ListingsService(prisma, { log: jest.fn().mockResolvedValue(undefined) } as any);
 
-    await expect(service.publish(user as any, "lst-no-metadata")).rejects.toThrow("render metadata");
+    await expect(service.publish(admin as any, "lst-no-metadata")).rejects.toThrow("render metadata");
   });
 
   it("publishes product listings with a complete ready image pack", async () => {
@@ -237,7 +237,7 @@ describe("ListingsService lifecycle", () => {
     const audit: any = { log: jest.fn().mockResolvedValue(undefined) };
     const service = new ListingsService(prisma, audit);
 
-    const result = await service.publish(user as any, "lst-ready");
+    const result = await service.publish(admin as any, "lst-ready");
 
     expect(result.status).toBe(ListingStatus.PUBLISHED);
     expect(prisma.commerceListing.update).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ status: ListingStatus.PUBLISHED }) }));

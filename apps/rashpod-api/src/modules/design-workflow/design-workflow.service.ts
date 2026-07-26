@@ -68,26 +68,43 @@ export class DesignWorkflowService {
     private readonly podPlacementTransform: PodPlacementTransformService,
   ) {}
 
-  moderationQueue(filters?: { status?: string; q?: string }) {
+  async moderationQueue(filters?: { status?: string; q?: string; page?: number; limit?: number }) {
     const statuses = this.resolveModerationTabStatuses(filters?.status);
-    return this.prisma.designAsset.findMany({
-      where: {
-        status: statuses.length === 1 ? statuses[0] : { in: statuses },
-        ...(filters?.q
-          ? {
-              OR: [
-                { title: { contains: filters.q, mode: "insensitive" } },
-                { description: { contains: filters.q, mode: "insensitive" } },
-                { designer: { displayName: { contains: filters.q, mode: "insensitive" } } },
-                { designer: { email: { contains: filters.q, mode: "insensitive" } } },
-              ],
-            }
-          : {}),
+    const page = Math.max(Math.trunc(filters?.page ?? 1), 1);
+    const limit = Math.min(Math.max(Math.trunc(filters?.limit ?? 25), 1), 100);
+    const query = filters?.q?.trim();
+    const where: Prisma.DesignAssetWhereInput = {
+      status: statuses.length === 1 ? statuses[0] : { in: statuses },
+      ...(query
+        ? {
+            OR: [
+              { title: { contains: query, mode: "insensitive" } },
+              { description: { contains: query, mode: "insensitive" } },
+              { designer: { displayName: { contains: query, mode: "insensitive" } } },
+              { designer: { email: { contains: query, mode: "insensitive" } } },
+            ],
+          }
+        : {}),
+    };
+    const [items, total] = await Promise.all([
+      this.prisma.designAsset.findMany({
+        where,
+        include: { designer: { select: { id: true, email: true, displayName: true } }, versions: { orderBy: { createdAt: "desc" }, take: 1 } },
+        orderBy: { updatedAt: "asc" },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      this.prisma.designAsset.count({ where }),
+    ]);
+    return {
+      items,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.max(1, Math.ceil(total / limit)),
       },
-      include: { designer: { select: { id: true, email: true, displayName: true } }, versions: { orderBy: { createdAt: "desc" }, take: 1 } },
-      orderBy: { updatedAt: "asc" },
-      take: 200,
-    });
+    };
   }
 
   async moderationDetail(id: string) {
@@ -115,6 +132,27 @@ export class DesignWorkflowService {
     const latestVersion = design.versions[0];
     const previewImageUrl = await this.safeSignedUrl(latestVersion?.fileKey);
     return { ...design, previewImageUrl, ai: { jobs: aiJobs, suggestions: aiJobs.flatMap((job) => job.suggestions) } };
+  }
+
+  async mockupStatus(id: string) {
+    const design = await this.prisma.designAsset.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        productSelections: {
+          select: { id: true, status: true, updatedAt: true },
+        },
+      },
+    });
+    if (!design) throw new NotFoundException("Design not found");
+    return {
+      designId: design.id,
+      pending: design.productSelections.some((selection) =>
+        selection.status === DesignProductSelectionStatus.MOCKUP_PENDING ||
+        selection.status === DesignProductSelectionStatus.MOCKUP_GENERATING,
+      ),
+      selections: design.productSelections,
+    };
   }
 
   workflow(id: string) {

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Globe2, Languages, Send, Sparkles } from "lucide-react";
 import { Button, Card, Input, StatusBadge, Textarea } from "@rashpod/ui";
 import { api, type Listing } from "../../../lib/api";
+import { ModeratorActionDialog } from "../../../components/moderator/ModeratorActionDialog";
 
 type LocaleKey = "en" | "uz" | "ru";
 
@@ -141,6 +142,7 @@ export function ModeratorListingWizard({
   const [generating, setGenerating] = useState<"" | LocaleKey>("");
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [confirmPublish, setConfirmPublish] = useState(false);
 
   const mockups = listing.designProductSelection?.mockupAssets ?? [];
   const activeCopy = translations[activeLocale];
@@ -179,18 +181,24 @@ export function ModeratorListingWizard({
     setError("");
     try {
       const source = translations.en;
-      const [titleRes, descRes] = await Promise.all([
+      const [titleRes, descRes, tagsRes] = await Promise.all([
         source.title
           ? api.post<{ translatedText: string }>("/ai/translate", { text: source.title, targetLanguage: locale })
           : Promise.resolve({ translatedText: "" }),
         source.description
           ? api.post<{ translatedText: string }>("/ai/translate", { text: source.description, targetLanguage: locale })
           : Promise.resolve({ translatedText: "" }),
+        source.tags.length
+          ? api.post<{ translatedText: string }>("/ai/translate", { text: source.tags.join(", "), targetLanguage: locale })
+          : Promise.resolve({ translatedText: "" }),
       ]);
       updateLocale(locale, {
         title: titleRes.translatedText || source.title,
         description: descRes.translatedText || source.description,
-        tags: source.tags,
+        tags: (tagsRes.translatedText || source.tags.join(", "))
+          .split(",")
+          .map((tag) => tag.trim())
+          .filter(Boolean),
       });
       setMessage(`Translated to ${locale.toUpperCase()}. Review before saving.`);
     } catch (e) {
@@ -239,11 +247,13 @@ export function ModeratorListingWizard({
           variants: variants.filter((row) => row.enabled),
         },
       });
-      await api.post(`/admin/product-listings/${listing.id}/publish`);
-      setMessage("Listing queued for publish.");
+      await api.post(`/admin/listings/${listing.id}/status`, { status: "PUBLISHED" });
+      setMessage("Listing published.");
       onSaved?.();
+      return true;
     } catch (e) {
       setError(e instanceof Error ? e.message : "Publish failed");
+      return false;
     } finally {
       setSaving(false);
     }
@@ -291,13 +301,15 @@ export function ModeratorListingWizard({
         </div>
       ) : null}
 
-      <div className="flex flex-wrap gap-2">
+      <div role="tablist" aria-label="Listing language" className="flex flex-wrap gap-2">
         {(["en", "uz", "ru"] as LocaleKey[]).map((locale) => (
           <button
             key={locale}
             type="button"
+            role="tab"
+            aria-selected={activeLocale === locale}
             onClick={() => setActiveLocale(locale)}
-            className={`rounded-pill px-3 py-1.5 text-xs font-semibold uppercase ${
+            className={`h-11 rounded-pill px-4 text-xs font-semibold uppercase focus:outline-none focus:ring-4 focus:ring-brand-blue/20 ${
               activeLocale === locale ? "bg-brand-blue text-white" : "border border-surface-borderSoft text-brand-ink"
             }`}
           >
@@ -307,16 +319,17 @@ export function ModeratorListingWizard({
       </div>
 
       <div className="flex flex-wrap gap-2">
-        <Button
-          size="sm"
-          variant="secondary"
-          onClick={() => generateCopy(activeLocale)}
-          disabled={!!generating || saving}
-          loading={generating === activeLocale}
-        >
-          <Sparkles size={14} /> AI copy ({activeLocale.toUpperCase()})
-        </Button>
-        {activeLocale !== "en" ? (
+        {activeLocale === "en" ? (
+          <Button
+            size="sm"
+            variant="secondary"
+            onClick={() => generateCopy("en")}
+            disabled={!!generating || saving}
+            loading={generating === "en"}
+          >
+            <Sparkles size={14} /> Generate English draft
+          </Button>
+        ) : (
           <Button
             size="sm"
             variant="secondary"
@@ -324,9 +337,9 @@ export function ModeratorListingWizard({
             disabled={!!generating || saving}
             loading={generating === activeLocale}
           >
-            <Languages size={14} /> Translate from EN
+            <Languages size={14} /> Translate English to {activeLocale.toUpperCase()}
           </Button>
-        ) : null}
+        )}
       </div>
 
       <label className="block text-sm font-medium text-brand-ink">
@@ -428,14 +441,14 @@ export function ModeratorListingWizard({
         </div>
       </div>
 
-      {error ? <p className="text-sm text-status-danger">{error}</p> : null}
-      {message ? <p className="text-sm text-brand-blue">{message}</p> : null}
+      {error ? <p role="alert" className="text-sm text-status-danger">{error}</p> : null}
+      {message ? <p aria-live="polite" className="text-sm text-brand-blue">{message}</p> : null}
 
       <div className="flex flex-wrap gap-3">
         <Button onClick={saveListing} disabled={saving} loading={saving}>
           Save listing
         </Button>
-        <Button variant="primaryPeach" onClick={publishListing} disabled={saving} loading={saving}>
+        <Button variant="primaryPeach" onClick={() => setConfirmPublish(true)} disabled={saving}>
           <Send size={16} /> Publish
         </Button>
         {listing.designProductSelection?.pipeline === "GLOBAL_PRINTFUL" ? (
@@ -444,6 +457,17 @@ export function ModeratorListingWizard({
           </span>
         ) : null}
       </div>
+      <ModeratorActionDialog
+        open={confirmPublish}
+        title="Publish this listing?"
+        description="The current copy, price, variations, and images will be saved, then the listing will become visible in the shop immediately."
+        confirmLabel="Publish listing"
+        busy={saving}
+        onCancel={() => setConfirmPublish(false)}
+        onConfirm={async () => {
+          if (await publishListing()) setConfirmPublish(false);
+        }}
+      />
     </Card>
   );
 }

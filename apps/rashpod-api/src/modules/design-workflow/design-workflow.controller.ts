@@ -22,8 +22,20 @@ export class DesignWorkflowController {
 
   @Get("moderation-queue")
   @RequirePermission("design:moderate")
-  moderationQueue(@Query("status") status?: string, @Query("q") q?: string) {
-    return this.workflow.moderationQueue({ status, q });
+  moderationQueue(
+    @Query("status") status?: string,
+    @Query("q") q?: string,
+    @Query("page") page?: string,
+    @Query("limit") limit?: string,
+  ) {
+    const parsedPage = page ? Number.parseInt(page, 10) : undefined;
+    const parsedLimit = limit ? Number.parseInt(limit, 10) : undefined;
+    return this.workflow.moderationQueue({
+      status,
+      q,
+      page: Number.isFinite(parsedPage) ? parsedPage : undefined,
+      limit: Number.isFinite(parsedLimit) ? parsedLimit : undefined,
+    });
   }
 
   @Get("printful/mockup-tasks/:taskKey")
@@ -36,6 +48,12 @@ export class DesignWorkflowController {
   @RequirePermission("design:moderate")
   moderationDetail(@Param("id") id: string) {
     return this.workflow.moderationDetail(id);
+  }
+
+  @Get(":id/mockup-status")
+  @RequirePermission("design:moderate")
+  mockupStatus(@Param("id") id: string) {
+    return this.workflow.mockupStatus(id);
   }
 
   @Get(":id/mockup-editor-context")

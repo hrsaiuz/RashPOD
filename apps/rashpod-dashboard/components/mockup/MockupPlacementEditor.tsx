@@ -8,6 +8,7 @@ import { EditorToolbar } from "./EditorToolbar";
 import { useMockupEditorState } from "./useMockupEditorState";
 import type { MockupEditorContextResponse } from "./types";
 import { useImage } from "./useImage";
+import { rashpodTokens } from "../../../../rashpod-ui-tokens";
 
 function DesignNode(props: {
   image: HTMLImageElement;
@@ -141,7 +142,7 @@ export function MockupPlacementEditor(props: {
         onReset={editor.resetPlacement}
         onCenter={editor.centerPlacement}
       />
-      <div ref={containerRef} className="overflow-hidden rounded-2xl border border-surface-borderSoft bg-[#E8EBF8]">
+      <div ref={containerRef} className="overflow-hidden rounded-2xl border border-surface-borderSoft bg-brand-blueLight/40">
         <Stage
           width={viewport.width}
           height={viewport.height}
@@ -166,7 +167,7 @@ export function MockupPlacementEditor(props: {
               y={printArea.y}
               width={printArea.width}
               height={printArea.height}
-              stroke="#788AE0"
+              stroke={rashpodTokens.colors.brand.blue}
               strokeWidth={2}
               dash={[12, 8]}
               listening={false}
@@ -176,7 +177,7 @@ export function MockupPlacementEditor(props: {
               y={printArea.safeY}
               width={printArea.safeWidth}
               height={printArea.safeHeight}
-              stroke="#F39E7C"
+              stroke={rashpodTokens.colors.brand.peach}
               strokeWidth={2}
               dash={[6, 6]}
               listening={false}

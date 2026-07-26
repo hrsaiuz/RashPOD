@@ -7,12 +7,14 @@ import DashboardLayout from "../dashboard-layout";
 import { KpiTile, DataTable, DataTableColumn, EmptyState, ErrorState, Skeleton, Card, Button, StatusBadge } from "@rashpod/ui";
 import { Search, CheckCircle, XCircle, Clock } from "lucide-react";
 import Link from "next/link";
+import { api } from "../../../lib/api";
 
 interface ModeratorKpis {
   pendingDesigns: number;
+  needsFix: number;
   approvedToday: number;
   rejectedToday: number;
-  avgSla: number;
+  oldestPendingHours: number;
 }
 
 interface ModerationDecision {
@@ -20,7 +22,12 @@ interface ModerationDecision {
   designTitle: string;
   designer: string;
   decision: string;
+  reason?: string | null;
   timestamp: string;
+}
+
+interface ModeratorOverviewResponse extends ModeratorKpis {
+  recentDecisions: ModerationDecision[];
 }
 
 export default function ModeratorOverview() {
@@ -42,20 +49,9 @@ export default function ModeratorOverview() {
       setLoading(true);
       setError("");
       try {
-        // TODO: Replace with actual endpoints
-        // const kpiRes = await fetch("/api/proxy/moderator/kpis");
-        // const decisionsRes = await fetch("/api/proxy/moderator/decisions?limit=5");
-        
-        setKpis({
-          pendingDesigns: 24,
-          approvedToday: 12,
-          rejectedToday: 3,
-          avgSla: 2.4,
-        });
-        setRecentDecisions([
-          { id: "1", designTitle: "Abstract Pattern", designer: "john@example.com", decision: "approved", timestamp: "2025-01-20T10:30:00" },
-          { id: "2", designTitle: "Mountain Scene", designer: "jane@example.com", decision: "rejected", timestamp: "2025-01-20T09:15:00" },
-        ]);
+        const data = await api.get<ModeratorOverviewResponse>("/dashboard/moderator");
+        setKpis(data);
+        setRecentDecisions(data.recentDecisions);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to load data");
       } finally {
@@ -72,13 +68,13 @@ export default function ModeratorOverview() {
       key: "decision", 
       header: "Decision",
       render: (val) => (
-        <StatusBadge status={val === "approved" ? "approved" : "rejected"} label={String(val)} />
+        <StatusBadge status={String(val).toLowerCase()} label={formatDecision(String(val))} />
       ),
     },
     { 
       key: "timestamp", 
       header: "Time",
-      render: (val) => new Date(val).toLocaleTimeString(),
+      render: (val) => new Date(String(val)).toLocaleString(),
     },
   ];
 
@@ -117,7 +113,7 @@ export default function ModeratorOverview() {
                   <KpiTile label="Pending Designs" value={kpis.pendingDesigns} icon={<Search size={24} />} />
                   <KpiTile label="Approved Today" value={kpis.approvedToday} icon={<CheckCircle size={24} />} />
                   <KpiTile label="Rejected Today" value={kpis.rejectedToday} icon={<XCircle size={24} />} />
-                  <KpiTile label="Avg SLA (hours)" value={kpis.avgSla} icon={<Clock size={24} />} />
+                  <KpiTile label="Oldest Pending (hours)" value={kpis.oldestPendingHours} icon={<Clock size={24} />} />
                 </>
               ) : null}
             </div>
@@ -147,4 +143,12 @@ export default function ModeratorOverview() {
       </div>
     </DashboardLayout>
   );
+}
+
+function formatDecision(decision: string) {
+  return decision
+    .toLowerCase()
+    .split("_")
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
 }

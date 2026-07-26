@@ -142,22 +142,61 @@ export class DashboardService {
   }
 
   async moderatorOverview() {
-    const [submitted, needsFix, recentCases] = await Promise.all([
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
+
+    const [submitted, needsFix, approvedToday, rejectedToday, oldestPending, recentCases] = await Promise.all([
       this.prisma.designAsset.count({ where: { status: "SUBMITTED" } }),
       this.prisma.designAsset.count({ where: { status: "NEEDS_FIX" } }),
+      this.prisma.designModerationCase.count({
+        where: { decision: "APPROVE", createdAt: { gte: startOfToday } },
+      }),
+      this.prisma.designModerationCase.count({
+        where: { decision: "REJECT", createdAt: { gte: startOfToday } },
+      }),
+      this.prisma.designAsset.findFirst({
+        where: { status: "SUBMITTED" },
+        orderBy: { updatedAt: "asc" },
+        select: { updatedAt: true },
+      }),
       this.prisma.designModerationCase.findMany({
         orderBy: { createdAt: "desc" },
         take: 10,
         select: {
           id: true,
-          designAssetId: true,
           decision: true,
           createdAt: true,
           reason: true,
+          designAsset: {
+            select: {
+              id: true,
+              title: true,
+              designer: { select: { email: true, displayName: true } },
+            },
+          },
         },
       }),
     ]);
-    return { submitted, needsFix, recentCases };
+    const oldestPendingHours = oldestPending
+      ? Math.max(0, Math.round(((Date.now() - oldestPending.updatedAt.getTime()) / 3_600_000) * 10) / 10)
+      : 0;
+
+    return {
+      pendingDesigns: submitted,
+      needsFix,
+      approvedToday,
+      rejectedToday,
+      oldestPendingHours,
+      recentDecisions: recentCases.map((item) => ({
+        id: item.id,
+        designId: item.designAsset.id,
+        designTitle: item.designAsset.title,
+        designer: item.designAsset.designer.displayName || item.designAsset.designer.email,
+        decision: item.decision,
+        reason: item.reason,
+        timestamp: item.createdAt,
+      })),
+    };
   }
 
   async productionOverview() {

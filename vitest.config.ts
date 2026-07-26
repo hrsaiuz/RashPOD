@@ -5,7 +5,7 @@ export default defineConfig({
   test: {
     environment: "jsdom",
     setupFiles: ["./test/ui-setup.ts"],
-    include: ["apps/rashpod-web/**/*.test.tsx", "apps/rashpod-dashboard/**/*.test.ts", "packages/ui/**/*.test.tsx"],
+    include: ["apps/rashpod-web/**/*.test.tsx", "apps/rashpod-dashboard/**/*.test.{ts,tsx}", "packages/ui/**/*.test.tsx"],
     clearMocks: true,
   },
 });

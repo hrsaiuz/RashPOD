@@ -8,6 +8,7 @@ import { normalizePrintAreaRects, type PrintAreaRect } from "@rashpod/mockup";
 import { ZoomIn, ZoomOut, Maximize2 } from "lucide-react";
 import { Button } from "@rashpod/ui";
 import { useImage } from "./useImage";
+import { rashpodTokens } from "../../../../rashpod-ui-tokens";
 
 type LayerId = "print" | "safe";
 
@@ -235,7 +236,7 @@ export function PrintAreaVisualEditor(props: {
           </Button>
         </div>
       </div>
-      <div ref={containerRef} className="overflow-hidden rounded-2xl border border-surface-borderSoft bg-[#E8EBF8]">
+      <div ref={containerRef} className="overflow-hidden rounded-2xl border border-surface-borderSoft bg-brand-blueLight/40">
         <Stage
           width={viewport.width}
           height={viewport.height}
@@ -251,14 +252,14 @@ export function PrintAreaVisualEditor(props: {
             <RectEditorNode
               rect={printRect}
               active={activeLayer === "print"}
-              stroke="#788AE0"
+              stroke={rashpodTokens.colors.brand.blue}
               fill={activeLayer === "print" ? "rgba(120, 138, 224, 0.12)" : "rgba(120, 138, 224, 0.04)"}
               onChange={(nextPrint) => emitChange(nextPrint, safeRect)}
             />
             <RectEditorNode
               rect={safeRect}
               active={activeLayer === "safe"}
-              stroke="#F39E7C"
+              stroke={rashpodTokens.colors.brand.peach}
               fill={activeLayer === "safe" ? "rgba(243, 158, 124, 0.12)" : "rgba(243, 158, 124, 0.04)"}
               onChange={(nextSafe) => emitChange(printRect, nextSafe)}
             />

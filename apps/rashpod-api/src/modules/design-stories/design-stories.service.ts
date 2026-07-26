@@ -289,6 +289,23 @@ export class DesignStoriesService {
   async approvePublish(actorId: string, designId: string) {
     const story = await this.prisma.designStory.findUnique({ where: { designAssetId: designId } });
     if (!story) throw new NotFoundException("Story not found");
+    if (story.status !== DesignStoryStatus.PENDING_REVIEW) {
+      throw new BadRequestException("Only stories submitted for review can be published.");
+    }
+    const sourceLocale = this.normalizeLocale(story.sourceLocale);
+    const titleTranslations = this.jsonToLocalizedStringMap(story.titleTranslationsJson);
+    const bodyTranslations = this.jsonToLocalizedStringMap(story.bodyTranslationsJson);
+    const sourceFingerprint = storySourceFingerprint(
+      sourceLocale,
+      titleTranslations[sourceLocale] || story.title,
+      bodyTranslations[sourceLocale] || "",
+    );
+    if (
+      !hasCompleteStoryTranslations(titleTranslations, bodyTranslations) ||
+      !storyTranslationsAreCurrent(this.objectJson(story.translationMetaJson), sourceFingerprint)
+    ) {
+      throw new BadRequestException("Current Uzbek, Russian, and English translations are required before publishing.");
+    }
     const updated = await this.prisma.designStory.update({
       where: { id: story.id },
       data: {
@@ -313,6 +330,9 @@ export class DesignStoriesService {
   async rejectPublish(actorId: string, designId: string, notes: string) {
     const story = await this.prisma.designStory.findUnique({ where: { designAssetId: designId } });
     if (!story) throw new NotFoundException("Story not found");
+    if (story.status !== DesignStoryStatus.PENDING_REVIEW) {
+      throw new BadRequestException("Only stories submitted for review can be returned for changes.");
+    }
     const updated = await this.prisma.designStory.update({
       where: { id: story.id },
       data: {
@@ -335,6 +355,9 @@ export class DesignStoriesService {
   async unpublish(actorId: string, designId: string) {
     const story = await this.prisma.designStory.findUnique({ where: { designAssetId: designId } });
     if (!story) throw new NotFoundException("Story not found");
+    if (story.status !== DesignStoryStatus.PUBLISHED) {
+      throw new BadRequestException("Only a published story can be unpublished.");
+    }
     const updated = await this.prisma.designStory.update({
       where: { id: story.id },
       data: {

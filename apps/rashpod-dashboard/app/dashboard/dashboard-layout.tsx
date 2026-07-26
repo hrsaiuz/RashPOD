@@ -32,6 +32,7 @@ import {
   CloudCog,
   BarChart3,
   Bell,
+  Activity,
   CheckCircle,
   Landmark,
   Banknote,
@@ -77,6 +78,7 @@ const ROLE_LINKS: Record<string, Array<{ href: string; label: string; icon?: any
     { href: "/dashboard/moderator", label: "Overview", icon: LayoutDashboard },
     { href: "/dashboard/moderator/designs", label: "Moderation Queue", icon: Search, group: "Workflow" },
     { href: "/dashboard/moderator/listings", label: "Listing Review", icon: Tag, group: "Workflow" },
+    { href: "/dashboard/moderator/logs", label: "Moderation Logs", icon: Activity, group: "Workflow" },
   ],
   finance: [
     { href: "/dashboard/finance", label: "Overview", icon: LayoutDashboard },

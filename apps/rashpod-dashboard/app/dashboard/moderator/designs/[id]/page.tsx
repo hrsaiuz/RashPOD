@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { AlertTriangle, ArrowLeft, ChevronDown, ChevronUp, Globe2, Loader2, MapPin, Plus, Trash2, XCircle } from "lucide-react";
-import { Button, Card, EmptyState, ErrorState, Input, ProductPickerGrid, StatusBadge } from "@rashpod/ui";
+import { Button, Card, EmptyState, ErrorState, Input, ProductPickerGrid, Skeleton, StatusBadge } from "@rashpod/ui";
 import DashboardLayout from "../../../dashboard-layout";
 import { api, ApiError, type DesignWorkflowDetail } from "../../../../../lib/api";
 import { useAuth } from "../../../../auth/auth-provider";
@@ -178,6 +178,8 @@ export default function Page() {
   const [highlightMockups, setHighlightMockups] = useState(false);
   const mockupSectionRef = useRef<HTMLDivElement>(null);
   const prevMockupPending = useRef(false);
+  const configLoadedRef = useRef(false);
+  const previewControllersRef = useRef(new Map<string, AbortController>());
 
   const activeBaseProducts = useMemo(() => baseProducts.filter((item) => item.isActive !== false), [baseProducts]);
   const activeMockupTemplates = useMemo(() => mockupTemplates.filter((item) => item.isActive !== false), [mockupTemplates]);
@@ -191,7 +193,6 @@ export default function Page() {
       return;
     }
     void load();
-    void loadConfig();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, authLoading, params.id]);
 
@@ -199,6 +200,18 @@ export default function Page() {
     if (!detail) return false;
     return ["SUBMITTED", "PENDING_MODERATION"].includes(detail.status);
   }, [detail]);
+
+  useEffect(() => {
+    if (!canModerate || configLoadedRef.current) return;
+    configLoadedRef.current = true;
+    void loadConfig();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [canModerate]);
+
+  useEffect(() => () => {
+    previewControllersRef.current.forEach((controller) => controller.abort());
+    previewControllersRef.current.clear();
+  }, []);
 
   const mockupPending = useMemo(
     () => detail?.productSelections?.some((selection) => ["MOCKUP_PENDING", "MOCKUP_GENERATING"].includes(selection.status)) ?? false,
@@ -208,26 +221,37 @@ export default function Page() {
   useEffect(() => {
     if (!mockupPending) return;
     const timer = window.setInterval(() => {
-      void load();
+      void pollMockupStatus();
     }, 5000);
     return () => window.clearInterval(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mockupPending, params.id]);
 
+  async function pollMockupStatus() {
+    try {
+      const status = await api.get<{ pending: boolean }>(`/admin/designs/${params.id}/mockup-status`);
+      if (!status.pending) await load({ background: true });
+    } catch (e) {
+      setLoadError(e instanceof Error ? e.message : "Failed to refresh mockup status");
+    }
+  }
+
   useEffect(() => {
     if (prevMockupPending.current && !mockupPending && detail?.productSelections?.length) {
       setHighlightMockups(true);
-      mockupSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      mockupSectionRef.current?.scrollIntoView({ behavior: preferredScrollBehavior(), block: "start" });
       const timer = window.setTimeout(() => setHighlightMockups(false), 4000);
       return () => window.clearTimeout(timer);
     }
     prevMockupPending.current = mockupPending;
   }, [mockupPending, detail?.productSelections?.length]);
 
-  async function load() {
-    setLoading(true);
-    setLoadError("");
-    setLoadNotFound(false);
+  async function load(options: { background?: boolean } = {}) {
+    if (!options.background) {
+      setLoading(true);
+      setLoadError("");
+      setLoadNotFound(false);
+    }
     try {
       setDetail(await api.get<DesignWorkflowDetail>(`/admin/designs/${params.id}/moderation-detail`));
     } catch (e) {
@@ -236,10 +260,10 @@ export default function Page() {
         setDetail(null);
       } else {
         setLoadError(e instanceof Error ? e.message : "Failed to load design");
-        setDetail(null);
+        if (!options.background) setDetail(null);
       }
     } finally {
-      setLoading(false);
+      if (!options.background) setLoading(false);
     }
   }
 
@@ -394,6 +418,7 @@ export default function Page() {
   async function previewPrintfulMockup(index: number) {
     const selection = globalSelections[index];
     if (!selection?.printfulProductTemplateId) return;
+    let previewTaskKey = "";
     updateGlobalSelection(index, { previewLoading: true, previewUrls: undefined });
     try {
       const started = await api.post<{ taskKey: string; status: string }>(`/admin/designs/${params.id}/printful-mockup-preview`, {
@@ -409,21 +434,27 @@ export default function Page() {
           scale: numberValue(selection.scale),
         },
       });
+      previewTaskKey = started.taskKey;
       updateGlobalSelection(index, { previewTaskKey: started.taskKey });
-      await pollPrintfulPreview(index, started.taskKey);
+      const controller = new AbortController();
+      previewControllersRef.current.set(started.taskKey, controller);
+      await pollPrintfulPreview(index, started.taskKey, controller.signal);
     } catch (e) {
+      if (e instanceof DOMException && e.name === "AbortError") return;
       updateGlobalSelection(index, { previewLoading: false });
       setActionError(e instanceof Error ? e.message : "Printful preview failed");
+    } finally {
+      if (previewTaskKey) previewControllersRef.current.delete(previewTaskKey);
     }
   }
 
-  async function pollPrintfulPreview(index: number, taskKey: string, attempt = 0) {
+  async function pollPrintfulPreview(index: number, taskKey: string, signal: AbortSignal, attempt = 0) {
     if (attempt > 12) {
       updateGlobalSelection(index, { previewLoading: false });
       setActionError("Printful preview timed out");
       return;
     }
-    const result = await api.get<{ status: string; mockupUrls: string[] }>(`/admin/designs/printful/mockup-tasks/${taskKey}`);
+    const result = await api.get<{ status: string; mockupUrls: string[] }>(`/admin/designs/printful/mockup-tasks/${taskKey}`, { signal });
     if ((result.status === "completed" || result.mockupUrls.length > 0) && result.mockupUrls.length) {
       updateGlobalSelection(index, { previewLoading: false, previewUrls: result.mockupUrls });
       return;
@@ -433,8 +464,8 @@ export default function Page() {
       setActionError("Printful preview failed");
       return;
     }
-    await new Promise((resolve) => window.setTimeout(resolve, Math.min(5000, 1000 * (attempt + 1))));
-    await pollPrintfulPreview(index, taskKey, attempt + 1);
+    await abortableDelay(Math.min(5000, 1000 * (attempt + 1)), signal);
+    await pollPrintfulPreview(index, taskKey, signal, attempt + 1);
   }
 
   function toggleMarketplace(index: number, marketplace: string) {
@@ -561,18 +592,21 @@ export default function Page() {
           </Link>
           <div className="flex flex-wrap items-center justify-end gap-2">
             {detail?.previewImageUrl ? <a href={detail.previewImageUrl} target="_blank" rel="noopener noreferrer"><Button variant="secondary" size="sm">Download file</Button></a> : null}
-            {detail && canModerate ? <Button variant="secondary" size="sm" onClick={() => document.getElementById("moderation-rejection")?.scrollIntoView({ behavior: "smooth", block: "start" })}>Internal notes</Button> : null}
-            {detail && canModerate ? <Button variant="danger" size="sm" onClick={() => document.getElementById("moderation-rejection")?.scrollIntoView({ behavior: "smooth", block: "start" })}>Reject design</Button> : null}
-            {detail && canModerate ? <Button variant="primaryPeach" size="sm" onClick={() => document.getElementById("pipeline-approval")?.scrollIntoView({ behavior: "smooth", block: "start" })}>Approve</Button> : null}
+            {detail && canModerate ? <Button variant="secondary" size="sm" onClick={() => scrollToElement("moderation-rejection")}>Internal notes</Button> : null}
+            {detail && canModerate ? <Button variant="danger" size="sm" onClick={() => scrollToElement("moderation-rejection")}>Reject design</Button> : null}
+            {detail && canModerate ? <Button variant="primaryPeach" size="sm" onClick={() => scrollToElement("pipeline-approval")}>Approve</Button> : null}
             {detail ? <StatusBadge status={detail.status} /> : null}
           </div>
         </div>
 
-        {loadError ? <ErrorState title="Moderation issue" description={loadError} retry={<Button onClick={load}>Retry</Button>} /> : null}
+        {loadError ? <ErrorState title="Moderation issue" description={loadError} retry={<Button onClick={() => void load()}>Retry</Button>} /> : null}
         {actionError ? <ErrorState title="Action failed" description={actionError} retry={<Button onClick={() => setActionError("")}>Dismiss</Button>} /> : null}
 
         {loading ? (
-          <Card><p className="text-brand-muted">Loading design...</p></Card>
+          <div aria-label="Loading design" className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
+            <Skeleton className="h-[520px]" />
+            <Skeleton className="h-[360px]" />
+          </div>
         ) : loadNotFound ? (
           <EmptyState title="Design not found" description="This moderation item is no longer available." />
         ) : !detail ? null : (
@@ -1036,7 +1070,7 @@ export default function Page() {
                 id="customReason"
                 value={customReason}
                 onChange={(event) => setCustomReason(event.target.value)}
-                className="mt-2 min-h-24 w-full rounded-xl border border-surface-borderSoft bg-white px-3 py-2 text-sm outline-none focus:border-brand-blue"
+                className="mt-2 min-h-24 w-full rounded-xl border border-surface-borderSoft bg-white px-3 py-2 text-sm outline-none focus:border-brand-blue focus:ring-4 focus:ring-brand-blue/20"
               />
               <label className="mt-4 block text-sm font-medium text-brand-ink" htmlFor="notes">Internal notes</label>
               <Input id="notes" value={notes} onChange={(event) => setNotes(event.target.value)} placeholder="Optional moderator note" className="mt-2" />
@@ -1224,7 +1258,7 @@ function SelectField({ label, value, onChange, options }: { label: string; value
   return (
     <label className="block text-sm font-medium text-brand-ink">
       {label}
-      <select value={value} onChange={(event) => onChange(event.target.value)} className="mt-2 h-12 w-full rounded-xl border border-surface-borderSoft bg-white px-3 text-sm outline-none focus:border-brand-blue">
+      <select value={value} onChange={(event) => onChange(event.target.value)} className="mt-2 h-12 w-full rounded-xl border border-surface-borderSoft bg-white px-3 text-sm outline-none focus:border-brand-blue focus:ring-4 focus:ring-brand-blue/20">
         <option value="">Select</option>
         {options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
       </select>
@@ -1240,7 +1274,33 @@ function TextField({ label, value, onChange, type = "text" }: { label: string; v
   return (
     <label className="block text-sm font-medium text-brand-ink">
       {label}
-      <input value={value} type={type} step={type === "number" ? "0.01" : undefined} onChange={(event) => onChange(event.target.value)} className="mt-2 h-12 w-full rounded-xl border border-surface-borderSoft bg-white px-3 text-sm outline-none focus:border-brand-blue" />
+      <input value={value} type={type} step={type === "number" ? "0.01" : undefined} onChange={(event) => onChange(event.target.value)} className="mt-2 h-12 w-full rounded-xl border border-surface-borderSoft bg-white px-3 text-sm outline-none focus:border-brand-blue focus:ring-4 focus:ring-brand-blue/20" />
     </label>
   );
+}
+
+function preferredScrollBehavior(): ScrollBehavior {
+  return window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth";
+}
+
+function scrollToElement(id: string) {
+  document.getElementById(id)?.scrollIntoView({ behavior: preferredScrollBehavior(), block: "start" });
+}
+
+function abortableDelay(milliseconds: number, signal: AbortSignal) {
+  return new Promise<void>((resolve, reject) => {
+    if (signal.aborted) {
+      reject(new DOMException("Aborted", "AbortError"));
+      return;
+    }
+    const onAbort = () => {
+      window.clearTimeout(timer);
+      reject(new DOMException("Aborted", "AbortError"));
+    };
+    const timer = window.setTimeout(() => {
+      signal.removeEventListener("abort", onAbort);
+      resolve();
+    }, milliseconds);
+    signal.addEventListener("abort", onAbort, { once: true });
+  });
 }

@@ -24,9 +24,10 @@ type AuditResponse = {
   page?: number;
   totalPages?: number;
   total?: number;
+  pagination?: { page: number; limit: number; total: number; totalPages: number };
 };
 
-const ACTIONS = ["moderation.pipeline", "product-listing", "design-product-selection", "marketplace-publication", "design.submit"];
+const ACTIONS = ["", "moderation.pipeline", "listing.", "design-story.", "product-listing", "design-product-selection", "marketplace-publication", "design.submit"];
 
 export default function Page() {
   const [rows, setRows] = useState<AuditRow[]>([]);
@@ -56,8 +57,8 @@ export default function Page() {
         setTotalPages(1);
       } else {
         setRows(result.data ?? result.rows ?? result.items ?? []);
-        setPage(result.page ?? nextPage);
-        setTotalPages(result.totalPages ?? 1);
+        setPage(result.pagination?.page ?? result.page ?? nextPage);
+        setTotalPages(result.pagination?.totalPages ?? result.totalPages ?? 1);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load audit logs");
@@ -81,8 +82,8 @@ export default function Page() {
           <div className="grid gap-3 md:grid-cols-[260px_minmax(0,1fr)_auto]">
             <label className="block text-sm font-medium text-brand-ink">
               Action prefix
-              <select value={action} onChange={(event) => setAction(event.target.value)} className="mt-2 h-12 w-full rounded-xl border border-surface-borderSoft bg-white px-3 text-sm outline-none focus:border-brand-blue">
-                {ACTIONS.map((item) => <option key={item} value={item}>{item}</option>)}
+              <select value={action} onChange={(event) => setAction(event.target.value)} className="mt-2 h-12 w-full rounded-xl border border-surface-borderSoft bg-white px-3 text-sm outline-none focus:border-brand-blue focus:ring-4 focus:ring-brand-blue/20">
+                {ACTIONS.map((item) => <option key={item || "all"} value={item}>{item || "All moderation actions"}</option>)}
               </select>
             </label>
             <label className="block text-sm font-medium text-brand-ink">
@@ -101,7 +102,10 @@ export default function Page() {
           <Card><EmptyState icon={<Activity className="text-brand-peach" size={32} />} title="No logs found" description="No audit events match the selected moderation filters." /></Card>
         ) : (
           <Card className="!p-0 overflow-hidden">
-            <div className="overflow-x-auto">
+            <div className="grid gap-3 p-4 md:hidden">
+              {rows.map((row) => <AuditLogCard key={row.id} row={row} />)}
+            </div>
+            <div className="hidden overflow-x-auto md:block">
               <table className="w-full text-sm">
                 <thead className="bg-surface-app text-brand-muted">
                   <tr>
@@ -114,7 +118,10 @@ export default function Page() {
                 <tbody className="divide-y divide-surface-borderSoft">
                   {rows.map((row) => (
                     <tr key={row.id}>
-                      <td className="px-5 py-4"><p className="font-semibold text-brand-ink">{row.action}</p><p className="max-w-xl truncate text-xs text-brand-muted">{metadataSummary(row.metadata)}</p></td>
+                      <td className="px-5 py-4">
+                        <p className="font-semibold text-brand-ink">{row.action}</p>
+                        <MetadataDetails metadata={row.metadata} />
+                      </td>
                       <td className="px-5 py-4"><p>{row.entityType}</p><p className="font-mono text-xs text-brand-muted">{row.entityId}</p></td>
                       <td className="px-5 py-4">{row.actor?.displayName ?? row.actor?.email ?? row.actorId ?? "System"}</td>
                       <td className="px-5 py-4 text-brand-muted">{new Date(row.createdAt).toLocaleString()}</td>
@@ -143,5 +150,49 @@ function metadataSummary(value: unknown) {
     return JSON.stringify(value);
   } catch {
     return "Metadata unavailable";
+  }
+}
+
+function MetadataDetails({ metadata }: { metadata: unknown }) {
+  const summary = metadataSummary(metadata);
+  return (
+    <details className="mt-1 max-w-xl text-xs text-brand-muted">
+      <summary className="cursor-pointer rounded focus:outline-none focus:ring-4 focus:ring-brand-blue/20">View metadata</summary>
+      <pre className="mt-2 max-h-64 overflow-auto whitespace-pre-wrap break-all rounded-xl bg-surface-app p-3 font-mono text-xs text-brand-ink">
+        {formatMetadata(metadata, summary)}
+      </pre>
+    </details>
+  );
+}
+
+function AuditLogCard({ row }: { row: AuditRow }) {
+  return (
+    <article className="rounded-2xl border border-surface-borderSoft bg-white p-4">
+      <p className="break-words font-semibold text-brand-ink">{row.action}</p>
+      <dl className="mt-3 grid gap-3 text-sm">
+        <div>
+          <dt className="text-xs text-brand-muted">Entity</dt>
+          <dd className="mt-1 break-all font-mono text-xs text-brand-ink">{row.entityType} · {row.entityId}</dd>
+        </div>
+        <div>
+          <dt className="text-xs text-brand-muted">Actor</dt>
+          <dd className="mt-1 text-brand-ink">{row.actor?.displayName ?? row.actor?.email ?? row.actorId ?? "System"}</dd>
+        </div>
+        <div>
+          <dt className="text-xs text-brand-muted">Time</dt>
+          <dd className="mt-1 text-brand-ink">{new Date(row.createdAt).toLocaleString()}</dd>
+        </div>
+      </dl>
+      <MetadataDetails metadata={row.metadata} />
+    </article>
+  );
+}
+
+function formatMetadata(value: unknown, fallback: string) {
+  if (!value) return fallback;
+  try {
+    return JSON.stringify(value, null, 2);
+  } catch {
+    return fallback;
   }
 }

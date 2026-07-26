@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Button, Card, DataTable, DataTableColumn, EmptyState, ErrorState, Input, StatusBadge } from "@rashpod/ui";
@@ -25,11 +25,20 @@ export default function ModeratorDesignsPage() {
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [total, setTotal] = useState(0);
+  const requestRef = useRef<AbortController | null>(null);
+  const requestIdRef = useRef(0);
 
   useEffect(() => {
     const timer = window.setTimeout(() => setDebouncedSearch(search.trim()), 300);
     return () => window.clearTimeout(timer);
   }, [search]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [activeTab, debouncedSearch]);
 
   useEffect(() => {
     if (authLoading) return;
@@ -39,20 +48,33 @@ export default function ModeratorDesignsPage() {
     }
     void load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user, authLoading, activeTab, debouncedSearch]);
+  }, [user, authLoading, activeTab, debouncedSearch, page]);
+
+  useEffect(() => () => requestRef.current?.abort(), []);
 
   async function load() {
+    requestRef.current?.abort();
+    const controller = new AbortController();
+    const requestId = ++requestIdRef.current;
+    requestRef.current = controller;
     setLoading(true);
     setError("");
     try {
-      const params = new URLSearchParams({ status: activeTab });
+      const params = new URLSearchParams({ status: activeTab, page: String(page), limit: "25" });
       if (debouncedSearch) params.set("q", debouncedSearch);
-      const rows = await api.get<ModerationQueueDesign[]>(`/admin/designs/moderation-queue?${params.toString()}`);
-      setItems(Array.isArray(rows) ? rows : []);
+      const response = await api.get<{
+        items: ModerationQueueDesign[];
+        pagination: { page: number; limit: number; total: number; totalPages: number };
+      }>(`/admin/designs/moderation-queue?${params.toString()}`, { signal: controller.signal });
+      if (requestId !== requestIdRef.current) return;
+      setItems(response.items);
+      setTotal(response.pagination.total);
+      setTotalPages(response.pagination.totalPages);
     } catch (e) {
+      if (e instanceof DOMException && e.name === "AbortError") return;
       setError(e instanceof Error ? e.message : "Failed to load moderation queue");
     } finally {
-      setLoading(false);
+      if (requestId === requestIdRef.current) setLoading(false);
     }
   }
 
@@ -60,6 +82,7 @@ export default function ModeratorDesignsPage() {
     setActiveTab(tab);
     setSearch("");
     setDebouncedSearch("");
+    setPage(1);
   }
 
   const columns: DataTableColumn<ModerationQueueDesign>[] = useMemo(() => [
@@ -130,15 +153,18 @@ export default function ModeratorDesignsPage() {
         </div>
 
         <Card>
-          <div className="flex flex-wrap gap-2 mb-4">
+          <div role="tablist" aria-label="Moderation queue status" className="flex flex-wrap gap-2 mb-4">
             {TABS.map((tab) => {
               const active = tab.key === activeTab;
               return (
                 <button
                   key={tab.key}
+                  type="button"
+                  role="tab"
+                  aria-selected={active}
                   onClick={() => onTabChange(tab.key)}
                   className={
-                    "px-4 h-10 rounded-pill text-sm font-medium transition-colors " +
+                    "px-4 h-11 rounded-pill text-sm font-medium transition-colors focus:outline-none focus:ring-4 focus:ring-brand-blue/20 " +
                     (active ? "bg-brand-blue text-white" : "bg-surface-card text-brand-ink hover:bg-surface-borderSoft")
                   }
                 >
@@ -148,9 +174,11 @@ export default function ModeratorDesignsPage() {
             })}
           </div>
 
+          <label htmlFor="moderation-search" className="mb-2 block text-sm font-medium text-brand-ink">Search submissions</label>
           <div className="relative mb-4 max-w-md">
             <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-brand-muted" />
             <Input
+              id="moderation-search"
               placeholder="Search by title, description, or designer"
               value={search}
               onChange={(event) => setSearch(event.target.value)}
@@ -175,6 +203,15 @@ export default function ModeratorDesignsPage() {
               }
             />
           )}
+          {!loading && !error && total > 0 ? (
+            <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
+              <p className="text-sm text-brand-muted">{total.toLocaleString()} designs · Page {page} of {totalPages}</p>
+              <div className="flex gap-2">
+                <Button variant="secondary" size="sm" onClick={() => setPage((current) => Math.max(1, current - 1))} disabled={page <= 1}>Previous</Button>
+                <Button variant="secondary" size="sm" onClick={() => setPage((current) => Math.min(totalPages, current + 1))} disabled={page >= totalPages}>Next</Button>
+              </div>
+            </div>
+          ) : null}
         </Card>
       </div>
     </DashboardLayout>

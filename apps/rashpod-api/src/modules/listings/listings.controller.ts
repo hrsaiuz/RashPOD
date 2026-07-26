@@ -6,6 +6,7 @@ import { PermissionGuard } from "../../common/auth/permission.guard";
 import { RequirePermission } from "../../common/auth/permission.decorator";
 import { CreateFilmListingDto } from "./dto/create-film-listing.dto";
 import { CreateListingDto } from "./dto/create-listing.dto";
+import { AdminSetListingStatusDto } from "./dto/admin-set-listing-status.dto";
 import { UpdateListingDto } from "./dto/update-listing.dto";
 import { ListingsService } from "./listings.service";
 
@@ -77,8 +78,19 @@ export class ListingsController {
     @Query("type") type?: ListingType,
     @Query("q") q?: string,
     @Query("limit") limit?: string,
+    @Query("page") page?: string,
   ) {
     const parsed = limit ? Number(limit) : undefined;
+    const parsedPage = page ? Number(page) : undefined;
+    if (Number.isFinite(parsedPage)) {
+      return this.listings.adminListPage({
+        status,
+        type,
+        q,
+        limit: Number.isFinite(parsed) ? parsed : undefined,
+        page: parsedPage,
+      });
+    }
     return this.listings.adminList({ status, type, q, limit: Number.isFinite(parsed) ? parsed : undefined });
   }
 
@@ -99,8 +111,11 @@ export class ListingsController {
   @Post("admin/listings/:id/status")
   @UseGuards(JwtAuthGuard, PermissionGuard)
   @RequirePermission("listing:publish")
-  adminSetStatus(@CurrentUser() user: RequestUser, @Param("id") id: string, @Body("status") status: ListingStatus) {
-    return this.listings.adminSetStatus(user, id, status);
+  adminSetStatus(@CurrentUser() user: RequestUser, @Param("id") id: string, @Body() dto: AdminSetListingStatusDto) {
+    return this.listings.adminSetStatus(user, id, dto.status, {
+      reason: dto.reason,
+      notes: dto.notes,
+    });
   }
 
   @Get("shop/listings")
