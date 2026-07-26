@@ -14,7 +14,7 @@ export default function DesignerApplicationSuccessPage() {
           Thank you for applying to become a RashPOD designer. Our team will review your profile, portfolio, and submitted information.
         </p>
         <p className="mx-auto mt-24 max-w-[900px] text-[16px]">
-          If your application matches RashPOD’s quality and originality standards, we’ll contact you with the next steps.
+          If approved, we’ll email you a secure invitation to create your password and activate your designer account. Submitting this form does not create an active account.
         </p>
       </DecoratedPanel>
     </StorePage>

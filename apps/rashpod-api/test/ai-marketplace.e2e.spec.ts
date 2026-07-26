@@ -32,6 +32,7 @@ describe("AI + Marketplace e2e", () => {
       email: "designer-aimk@test.local",
       password: "Password123!",
       displayName: "Designer AIMK",
+      role: "DESIGNER",
     });
     designerToken = designerReg.body.accessToken;
   });

@@ -25,7 +25,12 @@ JWT_EXPIRES_IN=7d
 PASSWORD_RESET_SECRET=
 EMAIL_VERIFICATION_SECRET=
 DESIGNER_INVITATION_TTL_HOURS=168
+INTAKE_SYSTEM_OWNER_ID=
 ```
+
+`INTAKE_SYSTEM_OWNER_ID` must be the UUID of a dedicated, non-human database user used only to own anonymous
+storefront uploads. Designer portfolio, identity, and selfie evidence stays private and is exposed to authorized
+reviewers only through short-lived signed URLs.
 
 ## Google Cloud
 ```env

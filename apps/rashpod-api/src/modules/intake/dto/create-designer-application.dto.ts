@@ -1,12 +1,24 @@
-import { IsArray, IsBoolean, IsEmail, IsObject, IsOptional, IsString, MinLength } from "class-validator";
+import {
+  ArrayMinSize,
+  IsArray,
+  IsBoolean,
+  IsEmail,
+  IsObject,
+  IsOptional,
+  IsString,
+  MaxLength,
+  MinLength,
+} from "class-validator";
 
 export class CreateDesignerApplicationDto {
   @IsString()
   @MinLength(1)
+  @MaxLength(100)
   firstName!: string;
 
   @IsString()
   @MinLength(1)
+  @MaxLength(100)
   lastName!: string;
 
   @IsEmail()
@@ -14,53 +26,60 @@ export class CreateDesignerApplicationDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(32)
   phoneCountryCode?: string;
 
   @IsOptional()
   @IsString()
+  @MaxLength(64)
   phoneNumber?: string;
 
   @IsOptional()
   @IsString()
+  @MaxLength(100)
   telegramUsername?: string;
 
   @IsOptional()
   @IsBoolean()
   passwordProvided?: boolean;
 
-  @IsOptional()
   @IsString()
-  displayName?: string;
+  @MinLength(1)
+  @MaxLength(120)
+  displayName!: string;
 
-  @IsOptional()
   @IsString()
-  country?: string;
+  @MinLength(1)
+  @MaxLength(100)
+  country!: string;
 
-  @IsOptional()
   @IsString()
-  city?: string;
+  @MinLength(1)
+  @MaxLength(100)
+  city!: string;
 
-  @IsOptional()
   @IsArray()
-  designCategories?: string[];
+  @ArrayMinSize(1)
+  @IsString({ each: true })
+  designCategories!: string[];
 
-  @IsOptional()
   @IsString()
-  shortBio?: string;
+  @MinLength(20)
+  @MaxLength(2000)
+  shortBio!: string;
 
-  @IsOptional()
   @IsArray()
-  portfolioFiles?: unknown[];
+  @ArrayMinSize(1)
+  portfolioFiles!: unknown[];
 
-  @IsOptional()
   @IsArray()
-  identityFiles?: unknown[];
+  @ArrayMinSize(1)
+  identityFiles!: unknown[];
 
-  @IsOptional()
   @IsArray()
-  selfieFiles?: unknown[];
+  @ArrayMinSize(1)
+  selfieFiles!: unknown[];
 
-  @IsOptional()
   @IsObject()
-  confirmations?: Record<string, boolean>;
+  confirmations!: Record<string, boolean>;
 }

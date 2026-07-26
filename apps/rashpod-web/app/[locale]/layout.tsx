@@ -83,7 +83,7 @@ export default async function LocaleLayout({
             <CartProvider freeDeliveryThreshold={freeDeliveryThreshold}>
               <StorefrontHeader
                 signInUrl="/auth/login"
-                startSellingUrl={`${dashboardUrl}/auth/register?role=designer`}
+                startSellingUrl="/designer-application"
                 logoUrl={branding?.storefrontLogoUrl ?? null}
                 brandName={brandName}
                 shopCategories={shopCategories}

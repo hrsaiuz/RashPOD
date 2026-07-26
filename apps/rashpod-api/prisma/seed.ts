@@ -47,12 +47,16 @@ async function upsertUser(input: {
       handle,
       role: input.role,
       passwordHash: hash,
+      designerStatus: "ACTIVE",
+      emailVerifiedAt: new Date(),
     },
     update: {
       displayName: input.displayName,
       handle,
       role: input.role,
       passwordHash: hash,
+      designerStatus: "ACTIVE",
+      emailVerifiedAt: new Date(),
     },
   });
 }

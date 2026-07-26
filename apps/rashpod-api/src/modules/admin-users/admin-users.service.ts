@@ -226,6 +226,9 @@ export class AdminUsersService {
     const designer = await this.prisma.user.findUnique({ where: { id } });
     if (!designer || designer.role !== UserRole.DESIGNER) throw new NotFoundException("Designer not found");
     const status = dto.status as DesignerStatus;
+    if (status === DesignerStatus.ACTIVE && !designer.emailVerifiedAt) {
+      throw new BadRequestException("Verify the designer email before activation");
+    }
     const updated = await this.prisma.user.update({ where: { id }, data: { designerStatus: status } });
     await this.audit.log({
       actorId,

@@ -38,6 +38,8 @@ export function IntakeAdminTable({ kind, title, description, emptyTitle }: Intak
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
   const [savingId, setSavingId] = useState("");
+  const [notice, setNotice] = useState("");
+  const [notesById, setNotesById] = useState<Record<string, string>>({});
 
   useEffect(() => {
     void load();
@@ -50,7 +52,9 @@ export function IntakeAdminTable({ kind, title, description, emptyTitle }: Intak
       const res = await fetch(`/api/proxy/admin/intake/${kind}`);
       if (!res.ok) throw new Error(`Failed to load (${res.status})`);
       const data = await res.json();
-      setRows(Array.isArray(data) ? data : []);
+      const nextRows = Array.isArray(data) ? data : [];
+      setRows(nextRows);
+      setNotesById(Object.fromEntries(nextRows.map((row) => [row.id, row.reviewNotes || ""])));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load");
     } finally {
@@ -59,7 +63,18 @@ export function IntakeAdminTable({ kind, title, description, emptyTitle }: Intak
   }
 
   async function updateRow(id: string, patch: { status?: string; reviewNotes?: string }) {
+    if (
+      kind === "designer-applications" &&
+      patch.status &&
+      ["APPROVED", "REJECTED"].includes(patch.status) &&
+      !window.confirm(
+        patch.status === "APPROVED"
+          ? "Approve this application and send the designer activation invitation?"
+          : "Reject this designer application?",
+      )
+    ) return;
     setSavingId(id);
+    setNotice("");
     try {
       const res = await fetch(`/api/proxy/admin/intake/${kind}/${id}`, {
         method: "PATCH",
@@ -69,11 +84,63 @@ export function IntakeAdminTable({ kind, title, description, emptyTitle }: Intak
       if (!res.ok) throw new Error(`Failed to update (${res.status})`);
       const updated = await res.json();
       setRows((current) => current.map((row) => (row.id === id ? { ...row, ...updated } : row)));
+      if (typeof updated.reviewNotes === "string" || updated.reviewNotes === null) {
+        setNotesById((current) => ({ ...current, [id]: updated.reviewNotes || "" }));
+      }
+      setNotice(patch.status === "APPROVED" ? "Application approved and activation invitation queued." : "Application saved.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to update");
     } finally {
       setSavingId("");
     }
+  }
+
+  function changeStatus(row: Record<string, any>, status: string) {
+    const reviewNotes = notesById[row.id]?.trim() || "";
+    if (kind === "designer-applications" && status === "REJECTED" && !reviewNotes) {
+      setError("Add a rejection reason before rejecting this application.");
+      return;
+    }
+    setError("");
+    void updateRow(row.id, {
+      status,
+      ...(status === "REJECTED" ? { reviewNotes } : {}),
+    });
+  }
+
+  async function openEvidence(fileId: string) {
+    setError("");
+    const response = await fetch(`/api/proxy/admin/intake/designer-applications/files/${encodeURIComponent(fileId)}`);
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok || !body.url) {
+      setError(body.message || "Could not open the review file.");
+      return;
+    }
+    window.open(body.url, "_blank", "noopener,noreferrer");
+  }
+
+  function evidence(row: Record<string, any>) {
+    const groups = [
+      ["Portfolio", row.portfolioFiles],
+      ["Identity", row.identityFiles],
+      ["Selfie", row.selfieFiles],
+    ] as const;
+    return (
+      <div className="mt-4 grid gap-3 sm:grid-cols-3">
+        {groups.map(([label, files]) => (
+          <div key={label} className="rounded-xl border border-surface-borderSoft p-3">
+            <p className="text-xs font-bold uppercase text-brand-muted">{label}</p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {Array.isArray(files) && files.length ? files.map((file: any, index: number) => (
+                <Button key={file.fileId || index} size="sm" variant="secondary" onClick={() => openEvidence(file.fileId)}>
+                  Open {index + 1}
+                </Button>
+              )) : <span className="text-xs text-semantic-dangerText">Missing</span>}
+            </div>
+          </div>
+        ))}
+      </div>
+    );
   }
 
   const filtered = useMemo(() => {
@@ -96,6 +163,7 @@ export function IntakeAdminTable({ kind, title, description, emptyTitle }: Intak
       </div>
 
       {error ? <div className="rounded-2xl border border-semantic-dangerBg bg-semantic-dangerBg px-4 py-3 text-sm text-semantic-dangerText">{error}</div> : null}
+      {notice ? <div role="status" className="rounded-2xl border border-semantic-successBg bg-semantic-successBg px-4 py-3 text-sm text-semantic-successText">{notice}</div> : null}
 
       {loading ? (
         <Skeleton className="h-64" />
@@ -118,11 +186,18 @@ export function IntakeAdminTable({ kind, title, description, emptyTitle }: Intak
                   <p className="mt-3 text-xs text-brand-muted">
                     Submitted {row.submittedAt ? new Date(row.submittedAt).toLocaleString() : "recently"}
                   </p>
+                  {kind === "designer-applications" ? evidence(row) : null}
+                  {kind === "designer-applications" && row.confirmations ? (
+                    <p className="mt-3 text-xs text-brand-muted">
+                      Agreements accepted: {Object.values(row.confirmations).every(Boolean) ? "Yes" : "No"}
+                      {row.reviewedAt ? ` · Reviewed ${new Date(row.reviewedAt).toLocaleString()}` : ""}
+                    </p>
+                  ) : null}
                 </div>
                 <div className="space-y-3">
                   <select
                     value={row.status}
-                    onChange={(e) => updateRow(row.id, { status: e.target.value })}
+                    onChange={(e) => changeStatus(row, e.target.value)}
                     disabled={savingId === row.id}
                     className="w-full rounded-[14px] border border-surface-borderSoft bg-white px-3 py-2 text-sm text-brand-text focus:border-brand-blue focus:outline-none focus:ring-4 focus:ring-brand-blue/20"
                   >
@@ -133,10 +208,19 @@ export function IntakeAdminTable({ kind, title, description, emptyTitle }: Intak
                   <Textarea
                     rows={3}
                     placeholder="Admin notes"
-                    defaultValue={row.reviewNotes || ""}
-                    onBlur={(e) => updateRow(row.id, { reviewNotes: e.target.value })}
+                    value={notesById[row.id] || ""}
+                    onChange={(e) => setNotesById((current) => ({ ...current, [row.id]: e.target.value }))}
                     disabled={savingId === row.id}
                   />
+                  <Button
+                    className="w-full"
+                    size="sm"
+                    variant="secondary"
+                    onClick={() => updateRow(row.id, { reviewNotes: notesById[row.id] || "" })}
+                    disabled={savingId === row.id || (notesById[row.id] || "") === (row.reviewNotes || "")}
+                  >
+                    Save notes
+                  </Button>
                 </div>
               </div>
             </Card>

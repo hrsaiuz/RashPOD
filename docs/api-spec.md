@@ -8,10 +8,31 @@ POST /auth/register
 POST /auth/login
 POST /auth/logout
 POST /auth/verify-email
+POST /auth/verify-email/confirm
 POST /auth/forgot-password
 POST /auth/reset-password
 GET  /auth/me
 ```
+
+General registration creates customer or corporate accounts and requires email verification. Designer access is
+invitation-only.
+
+## Designer Application and Activation
+```text
+POST  /intake/files/upload-url
+POST  /intake/files/complete-upload
+POST  /intake/designer-applications
+GET   /admin/intake/designer-applications
+PATCH /admin/intake/designer-applications/:id
+GET   /admin/intake/designer-applications/files/:fileId
+POST  /admin/designer-invitations
+GET   /designer-invitations/:token
+POST  /designer-invitations/:token/accept
+POST  /designer-invitations/:token/accept-existing
+```
+
+Application approval creates an invitation but does not directly create an authenticated account. Evidence assets are
+private and only available to users with `intake:manage`.
 
 ## Designer
 ```text

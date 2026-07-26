@@ -162,7 +162,7 @@ function FigmaHero({ media, dashboardUrl }: { media: HomeBrandingMedia; dashboar
           </p>
           <div className="mt-12 flex flex-wrap gap-5">
             <a
-              href={`${dashboardUrl}/auth/register?role=designer`}
+              href="/designer-application"
               className="inline-flex h-[75px] min-w-[189px] items-center justify-center rounded-[19px] bg-brand-blue px-9 text-[16px] font-extrabold tracking-[0.12em] text-white shadow-none transition-transform hover:scale-[1.02]"
             >
               Start Selling
@@ -526,7 +526,7 @@ function ActionCards({ dashboardUrl }: { dashboardUrl: string }) {
       titleTop: "DESIG",
       titleBottom: "NERS",
       body: "Upload artwork, publish products, and earn royalties without handling inventory",
-      href: `${dashboardUrl}/auth/register?role=designer`,
+      href: "/designer-application",
       cta: "Start selling",
       className: "bg-brand-peach text-black",
       button: "bg-brand-bg text-brand-ink",

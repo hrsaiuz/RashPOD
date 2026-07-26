@@ -27,13 +27,23 @@ function RegisterForm() {
 
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
+    if (role === "designer") {
+      const webUrl = process.env.NEXT_PUBLIC_WEB_URL || "https://rashpod.uz";
+      window.location.href = `${webUrl.replace(/\/$/, "")}/en/designer-application`;
+      return;
+    }
     setLoading(true);
     setError("");
     try {
       const res = await fetch(`${API_URL}/auth/register`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password, displayName }),
+        body: JSON.stringify({
+          email,
+          password,
+          displayName,
+          role: role === "corporate" ? "CORPORATE_CLIENT" : "CUSTOMER",
+        }),
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({ message: "Registration failed" }));
@@ -99,7 +109,7 @@ function RegisterForm() {
         />
         <MarketingSelect label="Account type" id="role" value={role} onChange={(e) => setRole(e.target.value)}>
           <option value="customer">Customer (shop & order products)</option>
-          <option value="designer">Designer (sell your designs)</option>
+          <option value="designer">Designer (application required)</option>
           <option value="corporate">Corporate (bulk orders)</option>
         </MarketingSelect>
         <Button

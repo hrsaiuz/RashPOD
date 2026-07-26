@@ -20,6 +20,7 @@ describe("Security e2e", () => {
       email: "owner-a@test.local",
       password: "Password123!",
       displayName: "Owner A",
+      role: "DESIGNER",
     });
     tokenA = regA.body.accessToken;
 
@@ -27,6 +28,7 @@ describe("Security e2e", () => {
       email: "owner-b@test.local",
       password: "Password123!",
       displayName: "Owner B",
+      role: "DESIGNER",
     });
     tokenB = regB.body.accessToken;
 

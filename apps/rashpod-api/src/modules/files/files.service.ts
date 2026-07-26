@@ -217,6 +217,18 @@ export class FilesService {
     };
   }
 
+  async getInternalReviewUrl(fileId: string, allowedPurposes: AssetPurpose[]) {
+    const file = await this.prisma.fileAsset.findUnique({ where: { id: fileId } });
+    if (!file || !allowedPurposes.includes(file.purpose)) throw new NotFoundException("Review file not found");
+    if (file.status !== AssetLifecycleStatus.READY) throw new ForbiddenException("Review file is not ready");
+    const expiresSeconds = Number(process.env.GCS_SIGNED_URL_EXPIRES_SECONDS || 900);
+    const safeExpires = Number.isFinite(expiresSeconds) ? Math.max(60, Math.min(3600, expiresSeconds)) : 900;
+    return {
+      fileId,
+      url: await this.storage.createSignedReadUrl({ objectKey: file.objectKey, expiresSeconds: safeExpires }),
+    };
+  }
+
   private async markUploadFailed(ownerId: string, fileId: string, failureReason: string) {
     await this.prisma.fileAsset.update({
       where: { id: fileId },

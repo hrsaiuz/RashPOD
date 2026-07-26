@@ -1,5 +1,5 @@
 import { IntakeStatus } from "@prisma/client";
-import { IsEnum, IsOptional, IsString } from "class-validator";
+import { IsEnum, IsOptional, IsString, MaxLength } from "class-validator";
 
 export class UpdateIntakeStatusDto {
   @IsOptional()
@@ -8,5 +8,6 @@ export class UpdateIntakeStatusDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(4000)
   reviewNotes?: string;
 }

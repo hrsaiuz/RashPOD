@@ -26,7 +26,7 @@ const FLOWS = [
   {
     audience: "Designers",
     tone: "peach" as const,
-    cta: { label: "Start selling", href: "/auth/register?role=designer" },
+    cta: { label: "Start selling", href: "/designer-application" },
     steps: [
       { icon: <UploadCloud size={18} />, title: "Upload your design", desc: "We apply it across product types automatically — no design rework required." },
       { icon: <CheckCircle size={18} />, title: "Get approved", desc: "Moderators review for quality and rights within 24–48 hours." },
@@ -142,7 +142,7 @@ export default function HowItWorksPage() {
           Whichever side of the marketplace you&rsquo;re on, you can sign up in under a minute.
         </p>
         <div className="flex flex-wrap gap-3 justify-center">
-          <Link href={`${dashboardUrl}/auth/register?role=designer`}>
+          <Link href="/designer-application">
             <Button variant="primaryPeach" size="md">Become a designer</Button>
           </Link>
           <Link href="/shop">

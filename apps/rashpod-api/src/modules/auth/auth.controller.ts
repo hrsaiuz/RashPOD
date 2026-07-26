@@ -45,6 +45,8 @@ export class AuthController {
         handle: true,
         socialLinks: true,
         role: true,
+        designerStatus: true,
+        emailVerifiedAt: true,
         createdAt: true,
         preferences: true,
       },

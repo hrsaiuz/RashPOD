@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from "@nestjs/common";
+import { BadRequestException, Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from "@nestjs/common";
 import { AssetPurpose } from "@prisma/client";
 import { IntakeStatus } from "@prisma/client";
 import { CurrentUser, RequestUser } from "../../common/auth/current-user.decorator";
@@ -34,9 +34,19 @@ export class PublicIntakeController {
 
   @Post("files/upload-url")
   createUploadUrl(@Body() dto: CreateUploadUrlDto) {
+    const allowedPurposes = new Set<AssetPurpose>([
+      AssetPurpose.DESIGNER_PORTFOLIO,
+      AssetPurpose.DESIGNER_IDENTITY,
+      AssetPurpose.DESIGNER_SELFIE,
+      AssetPurpose.PUBLIC_INTAKE_ATTACHMENT,
+    ]);
+    const purpose = dto.purpose ?? AssetPurpose.PUBLIC_INTAKE_ATTACHMENT;
+    if (!allowedPurposes.has(purpose)) {
+      throw new BadRequestException("Unsupported public intake upload purpose");
+    }
     return this.intake.createPublicUploadUrl({
       ...dto,
-      purpose: dto.purpose ?? AssetPurpose.DESIGN_ORIGINAL,
+      purpose,
     });
   }
 
@@ -61,6 +71,12 @@ export class AdminIntakeController {
   @RequirePermission("intake:manage")
   updateDesignerApplication(@CurrentUser() user: RequestUser, @Param("id") id: string, @Body() dto: UpdateIntakeStatusDto) {
     return this.intake.update("designer-applications", id, dto, user.sub);
+  }
+
+  @Get("designer-applications/files/:fileId")
+  @RequirePermission("intake:manage")
+  getDesignerEvidence(@Param("fileId") fileId: string) {
+    return this.intake.getDesignerEvidenceUrl(fileId);
   }
 
   @Get("contact-messages")

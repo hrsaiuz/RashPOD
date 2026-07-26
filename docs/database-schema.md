@@ -11,6 +11,7 @@
 ## Enums
 ```text
 UserRole: SUPER_ADMIN, ADMIN, OPERATIONS_MANAGER, MODERATOR, PRODUCTION_STAFF, FINANCE_STAFF, SUPPORT_STAFF, DESIGNER, CUSTOMER, CORPORATE_CLIENT
+DesignerStatus: PENDING, ACTIVE, INACTIVE, SUSPENDED
 DesignStatus: DRAFT, SUBMITTED, NEEDS_FIX, APPROVED, REJECTED, SUSPENDED, READY_FOR_MOCKUP, READY_TO_PUBLISH, PUBLISHED
 ListingType: PRODUCT, FILM
 ListingStatus: DRAFT, READY_FOR_REVIEW, PUBLISHED, ARCHIVED, REJECTED, SUSPENDED
@@ -25,13 +26,15 @@ DeliveryProviderType: YANDEX_DELIVERY, UZPOST, PICKUP, MANUAL
 
 ## Core Entities
 ```text
-User(id, email, phone, passwordHash, displayName, role, status, createdAt, updatedAt)
+User(id, email, phone, passwordHash, displayName, role, designerStatus, emailVerifiedAt, emailVerificationTokenHash, emailVerificationExpiresAt, createdAt, updatedAt)
 Role(id, name, description)
 Permission(id, key, description)
 RolePermission(roleId, permissionId)
 DesignerProfile(id, userId, handle, displayName, bio, avatarFileId, payoutStatus, defaultRoyaltyRuleId)
 CustomerProfile(id, userId)
 CorporateProfile(id, userId, companyName, taxId, contactPerson, phone, email, billingAddress)
+DesignerApplication(id, email, displayName, evidenceFileRefs, confirmations, status, reviewNotes, reviewedById, reviewedAt, invitationId, submittedAt)
+DesignerInvitation(id, email, displayName, tokenHash, status, expiresAt, acceptedByUserId, createdById)
 ```
 
 ## Design Entities

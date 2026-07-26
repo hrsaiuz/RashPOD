@@ -20,6 +20,11 @@ export class DesignerInvitationsService {
 
   async create(user: RequestUser, dto: CreateDesignerInvitationDto) {
     const email = dto.email.trim().toLowerCase();
+    const account = await this.prisma.user.findUnique({ where: { email }, select: { role: true } });
+    const convertibleRoles: UserRole[] = [UserRole.CUSTOMER, UserRole.CORPORATE_CLIENT, UserRole.DESIGNER];
+    if (account && !convertibleRoles.includes(account.role)) {
+      throw new BadRequestException("Staff accounts cannot be converted through a designer invitation");
+    }
     const tenantId = user.tenantId ?? user.tid ?? await this.defaultTenantId();
     await this.expirePending();
     const existing = await this.prisma.designerInvitation.findFirst({ where: { email, tenantId, status: DesignerInvitationStatus.PENDING } });
@@ -68,7 +73,17 @@ export class DesignerInvitationsService {
     const user = await this.prisma.$transaction(async (tx) => {
       const claimed = await tx.designerInvitation.updateMany({ where: { id: invitation.id, tokenHash: hashToken(token), status: DesignerInvitationStatus.PENDING, expiresAt: { gt: now } }, data: { status: DesignerInvitationStatus.ACCEPTED, acceptedAt: now } });
       if (claimed.count !== 1) throw new BadRequestException("Invitation is no longer valid");
-      const created = await tx.user.create({ data: { email: invitation.email, displayName, handle: await this.uniqueHandle(displayName), passwordHash, role: UserRole.DESIGNER } });
+      const created = await tx.user.create({
+        data: {
+          email: invitation.email,
+          displayName,
+          handle: await this.uniqueHandle(displayName),
+          passwordHash,
+          role: UserRole.DESIGNER,
+          designerStatus: "ACTIVE",
+          emailVerifiedAt: now,
+        },
+      });
       if (invitation.tenantId) await tx.tenantMember.upsert({ where: { tenantId_userId: { tenantId: invitation.tenantId, userId: created.id } }, create: { tenantId: invitation.tenantId, userId: created.id, roleKey: UserRole.DESIGNER, status: "ACTIVE", invitedById: invitation.invitedById, invitedAt: invitation.createdAt, joinedAt: now }, update: { roleKey: UserRole.DESIGNER, status: "ACTIVE", joinedAt: now } });
       await tx.designerInvitation.update({ where: { id: invitation.id }, data: { acceptedById: created.id } });
       return created;
@@ -81,15 +96,33 @@ export class DesignerInvitationsService {
     if (!dto.agreementsAccepted) throw new BadRequestException("Required agreements must be accepted");
     const invitation = await this.resolve(token, true);
     if (user.email.toLowerCase() !== invitation.email) throw new ForbiddenException("This invitation belongs to a different account");
+    const convertibleRoles: UserRole[] = [UserRole.CUSTOMER, UserRole.CORPORATE_CLIENT, UserRole.DESIGNER];
+    if (!convertibleRoles.includes(user.role as UserRole)) {
+      throw new ForbiddenException("Staff accounts cannot accept designer invitations");
+    }
     const now = new Date();
     await this.prisma.$transaction(async (tx) => {
       const claimed = await tx.designerInvitation.updateMany({ where: { id: invitation.id, tokenHash: hashToken(token), status: DesignerInvitationStatus.PENDING, expiresAt: { gt: now } }, data: { status: DesignerInvitationStatus.ACCEPTED, acceptedAt: now, acceptedById: user.sub } });
       if (claimed.count !== 1) throw new BadRequestException("Invitation is no longer valid");
-      await tx.user.update({ where: { id: user.sub }, data: { role: UserRole.DESIGNER } });
+      await tx.user.update({
+        where: { id: user.sub },
+        data: { role: UserRole.DESIGNER, designerStatus: "ACTIVE", emailVerifiedAt: now },
+      });
       if (invitation.tenantId) await tx.tenantMember.upsert({ where: { tenantId_userId: { tenantId: invitation.tenantId, userId: user.sub } }, create: { tenantId: invitation.tenantId, userId: user.sub, roleKey: UserRole.DESIGNER, status: "ACTIVE", invitedById: invitation.invitedById, invitedAt: invitation.createdAt, joinedAt: now }, update: { roleKey: UserRole.DESIGNER, status: "ACTIVE", joinedAt: now } });
     });
     await this.audit.log({ actorId: user.sub, tenantId: invitation.tenantId ?? undefined, action: "designer-invitation.accept", entityType: "DesignerInvitation", entityId: invitation.id, metadata: { account: "existing" } });
     return { accepted: true, requiresReauthentication: true, redirectTo: "/dashboard/designer" };
+  }
+
+  notifyApplicationRejected(input: { email: string; displayName: string; reason?: string | null }) {
+    const reason = clean(input.reason) || "The application did not meet the current designer onboarding requirements.";
+    return this.jobs.enqueue("SEND_EMAIL", {
+      to: input.email,
+      subject: "Your RashPOD designer application",
+      html: `<p>Hello ${escapeHtml(input.displayName)},</p><p>Thank you for applying to RashPOD. We are unable to approve your designer application at this time.</p><p><strong>Review note:</strong> ${escapeHtml(reason)}</p><p>You may contact RashPOD support if you need clarification before applying again.</p>`,
+      text: `Hello ${input.displayName},\n\nThank you for applying to RashPOD. We are unable to approve your designer application at this time.\n\nReview note: ${reason}\n\nContact RashPOD support if you need clarification before applying again.`,
+      idempotencyKey: `designer-application-rejected:${input.email}:${hashToken(reason).slice(0, 16)}`,
+    });
   }
 
   private async send(id: string, token: string) {
@@ -130,3 +163,4 @@ export class DesignerInvitationsService {
 function hashToken(token: string) { return createHash("sha256").update(token, "utf8").digest("hex"); }
 function clean(value?: string | null) { const result = value?.trim(); return result || undefined; }
 function normalizeLocale(value?: string | null) { return value === "ru" || value === "en" ? value : "uz"; }
+function escapeHtml(value: string) { return value.replace(/[&<>"']/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" })[character]!); }

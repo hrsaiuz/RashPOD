@@ -12,8 +12,6 @@ type FormState = {
   phoneCountryCode: string;
   phoneNumber: string;
   telegramUsername: string;
-  password: string;
-  confirmPassword: string;
   displayName: string;
   country: string;
   city: string;
@@ -29,11 +27,9 @@ const initial: FormState = {
   firstName: "",
   lastName: "",
   email: "",
-  phoneCountryCode: "+1",
+  phoneCountryCode: "+998",
   phoneNumber: "",
   telegramUsername: "",
-  password: "",
-  confirmPassword: "",
   displayName: "",
   country: "",
   city: "",
@@ -62,16 +58,28 @@ export default function DesignerApplicationPage() {
   async function submit(e: FormEvent) {
     e.preventDefault();
     if (step < 4) {
+      const stepError = validateStep(step);
+      if (stepError) {
+        setError(stepError);
+        return;
+      }
+      setError("");
       setStep(step + 1);
+      return;
+    }
+    const finalError = validateStep(3);
+    if (finalError) {
+      setStep(3);
+      setError(finalError);
       return;
     }
     setSubmitting(true);
     setError("");
     try {
       const [portfolioUploads, identityUploads, selfieUploads] = await Promise.all([
-        uploadIntakeFiles(portfolioFiles),
-        uploadIntakeFiles(identityFiles),
-        uploadIntakeFiles(selfieFiles),
+        uploadIntakeFiles(portfolioFiles, "DESIGNER_PORTFOLIO"),
+        uploadIntakeFiles(identityFiles, "DESIGNER_IDENTITY"),
+        uploadIntakeFiles(selfieFiles, "DESIGNER_SELFIE"),
       ]);
 
       const res = await fetch("/api/proxy/intake/designer-applications", {
@@ -79,9 +87,7 @@ export default function DesignerApplicationPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...form,
-          passwordProvided: Boolean(form.password),
-          password: undefined,
-          confirmPassword: undefined,
+          passwordProvided: false,
           designCategories: form.designCategories ? [form.designCategories] : [],
           portfolioFiles: portfolioUploads,
           identityFiles: identityUploads,
@@ -95,6 +101,27 @@ export default function DesignerApplicationPage() {
     } finally {
       setSubmitting(false);
     }
+  }
+
+  function validateStep(currentStep: number) {
+    if (currentStep === 1) {
+      if (!form.firstName.trim() || !form.lastName.trim() || !form.email.trim()) {
+        return "Enter your first name, last name, and email address.";
+      }
+    }
+    if (currentStep === 2) {
+      if (!form.displayName.trim() || !form.country.trim() || !form.city.trim() || !form.designCategories) {
+        return "Complete your designer profile, including a design category.";
+      }
+      if (form.shortBio.trim().length < 20) return "Tell us a little more about your creative background (at least 20 characters).";
+      if (portfolioFiles.length === 0) return "Upload at least one portfolio file.";
+    }
+    if (currentStep === 3) {
+      if (identityFiles.length === 0) return "Upload an identity document.";
+      if (selfieFiles.length === 0) return "Upload a verification selfie.";
+      if (!Object.values(form.confirmations).every(Boolean)) return "Accept all required designer agreements.";
+    }
+    return "";
   }
 
   return (
@@ -116,8 +143,9 @@ export default function DesignerApplicationPage() {
                 <UnderlineInput label="Phone Number" value={form.phoneNumber} onChange={(e) => setForm({ ...form, phoneNumber: e.target.value })} />
                 <UnderlineInput label="Telegram username" value={form.telegramUsername} onChange={(e) => setForm({ ...form, telegramUsername: e.target.value })} />
                 <div />
-                <UnderlineInput label="Password" type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} />
-                <UnderlineInput label="Confirm password" type="password" value={form.confirmPassword} onChange={(e) => setForm({ ...form, confirmPassword: e.target.value })} />
+                <p className="md:col-span-2 rounded-2xl bg-brand-blueLight/35 p-4 text-sm text-brand-ink">
+                  You will create your password from a secure invitation after the application is approved.
+                </p>
               </div>
             </section>
           ) : null}
@@ -127,8 +155,8 @@ export default function DesignerApplicationPage() {
               <h2 className="text-[18px] font-medium text-black">Designer profile</h2>
               <p className="mt-3 text-[13px] text-black">This information helps us understand your style and creative background.</p>
               <div className="mt-12 grid max-w-[760px] gap-x-24 gap-y-8 md:grid-cols-2">
-                <UnderlineInput label="Display name" value={form.displayName} onChange={(e) => setForm({ ...form, displayName: e.target.value })} />
-                <UnderlineInput label="Country" value={form.country} onChange={(e) => setForm({ ...form, country: e.target.value })} />
+                <UnderlineInput label="Display name" required value={form.displayName} onChange={(e) => setForm({ ...form, displayName: e.target.value })} />
+                <UnderlineInput label="Country" required value={form.country} onChange={(e) => setForm({ ...form, country: e.target.value })} />
                 <UnderlineSelect label="Design categories" value={form.designCategories} onChange={(e) => setForm({ ...form, designCategories: e.target.value })}>
                   <option value="">Choose category</option>
                   <option>Apparel</option>
@@ -136,9 +164,9 @@ export default function DesignerApplicationPage() {
                   <option>Posters</option>
                   <option>Pattern design</option>
                 </UnderlineSelect>
-                <UnderlineInput label="City" value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} />
+                <UnderlineInput label="City" required value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} />
               </div>
-              <UnderlineTextarea className="mt-10 max-w-[760px]" label="Short bio" rows={4} placeholder="Tell us about your creative background, design style, and the kind of work you create." value={form.shortBio} onChange={(e) => setForm({ ...form, shortBio: e.target.value })} />
+              <UnderlineTextarea className="mt-10 max-w-[760px]" label="Short bio" required rows={4} placeholder="Tell us about your creative background, design style, and the kind of work you create." value={form.shortBio} onChange={(e) => setForm({ ...form, shortBio: e.target.value })} />
               <div className="mt-12">
                 <UploadButton
                   label="Upload Portfolio"
@@ -179,7 +207,7 @@ export default function DesignerApplicationPage() {
                   ["terms", "I agree to RashPOD Designer Terms and Privacy Policy."],
                 ].map(([key, label]) => (
                   <label key={key} className="flex items-start gap-4 text-[17px] text-black">
-                    <input type="checkbox" className="mt-1 h-7 w-7 accent-brand-peach" checked={form.confirmations[key]} onChange={(e) => setForm({ ...form, confirmations: { ...form.confirmations, [key]: e.target.checked } })} />
+                    <input type="checkbox" required className="mt-1 h-7 w-7 accent-brand-peach" checked={form.confirmations[key]} onChange={(e) => setForm({ ...form, confirmations: { ...form.confirmations, [key]: e.target.checked } })} />
                     {label}
                   </label>
                 ))}
@@ -211,7 +239,7 @@ export default function DesignerApplicationPage() {
             </section>
           ) : null}
         </div>
-        {error ? <p className="text-semantic-dangerText">{error}</p> : null}
+        {error ? <p role="alert" className="text-semantic-dangerText">{error}</p> : null}
         <div className="flex justify-between gap-4">
           {step > 1 ? <button type="button" onClick={() => setStep(step - 1)} className="h-[68px] rounded-[18px] border border-brand-peach px-10 text-[20px] font-bold text-brand-peach">Back</button> : <span />}
           <button disabled={submitting} className="h-[78px] rounded-[22px] bg-brand-peach px-10 text-[24px] font-bold text-white">

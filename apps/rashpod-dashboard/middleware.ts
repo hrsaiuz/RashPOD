@@ -62,6 +62,7 @@ async function verifyOrDecode(token: string): Promise<Record<string, unknown> | 
       return null;
     }
   }
+  if (process.env.NODE_ENV === "production") return null;
   return decodeJwtPayloadUnsafe(token);
 }
 

@@ -16,7 +16,7 @@ interface DesignerDetail {
   bio?: string | null;
   avatarUrl?: string | null;
   coverUrl?: string | null;
-  designerStatus: "ACTIVE" | "INACTIVE" | "SUSPENDED";
+  designerStatus: "PENDING" | "ACTIVE" | "INACTIVE" | "SUSPENDED";
   createdAt: string;
   designAssets: Array<{ id: string; title: string; status: string; createdAt: string }>;
   listings: Array<{ id: string; title: string; status: string; price: string | number; currency: string }>;

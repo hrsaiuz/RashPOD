@@ -4,5 +4,10 @@ import { WorkerJobsModule } from "../worker-jobs/worker-jobs.module";
 import { DesignerInvitationsController } from "./designer-invitations.controller";
 import { DesignerInvitationsService } from "./designer-invitations.service";
 
-@Module({ imports: [AuditModule, WorkerJobsModule], controllers: [DesignerInvitationsController], providers: [DesignerInvitationsService] })
+@Module({
+  imports: [AuditModule, WorkerJobsModule],
+  controllers: [DesignerInvitationsController],
+  providers: [DesignerInvitationsService],
+  exports: [DesignerInvitationsService],
+})
 export class DesignerInvitationsModule {}

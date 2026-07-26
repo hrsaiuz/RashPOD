@@ -17,6 +17,7 @@ describe("HTTP e2e", () => {
       email: "e2e-designer@test.local",
       password: "Password123!",
       displayName: "E2E Designer",
+      role: "DESIGNER",
     });
     authToken = reg.body.accessToken;
 

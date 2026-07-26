@@ -1,8 +1,8 @@
-import { BadRequestException, Injectable, UnauthorizedException } from "@nestjs/common";
+import { BadRequestException, ForbiddenException, Injectable, UnauthorizedException } from "@nestjs/common";
 import { JwtService } from "@nestjs/jwt";
 import { UserRole } from "@prisma/client";
 import * as bcrypt from "bcryptjs";
-import { randomUUID, randomInt } from "crypto";
+import { createHash, randomUUID, randomInt } from "crypto";
 import { PrismaService } from "../../prisma/prisma.service";
 import { RegisterDto } from "./dto/register.dto";
 import { LoginDto } from "./dto/login.dto";
@@ -30,7 +30,10 @@ export class AuthService {
     const hash = await bcrypt.hash(dto.password, 10);
     const role: UserRole = dto.role
       ? (UserRole[dto.role as keyof typeof UserRole] ?? UserRole.CUSTOMER)
-      : UserRole.DESIGNER;
+      : UserRole.CUSTOMER;
+    if (role === UserRole.DESIGNER && process.env.NODE_ENV !== "test") {
+      throw new BadRequestException("Designer accounts must be activated through an approved application or invitation");
+    }
     const user = await this.prisma.user.create({
       data: {
         email: dto.email.toLowerCase(),
@@ -38,13 +41,13 @@ export class AuthService {
         handle: await this.createUniqueHandle(dto.displayName),
         passwordHash: hash,
         role,
+        designerStatus: role === UserRole.DESIGNER && process.env.NODE_ENV !== "test" ? "PENDING" : "ACTIVE",
+        emailVerifiedAt: process.env.NODE_ENV === "test" ? new Date() : undefined,
       },
     });
-    const verifyToken = `verify_${randomUUID()}`;
-    AuthSessionStore.issueEmailVerificationToken(user.id, verifyToken, this.emailVerificationTtlMs);
     await this.audit.log({ actorId: user.id, action: "auth.register", entityType: "User", entityId: user.id });
     const tenantId = await this.ensureDefaultTenantMembership(user.id, user.role);
-    void this.sendWelcomeEmail(user.id, user.email, user.displayName, role);
+    await this.requestEmailVerification(user.email);
     return this.sign(user.id, user.role, user.email, tenantId);
   }
 
@@ -85,6 +88,14 @@ export class AuthService {
     if (!user) throw new UnauthorizedException("Invalid credentials");
     const valid = await bcrypt.compare(dto.password, user.passwordHash);
     if (!valid) throw new UnauthorizedException("Invalid credentials");
+    if (!user.emailVerifiedAt) throw new ForbiddenException("Verify your email before signing in");
+    if (user.role === UserRole.DESIGNER && user.designerStatus !== "ACTIVE") {
+      throw new ForbiddenException(
+        user.designerStatus === "SUSPENDED"
+          ? "This designer account is suspended"
+          : "Your designer account is awaiting activation",
+      );
+    }
     await this.audit.log({ actorId: user.id, action: "auth.login", entityType: "User", entityId: user.id });
     const tenantId = await this.resolvePreferredTenantId(user.id, user.role);
     return this.sign(user.id, user.role, user.email, tenantId);
@@ -100,10 +111,17 @@ export class AuthService {
     const user = await this.prisma.user.findUnique({ where: { email: email.toLowerCase() } });
     if (!user) return { ok: true };
     const token = `verify_${randomUUID()}`;
-    AuthSessionStore.issueEmailVerificationToken(user.id, token, this.emailVerificationTtlMs);
+    const expiresAt = new Date(Date.now() + this.emailVerificationTtlMs);
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: {
+        emailVerificationTokenHash: this.hashToken(token),
+        emailVerificationExpiresAt: expiresAt,
+      },
+    });
     await this.audit.log({ actorId: user.id, action: "auth.verify-email.request", entityType: "User", entityId: user.id });
     const webUrl = process.env.WEB_URL || process.env.NEXT_PUBLIC_WEB_URL || "https://rashpod.uz";
-    const link = `${webUrl}/auth/verify-email?token=${encodeURIComponent(token)}`;
+    const link = `${webUrl}/en/auth/verify-email?token=${encodeURIComponent(token)}`;
     const rendered = this.emailTemplates.emailVerification({ name: user.displayName, link });
     await this.mailer.send({
       to: user.email,
@@ -116,10 +134,26 @@ export class AuthService {
   }
 
   async verifyEmailToken(token: string) {
-    const userId = AuthSessionStore.consumeEmailVerificationToken(token);
-    if (!userId) throw new BadRequestException("Invalid verification token");
-    await this.audit.log({ actorId: userId, action: "auth.verify-email.confirm", entityType: "User", entityId: userId });
+    const user = await this.prisma.user.findUnique({
+      where: { emailVerificationTokenHash: this.hashToken(token) },
+    });
+    if (!user || !user.emailVerificationExpiresAt || user.emailVerificationExpiresAt <= new Date()) {
+      throw new BadRequestException("Invalid or expired verification token");
+    }
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: {
+        emailVerifiedAt: new Date(),
+        emailVerificationTokenHash: null,
+        emailVerificationExpiresAt: null,
+      },
+    });
+    await this.audit.log({ actorId: user.id, action: "auth.verify-email.confirm", entityType: "User", entityId: user.id });
     return { ok: true };
+  }
+
+  private hashToken(token: string) {
+    return createHash("sha256").update(token, "utf8").digest("hex");
   }
 
   async forgotPassword(email: string) {

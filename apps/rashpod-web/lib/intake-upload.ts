@@ -15,7 +15,16 @@ export type UploadedIntakeFile = {
   type: string;
 };
 
-export async function uploadIntakeFiles(files: FileList | File[] | null): Promise<UploadedIntakeFile[]> {
+export type IntakeUploadPurpose =
+  | "DESIGNER_PORTFOLIO"
+  | "DESIGNER_IDENTITY"
+  | "DESIGNER_SELFIE"
+  | "PUBLIC_INTAKE_ATTACHMENT";
+
+export async function uploadIntakeFiles(
+  files: FileList | File[] | null,
+  purpose: IntakeUploadPurpose = "PUBLIC_INTAKE_ATTACHMENT",
+): Promise<UploadedIntakeFile[]> {
   if (!files || (Array.isArray(files) ? files.length === 0 : files.length === 0)) return [];
 
   const list = Array.from(files);
@@ -23,7 +32,7 @@ export async function uploadIntakeFiles(files: FileList | File[] | null): Promis
 
   for (const file of list) {
     const signed = await api.post<UploadUrlResponse>("/intake/files/upload-url", {
-      purpose: "DESIGN_ORIGINAL",
+      purpose,
       filename: file.name,
       mimeType: file.type || "application/octet-stream",
       sizeBytes: file.size,

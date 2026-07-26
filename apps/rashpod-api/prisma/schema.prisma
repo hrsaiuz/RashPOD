@@ -80,6 +80,7 @@ enum InvoiceStatus {
 }
 
 enum DesignerStatus {
+  PENDING
   ACTIVE
   INACTIVE
   SUSPENDED
@@ -136,6 +137,10 @@ enum GeneratedAssetStatus {
 
 enum AssetPurpose {
   DESIGN_ORIGINAL
+  DESIGNER_PORTFOLIO
+  DESIGNER_IDENTITY
+  DESIGNER_SELFIE
+  PUBLIC_INTAKE_ATTACHMENT
   DESIGN_NORMALIZED
   FILM_SOURCE
   GANG_SHEET_SOURCE
@@ -996,7 +1001,10 @@ model User {
   handle       String?  @unique
   socialLinks  Json?
   role         UserRole
-  designerStatus DesignerStatus @default(ACTIVE)
+  designerStatus DesignerStatus @default(PENDING)
+  emailVerifiedAt DateTime?
+  emailVerificationTokenHash String? @unique
+  emailVerificationExpiresAt DateTime?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
@@ -1041,6 +1049,7 @@ model User {
   tenantInvitationsSent TenantMember[] @relation("TenantMemberInviter")
   designerInvitationsSent DesignerInvitation[] @relation("DesignerInvitationInviter")
   designerInvitationsAccepted DesignerInvitation[] @relation("DesignerInvitationAcceptedUser")
+  designerApplicationsReviewed DesignerApplication[] @relation("DesignerApplicationReviewer")
   entitlementOverridesCreated TenantEntitlementOverride[] @relation("TenantEntitlementOverrideCreator")
   customerAddresses CustomerAddress[]
   wishlistItems WishlistItem[]
@@ -3853,6 +3862,7 @@ model DesignerInvitation {
   tenant     Tenant? @relation(fields: [tenantId], references: [id], onDelete: SetNull)
   invitedBy  User    @relation("DesignerInvitationInviter", fields: [invitedById], references: [id], onDelete: Restrict)
   acceptedBy User?   @relation("DesignerInvitationAcceptedUser", fields: [acceptedById], references: [id], onDelete: SetNull)
+  application DesignerApplication?
 
   @@index([email, status])
   @@index([tenantId, status, createdAt])
@@ -3880,14 +3890,20 @@ model DesignerApplication {
   confirmations      Json?
   status             IntakeStatus @default(NEW)
   reviewNotes        String?
+  reviewedById       String?
+  reviewedAt         DateTime?
+  invitationId       String?      @unique
   submittedAt        DateTime     @default(now())
   updatedAt          DateTime     @updatedAt
 
   tenant             Tenant?      @relation(fields: [tenantId], references: [id], onDelete: SetNull)
+  reviewedBy         User?        @relation("DesignerApplicationReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+  invitation         DesignerInvitation? @relation(fields: [invitationId], references: [id], onDelete: SetNull)
 
   @@index([tenantId, status, submittedAt])
   @@index([status, submittedAt])
   @@index([email])
+  @@index([reviewedById, reviewedAt])
 }
 
 model ContactMessage {

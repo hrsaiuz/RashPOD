@@ -10,6 +10,9 @@
 - Store sensitive credentials in Secret Manager.
 - Critical `super-admin:*` permissions must always retain `SUPER_ADMIN` as a recovery role.
 - A super admin cannot demote their own account or demote the final remaining super admin.
+- Email verification and an `ACTIVE` designer status are enforced on login and on every authenticated request.
+- Designer accounts are activated only by accepting an admin invitation created directly or after application approval.
+- Existing staff accounts cannot be converted to designers by accepting an invitation.
 
 ## Roles
 ```text
@@ -85,6 +88,8 @@ Audit moderation decisions, design suspension, listing publication/archive, comm
 | Listing image | Public when published |
 | Film production file | Private |
 | Corporate attachment | Private |
+| Designer portfolio evidence | Private |
+| Designer identity/selfie evidence | Private, admin review only |
 | Commercial offer PDF | Private |
 | Marketplace export package | Private |
 

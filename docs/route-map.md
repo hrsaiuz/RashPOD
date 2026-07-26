@@ -10,12 +10,17 @@
 /product/[slug]
 /film/[slug]
 /designer/[handle]
+/designer-application
+/designer-application/success
 /corporate
 /checkout
 /auth/login
 /auth/register
 /auth/verify-email
 ```
+
+Designer signup has one entry point: `/designer-application`. Approval creates an invitation; accepting that invitation
+activates the designer account. General `/auth/register` is only for customer and corporate accounts.
 
 ## Designer Dashboard
 ```text
@@ -87,6 +92,7 @@
 /dashboard/admin
 /dashboard/admin/users
 /dashboard/admin/designers
+/dashboard/admin/designer-applications
 /dashboard/admin/customers
 /dashboard/admin/corporate-clients
 /dashboard/admin/product-types

@@ -21,7 +21,7 @@ function LoginForm() {
 
   useEffect(() => {
     if (searchParams.get("registered") === "1") {
-      setSuccessMessage("Account created! Please sign in.");
+      setSuccessMessage("Account created. Check your email and verify the address before signing in.");
     }
   }, [searchParams]);
 

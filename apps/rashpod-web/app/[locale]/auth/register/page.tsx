@@ -20,6 +20,7 @@ function RegisterInner() {
   const [displayName, setDisplayName] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [submitted, setSubmitted] = useState(false);
 
   const onSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -27,7 +28,7 @@ function RegisterInner() {
     setError("");
     try {
       await register(email, password, displayName);
-      window.location.href = "/account";
+      setSubmitted(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Registration failed");
     } finally {
@@ -41,7 +42,15 @@ function RegisterInner() {
         <div className="p-2 sm:p-4">
           <h1 className="text-h3 font-bold text-brand-ink mb-1">Create an account</h1>
           <p className="text-sm text-brand-muted mb-6">Shop custom designs from Uzbek creators.</p>
-          <form onSubmit={onSubmit} className="space-y-4">
+          {submitted ? (
+            <div role="status" className="rounded-2xl border border-semantic-successBg bg-semantic-successBg p-5 text-semantic-successText">
+              <p className="font-semibold">Check your email</p>
+              <p className="mt-2 text-sm">We sent a verification link to {email}. Verify your address before signing in.</p>
+              <Link href="/auth/login" className="mt-4 inline-flex min-h-11 items-center font-semibold underline underline-offset-2">
+                Go to sign in
+              </Link>
+            </div>
+          ) : <form onSubmit={onSubmit} className="space-y-4">
             <FormField label="Full name">
               <Input required value={displayName} onChange={(e) => setDisplayName(e.target.value)} autoComplete="name" />
             </FormField>
@@ -53,12 +62,12 @@ function RegisterInner() {
             </FormField>
             {error ? <AuthError message={error} /> : null}
             <Button type="submit" variant="primaryBlue" size="lg" loading={loading} className="w-full">Create account</Button>
-          </form>
+          </form>}
           <div className="mt-6 text-center text-sm text-brand-muted">
             Already have an account? <Link href="/auth/login" className="text-brand-blue hover:underline">Sign in</Link>
           </div>
           <div className="mt-2 text-center text-xs text-brand-muted">
-            Want to sell designs? <a href={(process.env.NEXT_PUBLIC_DASHBOARD_URL || "") + "/auth/register?role=designer"} className="text-brand-blue hover:underline">Become a designer</a>
+            Want to sell designs? <Link href="/designer-application" className="text-brand-blue hover:underline">Apply as a designer</Link>
           </div>
         </div>
       </Card>

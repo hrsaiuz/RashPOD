@@ -11,6 +11,10 @@ type User = {
   handle?: string | null;
   socialLinks?: unknown;
   role: UserRole;
+  designerStatus?: string;
+  emailVerifiedAt?: Date | null;
+  emailVerificationTokenHash?: string | null;
+  emailVerificationExpiresAt?: Date | null;
   createdAt: Date;
 };
 
@@ -140,6 +144,7 @@ export function createFakePrisma(): any {
   const emailTemplates: EmailTemplate[] = [];
   const userPreferences: UserPreferences[] = [];
   const audits: any[] = [];
+  const tenantId = "tenant_test";
 
   return {
     user: {
@@ -149,7 +154,13 @@ export function createFakePrisma(): any {
         return record;
       },
       findUnique: async ({ where, select }: any) => {
-        const row = users.find((u) => u.id === where.id || u.email === where.email || u.handle === where.handle) ?? null;
+        const row = users.find(
+          (u) =>
+            u.id === where.id ||
+            u.email === where.email ||
+            u.handle === where.handle ||
+            u.emailVerificationTokenHash === where.emailVerificationTokenHash,
+        ) ?? null;
         if (!row) return null;
         return applyUserSelect(row, select, userPreferences);
       },
@@ -206,6 +217,17 @@ export function createFakePrisma(): any {
         userPreferences.push(created);
         return created;
       },
+    },
+    tenant: {
+      findUnique: async ({ where }: any) => where.slug === "rashpod" ? { id: tenantId } : null,
+      create: async () => ({ id: tenantId }),
+    },
+    saaSPlan: {
+      upsert: async () => ({ id: "plan_test" }),
+    },
+    tenantMember: {
+      findFirst: async () => null,
+      upsert: async () => ({ tenantId }),
     },
     designAsset: {
       create: async ({ data }: any) => {

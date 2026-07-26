@@ -1,8 +1,19 @@
 # RashPOD QA Checklist
 
+## Designer Signup and Activation
+- [ ] Every storefront "sell/start designing" CTA opens the designer application.
+- [ ] The application requires profile details, portfolio, identity evidence, selfie, and all agreements.
+- [ ] Anonymous uploads reject unsupported purposes, types, and sizes.
+- [ ] Duplicate active applications for the same email are rejected.
+- [ ] Admin reviewers can open private evidence through short-lived signed URLs.
+- [ ] Rejecting requires a review reason and queues applicant feedback.
+- [ ] Approving creates one activation invitation and is audit logged.
+- [ ] Invitation acceptance creates or activates a verified designer account.
+- [ ] Pending, inactive, suspended, and unverified designers cannot sign in or use an existing JWT.
+- [ ] A designer invitation cannot overwrite a staff role.
+- [ ] Customer and corporate registration preserve the selected role.
+
 ## Designer Upload
-- [ ] Designer can register.
-- [ ] Designer can verify email.
 - [ ] Designer can upload PNG.
 - [ ] Invalid file type is rejected.
 - [ ] Large file is rejected.
