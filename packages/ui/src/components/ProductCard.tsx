@@ -81,12 +81,12 @@ function ProductCardInner({
       >
         <div className="relative h-[220px] overflow-hidden rounded-product bg-brand-bg sm:h-[267px]">
           {badge ? (
-            <span className="absolute left-4 top-4 z-10 rounded-xs bg-badge-bestSeller px-3 py-1.5 text-caption font-bold text-white">
+            <span className="absolute left-4 top-4 z-10 rounded-xs bg-badge-bestSeller px-3 py-1.5 text-caption font-bold text-brand-ink">
               {badge}
             </span>
           ) : null}
           {secondaryBadge ? (
-            <span className="absolute left-4 top-12 z-10 rounded-xs bg-brand-blue px-3 py-1.5 text-caption font-bold text-white">
+            <span className="absolute left-4 top-12 z-10 rounded-xs bg-brand-blue px-3 py-1.5 text-caption font-bold text-brand-ink">
               {secondaryBadge}
             </span>
           ) : null}
@@ -117,7 +117,7 @@ function ProductCardInner({
       <Card variant="lift" className={cn("group overflow-hidden !rounded-product !p-[18px]", className)}>
         <div className="relative mb-4 h-56 w-full overflow-hidden rounded-[22px] bg-brand-bg sm:h-64">
           <span
-            className="absolute right-3 top-3 z-10 inline-flex h-9 w-9 items-center justify-center rounded-full bg-white/90 text-brand-muted shadow-xs transition-colors group-hover:text-brand-peach"
+            className="absolute right-3 top-3 z-10 inline-flex h-11 w-11 items-center justify-center rounded-full bg-white/90 text-brand-muted shadow-xs transition-colors group-hover:text-semantic-filmText"
             aria-hidden="true"
           >
             <Heart size={16} />
@@ -138,7 +138,7 @@ function ProductCardInner({
               <p className="text-lg font-bold tabular-nums text-brand-blue">{priceLabel}</p>
             ) : null}
           </div>
-          <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brand-peach text-white shadow-fab transition-transform group-hover:scale-105">
+          <span className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-brand-peach text-brand-ink shadow-fab transition-transform group-hover:scale-105">
             <ShoppingBag size={16} aria-hidden="true" />
           </span>
         </div>
@@ -157,7 +157,7 @@ function ProductCardInner({
     >
       <div className="relative mb-4 h-[220px] w-full overflow-hidden rounded-[22px] bg-brand-bg">
         <span
-          className="absolute right-3 top-3 z-10 inline-flex h-9 w-9 items-center justify-center rounded-full bg-white/90 text-brand-muted shadow-xs transition-colors hover:text-brand-peach"
+          className="absolute right-3 top-3 z-10 inline-flex h-11 w-11 items-center justify-center rounded-full bg-white/90 text-brand-muted shadow-xs transition-colors hover:text-semantic-filmText"
           aria-hidden="true"
         >
           <Heart size={16} />
@@ -182,7 +182,7 @@ function ProductCardInner({
             <span className="mt-1 block font-bold tabular-nums text-brand-blue">{priceLabel}</span>
           ) : null}
         </div>
-        <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brand-peach text-white shadow-fab transition-transform group-hover:scale-105">
+        <span className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-brand-peach text-brand-ink shadow-fab transition-transform group-hover:scale-105">
           <ShoppingBag size={16} aria-hidden="true" />
         </span>
       </div>

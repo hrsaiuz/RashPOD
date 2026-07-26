@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import Link from "next/link";
 import Image from "next/image";
 import { motion } from "framer-motion";
 import {
@@ -11,9 +10,10 @@ import {
   PackageCheck,
   Tags,
 } from "lucide-react";
-import { Button, EmptyState, ErrorState, getApiBase, getDashboardUrl, ProductCard } from "@rashpod/ui";
+import { Button, EmptyState, ErrorState, getApiBase, ProductCard } from "@rashpod/ui";
 import type { DesignerSummary, ProductListing } from "../../lib/catalog";
 import { normalizeDesigners, normalizeProducts } from "../../lib/catalog";
+import { Link } from "../../i18n/navigation";
 
 export interface HomeBrandingMedia {
   homeHeroImageUrl?: string;
@@ -51,7 +51,6 @@ export default function HomePageClient({
   initialProducts,
   initialDesigners,
 }: HomePageClientProps) {
-  const dashboardUrl = getDashboardUrl();
   const apiBase = getApiBase();
 
   const [products, setProducts] = useState<ProductListing[]>(initialProducts ?? []);
@@ -116,7 +115,7 @@ export default function HomePageClient({
 
   return (
     <div className="bg-white text-brand-ink">
-      <FigmaHero media={homeMedia} dashboardUrl={dashboardUrl} />
+      <FigmaHero media={homeMedia} />
       <ServiceStrip />
       <HomepageProductCarousel
         title="Bestselling Designs"
@@ -133,21 +132,21 @@ export default function HomePageClient({
         empty={!productsError && products.length === 0}
         onRetry={retryCatalog}
       />
-      <ClubCta dashboardUrl={dashboardUrl} />
+      <ClubCta />
       <DesignerCarousel designers={designers} error={designersError} empty={!designersError && designers.length === 0} onRetry={retryCatalog} />
-      <ActionCards dashboardUrl={dashboardUrl} />
+      <ActionCards />
     </div>
   );
 }
 
-function FigmaHero({ media, dashboardUrl }: { media: HomeBrandingMedia; dashboardUrl: string }) {
+function FigmaHero({ media }: { media: HomeBrandingMedia }) {
   return (
     <section className="relative overflow-hidden bg-white">
-      <div className={`mx-auto grid min-h-[765px] ${HOME_MAX} grid-cols-1 items-center gap-7 ${HOME_GUTTER} pb-7 pt-14 lg:grid-cols-[0.48fr_0.52fr] lg:pt-7`}>
-        <motion.div {...fadeUp} className="relative z-10 max-w-[520px]">
+      <div className={`mx-auto grid ${media.homeHeroImageUrl ? "min-h-[765px] lg:grid-cols-[0.48fr_0.52fr]" : "min-h-[620px] lg:grid-cols-1"} ${HOME_MAX} grid-cols-1 items-center gap-7 ${HOME_GUTTER} pb-7 pt-14 lg:pt-7`}>
+        <motion.div {...fadeUp} className={`relative z-10 ${media.homeHeroImageUrl ? "max-w-[520px]" : "mx-auto w-full max-w-[720px]"}`}>
           <h1 className="leading-none tracking-[0] text-brand-ink">
             <span className="block text-[clamp(28px,2.55vw,36px)] font-normal">Shop original</span>
-            <span className="relative mt-1 flex items-baseline text-[clamp(74px,6.3vw,112px)] font-normal leading-[0.86] text-brand-peach">
+            <span className="relative mt-1 flex items-baseline text-[clamp(74px,6.3vw,112px)] font-normal leading-[0.86] text-semantic-filmText">
               designs
             </span>
             <span className="block text-center text-[clamp(43px,3.55vw,61px)] font-normal leading-[0.82] text-brand-blue">
@@ -161,15 +160,15 @@ function FigmaHero({ media, dashboardUrl }: { media: HomeBrandingMedia; dashboar
             Discover unique products by independent designers - or upload your own artwork and earn royalties with RashPOD's local print-on-demand system.
           </p>
           <div className="mt-12 flex flex-wrap gap-5">
-            <a
+            <Link
               href="/designer-application"
-              className="inline-flex h-[75px] min-w-[189px] items-center justify-center rounded-[19px] bg-brand-blue px-9 text-[16px] font-extrabold tracking-[0.12em] text-white shadow-none transition-transform hover:scale-[1.02]"
+              className="inline-flex h-[75px] min-w-[189px] items-center justify-center rounded-md bg-brand-blue px-9 text-[16px] font-extrabold tracking-[0.12em] text-brand-ink shadow-none transition-transform hover:scale-[1.02]"
             >
               Start Selling
-            </a>
+            </Link>
             <Link
               href="/shop"
-              className="inline-flex h-[75px] min-w-[189px] items-center justify-center rounded-[19px] bg-brand-peach px-9 text-[16px] font-extrabold tracking-[0.12em] text-white shadow-none transition-transform hover:scale-[1.02]"
+              className="inline-flex h-[75px] min-w-[189px] items-center justify-center rounded-md bg-brand-peach px-9 text-[16px] font-extrabold tracking-[0.12em] text-brand-ink shadow-none transition-transform hover:scale-[1.02]"
             >
               RashPOD Shop
             </Link>
@@ -177,12 +176,11 @@ function FigmaHero({ media, dashboardUrl }: { media: HomeBrandingMedia; dashboar
           <p className="mt-5 text-[15px] text-brand-ink">Local production - Transparent royalties - Made in Uzbekistan</p>
         </motion.div>
 
-        <motion.div
-          {...fadeUp}
-          className={media.homeHeroImageUrl ? "relative min-h-[553px] lg:min-h-[723px]" : "hidden min-h-[553px] lg:block lg:min-h-[723px]"}
-          aria-hidden={!media.homeHeroImageUrl}
-        >
-          {media.homeHeroImageUrl ? (
+        {media.homeHeroImageUrl ? (
+          <motion.div
+            {...fadeUp}
+            className="relative min-h-[553px] lg:min-h-[723px]"
+          >
             <Image
               src={media.homeHeroImageUrl}
               alt={media.homeHeroImageAlt ?? "RashPOD designers and product artwork"}
@@ -191,8 +189,8 @@ function FigmaHero({ media, dashboardUrl }: { media: HomeBrandingMedia; dashboar
               sizes="(min-width: 1024px) 646px, 100vw"
               className="relative z-10 object-contain object-bottom"
             />
-          ) : null}
-        </motion.div>
+          </motion.div>
+        ) : null}
       </div>
     </section>
   );
@@ -372,7 +370,7 @@ function CollectionCarousel({
   );
 }
 
-function ClubCta({ dashboardUrl }: { dashboardUrl: string }) {
+function ClubCta() {
   return (
     <section className="relative my-10 overflow-hidden bg-white md:my-14">
       <div className="relative bg-brand-bg px-5 py-10 md:h-[272px] md:pt-[54px]">
@@ -403,13 +401,13 @@ function ClubCta({ dashboardUrl }: { dashboardUrl: string }) {
           </p>
           <div className="flex flex-col items-center">
             <h2 className="mb-6 text-[24px] font-extrabold text-black md:mb-[58px] md:text-[26px]">Join the RASH POD Club</h2>
-            <a
-              href={`${dashboardUrl}/auth/register`}
-              className="relative inline-flex h-[56px] min-w-[176px] items-center justify-center rounded-[18px] bg-brand-blue px-9 text-[18px] font-extrabold tracking-[0.08em] text-white md:h-[67px] md:text-[20px]"
+            <Link
+              href="/auth/register"
+              className="relative inline-flex h-[56px] min-w-[176px] items-center justify-center rounded-pill bg-brand-blue px-9 text-[18px] font-extrabold tracking-[0.08em] text-brand-ink md:h-[67px] md:text-[20px]"
             >
-              join Now
+              Join now
               <span className="absolute -right-4 -top-4 text-[40px] leading-none text-brand-peach md:text-[48px]">*</span>
-            </a>
+            </Link>
           </div>
           <p className="text-[16px] text-black md:pt-[104px] md:text-[18px]">Receive a mystery design every month</p>
         </div>
@@ -508,7 +506,7 @@ function DesignerCard({ designer }: { designer: DesignerSummary }) {
           </div>
         )}
         <div className="absolute inset-x-0 bottom-0 z-20 flex h-[148px] translate-y-0 items-center justify-center bg-white/58 opacity-100 backdrop-blur-md transition-all duration-300 sm:translate-y-full sm:opacity-0 sm:group-hover:translate-y-0 sm:group-hover:opacity-100 motion-reduce:transition-none">
-          <span className="rounded-[8px] bg-brand-peach px-7 py-3 text-[14px] font-bold text-white">{designer.displayName}'s Designs</span>
+          <span className="rounded-xs bg-brand-peach px-7 py-3 text-[14px] font-bold text-brand-ink">{designer.displayName}'s Designs</span>
         </div>
         <div className="absolute left-6 top-6 z-20 translate-y-0 opacity-100 transition-all duration-300 sm:translate-y-3 sm:opacity-0 sm:group-hover:translate-y-0 sm:group-hover:opacity-100 motion-reduce:transition-none">
           <h3 className="text-[36px] font-black uppercase leading-none text-black">{designer.displayName}</h3>
@@ -520,7 +518,7 @@ function DesignerCard({ designer }: { designer: DesignerSummary }) {
   );
 }
 
-function ActionCards({ dashboardUrl }: { dashboardUrl: string }) {
+function ActionCards() {
   const cards = [
     {
       titleTop: "DESIG",
@@ -538,7 +536,7 @@ function ActionCards({ dashboardUrl }: { dashboardUrl: string }) {
       href: "/custom-order",
       cta: "Request a quote",
       className: "bg-brand-ink text-white",
-      button: "bg-brand-blue text-white",
+      button: "bg-brand-blue text-brand-ink",
     },
     {
       titleTop: "your",
@@ -555,8 +553,8 @@ function ActionCards({ dashboardUrl }: { dashboardUrl: string }) {
       body: "Buy apparel, original products by independent designers",
       href: "/shop",
       cta: "RASHPOD SHOP",
-      className: "bg-brand-blue text-white",
-      button: "bg-brand-peach text-white",
+      className: "bg-brand-blue text-brand-ink",
+      button: "bg-brand-peach text-brand-ink",
     },
   ];
 
@@ -591,7 +589,7 @@ function SectionHeader({ title, href }: { title: string; href: string }) {
   return (
     <div className={`mx-auto mb-6 flex ${HOME_MAX} items-center justify-between ${HOME_GUTTER}`}>
       <h2 className="text-[clamp(31px,2.55vw,36px)] font-normal leading-tight text-black">{title}</h2>
-      <Link href={href} className="grid h-[53px] w-[53px] place-items-center rounded-full border border-brand-peach text-brand-peach transition-colors hover:bg-brand-peach hover:text-white" aria-label={`View ${title}`}>
+      <Link href={href} className="grid h-[53px] w-[53px] place-items-center rounded-full border border-semantic-filmText text-semantic-filmText transition-colors hover:bg-brand-peach hover:text-brand-ink" aria-label={`View ${title}`}>
         <ArrowRight size={32} strokeWidth={1.4} />
       </Link>
     </div>

@@ -42,6 +42,12 @@ function ShopContent({ initialListings = [], initialMeta = null, initialDesigner
       if (initialListings.length || initialMeta) return;
     }
     const controller = new AbortController();
+    let active = true;
+    let timedOut = false;
+    const timeout = window.setTimeout(() => {
+      timedOut = true;
+      controller.abort();
+    }, 8_000);
     setLoading(true);
     setError(false);
     const params = new URLSearchParams(filters.queryString);
@@ -56,10 +62,17 @@ function ShopContent({ initialListings = [], initialMeta = null, initialDesigner
         setMeta(data.meta ?? null);
       })
       .catch((requestError) => {
-        if (requestError instanceof Error && requestError.name !== "AbortError") setError(true);
+        if (timedOut || (requestError instanceof Error && requestError.name !== "AbortError")) setError(true);
       })
-      .finally(() => { if (!controller.signal.aborted) setLoading(false); });
-    return () => controller.abort();
+      .finally(() => {
+        window.clearTimeout(timeout);
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+      window.clearTimeout(timeout);
+      controller.abort();
+    };
   }, [apiBase, filters.queryString, initialListings.length, initialMeta]);
 
   const panel = (
@@ -106,7 +119,7 @@ function ShopContent({ initialListings = [], initialMeta = null, initialDesigner
           {panel}
         </aside>
 
-        <main className="min-w-0">
+        <section className="min-w-0" aria-label={t("title")}>
           {loading ? <CatalogSkeleton /> : null}
           {error ? <ErrorState title={t("loadErrorTitle")} description={t("loadErrorDescription")} retry={<Button onClick={() => filters.setParams({}, { keepPage: true })}>{t("retry")}</Button>} /> : null}
           {!loading && !error && !listings.length ? <EmptyState title={t("emptyTitle")} description={t("emptyDescription")} action={filters.activeCount ? <Button onClick={filters.reset}>{t("clearFilters")}</Button> : undefined} /> : null}
@@ -116,7 +129,7 @@ function ShopContent({ initialListings = [], initialMeta = null, initialDesigner
               {meta && meta.totalPages > 1 ? <Pagination page={meta.page} totalPages={meta.totalPages} onPage={(page) => filters.setParams({ page: page === 1 ? null : String(page) }, { keepPage: true })} /> : null}
             </>
           ) : null}
-        </main>
+        </section>
       </div>
 
       <Drawer open={mobileOpen} onClose={() => setMobileOpen(false)} side="left" title={t("filters")} className="!w-[min(92vw,420px)]">

@@ -33,7 +33,7 @@ The product should feel **friendly, creative, clean, and operationally reliable*
 | Ink | `#0B1020` | Primary dark text |
 | Text | `#20243A` | Default text |
 | Muted | `#6B7280` | Secondary text |
-| Subtle | `#9CA3AF` | Captions and helper text |
+| Subtle | `#667085` | Captions and helper text with accessible contrast |
 | White | `#FFFFFF` | Cards and elevated surfaces |
 | Focus Ring | `rgba(120,138,224,0.18)` | Input focus highlights |
 

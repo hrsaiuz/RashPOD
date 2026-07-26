@@ -31,14 +31,19 @@ export async function getShopSettings(): Promise<ShopSettings> {
     return fallbackShopSettings();
   }
 
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 5_000);
   try {
     const res = await fetch(`${apiUrl}/shop/settings`, {
       next: { revalidate: SHOP_SETTINGS_REVALIDATE_SECONDS, tags: [SHOP_SETTINGS_CACHE_TAG] },
+      signal: controller.signal,
     });
     if (!res.ok) return fallbackShopSettings();
     return (await res.json()) as ShopSettings;
   } catch {
     return fallbackShopSettings();
+  } finally {
+    clearTimeout(timeout);
   }
 }
 

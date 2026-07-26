@@ -2,9 +2,9 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import Image from "next/image";
-import Link from "next/link";
 import { Package, Tag, X } from "lucide-react";
 import { formatPrice } from "@rashpod/ui";
+import { Link } from "../../i18n/navigation";
 
 export interface CartItem {
   key: string;
@@ -191,7 +191,7 @@ function MiniCartDrawer({ freeDeliveryThreshold }: { freeDeliveryThreshold: numb
 
           <FreeDeliveryBar subtotal={subtotal} remaining={remaining} progress={progress} threshold={freeDeliveryThreshold} />
 
-          <div className="mb-4 grid grid-cols-[1fr_100px_82px] rounded-[5px] bg-brand-peach px-5 py-2 text-[11px] font-bold text-white sm:grid-cols-[1fr_140px_90px]">
+          <div className="mb-4 grid grid-cols-[1fr_100px_82px] rounded-xs bg-brand-peach px-5 py-2 text-[11px] font-bold text-brand-ink sm:grid-cols-[1fr_140px_90px]">
             <span>product</span>
             <span className="text-center">Quantity</span>
             <span className="text-right">Total</span>
@@ -199,7 +199,7 @@ function MiniCartDrawer({ freeDeliveryThreshold }: { freeDeliveryThreshold: numb
 
           <div className="min-h-0 flex-1 space-y-4 overflow-y-auto pr-1">
             {items.length === 0 ? (
-              <div className="rounded-[12px] bg-white p-10 text-center text-brand-muted">Your cart is empty.</div>
+              <div className="rounded-md bg-white p-10 text-center text-brand-muted">Your cart is empty.</div>
             ) : items.map((item) => (
               <div key={item.key} className="grid grid-cols-[74px_1fr] items-center gap-4 rounded-[9px] bg-white p-4 sm:grid-cols-[96px_1fr_110px_88px]">
                 <div className="relative h-[92px] overflow-hidden rounded-[7px] bg-brand-bg">
@@ -224,7 +224,13 @@ function MiniCartDrawer({ freeDeliveryThreshold }: { freeDeliveryThreshold: numb
                 </div>
                 <div className="col-start-2 sm:col-start-auto">
                   <QuantityPill quantity={item.quantity} onChange={(next) => updateQuantity(item.key, next)} />
-                  <button type="button" onClick={() => removeItem(item.key)} className="mt-4 text-[10px] font-medium text-brand-peach">Remove</button>
+                  <button
+                    type="button"
+                    onClick={() => removeItem(item.key)}
+                    className="mt-2 inline-flex min-h-11 items-center text-xs font-semibold text-semantic-filmText"
+                  >
+                    Remove
+                  </button>
                 </div>
                 <p className="text-right text-lg font-bold tabular-nums text-brand-ink">{formatPrice(item.price * item.quantity)}</p>
               </div>
@@ -239,7 +245,7 @@ function MiniCartDrawer({ freeDeliveryThreshold }: { freeDeliveryThreshold: numb
             <Link
               href="/checkout"
               onClick={closeCart}
-              className="inline-flex h-12 w-full items-center justify-center rounded-md bg-brand-peach px-7 text-base font-bold lowercase text-white transition-transform hover:-translate-y-0.5 sm:ml-auto sm:w-auto sm:min-w-[128px] sm:text-xl"
+              className="inline-flex h-12 w-full items-center justify-center rounded-pill bg-brand-peach px-7 text-base font-bold lowercase text-brand-ink transition-transform hover:-translate-y-0.5 sm:ml-auto sm:w-auto sm:min-w-[128px] sm:text-xl"
             >
               continue
             </Link>
@@ -286,10 +292,10 @@ export function FreeDeliveryBar({
 
 function QuantityPill({ quantity, onChange }: { quantity: number; onChange: (quantity: number) => void }) {
   return (
-    <div className="inline-flex h-[34px] min-w-[80px] items-center justify-between rounded-full bg-brand-bg px-4 text-[13px] font-black text-black">
-      <button type="button" aria-label="Decrease quantity" onClick={() => onChange(Math.max(1, quantity - 1))}>-</button>
+    <div className="inline-flex h-11 min-w-[132px] items-center justify-between overflow-hidden rounded-pill bg-brand-bg text-[13px] font-black text-brand-ink">
+      <button type="button" aria-label="Decrease quantity" className="grid h-11 w-11 place-items-center hover:bg-brand-blue/10" onClick={() => onChange(Math.max(1, quantity - 1))}>-</button>
       <span aria-live="polite">{quantity}</span>
-      <button type="button" aria-label="Increase quantity" onClick={() => onChange(quantity + 1)}>+</button>
+      <button type="button" aria-label="Increase quantity" className="grid h-11 w-11 place-items-center hover:bg-brand-blue/10" onClick={() => onChange(quantity + 1)}>+</button>
     </div>
   );
 }

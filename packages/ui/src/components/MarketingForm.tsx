@@ -9,15 +9,28 @@ import { MediaImage } from "./MediaImage";
 export function MarketingInput({
   label,
   className,
+  error,
+  id,
+  required,
   ...props
-}: React.InputHTMLAttributes<HTMLInputElement> & { label: string }) {
+}: React.InputHTMLAttributes<HTMLInputElement> & { label: string; error?: string }) {
+  const generatedId = React.useId();
+  const inputId = id ?? generatedId;
+  const errorId = `${inputId}-error`;
   return (
-    <label className={cn("block", className)}>
-      <span className="mb-2 block text-sm font-medium text-brand-ink">{label}</span>
+    <label className={cn("block", className)} htmlFor={inputId}>
+      <span className="mb-2 block text-sm font-medium text-brand-ink">
+        {label}{required ? <span className="text-semantic-dangerText" aria-hidden="true"> *</span> : null}
+      </span>
       <input
+        id={inputId}
+        required={required}
+        aria-invalid={Boolean(error)}
+        aria-describedby={error ? errorId : props["aria-describedby"]}
         {...props}
         className="h-10 w-full min-h-[44px] border-0 border-b border-brand-subtle bg-transparent px-0 text-base text-brand-ink outline-none focus:border-brand-ink focus:ring-0"
       />
+      {error ? <span id={errorId} className="mt-2 block text-sm text-semantic-dangerText">{error}</span> : null}
     </label>
   );
 }
@@ -26,17 +39,30 @@ export function MarketingSelect({
   label,
   children,
   className,
+  error,
+  id,
+  required,
   ...props
-}: React.SelectHTMLAttributes<HTMLSelectElement> & { label: string }) {
+}: React.SelectHTMLAttributes<HTMLSelectElement> & { label: string; error?: string }) {
+  const generatedId = React.useId();
+  const selectId = id ?? generatedId;
+  const errorId = `${selectId}-error`;
   return (
-    <label className={cn("block", className)}>
-      <span className="mb-2 block text-sm font-medium text-brand-ink">{label}</span>
+    <label className={cn("block", className)} htmlFor={selectId}>
+      <span className="mb-2 block text-sm font-medium text-brand-ink">
+        {label}{required ? <span className="text-semantic-dangerText" aria-hidden="true"> *</span> : null}
+      </span>
       <select
+        id={selectId}
+        required={required}
+        aria-invalid={Boolean(error)}
+        aria-describedby={error ? errorId : props["aria-describedby"]}
         {...props}
         className="h-10 w-full min-h-[44px] border-0 border-b border-brand-subtle bg-transparent px-0 text-base text-brand-ink outline-none focus:border-brand-ink focus:ring-0"
       >
         {children}
       </select>
+      {error ? <span id={errorId} className="mt-2 block text-sm text-semantic-dangerText">{error}</span> : null}
     </label>
   );
 }
@@ -44,15 +70,28 @@ export function MarketingSelect({
 export function MarketingTextarea({
   label,
   className,
+  error,
+  id,
+  required,
   ...props
-}: React.TextareaHTMLAttributes<HTMLTextAreaElement> & { label: string }) {
+}: React.TextareaHTMLAttributes<HTMLTextAreaElement> & { label: string; error?: string }) {
+  const generatedId = React.useId();
+  const textareaId = id ?? generatedId;
+  const errorId = `${textareaId}-error`;
   return (
-    <label className={cn("block", className)}>
-      <span className="mb-2 block text-sm font-medium text-brand-ink">{label}</span>
+    <label className={cn("block", className)} htmlFor={textareaId}>
+      <span className="mb-2 block text-sm font-medium text-brand-ink">
+        {label}{required ? <span className="text-semantic-dangerText" aria-hidden="true"> *</span> : null}
+      </span>
       <textarea
+        id={textareaId}
+        required={required}
+        aria-invalid={Boolean(error)}
+        aria-describedby={error ? errorId : props["aria-describedby"]}
         {...props}
         className="w-full rounded-2xl border border-brand-muted/60 bg-transparent px-4 py-3 text-base text-brand-ink outline-none focus:border-brand-ink focus:ring-0 min-h-[120px]"
       />
+      {error ? <span id={errorId} className="mt-2 block text-sm text-semantic-dangerText">{error}</span> : null}
     </label>
   );
 }
@@ -60,24 +99,36 @@ export function MarketingTextarea({
 export function MarketingUploadButton({
   label,
   onChange,
+  id,
+  required,
+  error,
 }: {
   label: string;
   onChange: (files: FileList | null) => void;
+  id?: string;
+  required?: boolean;
+  error?: string;
 }) {
+  const generatedId = React.useId();
+  const inputId = id ?? generatedId;
+  const errorId = `${inputId}-error`;
   return (
-    <label className="inline-flex min-h-[44px] cursor-pointer items-center gap-4 text-base font-medium text-brand-ink">
-      <span>{label}</span>
-      <input type="file" multiple className="hidden" onChange={(e) => onChange(e.target.files)} />
-      <span className="grid h-11 w-11 place-items-center rounded-xs bg-brand-ink text-white">
-        <Upload size={20} aria-hidden="true" />
-      </span>
-    </label>
+    <div>
+      <label htmlFor={inputId} className="inline-flex min-h-[44px] cursor-pointer items-center gap-4 text-base font-medium text-brand-ink">
+        <span>{label}{required ? <span className="text-semantic-dangerText" aria-hidden="true"> *</span> : null}</span>
+        <span className="grid h-11 w-11 place-items-center rounded-xs bg-brand-ink text-white">
+          <Upload size={20} aria-hidden="true" />
+        </span>
+      </label>
+      <input id={inputId} type="file" multiple className="sr-only" aria-required={required} aria-invalid={Boolean(error)} aria-describedby={error ? errorId : undefined} onChange={(e) => onChange(e.target.files)} />
+      {error ? <p id={errorId} className="mt-2 text-sm text-semantic-dangerText">{error}</p> : null}
+    </div>
   );
 }
 
 export function MarketingStepper({ step, total = 4 }: { step: number; total?: number }) {
   return (
-    <div className="mx-auto flex max-w-form items-center justify-center overflow-x-auto px-2">
+    <div className="mx-auto flex w-full max-w-form items-center justify-center" aria-label={`Step ${step} of ${total}`}>
       {Array.from({ length: total }).map((_, index) => {
         const n = index + 1;
         const complete = n < step;
@@ -87,18 +138,19 @@ export function MarketingStepper({ step, total = 4 }: { step: number; total?: nu
             <div
               className={cn(
                 "grid h-11 w-11 shrink-0 place-items-center rounded-full border-2 text-sm sm:h-12 sm:w-12",
-                complete && "border-brand-peach bg-brand-peach text-white",
-                active && !complete && "border-brand-peach bg-transparent text-brand-peach",
+                complete && "border-semantic-filmText bg-brand-peach text-brand-ink",
+                active && !complete && "border-semantic-filmText bg-transparent text-semantic-filmText",
                 !complete && !active && "border-brand-subtle bg-transparent text-brand-subtle"
               )}
             >
+              <span className="sr-only">{complete ? `Step ${n} completed` : active ? `Step ${n}, current` : `Step ${n}`}</span>
               {complete ? (
                 <Check size={20} />
               ) : (
                 <span
                   className={cn(
                     "h-3 w-3 rounded-full",
-                    active ? "bg-brand-peach" : "bg-brand-subtle"
+                    active ? "bg-semantic-filmText" : "bg-brand-subtle"
                   )}
                 />
               )}
@@ -106,8 +158,8 @@ export function MarketingStepper({ step, total = 4 }: { step: number; total?: nu
             {n < total ? (
               <div
                 className={cn(
-                  "h-0.5 w-12 shrink-0 sm:w-20 md:w-28",
-                  n < step ? "bg-brand-peach" : "bg-brand-subtle"
+                  "h-0.5 min-w-3 flex-1 sm:max-w-20 md:max-w-28",
+                  n < step ? "bg-semantic-filmText" : "bg-brand-subtle"
                 )}
               />
             ) : null}
@@ -174,13 +226,13 @@ export function MarketingSimpleCta() {
       <div className="mt-8 flex flex-col items-center justify-center gap-4 sm:flex-row sm:gap-6 md:mt-10">
         <Link
           href="/shop"
-          className="inline-flex h-12 min-w-[160px] items-center justify-center rounded-md bg-brand-blue px-6 text-base font-bold text-white transition-colors hover:bg-brand-blueSecondary"
+          className="inline-flex h-12 min-w-[160px] items-center justify-center rounded-pill bg-brand-blue px-6 text-base font-bold text-brand-ink transition-colors hover:bg-brand-blueSecondary"
         >
           Shop products
         </Link>
         <Link
-          href="/sell-on-rashpod"
-          className="inline-flex h-12 min-w-[160px] items-center justify-center rounded-md bg-brand-peach px-6 text-base font-bold text-white transition-colors hover:opacity-90"
+          href="/designer-application"
+          className="inline-flex h-12 min-w-[160px] items-center justify-center rounded-pill bg-brand-peach px-6 text-base font-bold text-brand-ink transition-colors hover:bg-brand-peachSecondary"
         >
           Start selling
         </Link>

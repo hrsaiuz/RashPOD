@@ -41,7 +41,7 @@ export const rashpodTokens = {
       ink: "#0B1020",
       text: "#20243A",
       muted: "#6B7280",
-      subtle: "#9CA3AF",
+      subtle: "#667085",
       white: "#FFFFFF",
     },
 

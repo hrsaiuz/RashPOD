@@ -19,9 +19,23 @@ export interface PublicFooterProps {
   termsUrl?: string;
   privacyUrl?: string;
   cookiesUrl?: string;
+  clubUrl?: string;
   logoUrl?: string | null;
   brandName?: string;
   className?: string;
+  labels?: {
+    shop?: string;
+    designers?: string;
+    company?: string;
+    clubTitle?: string;
+    joinNow?: string;
+    nextDrop?: string;
+    monthlyDesign?: string;
+    rightsReserved?: string;
+    terms?: string;
+    privacy?: string;
+    shippingReturns?: string;
+  };
 }
 
 export const PublicFooter: React.FC<PublicFooterProps> = ({
@@ -46,33 +60,35 @@ export const PublicFooter: React.FC<PublicFooterProps> = ({
   termsUrl = "/legal/terms",
   privacyUrl = "/legal/privacy",
   cookiesUrl = "/legal/shipping-returns",
+  clubUrl = "/auth/register",
   logoUrl,
   brandName = "RashPOD",
   className,
+  labels,
 }) => {
   return (
     <footer className={cn("relative overflow-hidden bg-brand-peach pt-24 md:pt-[272px]", className)}>
       <div className="relative rounded-t-[37px] bg-white px-5 pb-7 pt-[68px] md:rounded-t-[54px]">
         <div className="mx-auto grid max-w-storefront grid-cols-2 gap-9 lg:grid-cols-[1fr_1fr_1fr_1.8fr]">
-          <FooterColumn title="Shop" links={shopLinks} />
-          <FooterColumn title="For Designers" links={designerLinks} />
-          <FooterColumn title="Company" links={companyLinks} />
+          <FooterColumn title={labels?.shop ?? "Shop"} links={shopLinks} />
+          <FooterColumn title={labels?.designers ?? "For Designers"} links={designerLinks} />
+          <FooterColumn title={labels?.company ?? "Company"} links={companyLinks} />
 
           <div className="col-span-2 lg:col-span-1">
-            <h3 className="mb-6 text-[18px] font-extrabold text-black">Join the RASH POD Club</h3>
+            <h3 className="mb-6 text-[18px] font-extrabold text-black">{labels?.clubTitle ?? "Join the RASH POD Club"}</h3>
             <Link
-              href="/auth/register"
-              className="mb-6 inline-flex h-[54px] min-w-[141px] items-center justify-center rounded-[15px] bg-brand-blue px-7 text-[17px] font-extrabold tracking-[0.08em] text-white"
+              href={clubUrl}
+              className="mb-6 inline-flex h-12 min-w-[141px] items-center justify-center rounded-pill bg-brand-blue px-7 text-base font-bold tracking-[0.06em] text-brand-ink transition-colors hover:bg-brand-blueSecondary"
             >
-              join Now
+              {labels?.joinNow ?? "Join now"}
             </Link>
-            <p className="mb-2 text-[18px] font-semibold tracking-[0.16em] text-black">Be the first to get the next drop</p>
-            <p className="text-[16px] text-black">Receive a mystery design every month</p>
+            <p className="mb-2 text-[18px] font-semibold tracking-[0.08em] text-black">{labels?.nextDrop ?? "Be the first to get the next drop"}</p>
+            <p className="text-[16px] text-black">{labels?.monthlyDesign ?? "Receive a mystery design every month"}</p>
             <div className="mt-[68px] flex gap-7">
-              <a href={officialSocialLinks.telegram} target="_blank" rel="noopener noreferrer" aria-label={officialSocialAccessibleNames.telegram} className="text-black transition-transform hover:scale-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue">
+              <a href={officialSocialLinks.telegram} target="_blank" rel="noopener noreferrer" aria-label={officialSocialAccessibleNames.telegram} className="inline-flex h-11 w-11 items-center justify-center rounded-full text-black transition-transform hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue">
                 <Send size={32} strokeWidth={2.3} />
               </a>
-              <a href={officialSocialLinks.instagram} target="_blank" rel="noopener noreferrer" aria-label={officialSocialAccessibleNames.instagram} className="text-black transition-transform hover:scale-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue">
+              <a href={officialSocialLinks.instagram} target="_blank" rel="noopener noreferrer" aria-label={officialSocialAccessibleNames.instagram} className="inline-flex h-11 w-11 items-center justify-center rounded-full text-black transition-transform hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue">
                 <Camera size={32} strokeWidth={2.3} />
               </a>
             </div>
@@ -80,10 +96,10 @@ export const PublicFooter: React.FC<PublicFooterProps> = ({
         </div>
 
         <div className="mx-auto mt-12 flex max-w-storefront flex-wrap items-center gap-x-10 gap-y-4 text-body text-brand-muted">
-          <span>© 2026 RashPOD, All rights reserved.</span>
-          <Link href={termsUrl} className="hover:text-brand-blue">Terms</Link>
-          <Link href={privacyUrl} className="hover:text-brand-blue">Privacy</Link>
-          <Link href={cookiesUrl} className="hover:text-brand-blue">Shipping & Returns</Link>
+          <span>© 2026 RashPOD, {labels?.rightsReserved ?? "All rights reserved."}</span>
+          <Link href={termsUrl} className="inline-flex min-h-11 items-center hover:text-brand-blue">{labels?.terms ?? "Terms"}</Link>
+          <Link href={privacyUrl} className="inline-flex min-h-11 items-center hover:text-brand-blue">{labels?.privacy ?? "Privacy"}</Link>
+          <Link href={cookiesUrl} className="inline-flex min-h-11 items-center hover:text-brand-blue">{labels?.shippingReturns ?? "Shipping & Returns"}</Link>
         </div>
 
         <div className="pointer-events-none mx-auto mt-[68px] max-w-storefront overflow-hidden">
@@ -115,7 +131,7 @@ function FooterColumn({ title, links }: { title: string; links: PublicFooterLink
       <ul className="space-y-5">
         {links.map((link) => (
           <li key={link.href}>
-            <Link href={link.href} className="text-body text-brand-muted transition-colors hover:text-brand-blue">
+            <Link href={link.href} className="inline-flex min-h-11 items-center text-body text-brand-muted transition-colors hover:text-brand-blue">
               {link.label}
             </Link>
           </li>

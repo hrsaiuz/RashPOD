@@ -65,7 +65,7 @@ function ProtectedShell({ children }: { children: ReactNode }) {
             </button>
           </nav>
         </aside>
-        <main>{children}</main>
+        <div>{children}</div>
       </div>
     </div>
   );

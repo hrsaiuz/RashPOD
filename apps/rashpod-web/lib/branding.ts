@@ -45,9 +45,12 @@ export async function getStorefrontBranding(): Promise<StorefrontBranding | null
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || process.env.API_URL;
   if (!apiUrl) return null;
 
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 5_000);
   try {
     const res = await fetch(`${apiUrl}/branding`, {
       next: { revalidate: BRANDING_REVALIDATE_SECONDS, tags: [BRANDING_CACHE_TAG] },
+      signal: controller.signal,
     });
     if (!res.ok) return null;
     const data = (await res.json()) as Record<string, unknown>;
@@ -75,5 +78,7 @@ export async function getStorefrontBranding(): Promise<StorefrontBranding | null
     };
   } catch {
     return null;
+  } finally {
+    clearTimeout(timeout);
   }
 }

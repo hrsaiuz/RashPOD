@@ -18,15 +18,15 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
       "inline-flex items-center justify-center gap-2 rounded-pill font-semibold transition-[background-color,border-color,color,box-shadow,transform] duration-200 focus:outline-none focus:ring-4 focus:ring-brand-blue/20 disabled:opacity-50 disabled:pointer-events-none";
 
     const variants = {
-      primaryBlue: "bg-brand-blue text-white shadow-blueGlow hover:bg-[#6F7FDA]",
-      primaryPeach: "bg-brand-peach text-white shadow-peachGlow hover:bg-[#EA8F6E]",
+      primaryBlue: "bg-brand-blue text-brand-ink shadow-blueGlow hover:bg-brand-blueSecondary",
+      primaryPeach: "bg-brand-peach text-brand-ink shadow-peachGlow hover:bg-brand-peachSecondary",
       secondary: "border border-brand-blue/35 bg-white/70 text-brand-blue hover:bg-brand-blue/5",
       ghost: "text-brand-ink hover:bg-surface-borderSoft",
       danger: "bg-semantic-danger text-white hover:bg-semantic-danger/90",
     };
 
     const sizes = {
-      sm: "h-[38px] px-4 text-[13px]",
+      sm: "h-11 px-4 text-[13px]",
       md: "h-12 px-6 text-[14px]",
       lg: "h-14 px-[30px] text-[16px]",
     };

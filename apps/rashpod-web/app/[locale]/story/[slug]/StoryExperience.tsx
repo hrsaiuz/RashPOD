@@ -89,7 +89,7 @@ export function StoryExperience({ story, locale }: { story: PublicDesignStory; l
   ].filter((chip) => chip.visible), [story.audioUrl, story.listings.length, story.videoUrl, t]);
 
   return (
-    <main className="min-h-screen bg-surface-page text-brand-ink">
+    <article className="min-h-screen bg-surface-page text-brand-ink">
       <div className="mx-auto max-w-storefront px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
         <nav aria-label={t("breadcrumbLabel")} className="mb-6 flex flex-wrap items-center gap-2 rounded-xl bg-brand-bg px-4 py-3 text-sm text-brand-muted">
           <Link href={`/${locale}`} className="rounded-sm hover:text-brand-blue focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue">{t("home")}</Link>
@@ -151,7 +151,7 @@ export function StoryExperience({ story, locale }: { story: PublicDesignStory; l
           <Link href={`/${locale}/shop`} className="inline-flex min-h-11 items-center justify-center rounded-full bg-brand-blue px-6 py-3 text-sm font-bold text-white shadow-soft transition-transform hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue focus-visible:ring-offset-2 motion-reduce:transition-none">{t("exploreProducts")}</Link>
         </section>
       </div>
-    </main>
+    </article>
   );
 }
 

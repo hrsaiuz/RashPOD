@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { Link } from "../../../i18n/navigation";
 import { motion } from "framer-motion";
 import {
   UploadCloud,
@@ -13,7 +13,7 @@ import {
   Briefcase,
   ArrowRight,
 } from "lucide-react";
-import { Button, Card, getDashboardUrl } from "@rashpod/ui";
+import { Button, Card } from "@rashpod/ui";
 
 const fadeIn = {
   initial: { opacity: 0, y: 12 },
@@ -66,8 +66,6 @@ const FLOWS = [
 ];
 
 export default function HowItWorksPage() {
-  const dashboardUrl = getDashboardUrl();
-
   return (
     <div className="max-w-[1200px] mx-auto px-6 py-14">
       <motion.div
@@ -123,7 +121,7 @@ export default function HowItWorksPage() {
               </div>
               <div className="pt-5 mt-5 border-t border-surface-borderSoft">
                 <Link
-                  href={flow.cta.href.startsWith("/auth") ? `${dashboardUrl}${flow.cta.href}` : flow.cta.href}
+                  href={flow.cta.href}
                 >
                   <Button variant={flow.tone === "blue" ? "primaryBlue" : "primaryPeach"} size="md">
                     {flow.cta.label}

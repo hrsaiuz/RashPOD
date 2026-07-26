@@ -79,6 +79,26 @@ function getApiUrl() {
   return process.env.NEXT_PUBLIC_API_URL || process.env.API_URL || "";
 }
 
+const CATALOG_TIMEOUT_MS = 5_000;
+
+async function fetchCatalogResource(path: string) {
+  const apiUrl = getApiUrl();
+  if (!apiUrl) return null;
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), CATALOG_TIMEOUT_MS);
+  try {
+    return await fetch(`${apiUrl}${path}`, {
+      next: { revalidate: CATALOG_REVALIDATE_SECONDS },
+      signal: controller.signal,
+    });
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 export function normalizeProducts(data: unknown): ProductListing[] {
   const rows = Array.isArray(data)
     ? data
@@ -171,48 +191,28 @@ export function normalizeFilmListings(data: unknown): FilmListing[] {
 }
 
 export async function fetchListings(params: Record<string, string> = {}) {
-  const apiUrl = getApiUrl();
-  if (!apiUrl) return [];
-
   const search = new URLSearchParams(params);
-  const res = await fetch(`${apiUrl}/shop/listings?${search.toString()}`, {
-    next: { revalidate: CATALOG_REVALIDATE_SECONDS },
-  });
-  if (!res.ok) return [];
+  const res = await fetchCatalogResource(`/shop/listings?${search.toString()}`);
+  if (!res?.ok) return [];
   return normalizeProducts(await res.json());
 }
 
 export async function fetchListingBySlug(slug: string) {
-  const apiUrl = getApiUrl();
-  if (!apiUrl) return null;
-
-  const res = await fetch(`${apiUrl}/shop/listings/${slug}`, {
-    next: { revalidate: CATALOG_REVALIDATE_SECONDS },
-  });
-  if (!res.ok) return null;
+  const res = await fetchCatalogResource(`/shop/listings/${encodeURIComponent(slug)}`);
+  if (!res?.ok) return null;
   const products = normalizeProducts([await res.json()]);
   return products[0] ?? null;
 }
 
 export async function fetchDesigners(limit = 50) {
-  const apiUrl = getApiUrl();
-  if (!apiUrl) return [];
-
-  const res = await fetch(`${apiUrl}/shop/designers?limit=${limit}`, {
-    next: { revalidate: CATALOG_REVALIDATE_SECONDS },
-  });
-  if (!res.ok) return [];
+  const res = await fetchCatalogResource(`/shop/designers?limit=${limit}`);
+  if (!res?.ok) return [];
   return normalizeDesigners(await res.json());
 }
 
 export async function fetchDesignerByHandle(handle: string) {
-  const apiUrl = getApiUrl();
-  if (!apiUrl) return null;
-
-  const res = await fetch(`${apiUrl}/shop/designers/${encodeURIComponent(handle)}`, {
-    next: { revalidate: CATALOG_REVALIDATE_SECONDS },
-  });
-  if (!res.ok) return null;
+  const res = await fetchCatalogResource(`/shop/designers/${encodeURIComponent(handle)}`);
+  if (!res?.ok) return null;
   const data = await res.json();
   const designer = data.designer || data;
   const listings = Array.isArray(data.listings) ? normalizeProducts(data.listings) : [];
@@ -222,48 +222,28 @@ export async function fetchDesignerByHandle(handle: string) {
 }
 
 export async function fetchProductDetail(slug: string) {
-  const apiUrl = getApiUrl();
-  if (!apiUrl) return null;
-
-  const res = await fetch(`${apiUrl}/shop/listings/${encodeURIComponent(slug)}`, {
-    next: { revalidate: CATALOG_REVALIDATE_SECONDS },
-  });
-  if (!res.ok) return null;
+  const res = await fetchCatalogResource(`/shop/listings/${encodeURIComponent(slug)}`);
+  if (!res?.ok) return null;
   return res.json();
 }
 
 export async function fetchFilmListings(params: Record<string, string> = {}) {
-  const apiUrl = getApiUrl();
-  if (!apiUrl) return [];
-
   const search = new URLSearchParams({ type: "FILM", limit: "60", ...params });
-  const res = await fetch(`${apiUrl}/shop/listings?${search.toString()}`, {
-    next: { revalidate: CATALOG_REVALIDATE_SECONDS },
-  });
-  if (!res.ok) return [];
+  const res = await fetchCatalogResource(`/shop/listings?${search.toString()}`);
+  if (!res?.ok) return [];
   return normalizeFilmListings(await res.json());
 }
 
 export async function fetchFilmBySlug(slug: string) {
-  const apiUrl = getApiUrl();
-  if (!apiUrl) return null;
-
-  const res = await fetch(`${apiUrl}/shop/listings/${encodeURIComponent(slug)}`, {
-    next: { revalidate: CATALOG_REVALIDATE_SECONDS },
-  });
-  if (!res.ok) return null;
+  const res = await fetchCatalogResource(`/shop/listings/${encodeURIComponent(slug)}`);
+  if (!res?.ok) return null;
   return normalizeFilmListing(await res.json());
 }
 
 export async function fetchShopListings(params: Record<string, string> = {}) {
-  const apiUrl = getApiUrl();
-  if (!apiUrl) return { items: [] as ProductListing[], meta: null as { total: number; page: number; perPage: number; totalPages: number } | null };
-
   const search = new URLSearchParams(params);
-  const res = await fetch(`${apiUrl}/shop/listings?${search.toString()}`, {
-    next: { revalidate: CATALOG_REVALIDATE_SECONDS },
-  });
-  if (!res.ok) return { items: [], meta: null };
+  const res = await fetchCatalogResource(`/shop/listings?${search.toString()}`);
+  if (!res?.ok) return { items: [] as ProductListing[], meta: null as { total: number; page: number; perPage: number; totalPages: number } | null };
 
   const data = await res.json();
   const items = normalizeProducts(data);
@@ -272,24 +252,17 @@ export async function fetchShopListings(params: Record<string, string> = {}) {
 }
 
 export async function fetchShopCategories() {
-  const apiUrl = getApiUrl();
-  if (!apiUrl) return [] as ShopCategory[];
-  const res = await fetch(`${apiUrl}/shop/categories`, { next: { revalidate: CATALOG_REVALIDATE_SECONDS } });
-  if (!res.ok) return [] as ShopCategory[];
+  const res = await fetchCatalogResource("/shop/categories");
+  if (!res?.ok) return [] as ShopCategory[];
   const data = await res.json();
   return Array.isArray(data) ? (data as ShopCategory[]) : [];
 }
 
 export async function fetchStoryBySlug(slug: string, locale?: string) {
-  const apiUrl = getApiUrl();
-  if (!apiUrl) return null;
-
   const search = new URLSearchParams();
   if (locale) search.set("locale", locale);
   const suffix = search.toString() ? `?${search.toString()}` : "";
-  const res = await fetch(`${apiUrl}/shop/stories/${encodeURIComponent(slug)}${suffix}`, {
-    next: { revalidate: CATALOG_REVALIDATE_SECONDS },
-  });
-  if (!res.ok) return null;
+  const res = await fetchCatalogResource(`/shop/stories/${encodeURIComponent(slug)}${suffix}`);
+  if (!res?.ok) return null;
   return (await res.json()) as PublicDesignStory;
 }

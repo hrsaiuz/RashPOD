@@ -9,9 +9,12 @@ import { Drawer } from "./Drawer";
 
 export interface PublicHeaderProps {
   dashboardUrl?: string;
+  homeUrl?: string;
   shopUrl?: string;
   designersUrl?: string;
   filmsUrl?: string;
+  sellOnRashpodUrl?: string;
+  customOrderUrl?: string;
   signInUrl?: string;
   startSellingUrl?: string;
   logoUrl?: string | null;
@@ -40,10 +43,13 @@ export interface PublicHeaderProps {
 }
 
 export const PublicHeader: React.FC<PublicHeaderProps> = ({
-  dashboardUrl = "http://localhost:3003",
+  dashboardUrl = "http://localhost:3001",
+  homeUrl = "/",
   shopUrl = "/shop",
   designersUrl = "/designers",
   filmsUrl = "/films",
+  sellOnRashpodUrl = "/designer-application",
+  customOrderUrl = "/custom-order",
   signInUrl,
   startSellingUrl,
   logoUrl,
@@ -63,12 +69,12 @@ export const PublicHeader: React.FC<PublicHeaderProps> = ({
   const closeTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   const pathname = usePathname();
   const finalSignInUrl = signInUrl || `${dashboardUrl}/auth/login`;
-  const finalStartSellingUrl = startSellingUrl || `${dashboardUrl}/auth/register`;
+  const finalStartSellingUrl = startSellingUrl || sellOnRashpodUrl;
 
   const navLinks = [
     { href: filmsUrl, label: navLabels?.films ?? "Films" },
-    { href: "/sell-on-rashpod", label: navLabels?.sellOnRashpod ?? "Sell on RashPOD" },
-    { href: "/custom-order", label: navLabels?.customOrder ?? "Custom order" },
+    { href: sellOnRashpodUrl, label: navLabels?.sellOnRashpod ?? "Sell on RashPOD" },
+    { href: customOrderUrl, label: navLabels?.customOrder ?? "Custom order" },
   ];
   const categoryGroups = React.useMemo(() => {
     const groups = new Map<string, typeof shopCategories>();
@@ -96,15 +102,9 @@ export const PublicHeader: React.FC<PublicHeaderProps> = ({
 
   return (
     <>
-      <a
-        href="#main-content"
-        className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 focus:px-4 focus:py-2 focus:bg-brand-blue focus:text-white focus:rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-blue"
-      >
-        Skip to content
-      </a>
       <header className={cn("sticky top-0 z-sticky bg-brand-bg/95 backdrop-blur-md", className)}>
         <div className="mx-auto flex h-14 max-w-storefront items-center justify-between gap-5 px-4 sm:px-5 md:h-[76px]">
-          <Link href="/" className="flex shrink-0 items-center text-[29px] font-normal lowercase leading-none tracking-[0.16em] text-brand-blue">
+          <Link href={homeUrl} className="flex min-h-11 shrink-0 items-center text-[29px] font-normal lowercase leading-none tracking-[0.16em] text-brand-blue">
             {logoUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={logoUrl} alt={brandName} className="h-7 w-auto" />
@@ -145,7 +145,7 @@ export const PublicHeader: React.FC<PublicHeaderProps> = ({
                         {categoryGroups.map(([group, categories]) => <MegaGroup key={group} title={group} links={categories.map((category) => ({ href: `${shopUrl}?categories=${encodeURIComponent(category.slug)}`, label: category.name }))} onNavigate={closeShopMenu} compact />)}
                       </div>
                     </div>
-                    <MegaGroup title={navLabels?.filmReady ?? "Film ready"} links={[{ href: filmsUrl, label: navLabels?.films ?? "Films" }, { href: "/custom-order", label: navLabels?.customOrder ?? "Custom order" }]} onNavigate={closeShopMenu} />
+                    <MegaGroup title={navLabels?.filmReady ?? "Film ready"} links={[{ href: filmsUrl, label: navLabels?.films ?? "Films" }, { href: customOrderUrl, label: navLabels?.customOrder ?? "Custom order" }]} onNavigate={closeShopMenu} />
                   </div>
                 </div>
               ) : null}
@@ -154,7 +154,7 @@ export const PublicHeader: React.FC<PublicHeaderProps> = ({
               <Link
                 key={link.href}
                 href={link.href}
-                className="inline-flex items-center gap-2 text-[13px] font-medium text-black transition-colors hover:text-brand-blue"
+                className="inline-flex min-h-11 items-center gap-2 text-[13px] font-medium text-black transition-colors hover:text-brand-blue"
               >
                 {link.label}
               </Link>
@@ -167,25 +167,25 @@ export const PublicHeader: React.FC<PublicHeaderProps> = ({
             {onCartOpen ? (
               <button
                 type="button"
-                className="relative inline-flex h-[34px] w-[34px] items-center justify-center rounded-[10px] border border-surface-borderSoft transition-colors hover:bg-surface-borderSoft"
+                className="relative inline-flex h-11 w-11 items-center justify-center rounded-md border border-surface-borderSoft transition-colors hover:bg-surface-borderSoft"
                 onClick={onCartOpen}
                 aria-label={`Open cart${cartItemCount ? `, ${cartItemCount} items` : ""}`}
               >
                 {cartIcon}
                 {cartItemCount > 0 ? (
-                  <span className="absolute -right-1 -top-1 inline-flex min-h-5 min-w-5 items-center justify-center rounded-full bg-brand-peach px-1 text-[10px] font-bold text-white">
+                  <span className="absolute -right-1 -top-1 inline-flex min-h-5 min-w-5 items-center justify-center rounded-full bg-brand-peach px-1 text-[10px] font-bold text-brand-ink">
                     {cartItemCount > 99 ? "99+" : cartItemCount}
                   </span>
                 ) : null}
               </button>
             ) : null}
             <Link href={finalSignInUrl}>
-              <span className="inline-flex h-[34px] items-center justify-center rounded-[10px] border border-brand-peach bg-transparent px-4 text-[13px] font-medium text-brand-ink transition-colors hover:bg-brand-peach hover:text-white">
+              <span className="inline-flex h-11 items-center justify-center rounded-pill border border-brand-peach bg-transparent px-5 text-sm font-semibold text-brand-ink transition-colors hover:bg-brand-peach">
                 {navLabels?.signIn ?? "Sign in"}
               </span>
             </Link>
             <Link href={finalStartSellingUrl}>
-              <span className="inline-flex h-[34px] items-center justify-center rounded-[10px] bg-brand-peach px-4 text-[13px] font-medium text-white transition-colors hover:bg-[#EA8F6E]">
+              <span className="inline-flex h-11 items-center justify-center rounded-pill bg-brand-peach px-5 text-sm font-semibold text-brand-ink transition-colors hover:bg-brand-peachSecondary">
                 {navLabels?.startSelling ?? "Start Selling"}
               </span>
             </Link>
@@ -196,20 +196,20 @@ export const PublicHeader: React.FC<PublicHeaderProps> = ({
             {onCartOpen ? (
               <button
                 type="button"
-                className="relative rounded-lg p-2 transition-colors hover:bg-surface-borderSoft"
+                className="relative inline-flex h-11 w-11 items-center justify-center rounded-md transition-colors hover:bg-surface-borderSoft"
                 onClick={onCartOpen}
                 aria-label={`Open cart${cartItemCount ? `, ${cartItemCount} items` : ""}`}
               >
                 {cartIcon ?? <Menu size={24} />}
                 {cartItemCount > 0 ? (
-                  <span className="absolute right-0 top-0 inline-flex min-h-5 min-w-5 items-center justify-center rounded-full bg-brand-peach px-1 text-[10px] font-bold text-white">
+                  <span className="absolute right-0 top-0 inline-flex min-h-5 min-w-5 items-center justify-center rounded-full bg-brand-peach px-1 text-[10px] font-bold text-brand-ink">
                     {cartItemCount > 99 ? "99+" : cartItemCount}
                   </span>
                 ) : null}
               </button>
             ) : null}
             <button
-              className="rounded-lg p-2 transition-colors hover:bg-surface-borderSoft"
+              className="inline-flex h-11 w-11 items-center justify-center rounded-md transition-colors hover:bg-surface-borderSoft"
               onClick={() => setMobileMenuOpen(true)}
               aria-label="Menu"
             >
@@ -234,7 +234,7 @@ export const PublicHeader: React.FC<PublicHeaderProps> = ({
             <Link
               key={link.href}
               href={link.href}
-              className="flex items-center justify-between py-2 text-base font-medium text-brand-ink transition-colors hover:text-brand-blue"
+              className="flex min-h-11 items-center justify-between text-base font-medium text-brand-ink transition-colors hover:text-brand-blue"
               onClick={() => setMobileMenuOpen(false)}
             >
               <span>{link.label}</span>
@@ -243,12 +243,12 @@ export const PublicHeader: React.FC<PublicHeaderProps> = ({
           <div className="border-t border-surface-borderSoft pt-4 mt-4 flex flex-col gap-3">
             {localeSwitcher ? <div className="pb-2">{localeSwitcher}</div> : null}
             <Link href={finalSignInUrl} onClick={() => setMobileMenuOpen(false)}>
-              <span className="inline-flex h-11 w-full items-center justify-center rounded-[12px] border border-brand-peach text-brand-ink">
+              <span className="inline-flex h-12 w-full items-center justify-center rounded-pill border border-brand-peach text-brand-ink">
                 {navLabels?.signIn ?? "Sign in"}
               </span>
             </Link>
             <Link href={finalStartSellingUrl} onClick={() => setMobileMenuOpen(false)}>
-              <span className="inline-flex h-11 w-full items-center justify-center rounded-[12px] bg-brand-peach text-white">
+              <span className="inline-flex h-12 w-full items-center justify-center rounded-pill bg-brand-peach text-brand-ink">
                 {navLabels?.startSelling ?? "Start Selling"}
               </span>
             </Link>
@@ -262,6 +262,6 @@ PublicHeader.displayName = "PublicHeader";
 
 function MegaGroup({ title, links, onNavigate, compact = false }: { title: string; links: Array<{ href: string; label: string }>; onNavigate: () => void; compact?: boolean }) {
   return <div><p className="mb-3 text-[11px] font-bold uppercase tracking-[0.12em] text-brand-muted">{title}</p><div className={cn("space-y-1", compact && "space-y-0")}>
-    {links.map((link) => <Link role="menuitem" key={link.href} href={link.href} onClick={onNavigate} className="flex min-h-10 items-center rounded-lg px-2 text-sm font-medium text-brand-ink transition-colors hover:bg-brand-blueLight/30 hover:text-brand-blue focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue">{link.label}</Link>)}
+    {links.map((link) => <Link role="menuitem" key={link.href} href={link.href} onClick={onNavigate} className="flex min-h-11 items-center rounded-lg px-2 text-sm font-medium text-brand-ink transition-colors hover:bg-brand-blueLight/30 hover:text-brand-blue focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue">{link.label}</Link>)}
   </div></div>;
 }

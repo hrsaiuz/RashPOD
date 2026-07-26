@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { Link } from "../../../i18n/navigation";
 import { ProductTypeTile, StorePage } from "../storefront-ui";
 
 const benefits = [
@@ -75,7 +75,7 @@ export default function SellOnRashpodPage() {
       <section className="mt-16 text-center text-black">
         <h2 className="text-[22px] font-bold">Ready to turn your art into products?</h2>
         <p className="mt-8 text-[16px]">Apply to become a RashPOD designer and start building your product catalog.</p>
-        <Link href="/designer-application" className="mt-10 inline-flex h-[68px] items-center rounded-[18px] bg-brand-peach px-12 text-[20px] font-bold tracking-[0.08em] text-white">
+        <Link href="/designer-application" className="mt-10 inline-flex h-12 items-center rounded-pill bg-brand-peach px-8 text-base font-bold tracking-[0.06em] text-brand-ink transition-colors hover:bg-brand-peachSecondary">
           Apply as a Designer
         </Link>
       </section>

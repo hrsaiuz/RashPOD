@@ -9,5 +9,5 @@ export function getApiBase(): string {
  * Dashboard URL Configuration
  */
 export function getDashboardUrl(): string {
-  return process.env.NEXT_PUBLIC_DASHBOARD_URL || "http://localhost:3003";
+  return process.env.NEXT_PUBLIC_DASHBOARD_URL || "http://localhost:3001";
 }

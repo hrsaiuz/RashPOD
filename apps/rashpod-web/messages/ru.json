@@ -16,6 +16,31 @@
     "filmReady": "Для плёнки",
     "shopMenu": "Меню магазина"
   },
+  "footer": {
+    "skipToContent": "Перейти к содержимому",
+    "shop": "Магазин",
+    "designers": "Для дизайнеров",
+    "company": "Компания",
+    "allProducts": "Все товары",
+    "newArrivals": "Новинки",
+    "bestsellers": "Бестселлеры",
+    "films": "Плёнки DTF/UV-DTF",
+    "designerDirectory": "Каталог дизайнеров",
+    "startSelling": "Начать продавать",
+    "howItWorks": "Как это работает",
+    "applyAsDesigner": "Стать дизайнером",
+    "about": "О нас",
+    "contact": "Контакты",
+    "faq": "Вопросы и ответы",
+    "shippingReturns": "Доставка и возврат",
+    "clubTitle": "Вступайте в клуб RASH POD",
+    "joinNow": "Вступить",
+    "nextDrop": "Узнавайте первыми о новых коллекциях",
+    "monthlyDesign": "Получайте таинственный дизайн каждый месяц",
+    "rightsReserved": "Все права защищены.",
+    "terms": "Условия",
+    "privacy": "Конфиденциальность"
+  },
   "home": {
     "hero": {
       "title": "Загрузите дизайны. Продавайте товары. Зарабатывайте роялти.",

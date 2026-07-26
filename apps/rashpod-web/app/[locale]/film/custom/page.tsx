@@ -1,23 +1,195 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
 import { Button, Card } from "@rashpod/ui";
 import { Upload } from "lucide-react";
+import { useRouter } from "../../../../i18n/navigation";
 import { api, ApiError, uploadToSignedUrl } from "../../../../lib/api";
 
-type Quote = { total: number; currency: string; areaCm2: number; minimumOrderAdjustment: number };
+type Quote = {
+  total: number;
+  currency: string;
+  areaCm2: number;
+  minimumOrderAdjustment: number;
+};
 
-type UploadUrl = { fileId: string; url?: string; uploadUrl?: string; headers?: Record<string, string>; uploadHeaders?: Record<string, string> };
+type UploadUrl = {
+  fileId: string;
+  url?: string;
+  uploadUrl?: string;
+  headers?: Record<string, string>;
+  uploadHeaders?: Record<string, string>;
+};
 
 export default function CustomFilmPage() {
   const router = useRouter();
-  const [filmType, setFilmType] = useState<"DTF" | "UV_DTF">("DTF"); const [widthCm, setWidthCm] = useState(28); const [heightCm, setHeightCm] = useState(40); const [quantity, setQuantity] = useState(1); const [file, setFile] = useState<File | null>(null); const [assetId, setAssetId] = useState<string | null>(null); const [quote, setQuote] = useState<Quote | null>(null); const [busy, setBusy] = useState(false); const [error, setError] = useState("");
-  const quoteInput = useMemo(() => ({ filmType, widthCm, heightCm, quantity, itemKind: "CUSTOM_FILM" }), [filmType, widthCm, heightCm, quantity]);
-  useEffect(() => { async function load() { try { setQuote(await api.post<Quote>("/film/quote", quoteInput)); } catch { setQuote(null); } } const timer = window.setTimeout(load, 200); return () => window.clearTimeout(timer); }, [quoteInput]);
-  async function upload() { if (!file) return null; setBusy(true); setError(""); try { const signed = await api.post<UploadUrl>("/files/upload-url", { purpose: "FILM_SOURCE", filename: file.name, mimeType: file.type || "application/octet-stream", sizeBytes: file.size }); const url = signed.uploadUrl || signed.url; if (!url) throw new Error("Upload URL unavailable"); await uploadToSignedUrl(url, file, signed.uploadHeaders || signed.headers); await api.post("/files/complete-upload", { fileId: signed.fileId, uploadedSizeBytes: file.size, uploadedMimeType: file.type || "application/octet-stream" }); setAssetId(signed.fileId); return signed.fileId; } catch (err) { if (err instanceof ApiError && (err.status === 401 || err.status === 403)) { window.location.href = `/auth/login?next=${encodeURIComponent("/film/custom")}`; return null; } setError(err instanceof Error ? err.message : "Upload failed."); return null; } finally { setBusy(false); } }
-  async function addToCart() { setBusy(true); setError(""); try { const sourceAssetId = assetId || await upload(); if (!sourceAssetId) return; await api.post("/cart/film/custom", { sourceAssetId, filmType, widthCm, heightCm, quantity }); router.push("/checkout"); } catch (err) { if (err instanceof ApiError && (err.status === 401 || err.status === 403)) { window.location.href = `/auth/login?next=${encodeURIComponent("/film/custom")}`; return; } setError(err instanceof Error ? err.message : "Could not add custom film to cart."); } finally { setBusy(false); } }
-  return <main className="mx-auto max-w-storefront px-6 py-10"><div className="mb-8"><h1 className="text-3xl font-bold text-brand-ink">Custom Film Upload</h1><p className="mt-2 text-brand-muted">Upload a print-ready file, choose DTF or UV-DTF, and order local film production.</p></div><div className="grid gap-8 lg:grid-cols-[1fr_420px]"><Card className="p-6"><label className="grid min-h-[280px] cursor-pointer place-items-center rounded-[18px] border-2 border-dashed border-brand-blueLight bg-brand-bg p-8 text-center"><input type="file" accept="image/png,image/tiff,application/pdf,image/svg+xml" className="hidden" onChange={(e) => { setFile(e.target.files?.[0] ?? null); setAssetId(null); }} /><div><Upload className="mx-auto mb-4 text-brand-blue" size={44} /><p className="font-semibold text-brand-ink">{file ? file.name : "Choose a film source file"}</p><p className="mt-2 text-sm text-brand-muted">PNG, TIFF, PDF, or SVG. Private upload, verified before checkout.</p></div></label>{error ? <p className="mt-4 rounded-[12px] bg-semantic-dangerBg p-3 text-sm text-semantic-dangerText">{error}</p> : null}</Card><Card className="p-6"><h2 className="text-lg font-bold text-brand-ink">Film specs</h2><div className="mt-5 grid gap-4"><div className="grid grid-cols-2 gap-2 rounded-[12px] bg-brand-bg p-1"><button onClick={() => setFilmType("DTF")} className={`rounded-[10px] px-4 py-3 text-sm font-bold ${filmType === "DTF" ? "bg-brand-blue text-white" : "text-brand-ink"}`}>DTF</button><button onClick={() => setFilmType("UV_DTF")} className={`rounded-[10px] px-4 py-3 text-sm font-bold ${filmType === "UV_DTF" ? "bg-brand-blue text-white" : "text-brand-ink"}`}>UV-DTF</button></div><Input label="Width, cm" value={widthCm} setValue={setWidthCm} /><Input label="Height, cm" value={heightCm} setValue={setHeightCm} /><Input label="Quantity" value={quantity} setValue={setQuantity} /></div><div className="mt-6 rounded-[12px] bg-brand-bg p-4"><p className="text-xs text-brand-muted">Estimated total</p><p className="text-2xl font-black text-brand-ink">{quote ? money(quote.total, quote.currency) : "Unavailable"}</p>{quote?.minimumOrderAdjustment ? <p className="mt-2 text-xs text-semantic-warningText">Minimum order adjustment included.</p> : null}</div><Button variant="primaryPeach" size="lg" className="mt-5 w-full" disabled={!file || !quote} loading={busy} onClick={addToCart}>{assetId ? "Add to cart" : "Upload and add to cart"}</Button></Card></div></main>;
+  const [filmType, setFilmType] = useState<"DTF" | "UV_DTF">("DTF");
+  const [widthCm, setWidthCm] = useState(28);
+  const [heightCm, setHeightCm] = useState(40);
+  const [quantity, setQuantity] = useState(1);
+  const [file, setFile] = useState<File | null>(null);
+  const [assetId, setAssetId] = useState<string | null>(null);
+  const [quote, setQuote] = useState<Quote | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const quoteInput = useMemo(
+    () => ({ filmType, widthCm, heightCm, quantity, itemKind: "CUSTOM_FILM" }),
+    [filmType, widthCm, heightCm, quantity],
+  );
+
+  useEffect(() => {
+    async function load() {
+      try {
+        setQuote(await api.post<Quote>("/film/quote", quoteInput));
+      } catch {
+        setQuote(null);
+      }
+    }
+    const timer = window.setTimeout(load, 200);
+    return () => window.clearTimeout(timer);
+  }, [quoteInput]);
+
+  async function upload() {
+    if (!file) return null;
+    setBusy(true);
+    setError("");
+    try {
+      const signed = await api.post<UploadUrl>("/files/upload-url", {
+        purpose: "FILM_SOURCE",
+        filename: file.name,
+        mimeType: file.type || "application/octet-stream",
+        sizeBytes: file.size,
+      });
+      const url = signed.uploadUrl || signed.url;
+      if (!url) throw new Error("Upload URL unavailable");
+      await uploadToSignedUrl(url, file, signed.uploadHeaders || signed.headers);
+      await api.post("/files/complete-upload", {
+        fileId: signed.fileId,
+        uploadedSizeBytes: file.size,
+        uploadedMimeType: file.type || "application/octet-stream",
+      });
+      setAssetId(signed.fileId);
+      return signed.fileId;
+    } catch (uploadError) {
+      if (uploadError instanceof ApiError && (uploadError.status === 401 || uploadError.status === 403)) {
+        router.push(`/auth/login?next=${encodeURIComponent("/film/custom")}`);
+        return null;
+      }
+      setError(uploadError instanceof Error ? uploadError.message : "Upload failed.");
+      return null;
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function addToCart() {
+    setBusy(true);
+    setError("");
+    try {
+      const sourceAssetId = assetId || await upload();
+      if (!sourceAssetId) return;
+      await api.post("/cart/film/custom", { sourceAssetId, filmType, widthCm, heightCm, quantity });
+      router.push("/checkout");
+    } catch (cartError) {
+      if (cartError instanceof ApiError && (cartError.status === 401 || cartError.status === 403)) {
+        router.push(`/auth/login?next=${encodeURIComponent("/film/custom")}`);
+        return;
+      }
+      setError(cartError instanceof Error ? cartError.message : "Could not add custom film to cart.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <section className="mx-auto max-w-storefront px-4 py-8 sm:px-6 sm:py-10" aria-labelledby="custom-film-title">
+      <div className="mb-8">
+        <h1 id="custom-film-title" className="text-3xl font-bold text-brand-ink">Custom Film Upload</h1>
+        <p className="mt-2 text-brand-muted">Upload a print-ready file, choose DTF or UV-DTF, and order local film production.</p>
+      </div>
+      <div className="grid gap-8 lg:grid-cols-[1fr_420px]">
+        <Card className="p-6">
+          <label className="grid min-h-[280px] cursor-pointer place-items-center rounded-lg border-2 border-dashed border-brand-blueLight bg-brand-bg p-8 text-center">
+            <input
+              type="file"
+              accept="image/png,image/tiff,application/pdf,image/svg+xml"
+              className="sr-only"
+              onChange={(event) => {
+                setFile(event.target.files?.[0] ?? null);
+                setAssetId(null);
+              }}
+            />
+            <span>
+              <Upload className="mx-auto mb-4 text-brand-blue" size={44} aria-hidden="true" />
+              <span className="block font-semibold text-brand-ink">{file ? file.name : "Choose a film source file"}</span>
+              <span className="mt-2 block text-sm text-brand-muted">PNG, TIFF, PDF, or SVG. Private upload, verified before checkout.</span>
+            </span>
+          </label>
+          {error ? <p role="alert" className="mt-4 rounded-sm bg-semantic-dangerBg p-3 text-sm text-semantic-dangerText">{error}</p> : null}
+        </Card>
+
+        <Card className="p-6">
+          <h2 className="text-lg font-bold text-brand-ink">Film specs</h2>
+          <div className="mt-5 grid gap-4">
+            <div className="grid grid-cols-2 gap-2 rounded-sm bg-brand-bg p-1">
+              {(["DTF", "UV_DTF"] as const).map((type) => (
+                <button
+                  key={type}
+                  type="button"
+                  onClick={() => setFilmType(type)}
+                  className={`min-h-11 rounded-xs px-4 py-3 text-sm font-bold ${
+                    filmType === type ? "bg-brand-blue text-brand-ink" : "text-brand-ink"
+                  }`}
+                >
+                  {type === "UV_DTF" ? "UV-DTF" : type}
+                </button>
+              ))}
+            </div>
+            <NumberInput label="Width, cm" value={widthCm} setValue={setWidthCm} />
+            <NumberInput label="Height, cm" value={heightCm} setValue={setHeightCm} />
+            <NumberInput label="Quantity" value={quantity} setValue={setQuantity} />
+          </div>
+          <div className="mt-6 rounded-sm bg-brand-bg p-4">
+            <p className="text-xs text-brand-muted">Estimated total</p>
+            <p className="text-2xl font-black text-brand-ink">{quote ? money(quote.total, quote.currency) : "Unavailable"}</p>
+            {quote?.minimumOrderAdjustment ? <p className="mt-2 text-xs text-semantic-warningText">Minimum order adjustment included.</p> : null}
+          </div>
+          <Button variant="primaryPeach" size="lg" className="mt-5 w-full" disabled={!file || !quote} loading={busy} onClick={addToCart}>
+            {assetId ? "Add to cart" : "Upload and add to cart"}
+          </Button>
+        </Card>
+      </div>
+    </section>
+  );
 }
-function Input({ label, value, setValue }: { label: string; value: number; setValue: (value: number) => void }) { return <label className="text-sm font-semibold text-brand-ink">{label}<input type="number" min={1} value={value} onChange={(e) => setValue(Number(e.target.value))} className="mt-2 w-full rounded-[12px] border border-brand-line px-4 py-3" /></label>; }
-function money(value: number, currency: string) { return new Intl.NumberFormat("en-US", { style: "currency", currency, maximumFractionDigits: currency === "UZS" ? 0 : 2 }).format(value || 0); }
+
+function NumberInput({
+  label,
+  value,
+  setValue,
+}: {
+  label: string;
+  value: number;
+  setValue: (value: number) => void;
+}) {
+  return (
+    <label className="text-sm font-semibold text-brand-ink">
+      {label}
+      <input
+        type="number"
+        min={1}
+        value={value}
+        onChange={(event) => setValue(Number(event.target.value))}
+        className="mt-2 min-h-11 w-full rounded-sm border border-brand-line px-4 py-3"
+      />
+    </label>
+  );
+}
+
+function money(value: number, currency: string) {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency,
+    maximumFractionDigits: currency === "UZS" ? 0 : 2,
+  }).format(value || 0);
+}

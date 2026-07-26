@@ -41,7 +41,7 @@ export function CategoryTile({ category, title, variant = "blue", imageUrl, clas
         </h2>
         <div className={cn(
           "mt-4 inline-flex items-center justify-center rounded-full px-5 py-2.5 text-sm font-semibold transition-colors",
-          isBlue ? "bg-brand-peach text-white hover:bg-[#EA8F6E]" : "bg-white text-brand-ink hover:bg-surface-app"
+          isBlue ? "bg-brand-peach text-brand-ink hover:bg-brand-peachSecondary" : "bg-white text-brand-ink hover:bg-surface-app"
         )}>
           SHOP NOW <ArrowRight className="ml-2 w-4 h-4" />
         </div>

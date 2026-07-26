@@ -40,7 +40,7 @@ export function ProductCategoryBentoCard({
       className={cn(
         "relative rounded-category overflow-hidden cursor-pointer shadow-soft",
         "flex min-h-[210px] md:min-h-[248px]",
-        isBlue ? "bg-brand-blue text-white" : "bg-brand-peach text-brand-ink",
+        isBlue ? "bg-brand-blue text-brand-ink" : "bg-brand-peach text-brand-ink",
         className
       )}
       onClick={onClick}
@@ -67,7 +67,7 @@ export function ProductCategoryBentoCard({
           <span
             className={cn(
               "text-[13px] font-medium leading-none",
-              isBlue ? "text-brand-peachLight" : "text-brand-blueLight"
+              isBlue ? "text-brand-ink" : "text-brand-blue"
             )}
           >
             {category}
@@ -75,7 +75,7 @@ export function ProductCategoryBentoCard({
           <h3
             className={cn(
               "text-[22px] md:text-[28px] font-bold leading-tight mt-1",
-              isBlue ? "text-white" : "text-brand-ink"
+              "text-brand-ink"
             )}
           >
             {productName}
@@ -88,7 +88,7 @@ export function ProductCategoryBentoCard({
               className={cn(
                 "inline-flex items-center gap-2 rounded-full px-4 py-2 text-[12px] font-semibold uppercase tracking-wide transition-opacity hover:opacity-90",
                 isBlue
-                  ? "bg-brand-peach text-white"
+                  ? "bg-brand-peach text-brand-ink"
                   : "bg-white text-brand-ink shadow-xs"
               )}
             >

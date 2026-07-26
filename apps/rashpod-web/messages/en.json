@@ -16,6 +16,31 @@
     "filmReady": "Film ready",
     "shopMenu": "Shop menu"
   },
+  "footer": {
+    "skipToContent": "Skip to content",
+    "shop": "Shop",
+    "designers": "For Designers",
+    "company": "Company",
+    "allProducts": "All Products",
+    "newArrivals": "New Arrivals",
+    "bestsellers": "Bestsellers",
+    "films": "DTF/UV-DTF Films",
+    "designerDirectory": "Designer Directory",
+    "startSelling": "Start Selling",
+    "howItWorks": "How It Works",
+    "applyAsDesigner": "Apply as Designer",
+    "about": "About Us",
+    "contact": "Contact",
+    "faq": "FAQ",
+    "shippingReturns": "Shipping & Returns",
+    "clubTitle": "Join the RASH POD Club",
+    "joinNow": "Join now",
+    "nextDrop": "Be the first to get the next drop",
+    "monthlyDesign": "Receive a mystery design every month",
+    "rightsReserved": "All rights reserved.",
+    "terms": "Terms",
+    "privacy": "Privacy"
+  },
   "home": {
     "hero": {
       "title": "Upload your designs. Sell products. Earn royalties.",

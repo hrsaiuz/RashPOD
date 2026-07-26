@@ -1,11 +1,10 @@
 import type { ReactNode } from "react";
 import type { Metadata } from "next";
-import { DM_Sans, Inter } from "next/font/google";
 import localFont from "next/font/local";
 import { NextIntlClientProvider } from "next-intl";
-import { getMessages, setRequestLocale } from "next-intl/server";
+import { getMessages, getTranslations, setRequestLocale } from "next-intl/server";
 import { notFound } from "next/navigation";
-import { PublicFooter, MotionProvider, getDashboardUrl } from "@rashpod/ui";
+import { PublicFooter, MotionProvider } from "@rashpod/ui";
 import { CartProvider } from "../../components/cart/CartProvider";
 import { StorefrontHeader } from "../../components/StorefrontHeader";
 import { getStorefrontBranding } from "../../lib/branding";
@@ -16,12 +15,6 @@ import { fetchShopCategories } from "../../lib/catalog";
 
 import "../globals.css";
 
-const dmSans = DM_Sans({
-  subsets: ["latin", "latin-ext"],
-  weight: ["400", "500", "600", "700"],
-  variable: "--font-dm-sans",
-  display: "swap",
-});
 const googleSans = localFont({
   src: [
     { path: "../fonts/google-sans-regular.ttf", weight: "400", style: "normal" },
@@ -32,12 +25,6 @@ const googleSans = localFont({
   variable: "--font-google-sans",
   display: "swap",
 });
-const inter = Inter({
-  subsets: ["latin", "latin-ext", "cyrillic", "cyrillic-ext"],
-  variable: "--font-inter",
-  display: "swap",
-});
-
 export function generateStaticParams() {
   return routing.locales.map((locale) => ({ locale }));
 }
@@ -66,17 +53,19 @@ export default async function LocaleLayout({
   if (!routing.locales.includes(locale as AppLocale)) notFound();
   setRequestLocale(locale);
   const messages = await getMessages();
-  const dashboardUrl = getDashboardUrl();
+  const footerT = await getTranslations({ locale, namespace: "footer" });
   const [branding, shopSettings, shopCategories] = await Promise.all([getStorefrontBranding(), getShopSettings(), fetchShopCategories()]);
   const brandName = branding?.theme?.storeName || "RashPOD";
   const freeDeliveryThreshold = resolveFreeDeliveryThreshold(shopSettings);
+  const prefix = locale === routing.defaultLocale ? "" : `/${locale}`;
+  const localize = (path: string) => `${prefix}${path}`;
 
   return (
-    <html lang={locale} className={`${googleSans.variable} ${dmSans.variable} ${inter.variable}`}>
+    <html lang={locale} className={googleSans.variable}>
       <body className="font-rash antialiased">
         <NextIntlClientProvider messages={messages}>
-          <a href="#main-content" className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-modal focus:rounded-pill focus:bg-brand-blue focus:px-4 focus:py-2 focus:text-white">
-            Skip to content
+          <a href="#main-content" className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-modal focus:rounded-pill focus:bg-brand-blue focus:px-4 focus:py-2 focus:text-brand-ink">
+            {footerT("skipToContent")}
           </a>
           <OrganizationJsonLd brandName={brandName} />
           <MotionProvider>
@@ -91,7 +80,45 @@ export default async function LocaleLayout({
               <main id="main-content" className="min-h-screen bg-brand-bg">
                 {children}
               </main>
-              <PublicFooter logoUrl={branding?.footerLogoUrl ?? null} brandName={brandName} />
+              <PublicFooter
+                logoUrl={branding?.footerLogoUrl ?? null}
+                brandName={brandName}
+                clubUrl={localize("/auth/register")}
+                shopLinks={[
+                  { href: localize("/shop"), label: footerT("allProducts") },
+                  { href: localize("/shop?sort=newest"), label: footerT("newArrivals") },
+                  { href: localize("/shop?sort=popular"), label: footerT("bestsellers") },
+                  { href: localize("/film"), label: footerT("films") },
+                ]}
+                designerLinks={[
+                  { href: localize("/designers"), label: footerT("designerDirectory") },
+                  { href: localize("/designer-application"), label: footerT("startSelling") },
+                  { href: localize("/how-it-works"), label: footerT("howItWorks") },
+                  { href: localize("/designer-application"), label: footerT("applyAsDesigner") },
+                ]}
+                companyLinks={[
+                  { href: localize("/about"), label: footerT("about") },
+                  { href: localize("/contact"), label: footerT("contact") },
+                  { href: localize("/faq"), label: footerT("faq") },
+                  { href: localize("/legal/shipping-returns"), label: footerT("shippingReturns") },
+                ]}
+                termsUrl={localize("/legal/terms")}
+                privacyUrl={localize("/legal/privacy")}
+                cookiesUrl={localize("/legal/shipping-returns")}
+                labels={{
+                  shop: footerT("shop"),
+                  designers: footerT("designers"),
+                  company: footerT("company"),
+                  clubTitle: footerT("clubTitle"),
+                  joinNow: footerT("joinNow"),
+                  nextDrop: footerT("nextDrop"),
+                  monthlyDesign: footerT("monthlyDesign"),
+                  rightsReserved: footerT("rightsReserved"),
+                  terms: footerT("terms"),
+                  privacy: footerT("privacy"),
+                  shippingReturns: footerT("shippingReturns"),
+                }}
+              />
             </CartProvider>
           </MotionProvider>
         </NextIntlClientProvider>
