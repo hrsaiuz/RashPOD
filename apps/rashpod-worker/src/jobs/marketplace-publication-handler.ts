@@ -1,4 +1,5 @@
 import { PrintfulApiClient, buildPrintfulSyncProductPayload } from "@rashpod/printful";
+import { createHash } from "node:crypto";
 import { createSignedReadUrl } from "../gcs-signing";
 import { MarketplacePublicationPublishContext, WorkerRepository } from "../repository";
 
@@ -10,10 +11,26 @@ export class MarketplacePublicationJobHandler {
     private readonly client = new PrintfulApiClient(),
   ) {}
 
-  async handlePublish(input: { marketplacePublicationId: string }) {
+  async handlePublish(input: { marketplacePublicationId: string; publicationVersion?: string }) {
     const repo = this.publicationRepo();
     const publication = await (repo.getMarketplacePublicationPublishContext?.(input.marketplacePublicationId) ?? repo.getMarketplacePublication(input.marketplacePublicationId));
     if (!publication) throw new Error("Marketplace publication not found");
+    const currentMetadata = this.record(publication.metadataJson);
+    if (
+      input.publicationVersion &&
+      typeof currentMetadata.publicationVersion === "string" &&
+      input.publicationVersion !== currentMetadata.publicationVersion
+    ) {
+      await repo.createIntegrationLog({
+        productListingId: publication.productListing.id,
+        marketplacePublicationId: publication.id,
+        action: ACTION,
+        status: "SKIPPED",
+        errorCode: "STALE_PUBLICATION_VERSION",
+        errorMessage: "A newer publication request replaced this job.",
+      });
+      return { skipped: true, reason: "STALE_PUBLICATION_VERSION" };
+    }
 
     if (publication.status === "NEEDS_REVIEW") {
       await repo.createIntegrationLog({
@@ -68,16 +85,49 @@ export class MarketplacePublicationJobHandler {
 
   private async publishPrintful(repo: ReturnType<MarketplacePublicationJobHandler["publicationRepo"]>, publication: MarketplacePublicationPublishContext) {
     const template = publication.printfulProductTemplate ?? publication.selection?.printfulProductTemplate;
-    const fileId = publication.printfulFileId;
-    if (!template || !fileId) return this.failPublication(publication, "PRINTFUL_PUBLISH_CONTEXT_MISSING", "Printful template or uploaded design file is missing.");
+    let fileId = publication.printfulFileId;
+    if (!template) return this.failPublication(publication, "PRINTFUL_PUBLISH_CONTEXT_MISSING", "The Printful product template is missing.");
+    if (!fileId && publication.selection?.designId && repo.ensurePrintfulFileForDesign) {
+      try {
+        const mapping = await repo.ensurePrintfulFileForDesign(
+          publication.selection.designId,
+          async (url) => {
+            const response = await this.client.uploadFileFromUrl(url);
+            const uploadedId = response.result?.id;
+            if (uploadedId == null) throw new Error("PRINTFUL_FILE_UPLOAD_FAILED");
+            return { fileId: String(uploadedId), printfulUrl: response.result?.url ?? null };
+          },
+        );
+        fileId = mapping.printfulFileId;
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "PRINTFUL_FILE_UPLOAD_FAILED";
+        return this.failPublication(publication, "PRINTFUL_FILE_UPLOAD_FAILED", message);
+      }
+    }
+    if (!fileId) return this.failPublication(publication, "PRINTFUL_FILE_MISSING", "The approved design file could not be uploaded to Printful.");
 
-    const variantIds = Array.isArray(template.printfulVariantIds) ? template.printfulVariantIds.filter((item): item is string => typeof item === "string") : [];
+    const publicationMetadata = this.record(publication.metadataJson);
+    const configuredVariantIds = Array.isArray(publicationMetadata.variantIds)
+      ? publicationMetadata.variantIds.map(String).filter(Boolean)
+      : [];
+    const variantIds = configuredVariantIds.length > 0
+      ? configuredVariantIds
+      : Array.isArray(template.printfulVariantIds)
+        ? template.printfulVariantIds.filter((item): item is string => typeof item === "string")
+        : [];
     if (variantIds.length === 0) return this.failPublication(publication, "INVALID_PRINTFUL_VARIANT", "Printful variant IDs are missing.");
 
     const mainAsset = publication.mockupAssets?.find((asset) => asset.mockupType === "MAIN") ?? publication.mockupAssets?.[0];
     const thumbnailUrl = mainAsset?.objectKey ? await createSignedReadUrl(mainAsset.objectKey, 3600) : mainAsset?.imageUrl ?? undefined;
-    const retailPrice = template.defaultRetailPrice != null ? String(template.defaultRetailPrice) : publication.productListing.price != null ? String(publication.productListing.price) : "24.99";
-    const placement = (publication.selection?.placement ?? template.defaultPlacement ?? "front").toLowerCase();
+    const retailPrice = publicationMetadata.retailPrice != null
+      ? String(publicationMetadata.retailPrice)
+      : template.defaultRetailPrice != null
+        ? String(template.defaultRetailPrice)
+        : publication.productListing.price != null
+          ? String(publication.productListing.price)
+          : "24.99";
+    const placement = String(publicationMetadata.placement ?? publication.selection?.placement ?? template.defaultPlacement ?? "front").toLowerCase();
+    const externalProductId = this.printfulExternalId(publication.id);
 
     const payload = buildPrintfulSyncProductPayload({
       title: publication.productListing.title,
@@ -86,13 +136,49 @@ export class MarketplacePublicationJobHandler {
       retailPrice,
       fileId,
       placement,
+      externalProductId,
+      externalVariantId: (variantId) => this.printfulExternalId(`${publication.id}:${variantId}`),
     });
 
     try {
-      const response = await this.client.createSyncProduct(payload);
+      let existing: Awaited<ReturnType<PrintfulApiClient["getSyncProduct"]>> | null = null;
+      const lookupId = publication.providerSyncProductId || `@${externalProductId}`;
+      try {
+        existing = await this.client.getSyncProduct(lookupId, publication.providerStoreId);
+      } catch (error) {
+        if (!(error instanceof Error) || error.message !== "PRINTFUL_REQUEST_FAILED:404") throw error;
+      }
+
+      const existingProduct = this.record(existing?.result?.sync_product);
+      const existingProductId = existing?.result?.id ?? existingProduct.id;
+      const existingVariants = existing?.result?.sync_variants ?? [];
+      const response = existingProductId == null
+        ? await this.client.createSyncProduct(payload, publication.providerStoreId)
+        : await this.client.updateSyncProduct(
+            String(existingProductId),
+            {
+              ...payload,
+              sync_variants: payload.sync_variants.map((variant) => {
+                const current = existingVariants.find((item) => Number(item.variant_id) === variant.variant_id);
+                return current?.id == null ? variant : { ...variant, id: current.id };
+              }),
+            },
+            publication.providerStoreId,
+          );
       const syncProductId = response.result?.id ?? response.result?.sync_product?.id;
       const externalId = syncProductId != null ? String(syncProductId) : undefined;
       if (!externalId) return this.failPublication(publication, "PRINTFUL_SYNC_PRODUCT_FAILED", "Printful did not return a sync product id.");
+      const hydrated = await this.client.getSyncProduct(externalId, publication.providerStoreId);
+      const syncVariants = hydrated.result?.sync_variants ?? response.result?.sync_variants ?? [];
+      const mappedCatalogVariantIds = new Set(
+        syncVariants
+          .filter((variant) => variant.id != null)
+          .map((variant) => String(variant.variant_id ?? variant.catalog_variant_id ?? "")),
+      );
+      const missingMappings = variantIds.filter((variantId) => !mappedCatalogVariantIds.has(String(variantId)));
+      if (missingMappings.length) {
+        throw new Error(`PRINTFUL_SYNC_VARIANT_MAPPING_MISSING:${missingMappings.join(",")}`);
+      }
 
       await repo.updateMarketplacePublication(publication.id, {
         status: "PUBLISHED",
@@ -101,9 +187,11 @@ export class MarketplacePublicationJobHandler {
         providerSyncProductId: externalId,
         lastSyncedAt: new Date(),
         metadataJson: {
+          ...publicationMetadata,
           publishedByWorker: true,
           printfulSyncProductId: externalId,
-          syncVariants: response.result?.sync_variants ?? [],
+          targetStoreId: publication.providerStoreId ?? null,
+          syncVariants,
         },
       });
       await repo.createIntegrationLog({
@@ -147,6 +235,14 @@ export class MarketplacePublicationJobHandler {
     return `${prefix}_${publication.marketplace.toLowerCase()}_${publication.id}`;
   }
 
+  private printfulExternalId(value: string) {
+    return `rpd_${createHash("sha256").update(value).digest("hex").slice(0, 24)}`;
+  }
+
+  private record(value: unknown): Record<string, unknown> {
+    return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
+  }
+
   private publicationRepo() {
     if (
       !this.repo.getMarketplacePublication ||
@@ -158,6 +254,6 @@ export class MarketplacePublicationJobHandler {
     }
     return this.repo as Required<
       Pick<WorkerRepository, "getMarketplacePublication" | "getMarketplacePublicationPublishContext" | "updateMarketplacePublication" | "markListingPublishedIfComplete" | "createIntegrationLog">
-    >;
+    > & Pick<WorkerRepository, "ensurePrintfulFileForDesign">;
   }
 }

@@ -24,8 +24,9 @@ export class PrintfulSyncService {
     retailPrice: string;
     fileId: string;
     placement: string;
+    storeId?: string | null;
   }) {
     const payload = this.buildSyncProductPayload(input);
-    return this.client.createSyncProduct(payload);
+    return this.client.createSyncProduct(payload, input.storeId);
   }
 }

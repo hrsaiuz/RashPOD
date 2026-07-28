@@ -38,6 +38,7 @@ type ProductDetail = {
   variants?: {
     sizes?: string[];
     colors?: string[];
+    combinations?: Array<{ id: string; name?: string; color?: string | null; colorCode?: string | null; size?: string | null; inStock?: boolean }>;
   };
   reviews?: {
     average: number;
@@ -173,6 +174,7 @@ export default function ProductPageClient({
   const price = toMoney(product.price, product.currency);
   const relatedCards = related;
   const sizes = product.variants?.sizes?.length ? product.variants.sizes : DEFAULT_SIZES;
+  const colors = product.variants?.colors?.length ? product.variants.colors : COLOR_SWATCHES.map((swatch) => swatch.label);
 
   async function toggleWishlist() {
     if (!product || wishlistBusy) return;
@@ -288,17 +290,24 @@ export default function ProductPageClient({
             <div className="border-t border-brand-line py-5">
               <h2 className="mb-4 text-body font-medium text-brand-ink">Choose a Color</h2>
               <div className="flex flex-wrap gap-5">
-                {COLOR_SWATCHES.map((swatch) => (
+                {colors.map((color) => {
+                  const fallback = COLOR_SWATCHES.find((swatch) => swatch.label.toLocaleLowerCase() === color.toLocaleLowerCase());
+                  const providerColor = product.variants?.combinations?.find((variant) => variant.color === color)?.colorCode;
+                  const swatchValue = providerColor || fallback?.value || COLOR_SWATCHES[0].value;
+                  return (
                   <button
-                    key={swatch.label}
-                    aria-label={swatch.label}
-                    onClick={() => setSelectedColor(swatch.label)}
-                    className={`grid h-[52px] w-[52px] place-items-center rounded-full ${selectedColor === swatch.label ? "ring-2 ring-brand-peachLight ring-offset-4" : ""}`}
-                    style={swatchStyle(swatch.value)}
+                    key={color}
+                    aria-label={color}
+                    aria-pressed={selectedColor === color}
+                    title={color}
+                    onClick={() => setSelectedColor(color)}
+                    className={`grid h-[52px] w-[52px] place-items-center rounded-full border border-brand-line ${selectedColor === color ? "ring-2 ring-brand-peachLight ring-offset-4" : ""}`}
+                    style={swatchStyle(swatchValue)}
                   >
-                    {selectedColor === swatch.label ? <Check size={26} className="text-white" /> : null}
+                    {selectedColor === color ? <Check size={26} className="text-white drop-shadow-sm" /> : null}
                   </button>
-                ))}
+                  );
+                })}
               </div>
               <p className="mt-4 text-caption text-brand-ink">The colors may differ by up to 15% from what you see in the image.</p>
             </div>

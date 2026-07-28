@@ -16,6 +16,7 @@ async function bootstrap() {
   app.use(securityHeadersMiddleware);
   app.use(createRateLimitMiddleware());
   app.use("/files/local-upload", raw({ type: "*/*", limit: DIRECT_UPLOAD_MAX_BYTES + 1024 * 1024 }));
+  app.use("/webhooks/printful", raw({ type: "application/json", limit: "1mb" }));
   app.use(json({ limit: "2mb" }));
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true, forbidNonWhitelisted: true }));
   app.useGlobalFilters(new SafeExceptionFilter());

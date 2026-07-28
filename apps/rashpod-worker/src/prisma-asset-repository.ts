@@ -1,4 +1,4 @@
-import { DesignProductSelectionStatus, GeneratedAssetStatus, IntegrationLogStatus, ListingStatus, ListingType, MarketplaceKind, MarketplacePublicationStatus, NotificationDeliveryStatus, PipelineType, PlacementAlignment, PlacementKind, PlacementUnits, Prisma, ProductionJobStatus, ProviderType } from "@prisma/client";
+import { DesignProductSelectionStatus, GeneratedAssetStatus, IntegrationLogStatus, ListingStatus, ListingType, MarketplaceKind, MarketplacePublicationStatus, NotificationDeliveryStatus, PipelineType, PlacementAlignment, PlacementKind, PlacementUnits, PodProviderType, Prisma, ProductionJobStatus, ProviderType } from "@prisma/client";
 import { parsePrintfulSettings } from "@rashpod/printful";
 import { getPrismaClient } from "./db";
 import { AiJobRecord, GeneratedAssetRecord, MarketplacePublicationPublishContext, MarketplacePublicationRecord, MockupAssetRecord, PipelineSelectionRecord, PipelineSelectionStatus, PrintfulSettingsRecord, ProductionJobRecord, WorkerRepository } from "./repository";
@@ -186,6 +186,72 @@ export class PrismaAssetRepository implements WorkerRepository {
     return updated;
   }
 
+  async getPrintfulFulfillmentOrderContext(orderId: string, storeId: string) {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      include: {
+        productionJobs: {
+          where: { providerType: PodProviderType.PRINTFUL },
+          include: { orderItem: true },
+        },
+      },
+    });
+    if (!order) return null;
+    const record = (value: unknown): Record<string, unknown> =>
+      value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
+    const jobs = order.productionJobs
+      .filter((job) => String(record(job.providerPayloadSnapshotJson).providerStoreId ?? "") === storeId)
+      .filter((job) => Boolean(job.orderItem?.providerVariantId))
+      .map((job) => ({
+        id: job.id,
+        quantity: job.orderItem!.quantity,
+        providerVariantId: String(job.orderItem!.providerVariantId),
+        retailPrice: job.orderItem!.unitPrice.toString(),
+      }));
+    const delivery = record(order.deliverySnapshotJson);
+    const recipient = record(delivery.recipient);
+    return {
+      orderId: order.id,
+      storeId,
+      currency: order.currency,
+      recipient,
+      existingProviderOrderId: order.productionJobs.find((job) => job.providerOrderId)?.providerOrderId ?? null,
+      jobs,
+    };
+  }
+
+  async updatePrintfulFulfillmentJobs(
+    jobIds: string[],
+    data: {
+      providerOrderId?: string | null;
+      providerStatus?: string | null;
+      status?: string;
+      failureReason?: string | null;
+      providerResponse?: unknown;
+    },
+  ) {
+    const rows = await this.prisma.productionJob.findMany({ where: { id: { in: jobIds } } });
+    await this.prisma.$transaction(rows.map((row) => {
+      const metadata = row.providerPayloadSnapshotJson && typeof row.providerPayloadSnapshotJson === "object" && !Array.isArray(row.providerPayloadSnapshotJson)
+        ? row.providerPayloadSnapshotJson as Record<string, unknown>
+        : {};
+      return this.prisma.productionJob.update({
+        where: { id: row.id },
+        data: {
+          providerOrderId: data.providerOrderId,
+          providerStatus: data.providerStatus,
+          status: data.status as ProductionJobStatus | undefined,
+          failureReason: data.failureReason,
+          providerPayloadSnapshotJson: {
+            ...metadata,
+            ...(data.providerResponse === undefined ? {} : { providerResponse: data.providerResponse }),
+            providerUpdatedAt: new Date().toISOString(),
+          } as Prisma.InputJsonValue,
+        },
+      });
+    }));
+  }
+
   async getPipelineSelection(id: string): Promise<PipelineSelectionRecord | null> {
     const row = await this.prisma.designProductSelection.findUnique({
       where: { id },
@@ -363,10 +429,17 @@ export class PrismaAssetRepository implements WorkerRepository {
     const marketplaces = this.marketplacesForSelection(selection.pipeline, selection.targetMarketplaces);
     for (const marketplace of marketplaces) {
       await this.prisma.marketplacePublication.upsert({
-        where: { productListingId_marketplace: { productListingId: listing.id, marketplace } },
+        where: {
+          productListingId_marketplace_publicationKey: {
+            productListingId: listing.id,
+            marketplace,
+            publicationKey: "default",
+          },
+        },
         create: {
           productListingId: listing.id,
           marketplace,
+          publicationKey: "default",
           provider: marketplace === MarketplaceKind.RASHPOD_LOCAL || marketplace === MarketplaceKind.LOCAL_MARKETPLACE ? ProviderType.RASHPOD : ProviderType.PRINTFUL,
           status: marketplace === MarketplaceKind.AMAZON ? MarketplacePublicationStatus.NEEDS_REVIEW : MarketplacePublicationStatus.DRAFT,
         },
@@ -387,7 +460,9 @@ export class PrismaAssetRepository implements WorkerRepository {
     return {
       id: row.id,
       marketplace: row.marketplace,
+      publicationKey: row.publicationKey,
       provider: row.provider,
+      providerStoreId: row.providerStoreId,
       status: row.status,
       providerSyncProductId: row.providerSyncProductId,
       providerExternalListingId: row.providerExternalListingId,
@@ -616,7 +691,11 @@ export class PrismaAssetRepository implements WorkerRepository {
       include: { marketplacePublications: true },
     });
     if (!listing) throw new Error(`Listing ${listingId} not found`);
-    const publishable = listing.marketplacePublications.filter((publication) => publication.status !== MarketplacePublicationStatus.NEEDS_REVIEW);
+    const publishable = listing.marketplacePublications.filter((publication) =>
+      publication.status !== MarketplacePublicationStatus.NEEDS_REVIEW
+      && publication.status !== MarketplacePublicationStatus.DRAFT
+      && publication.status !== MarketplacePublicationStatus.NOT_SELECTED,
+    );
     const allPublished = publishable.length > 0 && publishable.every((publication) => publication.status === MarketplacePublicationStatus.PUBLISHED);
     if (!allPublished) return { id: listing.id, status: listing.status };
 

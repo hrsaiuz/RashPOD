@@ -404,7 +404,14 @@ export class ListingsService {
   async shopBySlug(slug: string) {
     const row = await this.prisma.commerceListing.findUnique({
       where: { slug },
-      include: { designer: { select: { id: true, displayName: true } } },
+      include: {
+        designer: { select: { id: true, displayName: true, handle: true } },
+        marketplacePublications: {
+          where: { provider: "PRINTFUL", status: "PUBLISHED" },
+          orderBy: { updatedAt: "desc" },
+          take: 1,
+        },
+      },
     });
     return row ? this.toShopListingDto(row) : null;
   }
@@ -423,10 +430,19 @@ export class ListingsService {
     designer: { id: string; displayName: string; handle?: string | null };
     productType?: string | null;
     localBaseProduct?: { productType?: { name: string; slug: string; category: string } | null } | null;
+    marketplacePublications?: Array<{ metadataJson: any }>;
   }) {
     const images = Array.isArray(row.imagesJson)
       ? (row.imagesJson as unknown[]).filter((v): v is string => typeof v === "string")
       : [];
+    const printfulMetadata = this.objectJson(row.marketplacePublications?.[0]?.metadataJson);
+    const variantSelections = Array.isArray(printfulMetadata.variantSelections)
+      ? printfulMetadata.variantSelections
+          .map((item) => this.objectJson(item))
+          .filter((item) => typeof item.id === "string")
+      : [];
+    const sizes = [...new Set(variantSelections.map((item) => item.size).filter((value): value is string => typeof value === "string" && value.length > 0))];
+    const colors = [...new Set(variantSelections.map((item) => item.color).filter((value): value is string => typeof value === "string" && value.length > 0))];
     return {
       id: row.id,
       slug: row.slug,
@@ -448,6 +464,7 @@ export class ListingsService {
         : row.productType
           ? { name: row.productType, slug: row.productType, category: row.productType }
           : null,
+      variants: variantSelections.length ? { sizes, colors, combinations: variantSelections } : undefined,
       designer: {
         id: row.designer.id,
         displayName: row.designer.displayName,
@@ -610,6 +627,10 @@ export class ListingsService {
       .replace(/[^a-z0-9]+/g, "-")
       .replace(/(^-|-$)/g, "");
     return slug || fallbackId;
+  }
+
+  private objectJson(value: unknown): Record<string, unknown> {
+    return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
   }
 
   private async calculateRoyalty(price: Prisma.Decimal | number, cost: Prisma.Decimal | number | null) {

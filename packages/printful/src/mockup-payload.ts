@@ -68,14 +68,18 @@ export function buildPrintfulSyncProductPayload(input: {
   retailPrice: string;
   fileId: string;
   placement: string;
+  externalProductId?: string;
+  externalVariantId?: (variantId: string) => string;
 }) {
   return {
     sync_product: {
       name: input.title,
       thumbnail: input.thumbnailUrl ?? undefined,
+      external_id: input.externalProductId,
     },
     sync_variants: input.variantIds.map((variantId) => ({
       variant_id: Number(variantId),
+      external_id: input.externalVariantId?.(variantId),
       retail_price: input.retailPrice,
       files: [{ type: input.placement, id: input.fileId }],
     })),

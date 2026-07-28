@@ -4,7 +4,7 @@ import { JwtAuthGuard } from "../../common/auth/jwt-auth.guard";
 import { PermissionGuard } from "../../common/auth/permission.guard";
 import { RequirePermission } from "../../common/auth/permission.decorator";
 import { AddCartItemDto } from "./dto/add-cart-item.dto";
-import { CreateOrderDto } from "./dto/create-order.dto";
+import { CreateOrderDto, PrintfulShippingRatesDto } from "./dto/create-order.dto";
 import { UpdateCartItemDto } from "./dto/update-cart-item.dto";
 import { OrdersService } from "./orders.service";
 
@@ -41,6 +41,12 @@ export class OrdersController {
   @RequirePermission("order:manage-own")
   createOrder(@CurrentUser() user: RequestUser, @Body() dto: CreateOrderDto) {
     return this.orders.createOrder(user.sub, dto);
+  }
+
+  @Post("orders/printful-shipping-rates")
+  @RequirePermission("order:manage-own")
+  printfulShippingRates(@CurrentUser() user: RequestUser, @Body() dto: PrintfulShippingRatesDto) {
+    return this.orders.printfulShippingRates(user.sub, dto);
   }
 
   @Get("orders")

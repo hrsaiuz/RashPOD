@@ -401,6 +401,7 @@ enum MockupAssetStatus {
 enum MarketplaceKind {
   RASHPOD_LOCAL
   LOCAL_MARKETPLACE
+  PRINTFUL
   ETSY
   AMAZON
   EBAY
@@ -1063,7 +1064,11 @@ model CustomerAddress {
   recipientName String
   phone         String
   line1         String
+  line2         String?
   city          String
+  stateCode     String?
+  countryCode   String   @default("UZ")
+  postalCode    String?
   zone          String   @default("UZ")
   isDefault     Boolean  @default(false)
   createdAt     DateTime @default(now())
@@ -2217,6 +2222,7 @@ model MarketplacePublication {
   id                         String                       @id @default(uuid())
   productListingId           String
   marketplace                MarketplaceKind
+  publicationKey             String                       @default("default")
   provider                   ProviderType
   providerStoreId            String?
   providerSyncProductId      String?
@@ -2230,8 +2236,9 @@ model MarketplacePublication {
 
   productListing CommerceListing @relation(fields: [productListingId], references: [id], onDelete: Cascade)
 
-  @@unique([productListingId, marketplace])
+  @@unique([productListingId, marketplace, publicationKey])
   @@index([marketplace, status])
+  @@index([providerStoreId, status])
 }
 
 model PrintfulFileMapping {

@@ -11,6 +11,7 @@ export type JobType =
   | "POLL_PRINTFUL_MOCKUP_TASK"
   | "CREATE_PRODUCT_LISTING_DRAFT"
   | "PUBLISH_MARKETPLACE_LISTING"
+  | "SUBMIT_PRINTFUL_ORDER"
   | "SYNC_PRINTFUL_CATALOG"
   | "SYNC_POD_CATALOG"
   | "UPLOAD_POD_PROVIDER_FILE"
@@ -81,6 +82,20 @@ export class JobDispatcherService {
     if (jobType === "SYNC_POD_PRODUCT_DRAFT") {
       const syncRecordId = payload.syncRecordId;
       if (typeof syncRecordId === "string" && syncRecordId.length > 0) return `${jobType}:${syncRecordId}`;
+    }
+    if (jobType === "PUBLISH_MARKETPLACE_LISTING") {
+      const publicationId = payload.marketplacePublicationId;
+      const publicationVersion = payload.publicationVersion;
+      if (typeof publicationId === "string" && publicationId.length > 0) {
+        return typeof publicationVersion === "string" && publicationVersion.length > 0
+          ? `${jobType}:${publicationId}:${publicationVersion}`
+          : `${jobType}:${publicationId}`;
+      }
+    }
+    if (jobType === "SUBMIT_PRINTFUL_ORDER") {
+      const orderId = payload.orderId;
+      const storeId = payload.storeId;
+      if (typeof orderId === "string" && typeof storeId === "string") return `${jobType}:${orderId}:${storeId}`;
     }
     if (jobType.startsWith("AI_")) {
       const aiJobId = payload.aiJobId;

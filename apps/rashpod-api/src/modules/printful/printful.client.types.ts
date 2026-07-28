@@ -3,5 +3,6 @@ export interface PrintfulRequestOptions {
   path: string;
   body?: unknown;
   query?: Record<string, string | number | undefined>;
+  storeId?: string | null;
   requestId?: string;
 }

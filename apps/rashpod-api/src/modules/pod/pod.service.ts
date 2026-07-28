@@ -478,7 +478,11 @@ export class PodService {
     if (provider === PodProviderType.PRINTFUL) {
       const printfulResult = await this.printfulWebhook.handleWebhook(body, signature);
       if (!printfulResult.accepted) {
-        return { accepted: false, eventId: null, reason: printfulResult.reason };
+        return {
+          accepted: false,
+          eventId: null,
+          reason: "reason" in printfulResult ? printfulResult.reason : "PRINTFUL_WEBHOOK_REJECTED",
+        };
       }
     }
     const config = await this.prisma.podProviderConfig.findFirst({ where: { provider, isEnabled: true }, orderBy: { updatedAt: "desc" } });

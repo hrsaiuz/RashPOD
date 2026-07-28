@@ -19,7 +19,11 @@ type CustomerAddress = {
   recipientName: string;
   phone: string;
   line1: string;
+  line2?: string | null;
   city: string;
+  stateCode?: string | null;
+  countryCode?: string | null;
+  postalCode?: string | null;
   zone: string;
   isDefault: boolean;
 };
@@ -42,6 +46,16 @@ type DeliveryQuote = {
   total: number;
 };
 
+type PrintfulShippingResponse = {
+  summary?: {
+    providerType: string;
+    providerName: string;
+    zone: string;
+    etaText?: string | null;
+    deliveryPrice: number;
+  } | null;
+};
+
 const STEP_LABELS: Array<{ key: CheckoutStep; label: string }> = [
   { key: "address", label: "Address" },
   { key: "shipping", label: "Shipping" },
@@ -61,7 +75,11 @@ export default function CheckoutPageClient({ shopSettings }: { shopSettings: Sho
   const [customerPhone, setCustomerPhone] = useState("");
   const [customerEmail, setCustomerEmail] = useState("");
   const [deliveryAddress, setDeliveryAddress] = useState("");
+  const [deliveryAddress2, setDeliveryAddress2] = useState("");
   const [addressCity, setAddressCity] = useState("Tashkent");
+  const [addressState, setAddressState] = useState("");
+  const [countryCode, setCountryCode] = useState("UZ");
+  const [postalCode, setPostalCode] = useState("");
   const [addressLabel, setAddressLabel] = useState("Home");
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [placingOrder, setPlacingOrder] = useState(false);
@@ -101,7 +119,11 @@ export default function CheckoutPageClient({ shopSettings }: { shopSettings: Sho
           setCustomerName(defaultAddress.recipientName);
           setCustomerPhone(defaultAddress.phone);
           setDeliveryAddress(defaultAddress.line1);
+          setDeliveryAddress2(defaultAddress.line2 ?? "");
           setAddressCity(defaultAddress.city);
+          setAddressState(defaultAddress.stateCode ?? "");
+          setCountryCode(defaultAddress.countryCode ?? "UZ");
+          setPostalCode(defaultAddress.postalCode ?? "");
           setAddressLabel(defaultAddress.label);
         } else if (profile.defaultDeliveryAddress) {
           setDeliveryAddress(profile.defaultDeliveryAddress);
@@ -151,8 +173,34 @@ export default function CheckoutPageClient({ shopSettings }: { shopSettings: Sho
         );
         if (cancelled) return;
         const valid = quotes.filter((row): row is DeliveryQuote => row != null);
-        setDeliveryQuotes(valid);
-        if (!selectedProvider && valid[0]) setSelectedProvider(valid[0].providerType);
+        let resolved = valid;
+        if (selectedAddressId !== "pickup" && deliveryAddress.trim() && addressCity.trim() && countryCode.trim() && postalCode.trim()) {
+          const printful = await api.post<PrintfulShippingResponse>("/orders/printful-shipping-rates", {
+            deliveryAddressDetails: {
+              address1: deliveryAddress.trim(),
+              address2: deliveryAddress2.trim() || undefined,
+              city: addressCity.trim(),
+              stateCode: addressState.trim() || undefined,
+              countryCode: countryCode.trim().toUpperCase(),
+              postalCode: postalCode.trim(),
+            },
+          }).catch(() => null);
+          if (printful?.summary) {
+            resolved = [{
+              providerType: printful.summary.providerType,
+              providerName: printful.summary.providerName,
+              zone: printful.summary.zone,
+              etaText: printful.summary.etaText,
+              subtotal,
+              deliveryPrice: printful.summary.deliveryPrice,
+              total: subtotal + printful.summary.deliveryPrice,
+            }];
+          }
+        }
+        setDeliveryQuotes(resolved);
+        if (resolved[0] && !resolved.some((quote) => quote.providerType === selectedProvider)) {
+          setSelectedProvider(resolved[0].providerType);
+        }
       } catch {
         if (!cancelled) setDeliveryQuotes([]);
       }
@@ -161,7 +209,7 @@ export default function CheckoutPageClient({ shopSettings }: { shopSettings: Sho
     return () => {
       cancelled = true;
     };
-  }, [authState, selectedAddressId, selectedProvider, shopSettings.deliveryOptions, subtotal]);
+  }, [addressCity, addressState, authState, countryCode, deliveryAddress, deliveryAddress2, postalCode, selectedAddressId, selectedProvider, shopSettings.deliveryOptions, subtotal]);
 
   const selectedQuote = deliveryQuotes.find((row) => row.providerType === selectedProvider) ?? deliveryQuotes[0] ?? null;
   const canContinue = (items.length > 0 || serverCartCount > 0) && authState === "authed";
@@ -177,13 +225,15 @@ export default function CheckoutPageClient({ shopSettings }: { shopSettings: Sho
           if (!customerPhone.trim()) nextErrors.customerPhone = "Phone is required.";
           if (!deliveryAddress.trim()) nextErrors.deliveryAddress = "Delivery address is required.";
           if (!addressCity.trim()) nextErrors.addressCity = "City is required.";
+          if (!countryCode.trim()) nextErrors.countryCode = "Country code is required.";
+          if (!postalCode.trim()) nextErrors.postalCode = "Postal code is required.";
         }
       }
       if (target === "payment" && !selectedQuote) nextErrors.shipping = "Choose a shipping method.";
       setFieldErrors(nextErrors);
       return Object.keys(nextErrors).length === 0;
     },
-    [addressCity, customerName, customerPhone, deliveryAddress, pickup, selectedAddressId, selectedQuote],
+    [addressCity, countryCode, customerName, customerPhone, deliveryAddress, pickup, postalCode, selectedAddressId, selectedQuote],
   );
 
   function selectAddress(address: CustomerAddress) {
@@ -191,18 +241,24 @@ export default function CheckoutPageClient({ shopSettings }: { shopSettings: Sho
     setCustomerName(address.recipientName);
     setCustomerPhone(address.phone);
     setDeliveryAddress(address.line1);
+    setDeliveryAddress2(address.line2 ?? "");
     setAddressCity(address.city);
+    setAddressState(address.stateCode ?? "");
+    setCountryCode(address.countryCode ?? "UZ");
+    setPostalCode(address.postalCode ?? "");
     setAddressLabel(address.label);
     setFieldErrors({});
   }
 
   async function saveNewAddress() {
-    if (!customerName.trim() || !customerPhone.trim() || !deliveryAddress.trim() || !addressCity.trim()) {
+    if (!customerName.trim() || !customerPhone.trim() || !deliveryAddress.trim() || !addressCity.trim() || !countryCode.trim() || !postalCode.trim()) {
       setFieldErrors({
         customerName: !customerName.trim() ? "Full name is required." : "",
         customerPhone: !customerPhone.trim() ? "Phone is required." : "",
         deliveryAddress: !deliveryAddress.trim() ? "Delivery address is required." : "",
         addressCity: !addressCity.trim() ? "City is required." : "",
+        countryCode: !countryCode.trim() ? "Country code is required." : "",
+        postalCode: !postalCode.trim() ? "Postal code is required." : "",
       });
       return null;
     }
@@ -211,7 +267,11 @@ export default function CheckoutPageClient({ shopSettings }: { shopSettings: Sho
       recipientName: customerName.trim(),
       phone: customerPhone.trim(),
       line1: deliveryAddress.trim(),
+      line2: deliveryAddress2.trim() || undefined,
       city: addressCity.trim(),
+      stateCode: addressState.trim() || undefined,
+      countryCode: countryCode.trim().toUpperCase(),
+      postalCode: postalCode.trim(),
       zone: deliveryZone,
       isDefault: addresses.length === 0,
     });
@@ -234,6 +294,14 @@ export default function CheckoutPageClient({ shopSettings }: { shopSettings: Sho
         deliveryType: selectedQuote?.providerType ?? selectedProvider,
         deliveryZone,
         deliveryAddress: selectedAddressId === "pickup" ? undefined : deliveryAddress.trim(),
+        deliveryAddressDetails: selectedAddressId === "pickup" ? undefined : {
+          address1: deliveryAddress.trim(),
+          address2: deliveryAddress2.trim() || undefined,
+          city: addressCity.trim(),
+          stateCode: addressState.trim() || undefined,
+          countryCode: countryCode.trim().toUpperCase(),
+          postalCode: postalCode.trim(),
+        },
         pickupLocation: selectedAddressId === "pickup" ? pickup?.address ?? pickup?.displayName ?? "RashPOD pickup" : undefined,
         customerNote: selectedAddressId === "pickup" ? "Pickup order" : undefined,
         paymentMethod: "CLICK",
@@ -294,14 +362,22 @@ export default function CheckoutPageClient({ shopSettings }: { shopSettings: Sho
                     customerPhone={customerPhone}
                     customerEmail={customerEmail}
                     deliveryAddress={deliveryAddress}
+                    deliveryAddress2={deliveryAddress2}
                     addressCity={addressCity}
+                    addressState={addressState}
+                    countryCode={countryCode}
+                    postalCode={postalCode}
                     addressLabel={addressLabel}
                     fieldErrors={fieldErrors}
                     setCustomerName={setCustomerName}
                     setCustomerPhone={setCustomerPhone}
                     setCustomerEmail={setCustomerEmail}
                     setDeliveryAddress={setDeliveryAddress}
+                    setDeliveryAddress2={setDeliveryAddress2}
                     setAddressCity={setAddressCity}
+                    setAddressState={setAddressState}
+                    setCountryCode={setCountryCode}
+                    setPostalCode={setPostalCode}
                     setAddressLabel={setAddressLabel}
                   />
                 ) : null}
@@ -423,14 +499,22 @@ function AddressStep(props: {
   customerPhone: string;
   customerEmail: string;
   deliveryAddress: string;
+  deliveryAddress2: string;
   addressCity: string;
+  addressState: string;
+  countryCode: string;
+  postalCode: string;
   addressLabel: string;
   fieldErrors: Record<string, string>;
   setCustomerName: (value: string) => void;
   setCustomerPhone: (value: string) => void;
   setCustomerEmail: (value: string) => void;
   setDeliveryAddress: (value: string) => void;
+  setDeliveryAddress2: (value: string) => void;
   setAddressCity: (value: string) => void;
+  setAddressState: (value: string) => void;
+  setCountryCode: (value: string) => void;
+  setPostalCode: (value: string) => void;
   setAddressLabel: (value: string) => void;
 }) {
   const showForm = props.selectedAddressId === "new" || props.addresses.length === 0;
@@ -469,8 +553,12 @@ function AddressStep(props: {
           <CheckoutInput label="Full name" value={props.customerName} onChange={props.setCustomerName} error={props.fieldErrors.customerName} />
           <CheckoutInput label="Phone" value={props.customerPhone} onChange={props.setCustomerPhone} error={props.fieldErrors.customerPhone} />
           <CheckoutInput label="Email" value={props.customerEmail} onChange={props.setCustomerEmail} type="email" />
-          <CheckoutInput label="Delivery address" value={props.deliveryAddress} onChange={props.setDeliveryAddress} error={props.fieldErrors.deliveryAddress} className="sm:col-span-2" />
+          <CheckoutInput label="Address line 1" value={props.deliveryAddress} onChange={props.setDeliveryAddress} error={props.fieldErrors.deliveryAddress} className="sm:col-span-2" />
+          <CheckoutInput label="Address line 2 (optional)" value={props.deliveryAddress2} onChange={props.setDeliveryAddress2} className="sm:col-span-2" />
           <CheckoutInput label="City" value={props.addressCity} onChange={props.setAddressCity} error={props.fieldErrors.addressCity} />
+          <CheckoutInput label="State / region (optional)" value={props.addressState} onChange={props.setAddressState} />
+          <CheckoutInput label="Country code" value={props.countryCode} onChange={props.setCountryCode} error={props.fieldErrors.countryCode} />
+          <CheckoutInput label="Postal code" value={props.postalCode} onChange={props.setPostalCode} error={props.fieldErrors.postalCode} />
         </div>
       ) : null}
     </div>

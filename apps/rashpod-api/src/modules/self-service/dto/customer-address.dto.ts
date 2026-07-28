@@ -17,9 +17,29 @@ export class CreateCustomerAddressDto {
   @MaxLength(500)
   line1!: string;
 
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  line2?: string;
+
   @IsString()
   @MaxLength(120)
   city!: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  stateCode?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(2)
+  countryCode?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(32)
+  postalCode?: string;
 
   @IsOptional()
   @IsString()
@@ -54,8 +74,28 @@ export class UpdateCustomerAddressDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(500)
+  line2?: string;
+
+  @IsOptional()
+  @IsString()
   @MaxLength(120)
   city?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  stateCode?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(2)
+  countryCode?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(32)
+  postalCode?: string;
 
   @IsOptional()
   @IsString()

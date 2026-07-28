@@ -1,11 +1,12 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
-import { FilmOrderKind, ListingStatus, ListingType, OrderFulfillmentRoute, OrderStatus, PaymentStatus, PodSyncRecordStatus, Prisma, ProductionJobStatus } from "@prisma/client";
+import { FilmOrderKind, ListingStatus, ListingType, OrderFulfillmentRoute, OrderStatus, PaymentStatus, PodProviderType, PodSyncRecordStatus, Prisma, ProductionJobStatus } from "@prisma/client";
 import { PrismaService } from "../../prisma/prisma.service";
 import { AuditService } from "../audit/audit.service";
 import { JobDispatcherService } from "../worker-jobs/job-dispatcher.service";
 import { FinanceService } from "../finance/finance.service";
+import { PrintfulClient } from "../printful/printful.client";
 import { AddCartItemDto } from "./dto/add-cart-item.dto";
-import { CreateOrderDto } from "./dto/create-order.dto";
+import { CreateOrderDto, PrintfulShippingRatesDto } from "./dto/create-order.dto";
 
 type CheckoutListing = NonNullable<Awaited<ReturnType<OrdersService["getCheckoutListing"]>>>;
 type CheckoutCartItem = Awaited<ReturnType<OrdersService["getCheckoutCartItems"]>>[number];
@@ -17,6 +18,7 @@ export class OrdersService {
     private readonly audit: AuditService,
     private readonly jobs?: JobDispatcherService,
     private readonly finance?: FinanceService,
+    private readonly printful?: PrintfulClient,
   ) {}
 
   private async ensureCart(customerId: string) {
@@ -45,6 +47,7 @@ export class OrdersService {
             },
           },
         },
+        printfulProductTemplate: true,
         designProductSelection: {
           include: {
             placementPreset: true,
@@ -52,6 +55,10 @@ export class OrdersService {
           },
         },
         podSyncRecords: { where: { status: { in: [PodSyncRecordStatus.READY, PodSyncRecordStatus.SYNCED] } }, orderBy: { updatedAt: "desc" }, take: 1 },
+        marketplacePublications: {
+          where: { provider: "PRINTFUL", status: "PUBLISHED" },
+          orderBy: { updatedAt: "desc" },
+        },
       },
     });
   }
@@ -75,6 +82,7 @@ export class OrdersService {
                 },
               },
             },
+            printfulProductTemplate: true,
             designProductSelection: {
               include: {
                 placementPreset: true,
@@ -82,6 +90,10 @@ export class OrdersService {
               },
             },
             podSyncRecords: { where: { status: { in: [PodSyncRecordStatus.READY, PodSyncRecordStatus.SYNCED] } }, orderBy: { updatedAt: "desc" }, take: 1 },
+            marketplacePublications: {
+              where: { provider: "PRINTFUL", status: "PUBLISHED" },
+              orderBy: { updatedAt: "desc" },
+            },
           },
         },
       },
@@ -170,6 +182,7 @@ export class OrdersService {
     const listing = await this.getCheckoutListing(dto.listingId);
     if (!listing) throw new NotFoundException("Listing not found");
     this.assertListingPurchasable(listing);
+    this.resolvePrintfulVariant(listing, dto.size, dto.color);
 
     const existing = await this.prisma.cartItem.findFirst({
       where: {
@@ -214,6 +227,69 @@ export class OrdersService {
     return { cart, items, subtotal };
   }
 
+  async printfulShippingRates(customerId: string, dto: PrintfulShippingRatesDto) {
+    if (!this.printful) throw new BadRequestException("Printful shipping is unavailable");
+    const cart = await this.ensureCart(customerId);
+    const items = await this.getCheckoutCartItems(cart.id);
+    if (!items.length) throw new BadRequestException("Cart is empty");
+    const shipments = new Map<string, Array<{ variant_id: number; quantity: number }>>();
+    for (const item of items) {
+      if (!item.listing) continue;
+      const mapping = this.resolvePrintfulVariant(item.listing, item.selectedSize, item.selectedColor);
+      if (!mapping) continue;
+      const variantId = Number(mapping.catalogVariantId);
+      if (!Number.isFinite(variantId)) throw new BadRequestException("Printful catalog variant is invalid");
+      const group = shipments.get(mapping.storeId) ?? [];
+      group.push({ variant_id: variantId, quantity: item.quantity });
+      shipments.set(mapping.storeId, group);
+    }
+    if (!shipments.size) return { shipments: [], summary: null };
+
+    const address = dto.deliveryAddressDetails;
+    const recipient = {
+      address1: address.address1.trim(),
+      ...(address.address2?.trim() ? { address2: address.address2.trim() } : {}),
+      city: address.city.trim(),
+      ...(address.stateCode?.trim() ? { state_code: address.stateCode.trim() } : {}),
+      country_code: address.countryCode.trim().toUpperCase(),
+      zip: address.postalCode.trim(),
+    };
+    const results = [];
+    for (const [storeId, shipmentItems] of shipments) {
+      const response = await this.printful.calculateShippingRates({ recipient, items: shipmentItems }, storeId);
+      results.push({
+        storeId,
+        rates: (response.result ?? []).map((rate) => ({
+          id: String(rate.id ?? rate.shipping ?? rate.name ?? "standard"),
+          name: String(rate.name ?? rate.shipping ?? "Printful shipping"),
+          rate: Number(rate.rate ?? 0),
+          currency: String(rate.currency ?? "USD"),
+          minDeliveryDays: rate.minDeliveryDays ?? rate.min_delivery_days ?? null,
+          maxDeliveryDays: rate.maxDeliveryDays ?? rate.max_delivery_days ?? null,
+        })),
+      });
+    }
+    const cheapestRates = results.map((shipment) =>
+      [...shipment.rates].filter((rate) => Number.isFinite(rate.rate)).sort((a, b) => a.rate - b.rate)[0],
+    );
+    if (cheapestRates.some((rate) => !rate)) return { shipments: results, summary: null };
+    const currencies = [...new Set(cheapestRates.map((rate) => rate!.currency))];
+    if (currencies.length !== 1) throw new BadRequestException("Printful returned mixed shipping currencies");
+    return {
+      shipments: results,
+      summary: {
+        providerType: "PRINTFUL",
+        providerName: "Printful delivery",
+        zone: address.countryCode.toUpperCase(),
+        deliveryPrice: Number(cheapestRates.reduce((sum, rate) => sum + rate!.rate, 0).toFixed(2)),
+        currency: currencies[0],
+        shipmentCount: results.length,
+        rateIds: cheapestRates.map((rate) => rate!.id),
+        etaText: this.printfulEta(cheapestRates),
+      },
+    };
+  }
+
   async removeCartItem(customerId: string, itemId: string) {
     const cart = await this.ensureCart(customerId);
     const item = await this.prisma.cartItem.findUnique({ where: { id: itemId } });
@@ -239,6 +315,8 @@ export class OrdersService {
     const items = await this.getCheckoutCartItems(cart.id);
     if (!items.length) throw new ForbiddenException("Cart is empty");
     await this.assertFilmCheckoutAllowed(customerId, items);
+    const hasPrintfulItems = items.some((item) => (item.listing?.marketplacePublications?.length ?? 0) > 0);
+    if (hasPrintfulItems) this.assertPrintfulDeliveryAddress(dto);
 
     for (const item of items) {
       if (!item.listing && item.itemKind !== FilmOrderKind.CUSTOM_FILM && item.itemKind !== FilmOrderKind.GANG_SHEET_FILM) throw new ForbiddenException("Cart item is missing listing");
@@ -252,11 +330,22 @@ export class OrdersService {
     }
 
     const subtotal = items.reduce((sum, item) => sum + Number(item.unitPrice) * item.quantity, 0);
-    const { deliveryFee, resolvedDeliveryType, resolvedDeliveryZone, setting } = await this.resolveDeliveryFee(
+    let { deliveryFee, resolvedDeliveryType, resolvedDeliveryZone, setting } = await this.resolveDeliveryFee(
       subtotal,
       dto.deliveryType,
       dto.deliveryZone,
     );
+    if (hasPrintfulItems && dto.deliveryAddressDetails) {
+      const printfulRates = await this.printfulShippingRates(customerId, { deliveryAddressDetails: dto.deliveryAddressDetails });
+      if (!printfulRates.summary) throw new BadRequestException("No Printful shipping method is available for this address");
+      if (printfulRates.summary.currency !== currency) {
+        throw new BadRequestException(`Printful shipping currency ${printfulRates.summary.currency} does not match cart currency ${currency}`);
+      }
+      deliveryFee = printfulRates.summary.deliveryPrice;
+      resolvedDeliveryType = "PRINTFUL";
+      resolvedDeliveryZone = dto.deliveryAddressDetails.countryCode.toUpperCase();
+      setting = null;
+    }
     const discountTotal = 0;
     const total = subtotal + deliveryFee - discountTotal;
     if (total <= 0) throw new BadRequestException("Order total is invalid");
@@ -267,7 +356,7 @@ export class OrdersService {
         customerName: dto.customerName.trim(),
         customerPhone: dto.customerPhone.trim(),
         customerEmail: dto.customerEmail?.trim(),
-        deliveryAddress: dto.deliveryAddress?.trim(),
+        deliveryAddress: dto.deliveryAddressDetails?.address1.trim() ?? dto.deliveryAddress?.trim(),
         pickupLocation: dto.pickupLocation?.trim(),
         customerNote: dto.customerNote?.trim(),
         subtotal,
@@ -280,7 +369,23 @@ export class OrdersService {
         notes: dto.notes,
         status: OrderStatus.PENDING_PAYMENT,
         pricingSnapshotJson: this.cleanJson({ subtotal, deliveryFee, discountTotal, total, currency, paymentMethod: dto.paymentMethod ?? "CLICK" }),
-        deliverySnapshotJson: this.cleanJson({ requestedType: dto.deliveryType, resolvedType: resolvedDeliveryType, zone: resolvedDeliveryZone, setting }),
+        deliverySnapshotJson: this.cleanJson({
+          requestedType: dto.deliveryType,
+          resolvedType: resolvedDeliveryType,
+          zone: resolvedDeliveryZone,
+          setting,
+          recipient: dto.deliveryAddressDetails ? {
+            name: dto.customerName.trim(),
+            address1: dto.deliveryAddressDetails.address1.trim(),
+            address2: dto.deliveryAddressDetails.address2?.trim(),
+            city: dto.deliveryAddressDetails.city.trim(),
+            stateCode: dto.deliveryAddressDetails.stateCode?.trim(),
+            countryCode: dto.deliveryAddressDetails.countryCode.trim().toUpperCase(),
+            postalCode: dto.deliveryAddressDetails.postalCode.trim(),
+            phone: dto.customerPhone.trim(),
+            email: dto.customerEmail?.trim(),
+          } : undefined,
+        }),
       },
     });
 
@@ -485,7 +590,8 @@ export class OrdersService {
       });
       const sourcePlacementId = this.sourcePlacementIdFrom(item.placementSnapshotJson);
       const isFilmItem = item.itemKind === FilmOrderKind.DESIGN_FILM || item.itemKind === FilmOrderKind.CUSTOM_FILM || item.itemKind === FilmOrderKind.GANG_SHEET_FILM;
-      const isProviderItem = item.fulfillmentRoute === OrderFulfillmentRoute.GLOBAL_POD_PROVIDER && Boolean(item.providerSyncRecordId);
+      const isProviderItem = item.fulfillmentRoute === OrderFulfillmentRoute.GLOBAL_POD_PROVIDER
+        && (Boolean(item.providerSyncRecordId) || (item.providerType === PodProviderType.PRINTFUL && Boolean(item.providerVariantId)));
       const filmSourceReady = isFilmItem && Boolean(item.filmSourceAssetId || item.designVersionId || item.gangSheetId);
       const productionFileStatus = isProviderItem ? "PROVIDER_SYNC_READY" : item.productionFileAssetId ? "READY" : isFilmItem && filmSourceReady ? "SOURCE_READY" : sourcePlacementId ? "REQUESTED" : "MISSING_SOURCE";
       const productionStatus = item.productionFileAssetId
@@ -597,6 +703,23 @@ export class OrdersService {
       createdOrExisting.push(job);
     }
 
+    if (this.jobs) {
+      const printfulStoreIds = [...new Set(createdOrExisting
+        .filter((job) => job.providerType === PodProviderType.PRINTFUL)
+        .map((job) => this.stringFrom(this.objectJson(job.providerPayloadSnapshotJson).providerStoreId))
+        .filter((storeId): storeId is string => Boolean(storeId)))];
+      for (const storeId of printfulStoreIds) {
+        const enqueued = await this.jobs.enqueue("SUBMIT_PRINTFUL_ORDER", { orderId: order.id, storeId });
+        await this.audit.log({
+          actorId,
+          action: "printful.order.submission-queued",
+          entityType: "Order",
+          entityId: order.id,
+          metadata: { storeId, workerJobId: enqueued.jobId },
+        });
+      }
+    }
+
     if (createdOrExisting.length > 0 && order.status === OrderStatus.PAID) {
       await this.prisma.order.update({ where: { id: order.id }, data: { status: OrderStatus.IN_PRODUCTION } });
       await this.audit.log({
@@ -646,12 +769,26 @@ export class OrdersService {
     if (method !== "CLICK") throw new BadRequestException("Unsupported payment method");
   }
 
+  private assertPrintfulDeliveryAddress(dto: CreateOrderDto) {
+    const address = dto.deliveryAddressDetails;
+    if (!address) throw new BadRequestException("A structured delivery address is required for Printful products");
+    if (!address.address1?.trim() || !address.city?.trim() || !address.countryCode?.trim() || !address.postalCode?.trim()) {
+      throw new BadRequestException("Address, city, country, and postal code are required for Printful delivery");
+    }
+    if (dto.pickupLocation?.trim()) throw new BadRequestException("Printful products require delivery and cannot use workshop pickup");
+  }
+
   private assertListingPurchasable(listing: CheckoutListing) {
     const reasons: string[] = [];
     if (listing.status !== ListingStatus.PUBLISHED) reasons.push("Listing is not published");
     if (Number(listing.price) <= 0) reasons.push("Listing price is missing or invalid");
     if (listing.type === ListingType.PRODUCT) {
-      if (!listing.localBaseProductId || !listing.localBaseProduct) reasons.push("Listing is missing base product");
+      if (listing.pipeline === "GLOBAL_PRINTFUL") {
+        if (!listing.printfulProductTemplateId || !listing.printfulProductTemplate) reasons.push("Listing is missing Printful product template");
+        if (!listing.marketplacePublications?.length) reasons.push("Listing is not published to a Printful store");
+      } else if (!listing.localBaseProductId || !listing.localBaseProduct) {
+        reasons.push("Listing is missing base product");
+      }
       if (!listing.designAssetId || !listing.designAsset) reasons.push("Listing is missing design");
       if (!listing.designProductSelectionId || !listing.designProductSelection) reasons.push("Listing is missing placement snapshot");
       const readyMockups = this.readyMockups(listing);
@@ -693,7 +830,8 @@ export class OrdersService {
     }) ?? baseProduct?.mockupTemplates[0]?.printAreas[0] ?? null;
     const metadata = this.objectJson(listing.metadataJson);
     const providerSyncRecord = listing.podSyncRecords[0];
-    const fulfillmentRoute = providerSyncRecord ? OrderFulfillmentRoute.GLOBAL_POD_PROVIDER : OrderFulfillmentRoute.LOCAL_PRODUCTION;
+    const printfulVariant = this.resolvePrintfulVariant(listing, item.selectedSize, item.selectedColor);
+    const fulfillmentRoute = providerSyncRecord || printfulVariant ? OrderFulfillmentRoute.GLOBAL_POD_PROVIDER : OrderFulfillmentRoute.LOCAL_PRODUCTION;
     const royaltyRuleSnapshot = {
       royaltyRuleId: metadata.royaltyRuleId ?? null,
       basis: metadata.royaltyBasis ?? null,
@@ -779,12 +917,20 @@ export class OrdersService {
       }),
       fulfillmentRoute,
       providerSyncRecordId: providerSyncRecord?.id,
-      providerType: providerSyncRecord?.provider,
-      providerProductId: providerSyncRecord?.providerProductId,
-      providerVariantId: providerSyncRecord?.providerVariantId,
+      providerType: printfulVariant ? PodProviderType.PRINTFUL : providerSyncRecord?.provider,
+      providerProductId: printfulVariant?.syncProductId ?? providerSyncRecord?.providerProductId,
+      providerVariantId: printfulVariant?.syncVariantId ?? providerSyncRecord?.providerVariantId,
       providerFileId: providerSyncRecord?.providerFileId,
       providerPlacementPayloadSnapshot: this.cleanJson(providerSyncRecord?.providerPlacementPayloadSnapshotJson ?? null),
-      providerFulfillmentSnapshot: this.cleanJson(providerSyncRecord ? {
+      providerFulfillmentSnapshot: this.cleanJson(printfulVariant ? {
+        provider: PodProviderType.PRINTFUL,
+        providerStoreId: printfulVariant.storeId,
+        providerSyncProductId: printfulVariant.syncProductId,
+        providerSyncVariantId: printfulVariant.syncVariantId,
+        catalogVariantId: printfulVariant.catalogVariantId,
+        publicationId: printfulVariant.publicationId,
+        liveOrderSubmission: true,
+      } : providerSyncRecord ? {
         providerSyncRecordId: providerSyncRecord.id,
         provider: providerSyncRecord.provider,
         mode: providerSyncRecord.mode,
@@ -919,6 +1065,60 @@ export class OrdersService {
       productionCostEstimate: this.numberFrom(pricing.productionCostEstimate),
       filmProductionSnapshot,
     };
+  }
+
+  private resolvePrintfulVariant(listing: CheckoutListing, selectedSize?: string | null, selectedColor?: string | null) {
+    const publications = listing.marketplacePublications ?? [];
+    if (!publications.length) return null;
+    const defaultStoreId = process.env.PRINTFUL_STORE_ID;
+    const publication = publications.find((candidate) => candidate.providerStoreId === defaultStoreId) ?? publications[0];
+    const metadata = this.objectJson(publication.metadataJson);
+    const selections = Array.isArray(metadata.variantSelections)
+      ? metadata.variantSelections.map((item) => this.objectJson(item))
+      : [];
+    if (!selections.length) throw new ForbiddenException("Printful variant configuration is missing");
+
+    const normalizedSize = selectedSize?.trim().toLocaleLowerCase();
+    const normalizedColor = selectedColor?.trim().toLocaleLowerCase();
+    if (!normalizedSize || !normalizedColor) {
+      throw new BadRequestException("Size and color are required for this Printful product");
+    }
+    const selected = selections.find((variant) =>
+      String(variant.size ?? "").trim().toLocaleLowerCase() === normalizedSize
+      && String(variant.color ?? "").trim().toLocaleLowerCase() === normalizedColor,
+    );
+    if (!selected) throw new BadRequestException("The selected size and color combination is unavailable");
+    if (selected.inStock === false) throw new BadRequestException("The selected Printful variant is out of stock");
+
+    const catalogVariantId = String(selected.id ?? "");
+    const syncVariants = Array.isArray(metadata.syncVariants)
+      ? metadata.syncVariants.map((item) => this.objectJson(item))
+      : [];
+    const syncVariant = syncVariants.find((variant) =>
+      String(variant.variant_id ?? variant.catalog_variant_id ?? "") === catalogVariantId,
+    );
+    const rawSyncVariantId = syncVariant?.id ?? syncVariant?.sync_variant_id;
+    const syncVariantId = rawSyncVariantId == null ? undefined : String(rawSyncVariantId);
+    const syncProductId = publication.providerSyncProductId ?? this.stringFrom(metadata.printfulSyncProductId);
+    if (!syncVariantId || !syncProductId || !publication.providerStoreId) {
+      throw new ForbiddenException("Printful fulfillment mapping is incomplete");
+    }
+    return {
+      publicationId: publication.id,
+      storeId: publication.providerStoreId,
+      catalogVariantId,
+      syncVariantId,
+      syncProductId,
+    };
+  }
+
+  private printfulEta(rates: Array<{ minDeliveryDays: unknown; maxDeliveryDays: unknown }>) {
+    const minimums = rates.map((rate) => Number(rate.minDeliveryDays)).filter(Number.isFinite);
+    const maximums = rates.map((rate) => Number(rate.maxDeliveryDays)).filter(Number.isFinite);
+    if (!minimums.length && !maximums.length) return null;
+    const min = minimums.length ? Math.min(...minimums) : Math.min(...maximums);
+    const max = maximums.length ? Math.max(...maximums) : Math.max(...minimums);
+    return `${min}-${max} business days`;
   }
 
   private marginEstimate(listing: CheckoutListing, quantity: number) {

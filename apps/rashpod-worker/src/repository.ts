@@ -73,7 +73,9 @@ export type MarketplacePublicationStatus = "NOT_SELECTED" | "DRAFT" | "QUEUED" |
 export interface MarketplacePublicationRecord {
   id: string;
   marketplace: string;
+  publicationKey?: string;
   provider: "RASHPOD" | "PRINTFUL" | "PRINTIFY" | "DIRECT_MARKETPLACE";
+  providerStoreId?: string | null;
   status: MarketplacePublicationStatus;
   providerSyncProductId?: string | null;
   providerExternalListingId?: string | null;
@@ -129,6 +131,20 @@ export interface ProductionJobRecord {
   notes?: string | null;
 }
 
+export interface PrintfulFulfillmentOrderContext {
+  orderId: string;
+  storeId: string;
+  currency: string;
+  existingProviderOrderId?: string | null;
+  recipient: Record<string, unknown>;
+  jobs: Array<{
+    id: string;
+    quantity: number;
+    providerVariantId: string;
+    retailPrice: string;
+  }>;
+}
+
 export interface AiJobRecord {
   id: string;
   workflow: string;
@@ -165,6 +181,17 @@ export interface WorkerRepository {
     id: string,
     data: { productionFileStatus?: string | null; productionFileObjectKey?: string | null; productionFileUrl?: string | null; status?: string; failureReason?: string | null },
   ): Promise<ProductionJobRecord>;
+  getPrintfulFulfillmentOrderContext?(orderId: string, storeId: string): Promise<PrintfulFulfillmentOrderContext | null>;
+  updatePrintfulFulfillmentJobs?(
+    jobIds: string[],
+    data: {
+      providerOrderId?: string | null;
+      providerStatus?: string | null;
+      status?: string;
+      failureReason?: string | null;
+      providerResponse?: unknown;
+    },
+  ): Promise<void>;
   getPipelineSelection?(id: string): Promise<PipelineSelectionRecord | null>;
   updatePipelineSelection?(id: string, data: { status?: PipelineSelectionStatus; errorMessage?: string | null }): Promise<PipelineSelectionRecord>;
   listMockupAssets?(selectionId: string): Promise<MockupAssetRecord[]>;

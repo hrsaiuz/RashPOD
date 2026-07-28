@@ -9,6 +9,7 @@ import { PipelineMockupJobHandler } from "./jobs/pipeline-mockup-handler";
 import { PodSyncJobHandler } from "./jobs/pod-sync-handler";
 import { PrintfulCatalogSyncJobHandler } from "./jobs/printful-catalog-sync-handler";
 import { PrintfulMockupPollJobHandler } from "./jobs/printful-mockup-poll-handler";
+import { PrintfulOrderJobHandler } from "./jobs/printful-order-handler";
 import { WorkerLogger, workerLogger } from "./logger";
 
 export class WorkerDispatcher {
@@ -17,6 +18,7 @@ export class WorkerDispatcher {
   private readonly marketplacePublicationHandler: MarketplacePublicationJobHandler;
   private readonly printfulCatalogSyncHandler: PrintfulCatalogSyncJobHandler;
   private readonly printfulMockupPollHandler: PrintfulMockupPollJobHandler;
+  private readonly printfulOrderHandler: PrintfulOrderJobHandler;
   private readonly podSyncHandler: PodSyncJobHandler;
   private readonly emailHandler: EmailJobHandler;
   private readonly telegramHandler: TelegramJobHandler;
@@ -29,6 +31,7 @@ export class WorkerDispatcher {
     this.marketplacePublicationHandler = new MarketplacePublicationJobHandler(repo);
     this.printfulCatalogSyncHandler = new PrintfulCatalogSyncJobHandler(repo);
     this.printfulMockupPollHandler = new PrintfulMockupPollJobHandler(repo);
+    this.printfulOrderHandler = new PrintfulOrderJobHandler(repo);
     this.podSyncHandler = new PodSyncJobHandler();
     this.emailHandler = new EmailJobHandler(emailSender, repo);
     this.telegramHandler = new TelegramJobHandler(repo);
@@ -55,7 +58,9 @@ export class WorkerDispatcher {
       case "POLL_PRINTFUL_MOCKUP_TASK":
         return this.printfulMockupPollHandler.handlePoll(job.payload as { mockupAssetId: string; taskKey: string; designProductSelectionId: string; attempt?: number });
       case "PUBLISH_MARKETPLACE_LISTING":
-        return this.marketplacePublicationHandler.handlePublish(job.payload as { marketplacePublicationId: string });
+        return this.marketplacePublicationHandler.handlePublish(job.payload as { marketplacePublicationId: string; publicationVersion?: string });
+      case "SUBMIT_PRINTFUL_ORDER":
+        return this.printfulOrderHandler.handleSubmit(job.payload as { orderId: string; storeId: string });
       case "SYNC_PRINTFUL_CATALOG":
         return this.printfulCatalogSyncHandler.handleSync(job.payload as { requestedBy?: string });
       case "SYNC_POD_CATALOG":

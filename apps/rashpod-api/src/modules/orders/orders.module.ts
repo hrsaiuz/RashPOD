@@ -2,11 +2,12 @@ import { Module } from "@nestjs/common";
 import { AuditModule } from "../audit/audit.module";
 import { FinanceModule } from "../finance/finance.module";
 import { WorkerJobsModule } from "../worker-jobs/worker-jobs.module";
+import { PrintfulModule } from "../printful/printful.module";
 import { OrdersController } from "./orders.controller";
 import { OrdersService } from "./orders.service";
 
 @Module({
-  imports: [AuditModule, WorkerJobsModule, FinanceModule],
+  imports: [AuditModule, WorkerJobsModule, FinanceModule, PrintfulModule],
   controllers: [OrdersController],
   providers: [OrdersService],
   exports: [OrdersService],

@@ -28,6 +28,7 @@ Production secrets must be injected from Secret Manager or the existing Cloud Ru
 | `PRINTFUL_API_TOKEN` | `PRINTFUL_API_TOKEN` | API, worker | Required only when global POD is enabled. |
 | `PRINTIFY_API_TOKEN` | `PRINTIFY_API_TOKEN` | API, worker | Required only when global POD is enabled. |
 | `PRINTFUL_WEBHOOK_SECRET` | `PRINTFUL_WEBHOOK_SECRET` | API | Required before enabling live webhooks. |
+| `PRINTFUL_WEBHOOK_SECRETS_JSON` | `PRINTFUL_WEBHOOK_SECRETS_JSON` | API | Preferred for multiple stores; JSON maps each webhook `public_key` to its hexadecimal `secret_key`. |
 | `PRINTIFY_WEBHOOK_SECRET` | `PRINTIFY_WEBHOOK_SECRET` | API | Required before enabling live webhooks. |
 | `WORKER_SECRET` | `WORKER_SECRET` | API, worker | Required when moving from DB polling to authenticated task dispatch. |
 
