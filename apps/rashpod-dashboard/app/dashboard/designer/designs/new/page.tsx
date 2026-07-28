@@ -239,6 +239,11 @@ export default function NewDesignPage() {
               designId={createdId}
               designTitle={title}
               onStatusChange={handleStoryStatusChange}
+              onReviewRequested={() => {
+                setStorySubmittedForReview(true);
+                setSubmittedForReview(true);
+              }}
+              reviewScope="design-and-story"
             />
             <Card>
             <div className="flex flex-col items-center text-center py-6">
@@ -248,7 +253,7 @@ export default function NewDesignPage() {
                 {submittedForReview ? (
                   <>Your design is now <strong>pending moderation</strong>. A submitted story will be reviewed alongside it.</>
                 ) : (
-                  <>The artwork is saved as a <strong>Draft</strong>. Finish the story above, submit it for approval, then send the design.</>
+                  <>The artwork is saved as a <strong>Draft</strong>. Finish the story above, then submit both items in one moderation request.</>
                 )}
               </p>
               {error ? <div className="mb-4 w-full"><ErrorState title="Submit failed" description={error} /></div> : null}
@@ -260,7 +265,7 @@ export default function NewDesignPage() {
                     disabled={!storySubmittedForReview}
                     onClick={() => void submitForModeration()}
                   >
-                    <Send size={16} /> Submit for moderation
+                    <Send size={16} /> Retry design submission
                   </Button>
                 ) : null}
                 <Link href={`/dashboard/designer/designs/${createdId}`}>
@@ -272,7 +277,7 @@ export default function NewDesignPage() {
               </div>
               {!submittedForReview && !storySubmittedForReview ? (
                 <p className="mt-3 text-sm text-brand-muted">
-                  Submit the story for approval above to unlock the combined moderation request.
+                  Complete the story above to submit the design and story together.
                 </p>
               ) : null}
             </div>

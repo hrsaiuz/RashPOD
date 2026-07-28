@@ -168,7 +168,7 @@ export class SelfServiceController {
   }
 
   @Post("designer/designs/:id/story/request-publish")
-  @RequirePermission("designer:designs-read-own")
+  @RequirePermission("design:submit-own")
   requestDesignerDesignStoryPublish(@CurrentUser() user: RequestUser, @Param("id") id: string) {
     return this.designStories.requestPublish(user.sub, id);
   }

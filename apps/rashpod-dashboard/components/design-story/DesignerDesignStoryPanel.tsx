@@ -47,6 +47,8 @@ type Props = {
   designTitle: string;
   storySummary?: { status?: string | null } | null;
   onStatusChange?: (status: string | null) => void;
+  onReviewRequested?: () => void;
+  reviewScope?: "story" | "design-and-story";
 };
 
 type WizardStep = 1 | 2 | 3 | 4;
@@ -66,7 +68,13 @@ const STEPS: Array<{ step: WizardStep; label: string; hint: string }> = [
   { step: 4, label: "Media & submit", hint: "Add media and request review" },
 ];
 
-export function DesignerDesignStoryPanel({ designId, designTitle, onStatusChange }: Props) {
+export function DesignerDesignStoryPanel({
+  designId,
+  designTitle,
+  onStatusChange,
+  onReviewRequested,
+  reviewScope = "story",
+}: Props) {
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -299,11 +307,20 @@ export function DesignerDesignStoryPanel({ designId, designTitle, onStatusChange
       await persistDraft();
       const next = await api.post<DesignStoryDetail>(`/designer/designs/${designId}/story/request-publish`);
       setPayload((current) => current ? { ...current, story: next } : null);
-      setMessage("Story submitted for approval. AI translations remain drafts until a human approves publication.");
+      onReviewRequested?.();
+      setMessage(
+        reviewScope === "design-and-story"
+          ? "Design and story submitted for moderation. AI translations remain drafts until a human approves publication."
+          : "Story submitted for approval. AI translations remain drafts until a human approves publication.",
+      );
       toast({
         tone: "success",
-        title: "Story sent for approval",
-        description: "A moderator will review all three language versions.",
+        title: reviewScope === "design-and-story"
+          ? "Design and story sent for moderation"
+          : "Story sent for approval",
+        description: reviewScope === "design-and-story"
+          ? "A moderator can now review the artwork and all three story versions."
+          : "A moderator will review all three language versions.",
       });
     } catch (err) {
       const nextError = err instanceof Error ? err.message : "Failed to request publish";
@@ -714,7 +731,9 @@ export function DesignerDesignStoryPanel({ designId, designTitle, onStatusChange
                 <Button variant="ghost" onClick={() => setStep(3)}>Back</Button>
                 <Button onClick={requestPublish} loading={requesting} disabled={publishDisabled}>
                   <Send size={16} />
-                  Request human approval
+                  {reviewScope === "design-and-story"
+                    ? "Submit design & story for moderation"
+                    : "Request human approval"}
                 </Button>
               </div>
             </section>

@@ -204,6 +204,20 @@ export class DesignStoriesService {
     const story = await this.prisma.designStory.findUnique({ where: { designAssetId: designId } });
     if (!story) throw new NotFoundException("Story draft not found");
     if (!story.slug || !story.title) throw new BadRequestException("Story title and slug are required.");
+    if (design.versions.length === 0) {
+      throw new BadRequestException(
+        "Upload a verified design file before submitting the design and story for moderation.",
+      );
+    }
+    const blockedSubmissionStatuses: DesignStatus[] = [
+      DesignStatus.REJECTED,
+      DesignStatus.SUSPENDED,
+    ];
+    if (blockedSubmissionStatuses.includes(design.status)) {
+      throw new BadRequestException(
+        "This design cannot be submitted from its current status. Contact support if you need help.",
+      );
+    }
 
     const sourceLocale = this.normalizeLocale(story.sourceLocale);
     const titleTranslations = this.jsonToLocalizedStringMap(story.titleTranslationsJson);
@@ -227,23 +241,58 @@ export class DesignStoriesService {
       );
     }
 
-    const updated = await this.prisma.designStory.update({
-      where: { id: story.id },
-      data: {
-        status: DesignStoryStatus.PENDING_REVIEW,
-        requestedPublishAt: new Date(),
-        reviewNotes: null,
-        titleTranslationsJson: titleTranslations as Prisma.InputJsonValue,
-        bodyTranslationsJson: bodyTranslations as Prisma.InputJsonValue,
-      },
+    const requestedAt = new Date();
+    const { updated, submittedDesignCount } = await this.prisma.$transaction(async (tx) => {
+      const updatedStory = await tx.designStory.update({
+        where: { id: story.id },
+        data: {
+          status: DesignStoryStatus.PENDING_REVIEW,
+          requestedPublishAt: requestedAt,
+          reviewNotes: null,
+          titleTranslationsJson: titleTranslations as Prisma.InputJsonValue,
+          bodyTranslationsJson: bodyTranslations as Prisma.InputJsonValue,
+        },
+      });
+      const designSubmission = await tx.designAsset.updateMany({
+        where: {
+          id: designId,
+          designerId: userId,
+          status: { in: [DesignStatus.DRAFT, DesignStatus.NEEDS_FIX] },
+        },
+        data: {
+          status: DesignStatus.PENDING_MODERATION,
+          moderationStatus: "PENDING",
+        },
+      });
+      return {
+        updated: updatedStory,
+        submittedDesignCount: designSubmission.count,
+      };
     });
     await this.audit.log({
       actorId: userId,
       action: "design-story.publish.requested",
       entityType: "DesignStory",
       entityId: story.id,
-      metadata: { designAssetId: designId, sourceLocale },
+      metadata: {
+        designAssetId: designId,
+        sourceLocale,
+        designSubmittedForModeration: submittedDesignCount > 0,
+      },
     });
+    if (submittedDesignCount > 0) {
+      await this.audit.log({
+        actorId: userId,
+        action: "design.submit",
+        entityType: "DesignAsset",
+        entityId: designId,
+        metadata: {
+          from: design.status,
+          to: DesignStatus.PENDING_MODERATION,
+          source: "design-story.publish.requested",
+        },
+      });
+    }
     return this.toDesignerStoryDto(updated);
   }
 
@@ -544,7 +593,10 @@ export class DesignStoriesService {
   private async requireOwnedDesign(userId: string, designId: string) {
     const design = await this.prisma.designAsset.findFirst({
       where: { id: designId, designerId: userId },
-      include: { listings: { orderBy: { createdAt: "desc" } } },
+      include: {
+        listings: { orderBy: { createdAt: "desc" } },
+        versions: { orderBy: { createdAt: "desc" }, take: 1 },
+      },
     });
     if (!design) throw new ForbiddenException("Design not found or not owned by you.");
     return design;

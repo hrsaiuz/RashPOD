@@ -188,11 +188,96 @@ describe("DesignStoriesService publication validation", () => {
     );
     jest
       .spyOn(service as any, "requireOwnedDesign")
-      .mockResolvedValue({} as never);
+      .mockResolvedValue({
+        status: "DRAFT",
+        versions: [{ id: "version-1" }],
+      } as never);
 
     await expect(
       service.requestPublish("designer-1", "design-1"),
     ).rejects.toBeInstanceOf(BadRequestException);
     expect(prisma.designStory.update).not.toHaveBeenCalled();
+  });
+
+  it("submits the design and story together for moderation", async () => {
+    const fingerprint = storySourceFingerprint(
+      "uz",
+      "Yangi sarlavha",
+      "Yangi hikoya",
+    );
+    const story = {
+      id: "story-1",
+      designAssetId: "design-1",
+      title: "Yangi sarlavha",
+      slug: "yangi-hikoya",
+      sourceLocale: "uz",
+      titleTranslationsJson: {
+        uz: "Yangi sarlavha",
+        ru: "Новый заголовок",
+        en: "New title",
+      },
+      bodyTranslationsJson: {
+        uz: "Yangi hikoya",
+        ru: "Новая история",
+        en: "New story",
+      },
+      translationMetaJson: {
+        translationsSourceFingerprint: fingerprint,
+      },
+    };
+    const prisma: any = {
+      designStory: {
+        findUnique: jest.fn().mockResolvedValue(story),
+        update: jest.fn().mockImplementation(({ data }) => ({
+          ...story,
+          ...data,
+        })),
+      },
+      designAsset: {
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      },
+    };
+    prisma.$transaction = jest.fn(async (operation: (tx: typeof prisma) => unknown) =>
+      operation(prisma),
+    );
+    const audit = { log: jest.fn().mockResolvedValue(undefined) };
+    const service = new DesignStoriesService(
+      prisma as never,
+      audit as never,
+      {} as never,
+    );
+    jest
+      .spyOn(service as any, "requireOwnedDesign")
+      .mockResolvedValue({
+        status: "DRAFT",
+        versions: [{ id: "version-1" }],
+      } as never);
+    jest
+      .spyOn(service as any, "toDesignerStoryDto")
+      .mockResolvedValue({ status: "PENDING_REVIEW" } as never);
+
+    await service.requestPublish("designer-1", "design-1");
+
+    expect(prisma.designAsset.updateMany).toHaveBeenCalledWith({
+      where: {
+        id: "design-1",
+        designerId: "designer-1",
+        status: { in: ["DRAFT", "NEEDS_FIX"] },
+      },
+      data: {
+        status: "PENDING_MODERATION",
+        moderationStatus: "PENDING",
+      },
+    });
+    expect(audit.log).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: "design.submit",
+        entityId: "design-1",
+        metadata: expect.objectContaining({
+          source: "design-story.publish.requested",
+          to: "PENDING_MODERATION",
+        }),
+      }),
+    );
   });
 });
