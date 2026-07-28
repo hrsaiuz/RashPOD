@@ -7,6 +7,7 @@ function createService(overrides?: { prisma?: Record<string, unknown> }) {
     designAsset: {
       findMany: jest.fn().mockResolvedValue([]),
       findUnique: jest.fn(),
+      count: jest.fn().mockResolvedValue(0),
     },
     aiJob: {
       findMany: jest.fn().mockResolvedValue([]),
@@ -19,6 +20,7 @@ function createService(overrides?: { prisma?: Record<string, unknown> }) {
   const service = new DesignWorkflowService(
     prisma as any,
     { log: jest.fn() } as any,
+    { syncWithDesignDecision: jest.fn().mockResolvedValue(null) } as any,
     {} as any,
     {} as any,
     {} as any,

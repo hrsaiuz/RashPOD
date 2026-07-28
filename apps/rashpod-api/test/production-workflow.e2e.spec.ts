@@ -54,9 +54,10 @@ describe("Production workflow e2e", () => {
         passed: true,
         note: "approved",
         checklist: { printQuality: true, sizeAccuracy: true, placementAccuracy: true, packagingReady: true },
-      });
+    });
     expect(qc.status).toBe(201);
-    expect(qc.body.status).toBe("PACKING");
-    expect(qc.body.notes).toContain("[QC] result=PASS");
+    expect(qc.body.status).toBe("READY_FOR_DELIVERY");
+    expect(qc.body.qcStatus).toBe("PASSED");
+    expect(qc.body.qcNote).toBe("approved");
   });
 });

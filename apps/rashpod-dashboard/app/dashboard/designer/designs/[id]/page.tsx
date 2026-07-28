@@ -139,7 +139,7 @@ export default function DesignDetailPage() {
     }
   }
 
-  const canSubmit = design && (design.status === "DRAFT" || design.status === "NEEDS_FIX");
+  const canSubmit = design && (design.status === "DRAFT" || design.status === "NEEDS_FIX" || design.status === "REJECTED");
   const latestVersion = design?.versions?.[0];
 
   return (

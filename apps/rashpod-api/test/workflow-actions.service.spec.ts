@@ -12,6 +12,7 @@ function createService(prismaOverrides: any = {}) {
     ...prismaOverrides,
   };
   const audit = { log: jest.fn() } as any;
+  const designStories = { syncWithDesignDecision: jest.fn().mockResolvedValue(null) } as any;
   const jobs = { enqueue: jest.fn().mockResolvedValue({ jobId: "job_1" }) } as any;
   const storage = {
     isCloudStorageConfigured: jest.fn().mockReturnValue(false),
@@ -19,7 +20,7 @@ function createService(prismaOverrides: any = {}) {
     createPublicSignedReadUrl: jest.fn(),
     createSignedReadUrl: jest.fn(),
   } as any;
-  return { service: new DesignWorkflowService(prisma, audit, jobs, new PlacementCalculationService(), new MarketplaceComplianceService(), storage, {} as any, {} as any, {} as any, {} as any), prisma, audit, jobs };
+  return { service: new DesignWorkflowService(prisma, audit, designStories, jobs, new PlacementCalculationService(), new MarketplaceComplianceService(), storage, {} as any, {} as any, {} as any, {} as any), prisma, audit, jobs };
 }
 
 describe("DesignWorkflowService workflow actions", () => {
@@ -47,6 +48,28 @@ describe("DesignWorkflowService workflow actions", () => {
 
     expect(prisma.designProductSelection.update).toHaveBeenCalledWith(expect.objectContaining({ where: { id: "sel_1" } }));
     expect(jobs.enqueue).toHaveBeenCalledWith("GENERATE_LOCAL_MOCKUPS", { designProductSelectionId: "sel_1" });
+  });
+
+  it("keeps a failed retry actionable when the queue write fails", async () => {
+    const update = jest.fn().mockResolvedValue({ id: "sel_1" });
+    const { service, prisma, jobs } = createService({
+      designProductSelection: {
+        findUnique: jest.fn().mockResolvedValue({ id: "sel_1", pipeline: "LOCAL" }),
+        update,
+      },
+      mockupAsset: { updateMany: jest.fn().mockResolvedValue({ count: 3 }) },
+    });
+    jobs.enqueue.mockRejectedValueOnce(new Error("queue unavailable"));
+
+    await expect(service.retryMockup("admin_1", "sel_1")).rejects.toThrow("MOCKUP_QUEUE_FAILED");
+
+    expect(prisma.designProductSelection.update).toHaveBeenLastCalledWith({
+      where: { id: "sel_1" },
+      data: {
+        status: "MOCKUP_FAILED",
+        errorMessage: "queue unavailable",
+      },
+    });
   });
 
   it("blocks publishing Amazon rows that were not held for review", async () => {

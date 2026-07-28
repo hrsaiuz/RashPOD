@@ -562,7 +562,10 @@ export default function Page() {
         toast({ tone: "success", title: "Design returned to designer", description: "The rejection reason was recorded in the audit log." });
         setWorkflowStep(1);
       } else {
-        toast({ tone: "success", title: "Design approved", description: "Mockup generation has started." });
+        const failedMockupQueue = next.productSelections?.some((selection) => selection.status === "MOCKUP_FAILED");
+        toast(failedMockupQueue
+          ? { tone: "info", title: "Design approved", description: "One or more mockup jobs could not be queued. Use Retry in workflow history." }
+          : { tone: "success", title: "Design approved", description: "Mockup generation has started." });
         setWorkflowStep(3);
       }
     } catch (e) {

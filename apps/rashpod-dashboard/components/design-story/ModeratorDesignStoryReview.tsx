@@ -27,7 +27,7 @@ export function ModeratorDesignStoryReview({
   useEffect(() => {
     void load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [designId]);
+  }, [designId, designStatus]);
 
   async function load() {
     setLoading(true);

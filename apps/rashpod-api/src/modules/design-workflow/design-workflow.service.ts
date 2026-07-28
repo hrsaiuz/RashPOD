@@ -20,6 +20,7 @@ import { presetToInitialPlacement, presetToInitialPrintfulPlacement, printAreaIn
 import { resolvePrintfulPrintArea, type PrintfulPrintAreasMap } from "@rashpod/printful";
 import { PrismaService } from "../../prisma/prisma.service";
 import { AuditService } from "../audit/audit.service";
+import { DesignStoriesService, type DesignStoryModerationSyncResult } from "../design-stories/design-stories.service";
 import { StorageService } from "../files/storage.service";
 import { JobDispatcherService } from "../worker-jobs/job-dispatcher.service";
 import { PrintfulFilesService } from "../printful/printful-files.service";
@@ -58,6 +59,7 @@ export class DesignWorkflowService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    private readonly designStories: DesignStoriesService,
     private readonly jobs: JobDispatcherService,
     private readonly placementCalculation: PlacementCalculationService,
     private readonly marketplaceCompliance: MarketplaceComplianceService,
@@ -477,7 +479,7 @@ export class DesignWorkflowService {
     const localSelections = dto.localSelections ?? [];
     const globalSelections = dto.globalPrintfulSelections ?? [];
 
-    const updated = await this.prisma.$transaction(async (tx) => {
+    const { updated, storyModeration } = await this.prisma.$transaction(async (tx) => {
       const row = await tx.designAsset.update({
         where: { id: design.id },
         data: {
@@ -517,16 +519,21 @@ export class DesignWorkflowService {
       for (const selection of globalSelections) {
         await this.createGlobalSelection(tx, moderator.sub, design.id, selection);
       }
-      return row;
+      const storyModeration = await this.designStories.syncWithDesignDecision(
+        tx,
+        moderator.sub,
+        design.id,
+        "APPROVE",
+        dto.moderatorNotes,
+      );
+      return { updated: row, storyModeration };
     });
 
     const pendingSelections = await this.prisma.designProductSelection.findMany({
       where: { designId: design.id, status: DesignProductSelectionStatus.MOCKUP_PENDING },
     });
     for (const selection of pendingSelections) {
-      await this.jobs.enqueue(selection.pipeline === PipelineType.LOCAL ? "GENERATE_LOCAL_MOCKUPS" : "GENERATE_PRINTFUL_MOCKUPS", {
-        designProductSelectionId: selection.id,
-      });
+      await this.enqueueMockupSelection(moderator.sub, selection);
     }
 
     await this.audit.log({
@@ -536,6 +543,7 @@ export class DesignWorkflowService {
       entityId: design.id,
       metadata: { from: design.status, to: afterStatus, localSelections: localSelections.length, globalSelections: globalSelections.length },
     });
+    await this.auditStoryModeration(moderator.sub, design.id, storyModeration);
 
     return this.moderationDetail(updated.id);
   }
@@ -551,11 +559,10 @@ export class DesignWorkflowService {
       where: { designProductSelectionId: selection.id },
       data: { status: MockupAssetStatus.PENDING, imageUrl: null, thumbnailUrl: null },
     });
-    const job = await this.jobs.enqueue(selection.pipeline === PipelineType.LOCAL ? "GENERATE_LOCAL_MOCKUPS" : "GENERATE_PRINTFUL_MOCKUPS", {
-      designProductSelectionId: selection.id,
-    });
+    const queued = await this.enqueueMockupSelection(actorId, selection);
+    if (!queued.job) throw new BadRequestException(`MOCKUP_QUEUE_FAILED: ${queued.error}`);
     await this.audit.log({ actorId, action: "design-product-selection.retry-mockup", entityType: "DesignProductSelection", entityId: selection.id });
-    return job;
+    return queued.job;
   }
 
   async publishListing(actorId: string, listingId: string) {
@@ -592,7 +599,7 @@ export class DesignWorkflowService {
 
   private async rejectDesign(moderator: { sub: string }, design: { id: string; status: DesignStatus }, dto: SubmitModerationDecisionDto) {
     const reasons = dto.rejectionReasons ?? [];
-    const updated = await this.prisma.$transaction(async (tx) => {
+    const { updated, storyModeration } = await this.prisma.$transaction(async (tx) => {
       const row = await tx.designAsset.update({
         where: { id: design.id },
         data: {
@@ -620,7 +627,14 @@ export class DesignWorkflowService {
       await tx.designModerationCase.create({
         data: { designAssetId: design.id, reviewerId: moderator.sub, decision: "REJECT", reason: dto.customRejectionReason ?? reasons.join(", ") },
       });
-      return row;
+      const storyModeration = await this.designStories.syncWithDesignDecision(
+        tx,
+        moderator.sub,
+        design.id,
+        "REJECT",
+        dto.moderatorNotes ?? dto.customRejectionReason ?? reasons.join(", "),
+      );
+      return { updated: row, storyModeration };
     });
 
     await this.audit.log({
@@ -630,7 +644,66 @@ export class DesignWorkflowService {
       entityId: design.id,
       metadata: { from: design.status, to: DesignStatus.REJECTED, reasons, customReason: dto.customRejectionReason },
     });
+    await this.auditStoryModeration(moderator.sub, design.id, storyModeration);
     return updated;
+  }
+
+  private async auditStoryModeration(
+    actorId: string,
+    designId: string,
+    result: DesignStoryModerationSyncResult | null,
+  ) {
+    if (!result) return;
+    await this.audit.log({
+      actorId,
+      action: result.action === "approved"
+        ? "design-story.publish.approved"
+        : result.action === "unpublished"
+          ? "design-story.unpublished"
+          : "design-story.publish.rejected",
+      entityType: "DesignStory",
+      entityId: result.storyId,
+      metadata: {
+        designAssetId: designId,
+        slug: result.slug,
+        synchronizedWithDesignDecision: true,
+        ...(result.notes ? { notes: result.notes } : {}),
+      },
+    });
+  }
+
+  private async enqueueMockupSelection(
+    actorId: string,
+    selection: { id: string; pipeline: PipelineType },
+  ): Promise<{ job: unknown | null; error: string | null }> {
+    try {
+      const job = await this.jobs.enqueue(
+        selection.pipeline === PipelineType.LOCAL ? "GENERATE_LOCAL_MOCKUPS" : "GENERATE_PRINTFUL_MOCKUPS",
+        { designProductSelectionId: selection.id },
+      );
+      return { job, error: null };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unable to queue mockup generation";
+      await this.prisma.designProductSelection.update({
+        where: { id: selection.id },
+        data: {
+          status: DesignProductSelectionStatus.MOCKUP_FAILED,
+          errorMessage: message,
+        },
+      });
+      try {
+        await this.audit.log({
+          actorId,
+          action: "design-product-selection.mockup-enqueue-failed",
+          entityType: "DesignProductSelection",
+          entityId: selection.id,
+          metadata: { error: message },
+        });
+      } catch {
+        // The selection is already retryable; an audit outage must not hide that recovery state.
+      }
+      return { job: null, error: message };
+    }
   }
 
   private async createLocalSelection(tx: Prisma.TransactionClient, moderatorId: string, designId: string, selection: LocalSelectionDto) {

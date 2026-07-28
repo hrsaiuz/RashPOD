@@ -141,6 +141,8 @@ export function createFakePrisma(): any {
   const productionJobs: ProductionJob[] = [];
   const platformSettings: PlatformSetting[] = [];
   const aiSettings: AiSetting[] = [];
+  const aiJobs: any[] = [];
+  const aiSuggestions: any[] = [];
   const emailTemplates: EmailTemplate[] = [];
   const userPreferences: UserPreferences[] = [];
   const audits: any[] = [];
@@ -237,7 +239,19 @@ export function createFakePrisma(): any {
         return record;
       },
       findMany: async ({ where }: any) => designs.filter((d) => !where?.designerId || d.designerId === where.designerId),
-      findUnique: async ({ where }: any) => designs.find((d) => d.id === where.id) ?? null,
+      findUnique: async ({ where, include }: any) => {
+        const row = designs.find((d) => d.id === where.id) ?? null;
+        if (!row || !include?.versions) return row;
+        const relatedVersions = versions
+          .filter((version) => version.designAssetId === row.id)
+          .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+        return {
+          ...row,
+          versions: typeof include.versions.take === "number"
+            ? relatedVersions.slice(0, include.versions.take)
+            : relatedVersions,
+        };
+      },
       update: async ({ where, data }: any) => {
         const row = designs.find((d) => d.id === where.id)!;
         Object.assign(row, data, { updatedAt: new Date() });
@@ -537,15 +551,20 @@ export function createFakePrisma(): any {
         productionJobs.push(row);
         return row;
       },
-      findUnique: async ({ where }: any) => productionJobs.find((p) => p.id === where.id) ?? null,
-      findMany: async ({ where, orderBy, take }: any = {}) => {
+      findUnique: async ({ where, include }: any) => {
+        const row = productionJobs.find((p) => p.id === where.id);
+        if (!row) return null;
+        return include ? productionJobWithRelations(row, orders, users) : row;
+      },
+      findMany: async ({ where, orderBy, take, include }: any = {}) => {
         let rows = [...productionJobs];
         if (where?.queueType) rows = rows.filter((p) => p.queueType === where.queueType);
         if (where?.orderId) rows = rows.filter((p) => p.orderId === where.orderId);
         if (where?.status) rows = rows.filter((p) => p.status === where.status);
         if (orderBy?.createdAt === "asc") rows.sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
         if (orderBy?.createdAt === "desc") rows.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
-        return typeof take === "number" ? rows.slice(0, take) : rows;
+        const selected = typeof take === "number" ? rows.slice(0, take) : rows;
+        return include ? selected.map((row) => productionJobWithRelations(row, orders, users)) : selected;
       },
       update: async ({ where, data }: any) => {
         const row = productionJobs.find((p) => p.id === where.id)!;
@@ -616,6 +635,55 @@ export function createFakePrisma(): any {
         return created;
       },
     },
+    aiJob: {
+      findUnique: async ({ where, include }: any) => {
+        const row = aiJobs.find((job) => job.id === where.id || (where.idempotencyKey && job.idempotencyKey === where.idempotencyKey));
+        if (!row) return null;
+        return include?.suggestions ? { ...row, suggestions: aiSuggestions.filter((suggestion) => suggestion.aiJobId === row.id) } : row;
+      },
+      findMany: async ({ where, include, orderBy, take }: any = {}) => {
+        let rows = aiJobs.filter((job) => {
+          if (where?.workflow && job.workflow !== where.workflow) return false;
+          if (where?.status && job.status !== where.status) return false;
+          if (where?.entityType && job.entityType !== where.entityType) return false;
+          if (where?.entityId && job.entityId !== where.entityId) return false;
+          return true;
+        });
+        if (orderBy?.createdAt === "desc") rows = rows.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+        if (typeof take === "number") rows = rows.slice(0, take);
+        return include?.suggestions ? rows.map((row) => ({ ...row, suggestions: aiSuggestions.filter((suggestion) => suggestion.aiJobId === row.id) })) : rows;
+      },
+      create: async ({ data, include }: any) => {
+        const now = new Date();
+        const row = { id: nextId("aij"), ...data, createdAt: now, updatedAt: now };
+        aiJobs.push(row);
+        return include?.suggestions ? { ...row, suggestions: [] } : row;
+      },
+      update: async ({ where, data, include }: any) => {
+        const row = aiJobs.find((job) => job.id === where.id)!;
+        Object.assign(row, data, { updatedAt: new Date() });
+        return include?.suggestions ? { ...row, suggestions: aiSuggestions.filter((suggestion) => suggestion.aiJobId === row.id) } : row;
+      },
+    },
+    aiSuggestion: {
+      findUnique: async ({ where, include }: any) => {
+        const row = aiSuggestions.find((suggestion) => suggestion.id === where.id);
+        if (!row) return null;
+        const aiJob = aiJobs.find((job) => job.id === row.aiJobId);
+        return include?.aiJob ? { ...row, aiJob } : row;
+      },
+      create: async ({ data }: any) => {
+        const now = new Date();
+        const row = { id: nextId("ais"), status: "PENDING", ...data, createdAt: now, updatedAt: now };
+        aiSuggestions.push(row);
+        return row;
+      },
+      update: async ({ where, data }: any) => {
+        const row = aiSuggestions.find((suggestion) => suggestion.id === where.id)!;
+        Object.assign(row, data, { updatedAt: new Date() });
+        return row;
+      },
+    },
     emailTemplate: {
       findMany: async ({ orderBy }: any = {}) => {
         const rows = [...emailTemplates];
@@ -654,7 +722,17 @@ export function createFakePrisma(): any {
         return row;
       },
     },
-    __state: { users, designs, files, versions, moderationCases, audits, productTypes, baseProducts, mockupTemplates, printAreas, mockupPlacements, generatedAssets, workerJobs, deliverySettings, orders, commerceListings, productionJobs, platformSettings, aiSettings, emailTemplates, userPreferences },
+    __state: { users, designs, files, versions, moderationCases, audits, productTypes, baseProducts, mockupTemplates, printAreas, mockupPlacements, generatedAssets, workerJobs, deliverySettings, orders, commerceListings, productionJobs, platformSettings, aiSettings, aiJobs, aiSuggestions, emailTemplates, userPreferences },
+  };
+}
+
+function productionJobWithRelations(row: ProductionJob, orders: Order[], users: User[]) {
+  const order = orders.find((item) => item.id === row.orderId);
+  const customer = order ? users.find((user) => user.id === order.customerId) ?? null : null;
+  return {
+    ...row,
+    order: order ? { ...order, customer, payments: [] } : null,
+    orderItem: null,
   };
 }
 

@@ -325,7 +325,11 @@ export class AiService {
 
   private async runOpenAiText(input: { workflow: AIWorkflow; actorId: string; user: string }) {
     const settings = await this.adminOps.getAiSettings();
-    const workflowSettings = this.adminOps.workflowSettings(settings, WORKFLOW_PERMISSION_LABELS[input.workflow]);
+    const workflowKey = WORKFLOW_PERMISSION_LABELS[input.workflow];
+    if (!this.adminOps.isWorkflowEnabled(settings, workflowKey)) {
+      throw new ForbiddenException(`AI workflow ${input.workflow} is disabled`);
+    }
+    const workflowSettings = this.adminOps.workflowSettings(settings, workflowKey);
     const estimatedUsd = 0.002;
     if (!(await this.adminOps.canSpendAi(estimatedUsd))) throw new ForbiddenException("AI budget exceeded");
     const apiKey = process.env.OPENAI_API_KEY;

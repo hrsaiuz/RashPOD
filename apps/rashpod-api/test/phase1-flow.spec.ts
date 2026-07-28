@@ -24,7 +24,9 @@ describe("Phase1 flow integration-style", () => {
     const storage = { createSignedReadUrl: jest.fn().mockResolvedValue("https://storage.example/preview.png") } as any;
     const designs = new DesignsService(prisma as any, audit, storage);
     const files = new FilesService(prisma as any, new StorageService());
-    const moderation = new ModerationService(prisma as any, audit);
+    prisma.$transaction = async (operation: (tx: typeof prisma) => unknown) => operation(prisma);
+    const designStories = { syncWithDesignDecision: jest.fn().mockResolvedValue(null) } as any;
+    const moderation = new ModerationService(prisma as any, audit, designStories);
 
     const { accessToken } = await auth.register({
       email: "designer-flow@test.local",
@@ -57,7 +59,7 @@ describe("Phase1 flow integration-style", () => {
     expect(version.designAssetId).toBe(design.id);
 
     const submitted = await designs.submit(user!.id, design.id);
-    expect(submitted.status).toBe("SUBMITTED");
+    expect(submitted.status).toBe("PENDING_MODERATION");
 
     const moderator = await prisma.user.create({
       data: {

@@ -17,6 +17,12 @@ import {
 type SupportedLocale = "uz" | "ru" | "en";
 type LocalizedStringMap = Partial<Record<SupportedLocale, string>>;
 type LocalizedFileMap = Partial<Record<SupportedLocale, string>>;
+export type DesignStoryModerationSyncResult = {
+  storyId: string;
+  action: "approved" | "rejected" | "unpublished";
+  slug: string;
+  notes?: string;
+};
 
 const SUPPORTED_LOCALES: SupportedLocale[] = ["uz", "ru", "en"];
 
@@ -134,7 +140,7 @@ export class DesignStoriesService {
             qrCodeImageUrl:
               existing.slug === slug ? existing.qrCodeImageUrl : null,
             reviewNotes: existing.status === DesignStoryStatus.NEEDS_CHANGES ? existing.reviewNotes : null,
-            status: existing.status === DesignStoryStatus.NEEDS_CHANGES ? DesignStoryStatus.DRAFT : existing.status,
+            status: this.storyStatusAfterEdit(existing.status),
           },
         })
       : await this.prisma.designStory.create({
@@ -187,6 +193,8 @@ export class DesignStoriesService {
         coverImageFileId: dto.coverImageFileId ?? story.coverImageFileId,
         audioFileIdsJson: { ...this.jsonToLocalizedFileMap(story.audioFileIdsJson), ...this.compactLocalizedFiles(dto.audioFileIds) } as Prisma.InputJsonValue,
         videoFileIdsJson: { ...this.jsonToLocalizedFileMap(story.videoFileIdsJson), ...this.compactLocalizedFiles(dto.videoFileIds) } as Prisma.InputJsonValue,
+        status: this.storyStatusAfterEdit(story.status),
+        reviewNotes: story.status === DesignStoryStatus.PENDING_REVIEW ? null : story.reviewNotes,
       },
     });
     await this.audit.log({
@@ -209,10 +217,7 @@ export class DesignStoriesService {
         "Upload a verified design file before submitting the design and story for moderation.",
       );
     }
-    const blockedSubmissionStatuses: DesignStatus[] = [
-      DesignStatus.REJECTED,
-      DesignStatus.SUSPENDED,
-    ];
+    const blockedSubmissionStatuses: DesignStatus[] = [DesignStatus.SUSPENDED];
     if (blockedSubmissionStatuses.includes(design.status)) {
       throw new BadRequestException(
         "This design cannot be submitted from its current status. Contact support if you need help.",
@@ -257,7 +262,7 @@ export class DesignStoriesService {
         where: {
           id: designId,
           designerId: userId,
-          status: { in: [DesignStatus.DRAFT, DesignStatus.NEEDS_FIX] },
+          status: { in: [DesignStatus.DRAFT, DesignStatus.NEEDS_FIX, DesignStatus.REJECTED] },
         },
         data: {
           status: DesignStatus.PENDING_MODERATION,
@@ -335,6 +340,60 @@ export class DesignStoriesService {
     };
   }
 
+  async syncWithDesignDecision(
+    tx: Prisma.TransactionClient,
+    actorId: string,
+    designId: string,
+    decision: "APPROVE" | "REJECT",
+    notes?: string,
+  ): Promise<DesignStoryModerationSyncResult | null> {
+    const story = await tx.designStory.findUnique({ where: { designAssetId: designId } });
+    if (!story) return null;
+
+    if (decision === "APPROVE") {
+      if (story.status !== DesignStoryStatus.PENDING_REVIEW) return null;
+      this.assertStoryTranslationsReady(story);
+      await tx.designStory.update({
+        where: { id: story.id },
+        data: {
+          status: DesignStoryStatus.PUBLISHED,
+          reviewNotes: null,
+          reviewedAt: new Date(),
+          reviewedById: actorId,
+          publishedAt: new Date(),
+          unpublishedAt: null,
+        },
+      });
+      return { storyId: story.id, action: "approved", slug: story.slug };
+    }
+
+    const reviewNotes = notes?.trim() || "The design was returned for changes.";
+    if (story.status === DesignStoryStatus.PUBLISHED) {
+      await tx.designStory.update({
+        where: { id: story.id },
+        data: {
+          status: DesignStoryStatus.UNPUBLISHED,
+          reviewNotes,
+          unpublishedAt: new Date(),
+          reviewedAt: new Date(),
+          reviewedById: actorId,
+        },
+      });
+      return { storyId: story.id, action: "unpublished", slug: story.slug, notes: reviewNotes };
+    }
+    if (story.status !== DesignStoryStatus.PENDING_REVIEW) return null;
+    await tx.designStory.update({
+      where: { id: story.id },
+      data: {
+        status: DesignStoryStatus.NEEDS_CHANGES,
+        reviewNotes,
+        reviewedAt: new Date(),
+        reviewedById: actorId,
+      },
+    });
+    return { storyId: story.id, action: "rejected", slug: story.slug, notes: reviewNotes };
+  }
+
   async approvePublish(actorId: string, designId: string) {
     const story = await this.prisma.designStory.findUnique({
       where: { designAssetId: designId },
@@ -355,20 +414,7 @@ export class DesignStoriesService {
     if (!approvedDesignStatuses.includes(story.designAsset.status)) {
       throw new BadRequestException("Approve the design before publishing its story.");
     }
-    const sourceLocale = this.normalizeLocale(story.sourceLocale);
-    const titleTranslations = this.jsonToLocalizedStringMap(story.titleTranslationsJson);
-    const bodyTranslations = this.jsonToLocalizedStringMap(story.bodyTranslationsJson);
-    const sourceFingerprint = storySourceFingerprint(
-      sourceLocale,
-      titleTranslations[sourceLocale] || story.title,
-      bodyTranslations[sourceLocale] || "",
-    );
-    if (
-      !hasCompleteStoryTranslations(titleTranslations, bodyTranslations) ||
-      !storyTranslationsAreCurrent(this.objectJson(story.translationMetaJson), sourceFingerprint)
-    ) {
-      throw new BadRequestException("Current Uzbek, Russian, and English translations are required before publishing.");
-    }
+    this.assertStoryTranslationsReady(story);
     const updated = await this.prisma.designStory.update({
       where: { id: story.id },
       data: {
@@ -588,6 +634,35 @@ export class DesignStoriesService {
       createdAt: story.createdAt,
       updatedAt: story.updatedAt,
     };
+  }
+
+  private assertStoryTranslationsReady(story: {
+    sourceLocale: string;
+    title: string;
+    titleTranslationsJson: Prisma.JsonValue | null;
+    bodyTranslationsJson: Prisma.JsonValue | null;
+    translationMetaJson: Prisma.JsonValue | null;
+  }) {
+    const sourceLocale = this.normalizeLocale(story.sourceLocale);
+    const titleTranslations = this.jsonToLocalizedStringMap(story.titleTranslationsJson);
+    const bodyTranslations = this.jsonToLocalizedStringMap(story.bodyTranslationsJson);
+    const sourceFingerprint = storySourceFingerprint(
+      sourceLocale,
+      titleTranslations[sourceLocale] || story.title,
+      bodyTranslations[sourceLocale] || "",
+    );
+    if (
+      !hasCompleteStoryTranslations(titleTranslations, bodyTranslations) ||
+      !storyTranslationsAreCurrent(this.objectJson(story.translationMetaJson), sourceFingerprint)
+    ) {
+      throw new BadRequestException("Current Uzbek, Russian, and English translations are required before publishing.");
+    }
+  }
+
+  private storyStatusAfterEdit(status: DesignStoryStatus) {
+    return status === DesignStoryStatus.PENDING_REVIEW || status === DesignStoryStatus.NEEDS_CHANGES
+      ? DesignStoryStatus.DRAFT
+      : status;
   }
 
   private async requireOwnedDesign(userId: string, designId: string) {

@@ -155,7 +155,11 @@ describe("FinanceService", () => {
     await service.trackRefund("finance-1", "order-1", { amount: 200000, currency: "UZS", reason: "Customer refund" });
 
     expect(prisma.royaltyLedgerEntry.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ entryType: RoyaltyEntryType.REVERSED, status: RoyaltyLedgerStatus.REVERSED, reversalOfEntryId: "royalty-1" }) }));
-    expect((audit.log as any)).toHaveBeenCalledWith(expect.objectContaining({ action: "royalty.entry.reversed", entityId: "royalty-1" }));
+    expect((audit.log as any)).toHaveBeenCalledWith(expect.objectContaining({
+      action: "royalty.entry.reversed",
+      entityId: "royalty-2",
+      metadata: expect.objectContaining({ originalEntryId: "royalty-1" }),
+    }));
     expect((audit.log as any)).toHaveBeenCalledWith(expect.objectContaining({ action: "refund.tracked" }));
   });
 
