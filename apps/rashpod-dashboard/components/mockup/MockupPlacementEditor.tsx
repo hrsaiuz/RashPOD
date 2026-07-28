@@ -108,11 +108,13 @@ export function MockupPlacementEditor(props: {
     const node = containerRef.current;
     if (!node) return;
     const observer = new ResizeObserver(([entry]) => {
-      setViewport({ width: entry.contentRect.width, height: Math.max(360, entry.contentRect.width * 0.66) });
+      const width = entry.contentRect.width;
+      const templateRatio = props.context.templateHeightPx / props.context.templateWidthPx;
+      setViewport({ width, height: Math.max(360, Math.min(760, width * templateRatio)) });
     });
     observer.observe(node);
     return () => observer.disconnect();
-  }, []);
+  }, [props.context.templateHeightPx, props.context.templateWidthPx]);
 
   const handlePlacementChange = (next: EditorPlacementState) => {
     const clamped = clampPlacementToPrintArea(next, props.context.printArea);
@@ -142,7 +144,7 @@ export function MockupPlacementEditor(props: {
         onReset={editor.resetPlacement}
         onCenter={editor.centerPlacement}
       />
-      <div ref={containerRef} className="overflow-hidden rounded-2xl border border-surface-borderSoft bg-brand-blueLight/40">
+      <div ref={containerRef} className="overflow-hidden rounded-2xl border border-surface-borderSoft bg-brand-blueLight/40 [touch-action:none]">
         <Stage
           width={viewport.width}
           height={viewport.height}
@@ -150,8 +152,6 @@ export function MockupPlacementEditor(props: {
           scaleY={editor.stageScale}
           x={editor.stagePosition.x}
           y={editor.stagePosition.y}
-          draggable
-          onDragEnd={(event) => editor.setStagePosition({ x: event.target.x(), y: event.target.y() })}
         >
           <Layer>
             <KonvaImage

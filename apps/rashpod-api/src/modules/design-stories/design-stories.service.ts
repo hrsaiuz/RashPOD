@@ -1,5 +1,5 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
-import { AssetAccessPolicy, AssetLifecycleStatus, AssetPurpose, AssetStorageProvider, DesignStoryStatus, ListingStatus, Prisma } from "@prisma/client";
+import { AssetAccessPolicy, AssetLifecycleStatus, AssetPurpose, AssetStorageProvider, DesignStatus, DesignStoryStatus, ListingStatus, Prisma } from "@prisma/client";
 import { randomUUID } from "crypto";
 import * as QRCode from "qrcode";
 import { PrismaService } from "../../prisma/prisma.service";
@@ -287,10 +287,24 @@ export class DesignStoriesService {
   }
 
   async approvePublish(actorId: string, designId: string) {
-    const story = await this.prisma.designStory.findUnique({ where: { designAssetId: designId } });
+    const story = await this.prisma.designStory.findUnique({
+      where: { designAssetId: designId },
+      include: { designAsset: { select: { status: true } } },
+    });
     if (!story) throw new NotFoundException("Story not found");
     if (story.status !== DesignStoryStatus.PENDING_REVIEW) {
       throw new BadRequestException("Only stories submitted for review can be published.");
+    }
+    const approvedDesignStatuses: DesignStatus[] = [
+      DesignStatus.APPROVED_LOCAL,
+      DesignStatus.APPROVED_GLOBAL,
+      DesignStatus.APPROVED,
+      DesignStatus.READY_FOR_MOCKUP,
+      DesignStatus.READY_TO_PUBLISH,
+      DesignStatus.PUBLISHED,
+    ];
+    if (!approvedDesignStatuses.includes(story.designAsset.status)) {
+      throw new BadRequestException("Approve the design before publishing its story.");
     }
     const sourceLocale = this.normalizeLocale(story.sourceLocale);
     const titleTranslations = this.jsonToLocalizedStringMap(story.titleTranslationsJson);

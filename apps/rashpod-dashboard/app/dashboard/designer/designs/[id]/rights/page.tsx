@@ -16,11 +16,13 @@ import { ArrowLeft, Save, AlertTriangle } from "lucide-react";
 import { useAuth } from "../../../../../auth/auth-provider";
 import DashboardLayout from "../../../../dashboard-layout";
 import { api, type CommercialRights } from "../../../../../../lib/api";
+import { useToast } from "../../../../../../components/feedback/toast-provider";
 
 export default function CommercialRightsPage() {
   const router = useRouter();
   const params = useParams();
   const { user, isLoading: authLoading } = useAuth();
+  const { toast } = useToast();
   const id = String(params.id);
 
   const [rights, setRights] = useState<CommercialRights | null>(null);
@@ -80,8 +82,11 @@ export default function CommercialRightsPage() {
         filmRoyaltyRate: rights.filmRoyaltyRate ?? null,
       });
       await load();
+      toast({ tone: "success", title: "Commercial rights saved" });
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Save failed");
+      const nextError = e instanceof Error ? e.message : "Save failed";
+      setError(nextError);
+      toast({ tone: "error", title: "Could not save rights", description: nextError });
     } finally {
       setSaving(false);
     }

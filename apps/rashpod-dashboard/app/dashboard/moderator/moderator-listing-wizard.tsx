@@ -6,6 +6,8 @@ import { Globe2, Languages, Send, Sparkles } from "lucide-react";
 import { Button, Card, Input, StatusBadge, Textarea } from "@rashpod/ui";
 import { api, type Listing } from "../../../lib/api";
 import { ModeratorActionDialog } from "../../../components/moderator/ModeratorActionDialog";
+import { PrintfulPublishWizard } from "../../../components/moderator/PrintfulPublishWizard";
+import { useDashboardFeedback } from "../../../components/feedback/use-dashboard-feedback";
 
 type LocaleKey = "en" | "uz" | "ru";
 
@@ -117,6 +119,7 @@ export function ModeratorListingWizard({
   designTitle?: string;
   onSaved?: () => void;
 }) {
+  const feedback = useDashboardFeedback();
   const initialTranslations = readTranslations(listing.metadataJson);
   const [activeLocale, setActiveLocale] = useState<LocaleKey>("en");
   const [translations, setTranslations] = useState<Record<LocaleKey, LocaleCopy>>({
@@ -224,9 +227,10 @@ export function ModeratorListingWizard({
         },
       });
       setMessage("Listing saved.");
+      feedback.success({ title: "Listing draft saved", description: "Copy, variants, and pricing are up to date." });
       onSaved?.();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Save failed");
+      setError(feedback.error(e, { title: "Could not save listing", fallback: "Save failed" }));
     } finally {
       setSaving(false);
     }
@@ -249,10 +253,11 @@ export function ModeratorListingWizard({
       });
       await api.post(`/admin/listings/${listing.id}/status`, { status: "PUBLISHED" });
       setMessage("Listing published.");
+      feedback.success({ title: "Listing published", description: "The listing is now available on published surfaces." });
       onSaved?.();
       return true;
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Publish failed");
+      setError(feedback.error(e, { title: "Could not publish listing", fallback: "Publish failed" }));
       return false;
     } finally {
       setSaving(false);
@@ -457,6 +462,13 @@ export function ModeratorListingWizard({
           </span>
         ) : null}
       </div>
+      {listing.designProductSelection?.pipeline === "GLOBAL_PRINTFUL" ? (
+        <PrintfulPublishWizard
+          listingId={listing.id}
+          defaultPrice={price}
+          onPublished={onSaved}
+        />
+      ) : null}
       <ModeratorActionDialog
         open={confirmPublish}
         title="Publish this listing?"

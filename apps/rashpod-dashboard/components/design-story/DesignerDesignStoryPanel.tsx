@@ -40,11 +40,13 @@ import {
   hasCompleteStoryTranslations,
   type StoryTranslationDrafts,
 } from "./design-story-wizard";
+import { useToast } from "../feedback/toast-provider";
 
 type Props = {
   designId: string;
   designTitle: string;
   storySummary?: { status?: string | null } | null;
+  onStatusChange?: (status: string | null) => void;
 };
 
 type WizardStep = 1 | 2 | 3 | 4;
@@ -64,7 +66,8 @@ const STEPS: Array<{ step: WizardStep; label: string; hint: string }> = [
   { step: 4, label: "Media & submit", hint: "Add media and request review" },
 ];
 
-export function DesignerDesignStoryPanel({ designId, designTitle }: Props) {
+export function DesignerDesignStoryPanel({ designId, designTitle, onStatusChange }: Props) {
+  const { toast } = useToast();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [translating, setTranslating] = useState(false);
@@ -129,6 +132,10 @@ export function DesignerDesignStoryPanel({ designId, designTitle }: Props) {
         story.translationsCurrent === false,
     );
   }, [story?.id, story?.updatedAt]);
+
+  useEffect(() => {
+    onStatusChange?.(story?.status ?? null);
+  }, [onStatusChange, story?.status]);
 
   useEffect(() => {
     if (previousStepRef.current === step) return;
@@ -205,8 +212,11 @@ export function DesignerDesignStoryPanel({ designId, designTitle }: Props) {
     try {
       await persistDraft();
       setMessage("Story draft saved.");
+      toast({ tone: "success", title: "Story draft saved" });
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to save story");
+      const nextError = err instanceof Error ? err.message : "Failed to save story";
+      setError(nextError);
+      toast({ tone: "error", title: "Could not save story", description: nextError });
     } finally {
       setSaving(false);
     }
@@ -290,8 +300,15 @@ export function DesignerDesignStoryPanel({ designId, designTitle }: Props) {
       const next = await api.post<DesignStoryDetail>(`/designer/designs/${designId}/story/request-publish`);
       setPayload((current) => current ? { ...current, story: next } : null);
       setMessage("Story submitted for approval. AI translations remain drafts until a human approves publication.");
+      toast({
+        tone: "success",
+        title: "Story sent for approval",
+        description: "A moderator will review all three language versions.",
+      });
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to request publish");
+      const nextError = err instanceof Error ? err.message : "Failed to request publish";
+      setError(nextError);
+      toast({ tone: "error", title: "Could not send story", description: nextError });
     } finally {
       setRequesting(false);
     }
@@ -586,7 +603,20 @@ export function DesignerDesignStoryPanel({ designId, designTitle }: Props) {
               <div className="grid gap-4 md:grid-cols-[1.3fr_.7fr]">
                 <div className="rounded-2xl border border-brand-line bg-surface-card p-5">
                   <p className="text-xs font-semibold uppercase tracking-[0.18em] text-brand-muted">Public URL</p>
-                  <p className="mt-2 break-all text-sm text-brand-ink">{selectedPublicUrl}</p>
+                  {story?.status === "PUBLISHED" ? (
+                    <a
+                      href={story.publicUrl ?? selectedPublicUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="mt-2 inline-flex min-h-11 items-center break-all text-sm font-semibold text-brand-blue underline decoration-brand-blue/35 underline-offset-4 hover:text-brand-ink"
+                    >
+                      {story.publicUrl ?? selectedPublicUrl}
+                    </a>
+                  ) : (
+                    <p className="mt-2 break-all text-sm text-brand-muted" aria-disabled="true">
+                      {selectedPublicUrl}
+                    </p>
+                  )}
                   <div className="mt-4 flex flex-wrap gap-2">
                     <Button
                       variant="secondary"

@@ -27,6 +27,7 @@ import {
 } from "lucide-react";
 import DashboardLayout from "../dashboard-layout";
 import { api } from "../../../lib/api";
+import { useDashboardFeedback } from "../../../components/feedback/use-dashboard-feedback";
 
 type LoadState = "idle" | "loading" | "ready" | "error";
 
@@ -76,6 +77,7 @@ function Drawer({ title, children, onClose }: { title: string; children: ReactNo
 type EmailTemplate = { id: string; key: string; subject: string; body: string; variables?: unknown; updatedAt?: string };
 
 export function EmailTemplatesScreen() {
+  const feedback = useDashboardFeedback();
   const [rows, setRows] = useState<EmailTemplate[]>([]);
   const [state, setState] = useState<LoadState>("loading");
   const [error, setError] = useState("");
@@ -110,8 +112,9 @@ export function EmailTemplatesScreen() {
       }
       setEditing(null);
       await load();
+      feedback.success({ title: "Email template saved", description: "The latest template content is ready for transactional email jobs." });
     } catch (err) {
-      setError(errorMessage(err));
+      setError(feedback.error(err, { title: "Could not save email template", fallback: "Request failed" }));
     } finally {
       setSaving(false);
     }
@@ -123,8 +126,9 @@ export function EmailTemplatesScreen() {
     try {
       await api.post(`/admin/email-templates/${editing.id}/test`, { to: testTo, key: editing.key });
       setError("");
+      feedback.success({ title: "Test email sent", description: testTo });
     } catch (err) {
-      setError(errorMessage(err));
+      setError(feedback.error(err, { title: "Could not send test email", fallback: "Request failed" }));
     } finally {
       setSaving(false);
     }
@@ -188,6 +192,7 @@ type AiSettings = {
 };
 
 export function AiSettingsScreen() {
+  const feedback = useDashboardFeedback();
   const [settings, setSettings] = useState<AiSettings | null>(null);
   const [state, setState] = useState<LoadState>("loading");
   const [error, setError] = useState("");
@@ -221,8 +226,9 @@ export function AiSettingsScreen() {
         workflows: settings.workflows,
       });
       setSettings(updated);
+      feedback.success({ title: "AI settings saved", description: "Budget and workflow controls are now active." });
     } catch (err) {
-      setError(errorMessage(err));
+      setError(feedback.error(err, { title: "Could not save AI settings", fallback: "Request failed" }));
     } finally {
       setSaving(false);
     }
@@ -417,6 +423,7 @@ type CommercialOffer = {
 };
 
 export function CommercialOffersScreen() {
+  const feedback = useDashboardFeedback();
   const [rows, setRows] = useState<CommercialOffer[]>([]);
   const [state, setState] = useState<LoadState>("loading");
   const [error, setError] = useState("");
@@ -444,8 +451,9 @@ export function CommercialOffersScreen() {
     try {
       await api.post(`/admin/commercial-offers/${id}/send`);
       await load();
+      feedback.success({ title: "Commercial offer sent", description: "The corporate client has been notified." });
     } catch (err) {
-      setError(errorMessage(err));
+      setError(feedback.error(err, { title: "Could not send commercial offer", fallback: "Request failed" }));
     } finally {
       setActing("");
     }
@@ -484,6 +492,7 @@ export function CommercialOffersScreen() {
 type UserRow = { id: string; email: string; displayName?: string | null; role: string; designerStatus?: string | null; createdAt: string };
 
 export function AdminUsersHubScreen() {
+  const feedback = useDashboardFeedback();
   const [tab, setTab] = useState<"designers" | "customers" | "staff">("designers");
   const [rows, setRows] = useState<UserRow[]>([]);
   const [state, setState] = useState<LoadState>("loading");
@@ -515,10 +524,11 @@ export function AdminUsersHubScreen() {
     setSaving(true);
     try {
       await api.patch(`/admin/users/${selected.id}/role`, { role: newRole });
+      feedback.success({ title: "User role updated", description: `${selected.email} is now ${newRole.replace(/_/g, " ")}.` });
       setSelected(null);
       await load();
     } catch (err) {
-      setError(errorMessage(err));
+      setError(feedback.error(err, { title: "Could not update user role", fallback: "Request failed" }));
     } finally {
       setSaving(false);
     }

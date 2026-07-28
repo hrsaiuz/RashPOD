@@ -17,11 +17,13 @@ import { ArrowLeft, Save, Send, Archive, Languages } from "lucide-react";
 import { useAuth } from "../../../../auth/auth-provider";
 import DashboardLayout from "../../../dashboard-layout";
 import { api, type Listing } from "../../../../../lib/api";
+import { useToast } from "../../../../../components/feedback/toast-provider";
 
 export default function ListingEditPage() {
   const router = useRouter();
   const params = useParams();
   const { user, isLoading: authLoading } = useAuth();
+  const { toast } = useToast();
   const id = String(params.id);
 
   const [listing, setListing] = useState<Listing | null>(null);
@@ -100,9 +102,12 @@ export default function ListingEditPage() {
         price: Number(form.price),
       });
       setMessage({ kind: "ok", text: "Saved." });
+      toast({ tone: "success", title: "Listing saved" });
       await load();
     } catch (e) {
-      setMessage({ kind: "err", text: e instanceof Error ? e.message : "Save failed" });
+      const nextError = e instanceof Error ? e.message : "Save failed";
+      setMessage({ kind: "err", text: nextError });
+      toast({ tone: "error", title: "Could not save listing", description: nextError });
     } finally {
       setSaving("");
     }
@@ -113,8 +118,11 @@ export default function ListingEditPage() {
     try {
       await api.post(`/listings/${id}/publish`);
       await load();
+      toast({ tone: "success", title: "Listing submitted for publication" });
     } catch (e) {
-      setMessage({ kind: "err", text: e instanceof Error ? e.message : "Publish failed" });
+      const nextError = e instanceof Error ? e.message : "Publish failed";
+      setMessage({ kind: "err", text: nextError });
+      toast({ tone: "error", title: "Could not publish listing", description: nextError });
     } finally {
       setSaving("");
     }
@@ -125,8 +133,11 @@ export default function ListingEditPage() {
     try {
       await api.post(`/listings/${id}/archive`);
       await load();
+      toast({ tone: "success", title: "Listing archived" });
     } catch (e) {
-      setMessage({ kind: "err", text: e instanceof Error ? e.message : "Archive failed" });
+      const nextError = e instanceof Error ? e.message : "Archive failed";
+      setMessage({ kind: "err", text: nextError });
+      toast({ tone: "error", title: "Could not archive listing", description: nextError });
     } finally {
       setSaving("");
     }

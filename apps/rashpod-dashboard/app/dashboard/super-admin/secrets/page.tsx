@@ -4,6 +4,7 @@ import { FormEvent, useEffect, useState } from "react";
 import { KeyRound, RefreshCw } from "lucide-react";
 import { Button, Card, Drawer, EmptyState, ErrorState, Input, Skeleton, Textarea } from "@rashpod/ui";
 import { api } from "../../../../lib/api";
+import { useDashboardFeedback } from "../../../../components/feedback/use-dashboard-feedback";
 import { ConfirmDialog, Feedback, FeedbackBanner, PageShell } from "../super-admin-ui";
 
 type SecretReference = {
@@ -20,6 +21,7 @@ type SecretReference = {
 const EMPTY_SECRET: SecretReference = { id: "", name: "", envVar: "", service: "rashpod-api", isNew: true };
 
 export default function SuperAdminSecretsPage() {
+  const actionFeedback = useDashboardFeedback();
   const [rows, setRows] = useState<SecretReference[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
@@ -60,10 +62,11 @@ export default function SuperAdminSecretsPage() {
       if (editing.isNew) await api.post("/super-admin/secrets", payload);
       else await api.patch(`/super-admin/secrets/${editing.id}`, payload);
       setFeedback({ kind: "success", message: editing.isNew ? "Secret reference added." : "Secret reference updated." });
+      actionFeedback.success({ title: editing.isNew ? "Secret reference added" : "Secret reference updated", description: editing.envVar });
       setEditing(null);
       await load();
     } catch (error) {
-      setFeedback({ kind: "error", message: error instanceof Error ? error.message : "Could not save secret reference" });
+      setFeedback({ kind: "error", message: actionFeedback.error(error, { title: "Could not save secret reference", fallback: "Could not save secret reference" }) });
     } finally {
       setSaving(false);
     }
@@ -76,10 +79,11 @@ export default function SuperAdminSecretsPage() {
     try {
       await api.delete(`/super-admin/secrets/${deleting.id}`);
       setFeedback({ kind: "success", message: `${deleting.envVar} reference deleted. The external secret itself was not changed.` });
+      actionFeedback.success({ title: "Secret reference deleted", description: "The external secret value was not changed." });
       setDeleting(null);
       await load();
     } catch (error) {
-      setFeedback({ kind: "error", message: error instanceof Error ? error.message : "Could not delete secret reference" });
+      setFeedback({ kind: "error", message: actionFeedback.error(error, { title: "Could not delete secret reference", fallback: "Could not delete secret reference" }) });
       setDeleting(null);
     } finally {
       setSaving(false);

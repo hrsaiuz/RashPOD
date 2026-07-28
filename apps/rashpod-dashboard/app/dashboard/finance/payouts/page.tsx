@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { Button } from "@rashpod/ui";
 import { useAuth } from "../../../auth/auth-provider";
 import DashboardLayout from "../../dashboard-layout";
+import { useDashboardFeedback } from "../../../../components/feedback/use-dashboard-feedback";
 import {
   FinanceAlert,
   FinanceCell,
@@ -34,12 +35,14 @@ type Payout = {
 };
 
 export default function PayoutsPage() {
+  const feedback = useDashboardFeedback();
   const router = useRouter();
   const { user, isLoading } = useAuth();
   const [rows, setRows] = useState<Payout[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [draftOpen, setDraftOpen] = useState(false);
+  const [workingId, setWorkingId] = useState("");
 
   async function load() {
     setLoading(true);
@@ -64,51 +67,68 @@ export default function PayoutsPage() {
   }, [user, isLoading]);
 
   async function createDraft(form: FormData) {
-    const body = {
-      designerId: String(form.get("designerId") || ""),
-      currency: String(form.get("currency") || "UZS"),
-      note: String(form.get("note") || "") || undefined,
-    };
-    const res = await fetch("/api/proxy/finance/payouts", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
-    if (!res.ok) {
-      setError(await res.text());
-      return;
+    setWorkingId("draft");
+    setError("");
+    try {
+      const body = {
+        designerId: String(form.get("designerId") || ""),
+        currency: String(form.get("currency") || "UZS"),
+        note: String(form.get("note") || "") || undefined,
+      };
+      const res = await fetch("/api/proxy/finance/payouts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      setDraftOpen(false);
+      await load();
+      feedback.success({ title: "Payout draft created", description: "The batch is ready for finance review." });
+    } catch (cause) {
+      setError(feedback.error(cause, { title: "Could not create payout draft", fallback: "Failed to create payout draft." }));
+    } finally {
+      setWorkingId("");
     }
-    setDraftOpen(false);
-    await load();
   }
 
   async function action(id: string, path: string, message: string) {
     if (!window.confirm(message)) return;
-    const res = await fetch(`/api/proxy/finance/payouts/${id}/${path}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ method: "MANUAL", note: message }),
-    });
-    if (!res.ok) {
-      setError(await res.text());
-      return;
+    setWorkingId(id);
+    setError("");
+    try {
+      const res = await fetch(`/api/proxy/finance/payouts/${id}/${path}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ method: "MANUAL", note: message }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      await load();
+      feedback.success({
+        title: path === "approve" ? "Payout approved" : path === "mark-paid" ? "Payout marked paid" : "Payout canceled",
+        description: "The payout ledger and audit trail were updated.",
+      });
+    } catch (cause) {
+      setError(feedback.error(cause, { title: "Could not update payout", fallback: "Payout action failed." }));
+    } finally {
+      setWorkingId("");
     }
-    await load();
   }
 
   async function exportCsv(id: string) {
-    const res = await fetch(`/api/proxy/finance/payouts/${id}/export`);
-    if (!res.ok) {
-      setError(await res.text());
-      return;
+    try {
+      const res = await fetch(`/api/proxy/finance/payouts/${id}/export`);
+      if (!res.ok) throw new Error(await res.text());
+      const data = await res.json();
+      const url = URL.createObjectURL(new Blob([data.csv], { type: data.contentType || "text/csv" }));
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = data.filename || `payout-${id}.csv`;
+      link.click();
+      URL.revokeObjectURL(url);
+      feedback.success({ title: "Payout export downloaded" });
+    } catch (cause) {
+      setError(feedback.error(cause, { title: "Could not export payout", fallback: "Payout export failed." }));
     }
-    const data = await res.json();
-    const url = URL.createObjectURL(new Blob([data.csv], { type: data.contentType || "text/csv" }));
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = data.filename || `payout-${id}.csv`;
-    link.click();
-    URL.revokeObjectURL(url);
   }
 
   return (
@@ -130,7 +150,7 @@ export default function PayoutsPage() {
             <FinanceInput name="designerId" required placeholder="Designer id" />
             <FinanceInput name="currency" defaultValue="UZS" />
             <FinanceInput name="note" placeholder="Note" />
-            <Button type="submit" variant="primaryBlue" size="sm">Create draft</Button>
+            <Button type="submit" variant="primaryBlue" size="sm" loading={workingId === "draft"} disabled={Boolean(workingId)}>Create draft</Button>
           </form>
         </FinancePanel>
       ) : null}
@@ -153,13 +173,13 @@ export default function PayoutsPage() {
             <FinanceCell>{new Date(row.createdAt).toLocaleDateString()}</FinanceCell>
             <FinanceCell>
               <div className="flex flex-wrap gap-2">
-                <FinanceIconButton title="Approve" disabled={!["DRAFT", "REQUESTED"].includes(row.status)} onClick={() => void action(row.id, "approve", "Approve this payout?")}>
+                <FinanceIconButton title="Approve" disabled={Boolean(workingId) || !["DRAFT", "REQUESTED"].includes(row.status)} onClick={() => void action(row.id, "approve", "Approve this payout?")}>
                   <CheckCircle2 size={14} />
                 </FinanceIconButton>
-                <FinanceIconButton title="Mark paid" disabled={!["APPROVED", "PROCESSING"].includes(row.status)} onClick={() => void action(row.id, "mark-paid", "Mark this payout paid?")}>
+                <FinanceIconButton title="Mark paid" disabled={Boolean(workingId) || !["APPROVED", "PROCESSING"].includes(row.status)} onClick={() => void action(row.id, "mark-paid", "Mark this payout paid?")}>
                   <CheckCircle2 size={14} />
                 </FinanceIconButton>
-                <FinanceIconButton title="Cancel" disabled={["PAID", "CONFIRMED", "CANCELED", "CANCELLED"].includes(row.status)} onClick={() => void action(row.id, "cancel", "Cancel this payout?")}>
+                <FinanceIconButton title="Cancel" disabled={Boolean(workingId) || ["PAID", "CONFIRMED", "CANCELED", "CANCELLED"].includes(row.status)} onClick={() => void action(row.id, "cancel", "Cancel this payout?")}>
                   <XCircle size={14} />
                 </FinanceIconButton>
                 <FinanceIconButton title="Export" onClick={() => void exportCsv(row.id)}>

@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { RefreshCw, Shield } from "lucide-react";
 import { Button, Card, ErrorState, Skeleton } from "@rashpod/ui";
 import { api } from "../../../../lib/api";
+import { useDashboardFeedback } from "../../../../components/feedback/use-dashboard-feedback";
 import { ConfirmDialog, Feedback, FeedbackBanner, PageShell } from "../super-admin-ui";
 
 const PLATFORM_ROLES = [
@@ -33,6 +34,7 @@ type Matrix = {
 };
 
 export default function SuperAdminPermissionsPage() {
+  const actionFeedback = useDashboardFeedback();
   const [matrix, setMatrix] = useState<Matrix | null>(null);
   const [draft, setDraft] = useState<Record<string, string[]>>({});
   const [loading, setLoading] = useState(true);
@@ -92,8 +94,12 @@ export default function SuperAdminPermissionsPage() {
       await api.patch("/super-admin/rbac/permissions", { overrides });
       await load();
       setFeedback({ kind: "success", message: mode === "reset" ? "Permission overrides reset to code defaults." : "RBAC overrides saved and applied." });
+      actionFeedback.success({
+        title: mode === "reset" ? "Permission overrides reset" : "Permissions saved",
+        description: "The access-control policy is active and audit logged.",
+      });
     } catch (error) {
-      setFeedback({ kind: "error", message: error instanceof Error ? error.message : "Could not update permissions" });
+      setFeedback({ kind: "error", message: actionFeedback.error(error, { title: "Could not update permissions", fallback: "Could not update permissions" }) });
     } finally {
       setSaving(false);
       setConfirmation(null);

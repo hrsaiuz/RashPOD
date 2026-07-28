@@ -5,6 +5,7 @@ import { RefreshCw, Users } from "lucide-react";
 import { Button, Card, Drawer, EmptyState, ErrorState, Input, Select, Skeleton } from "@rashpod/ui";
 import { useAuth } from "../../../auth/auth-provider";
 import { api } from "../../../../lib/api";
+import { useDashboardFeedback } from "../../../../components/feedback/use-dashboard-feedback";
 import { ConfirmDialog, Feedback, FeedbackBanner, PageShell, Pagination } from "../super-admin-ui";
 
 const ROLES = [
@@ -37,6 +38,7 @@ type PageData = {
 };
 
 export default function SuperAdminRolesPage() {
+  const actionFeedback = useDashboardFeedback();
   const { user } = useAuth();
   const [rows, setRows] = useState<PlatformUser[]>([]);
   const [search, setSearch] = useState("");
@@ -85,11 +87,12 @@ export default function SuperAdminRolesPage() {
     try {
       await api.patch(`/super-admin/users/${selected.id}/role`, { role: newRole });
       setFeedback({ kind: "success", message: `${selected.email} is now ${newRole.replace(/_/g, " ")}.` });
+      actionFeedback.success({ title: "User role updated", description: selected.email });
       setConfirming(false);
       setSelected(null);
       await load(page);
     } catch (error) {
-      setFeedback({ kind: "error", message: error instanceof Error ? error.message : "Could not update role" });
+      setFeedback({ kind: "error", message: actionFeedback.error(error, { title: "Could not update user role", fallback: "Could not update role" }) });
       setConfirming(false);
     } finally {
       setSaving(false);

@@ -7,6 +7,7 @@ import { Save, User as UserIcon, CreditCard, Bell, Link as LinkIcon } from "luci
 import { useAuth } from "../../../auth/auth-provider";
 import DashboardLayout from "../../dashboard-layout";
 import { api } from "../../../../lib/api";
+import { useToast } from "../../../../components/feedback/toast-provider";
 
 type Tab = "profile" | "portfolio" | "payout" | "notifications";
 
@@ -36,6 +37,7 @@ const notificationDefaults = {
 export default function DesignerSettingsPage() {
   const router = useRouter();
   const { user, isLoading: authLoading } = useAuth();
+  const { toast } = useToast();
   const [tab, setTab] = useState<Tab>("profile");
   const [profile, setProfile] = useState<MeResponse | null>(null);
   const [displayName, setDisplayName] = useState("");
@@ -110,8 +112,11 @@ export default function DesignerSettingsPage() {
       });
       setProfile(updated);
       setMessage({ kind: "ok", text: "Settings saved." });
+      toast({ tone: "success", title: "Settings saved" });
     } catch (e) {
-      setMessage({ kind: "err", text: e instanceof Error ? e.message : "Save failed" });
+      const nextError = e instanceof Error ? e.message : "Save failed";
+      setMessage({ kind: "err", text: nextError });
+      toast({ tone: "error", title: "Could not save settings", description: nextError });
     } finally {
       setSaving(false);
     }

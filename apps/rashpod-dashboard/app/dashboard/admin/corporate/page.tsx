@@ -6,11 +6,13 @@ import { Button, Card, EmptyState, ErrorState, Skeleton, StatusBadge } from "@ra
 import { Briefcase } from "lucide-react";
 import DashboardLayout from "../../dashboard-layout";
 import { api } from "../../../../lib/api";
+import { useDashboardFeedback } from "../../../../components/feedback/use-dashboard-feedback";
 
 type Req = { id: string; title: string; status: string };
 type Bid = { id: string; designerId: string; proposal: string; status: string; designFee: string };
 
 export default function AdminCorporatePage() {
+  const feedback = useDashboardFeedback();
   const { user } = useAuth();
   const [requests, setRequests] = useState<Req[]>([]);
   const [selectedReq, setSelectedReq] = useState("");
@@ -62,10 +64,11 @@ export default function AdminCorporatePage() {
     try {
       await api.post(`/admin/corporate/bids/${bidId}/select`);
       setMessage("Bid selected.");
+      feedback.success({ title: "Corporate bid selected", description: "The request is ready for a commercial offer." });
       await loadBids(selectedReq);
       await loadRequests();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to select bid");
+      setError(feedback.error(err, { title: "Could not select bid", fallback: "Failed to select bid" }));
     } finally {
       setActing(false);
     }
@@ -85,9 +88,10 @@ export default function AdminCorporatePage() {
       });
       await api.post(`/admin/commercial-offers/${offer.id}/send`);
       setMessage("Commercial offer created and sent.");
+      feedback.success({ title: "Commercial offer sent", description: "The selected corporate client has been notified." });
       await loadRequests();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to create offer");
+      setError(feedback.error(err, { title: "Could not send commercial offer", fallback: "Failed to create offer" }));
     } finally {
       setActing(false);
     }

@@ -3,10 +3,19 @@
 import { useEffect, useState } from "react";
 import { Button, Card, EmptyState, ErrorState, Skeleton, StatusBadge, Textarea } from "@rashpod/ui";
 import { Globe2, Languages, QrCode } from "lucide-react";
-import { api, type StoryLocale, type StoryReviewResponse } from "../../lib/api";
+import { api, type DesignStatus, type StoryLocale, type StoryReviewResponse } from "../../lib/api";
 import { ModeratorActionDialog } from "../moderator/ModeratorActionDialog";
+import { useToast } from "../feedback/toast-provider";
+import { isDesignApprovedForStoryPublication } from "./design-story-publication";
 
-export function ModeratorDesignStoryReview({ designId }: { designId: string }) {
+export function ModeratorDesignStoryReview({
+  designId,
+  designStatus,
+}: {
+  designId: string;
+  designStatus: DesignStatus;
+}) {
+  const { toast } = useToast();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState<"" | "approve" | "reject" | "unpublish">("");
   const [error, setError] = useState("");
@@ -43,9 +52,16 @@ export function ModeratorDesignStoryReview({ designId }: { designId: string }) {
       await api.post(`/admin/designs/${designId}/${path}`, kind === "reject" ? { notes } : undefined);
       await load();
       setMessage(kind === "approve" ? "Story published." : kind === "reject" ? "Story returned for changes." : "Story unpublished.");
+      toast({
+        tone: "success",
+        title: kind === "approve" ? "Story published" : kind === "reject" ? "Story returned for changes" : "Story unpublished",
+        description: kind === "approve" ? "The public story link is now active." : undefined,
+      });
       return true;
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Action failed");
+      const nextError = err instanceof Error ? err.message : "Action failed";
+      setError(nextError);
+      toast({ tone: "error", title: "Story action failed", description: nextError });
       return false;
     } finally {
       setSaving("");
@@ -55,12 +71,13 @@ export function ModeratorDesignStoryReview({ designId }: { designId: string }) {
   const story = payload?.story ?? null;
   const canReview = story?.status === "PENDING_REVIEW";
   const canUnpublish = story?.status === "PUBLISHED";
+  const designApproved = isDesignApprovedForStoryPublication(designStatus);
   const incompleteLocales = story
     ? (["uz", "ru", "en"] as StoryLocale[]).filter(
         (locale) => !story.titleTranslations?.[locale]?.trim() || !story.bodyTranslations?.[locale]?.trim(),
       )
     : [];
-  const canApprove = canReview && story?.translationsCurrent !== false && incompleteLocales.length === 0;
+  const canApprove = canReview && designApproved && story?.translationsCurrent !== false && incompleteLocales.length === 0;
 
   return (
     <Card>
@@ -83,7 +100,18 @@ export function ModeratorDesignStoryReview({ designId }: { designId: string }) {
                 <Globe2 size={14} />
                 <span>Public URL</span>
               </div>
-              <p className="mt-3 break-all text-sm text-brand-ink">{story.publicUrl}</p>
+              {story.status === "PUBLISHED" ? (
+                <a
+                  href={story.publicUrl ?? "#"}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-3 inline-flex min-h-11 items-center break-all text-sm font-semibold text-brand-blue underline decoration-brand-blue/35 underline-offset-4"
+                >
+                  {story.publicUrl}
+                </a>
+              ) : (
+                <p className="mt-3 break-all text-sm text-brand-muted" aria-disabled="true">{story.publicUrl}</p>
+              )}
               <div className="mt-4 grid gap-4 md:grid-cols-2">
                 {story.coverImageUrl ? <img src={story.coverImageUrl} alt={`${story.title} cover`} className="h-56 w-full rounded-2xl object-cover" /> : <div className="flex h-56 items-center justify-center rounded-2xl border border-dashed border-brand-line bg-white text-brand-muted">No cover image</div>}
                 {story.qrCodeImageUrl ? <img src={story.qrCodeImageUrl} alt={`QR for ${story.title}`} className="h-56 w-full rounded-2xl border border-brand-line bg-white object-contain p-4" /> : <div className="flex h-56 items-center justify-center rounded-2xl border border-dashed border-brand-line bg-white text-brand-muted"><QrCode size={24} /></div>}
@@ -99,7 +127,9 @@ export function ModeratorDesignStoryReview({ designId }: { designId: string }) {
                 <>
                   {!canApprove ? (
                     <p role="alert" className="mb-4 rounded-xl border border-semantic-warning/25 bg-semantic-warning/5 px-3 py-3 text-sm text-semantic-warningText">
-                      {incompleteLocales.length
+                      {!designApproved
+                        ? "Approve the design first. Story publication becomes available immediately afterward."
+                        : incompleteLocales.length
                         ? `Cannot publish: ${incompleteLocales.map(localeLabel).join(", ")} content is incomplete.`
                         : "Cannot publish: translations no longer match the current Uzbek source."}
                     </p>

@@ -34,6 +34,30 @@ describe("DesignStoriesService publication validation", () => {
     expect(prisma.designStory.update).not.toHaveBeenCalled();
   });
 
+  it("blocks story publication until the design is approved", async () => {
+    const prisma = {
+      designStory: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: "story-1",
+          designAssetId: "design-1",
+          status: "PENDING_REVIEW",
+          designAsset: { status: "PENDING_MODERATION" },
+        }),
+        update: jest.fn(),
+      },
+    };
+    const service = new DesignStoriesService(
+      prisma as never,
+      { log: jest.fn() } as never,
+      {} as never,
+    );
+
+    await expect(service.approvePublish("moderator-1", "design-1"))
+      .rejects
+      .toThrow("Approve the design before publishing its story.");
+    expect(prisma.designStory.update).not.toHaveBeenCalled();
+  });
+
   it("invalidates Russian and English text when the Uzbek source changes", async () => {
     const existing = {
       id: "story-1",

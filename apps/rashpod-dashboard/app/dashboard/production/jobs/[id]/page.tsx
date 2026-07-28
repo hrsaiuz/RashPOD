@@ -8,6 +8,7 @@ import { useRouter } from "next/navigation";
 import { Button, Card, FormField, Input, PageHeader, StatusBadge } from "@rashpod/ui";
 import { useAuth } from "../../../../auth/auth-provider";
 import DashboardLayout from "../../../dashboard-layout";
+import { useDashboardFeedback } from "../../../../../components/feedback/use-dashboard-feedback";
 
 type ProductionJobDetail = {
   id: string;
@@ -44,6 +45,7 @@ type ProductionJobDetail = {
 };
 
 export default function ProductionJobDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const feedback = useDashboardFeedback();
   const { id } = use(params);
   const router = useRouter();
   const { user, isLoading } = useAuth();
@@ -102,8 +104,12 @@ export default function ProductionJobDetailPage({ params }: { params: Promise<{ 
         window.open(data.url, "_blank", "noopener,noreferrer");
       }
       await load();
+      feedback.success({
+        title: path === "download-file" ? "Production file opened" : "Production job updated",
+        description: path === "download-file" ? "The secure download opened in a new tab." : "The latest job status is now visible.",
+      });
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Action failed.");
+      setError(feedback.error(e, { title: "Could not update production job", fallback: "Action failed." }));
     } finally {
       setSubmitting(false);
     }

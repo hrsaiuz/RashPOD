@@ -4,6 +4,7 @@ import { DM_Sans, Inter } from "next/font/google";
 import localFont from "next/font/local";
 import { MotionProvider } from "@rashpod/ui";
 import { AuthProvider } from "./auth/auth-provider";
+import { ToastProvider } from "../components/feedback/toast-provider";
 import "./globals.css";
 
 const dmSans = DM_Sans({
@@ -62,7 +63,9 @@ export default function RootLayout({ children }: { children: ReactNode }) {
     <html lang="en" className={`${googleSans.variable} ${dmSans.variable} ${inter.variable}`}>
       <body className="font-rash antialiased min-h-screen bg-brand-bg">
         <MotionProvider>
-          <AuthProvider>{children}</AuthProvider>
+          <ToastProvider>
+            <AuthProvider>{children}</AuthProvider>
+          </ToastProvider>
         </MotionProvider>
       </body>
     </html>

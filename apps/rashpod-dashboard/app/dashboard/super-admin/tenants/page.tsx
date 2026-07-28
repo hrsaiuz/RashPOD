@@ -4,6 +4,7 @@ import { FormEvent, useEffect, useState } from "react";
 import { Building2, Plus, RefreshCw, Search } from "lucide-react";
 import { Button, Card, Drawer, EmptyState, ErrorState, Input, Select, Skeleton, StatusBadge, Textarea } from "@rashpod/ui";
 import { api } from "../../../../lib/api";
+import { useDashboardFeedback } from "../../../../components/feedback/use-dashboard-feedback";
 import { ConfirmDialog, Feedback, FeedbackBanner, PageShell, Pagination } from "../super-admin-ui";
 
 const TENANT_STATUSES = ["TRIAL", "ACTIVE", "PAST_DUE", "SUSPENDED", "ARCHIVED"] as const;
@@ -48,6 +49,7 @@ const EMPTY_DRAFT: TenantDraft = {
 };
 
 export default function SuperAdminTenantsPage() {
+  const actionFeedback = useDashboardFeedback();
   const [rows, setRows] = useState<TenantRow[]>([]);
   const [plans, setPlans] = useState<PlanOption[]>([]);
   const [search, setSearch] = useState("");
@@ -121,12 +123,13 @@ export default function SuperAdminTenantsPage() {
     try {
       const created = await api.post<TenantRow>("/super-admin/tenants", tenantPayload(draft, true));
       setFeedback({ kind: "success", message: `${created.name} tenant created.` });
+      actionFeedback.success({ title: "Tenant created", description: `${created.name} is ready for configuration.` });
       setCreating(false);
       setDraft({ ...EMPTY_DRAFT });
       await load(1);
       await openTenant(created);
     } catch (error) {
-      setFeedback({ kind: "error", message: error instanceof Error ? error.message : "Could not create tenant" });
+      setFeedback({ kind: "error", message: actionFeedback.error(error, { title: "Could not create tenant", fallback: "Could not create tenant" }) });
     } finally {
       setSaving(false);
     }
@@ -141,9 +144,10 @@ export default function SuperAdminTenantsPage() {
       const updated = await api.patch<TenantRow>(`/super-admin/tenants/${selected.id}`, tenantPayload(draft, false));
       setSelected({ ...selected, ...updated });
       setFeedback({ kind: "success", message: `${updated.name} settings updated.` });
+      actionFeedback.success({ title: "Tenant settings saved", description: updated.name });
       await load(page);
     } catch (error) {
-      setFeedback({ kind: "error", message: error instanceof Error ? error.message : "Could not update tenant" });
+      setFeedback({ kind: "error", message: actionFeedback.error(error, { title: "Could not update tenant", fallback: "Could not update tenant" }) });
     } finally {
       setSaving(false);
     }
@@ -158,10 +162,11 @@ export default function SuperAdminTenantsPage() {
       const updated = await api.post<TenantRow>(`/super-admin/tenants/${selected.id}/${confirmation === "suspend" ? "suspend" : "reactivate"}`);
       setSelected({ ...selected, ...updated, status: target });
       setFeedback({ kind: "success", message: `${selected.name} is now ${target.toLowerCase()}.` });
+      actionFeedback.success({ title: `Tenant ${target === "ACTIVE" ? "reactivated" : "suspended"}`, description: selected.name });
       setConfirmation(null);
       await load(page);
     } catch (error) {
-      setFeedback({ kind: "error", message: error instanceof Error ? error.message : "Could not change tenant status" });
+      setFeedback({ kind: "error", message: actionFeedback.error(error, { title: "Could not change tenant status", fallback: "Could not change tenant status" }) });
       setConfirmation(null);
     } finally {
       setSaving(false);
@@ -175,12 +180,13 @@ export default function SuperAdminTenantsPage() {
     try {
       await api.post(`/super-admin/tenants/${selected.id}/plan`, { planId, status: "ACTIVE", notes: planNotes.trim() || undefined });
       setFeedback({ kind: "success", message: `${selected.name} was assigned to ${plans.find((plan) => plan.id === planId)?.name ?? "the selected plan"}.` });
+      actionFeedback.success({ title: "Tenant plan assigned", description: selected.name });
       setConfirmation(null);
       setPlanNotes("");
       await openTenant(selected);
       await load(page);
     } catch (error) {
-      setFeedback({ kind: "error", message: error instanceof Error ? error.message : "Could not assign plan" });
+      setFeedback({ kind: "error", message: actionFeedback.error(error, { title: "Could not assign tenant plan", fallback: "Could not assign plan" }) });
       setConfirmation(null);
     } finally {
       setSaving(false);
@@ -201,12 +207,13 @@ export default function SuperAdminTenantsPage() {
         reason: entitlementReason.trim() || undefined,
       });
       setFeedback({ kind: "success", message: `Entitlement ${entitlementKey.trim()} saved for ${selected.name}.` });
+      actionFeedback.success({ title: "Tenant entitlement saved", description: entitlementKey.trim() });
       setEntitlementKey("");
       setEntitlementValue("true");
       setEntitlementReason("");
       await openTenant(selected);
     } catch (error) {
-      setFeedback({ kind: "error", message: error instanceof Error ? error.message : "Could not save entitlement" });
+      setFeedback({ kind: "error", message: actionFeedback.error(error, { title: "Could not save entitlement", fallback: "Could not save entitlement" }) });
     } finally {
       setSaving(false);
     }

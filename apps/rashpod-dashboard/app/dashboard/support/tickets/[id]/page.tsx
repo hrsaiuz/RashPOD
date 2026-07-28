@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { Button, ErrorState, Textarea } from "@rashpod/ui";
 import { useAuth } from "../../../../auth/auth-provider";
 import DashboardLayout from "../../../dashboard-layout";
+import { useDashboardFeedback } from "../../../../../components/feedback/use-dashboard-feedback";
 
 type Ticket = {
   id: string;
@@ -17,6 +18,7 @@ type Ticket = {
 };
 
 export default function SupportTicketDetailPage() {
+  const feedback = useDashboardFeedback();
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const { user, isLoading } = useAuth();
@@ -46,8 +48,12 @@ export default function SupportTicketDetailPage() {
       if (!res.ok) throw new Error(`Server error (${res.status})`);
       setReply(""); setInternal(false);
       await load();
+      feedback.success({
+        title: internal ? "Internal note added" : "Reply sent",
+        description: internal ? "Only support staff can see this note." : "The customer can now see the response.",
+      });
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to add reply.");
+      setError(feedback.error(err, { title: "Could not add ticket message", fallback: "Failed to add reply." }));
     } finally {
       setSaving(false);
     }

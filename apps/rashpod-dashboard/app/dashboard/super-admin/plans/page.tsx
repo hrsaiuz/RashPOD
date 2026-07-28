@@ -4,6 +4,7 @@ import { FormEvent, useEffect, useState } from "react";
 import { CreditCard, Plus, RefreshCw } from "lucide-react";
 import { Button, Card, Drawer, EmptyState, ErrorState, Input, Select, Skeleton, StatusBadge, Textarea } from "@rashpod/ui";
 import { api } from "../../../../lib/api";
+import { useDashboardFeedback } from "../../../../components/feedback/use-dashboard-feedback";
 import { ConfirmDialog, Feedback, FeedbackBanner, PageShell, parseJsonObject } from "../super-admin-ui";
 
 type PlanRow = {
@@ -38,6 +39,7 @@ const EMPTY_PLAN: PlanDraft = {
 };
 
 export default function SuperAdminPlansPage() {
+  const actionFeedback = useDashboardFeedback();
   const [rows, setRows] = useState<PlanRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
@@ -91,11 +93,12 @@ export default function SuperAdminPlansPage() {
       if (editing.id) await api.patch(`/super-admin/plans/${editing.id}`, payload);
       else await api.post("/super-admin/plans", payload);
       setFeedback({ kind: "success", message: editing.id ? `${editing.name} updated.` : `${editing.name} created.` });
+      actionFeedback.success({ title: editing.id ? "Plan updated" : "Plan created", description: editing.name });
       setConfirming(false);
       setEditing(null);
       await load();
     } catch (error) {
-      setFeedback({ kind: "error", message: error instanceof Error ? error.message : "Could not save plan" });
+      setFeedback({ kind: "error", message: actionFeedback.error(error, { title: "Could not save plan", fallback: "Could not save plan" }) });
       setConfirming(false);
     } finally {
       setSaving(false);

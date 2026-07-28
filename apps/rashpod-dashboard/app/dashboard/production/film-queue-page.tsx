@@ -8,6 +8,7 @@ import { Download, FilePlus2, RefreshCw } from "lucide-react";
 import { useAuth } from "../../auth/auth-provider";
 import DashboardLayout from "../dashboard-layout";
 import { api } from "../../../lib/api";
+import { useDashboardFeedback } from "../../../components/feedback/use-dashboard-feedback";
 
 type FilmJob = {
   id: string;
@@ -20,6 +21,7 @@ type FilmJob = {
 };
 
 export function FilmQueuePage({ queueType, title }: { queueType: "DTF" | "UV_DTF"; title: string }) {
+  const feedback = useDashboardFeedback();
   const router = useRouter();
   const { user, isLoading: authLoading } = useAuth();
   const [jobs, setJobs] = useState<FilmJob[]>([]);
@@ -47,7 +49,8 @@ export function FilmQueuePage({ queueType, title }: { queueType: "DTF" | "UV_DTF
     try {
       await api.post(`/production/items/${job.id}/${job.productionFileStatus === "FAILED" ? "retry-file" : "request-file"}`, { reason: "Film production queue request" });
       await load();
-    } catch (err) { setError(err instanceof Error ? err.message : "File request failed."); }
+      feedback.success({ title: "Film file queued", description: "The production file request is being processed." });
+    } catch (err) { setError(feedback.error(err, { title: "Could not request film file", fallback: "File request failed." })); }
     finally { setWorking(null); }
   }
 
@@ -56,7 +59,8 @@ export function FilmQueuePage({ queueType, title }: { queueType: "DTF" | "UV_DTF
     try {
       const data = await api.get<{ url: string }>(`/production/items/${job.id}/download-file`);
       window.open(data.url, "_blank", "noopener,noreferrer");
-    } catch (err) { setError(err instanceof Error ? err.message : "Download failed."); }
+      feedback.success({ title: "Film file opened", description: "The secure download opened in a new tab." });
+    } catch (err) { setError(feedback.error(err, { title: "Could not download film file", fallback: "Download failed." })); }
     finally { setWorking(null); }
   }
 
@@ -67,7 +71,7 @@ export function FilmQueuePage({ queueType, title }: { queueType: "DTF" | "UV_DTF
     { key: "area", header: "Area", render: (_v, job) => <span className="text-sm text-brand-muted">{number(job.orderItem?.filmAreaCm2 ?? job.productSnapshotJson?.filmAreaCm2)} cm2</span> },
     { key: "file", header: "File", render: (_v, job) => <StatusBadge status={(job.productionFileStatus || "missing").toLowerCase()} /> },
     { key: "status", header: "Status", render: (_v, job) => <StatusBadge status={job.status.toLowerCase()} /> },
-    { key: "actions", header: "", render: (_v, job) => <div className="flex justify-end gap-2"><Button size="sm" variant="ghost" loading={working === job.id} onClick={() => requestFile(job)}><FilePlus2 size={14} /></Button><Button size="sm" variant="ghost" disabled={job.productionFileStatus !== "READY"} loading={working === job.id} onClick={() => download(job)}><Download size={14} /></Button></div> },
+    { key: "actions", header: "", render: (_v, job) => <div className="flex justify-end gap-2"><Button size="sm" variant="ghost" aria-label="Request production file" loading={working === job.id} onClick={() => requestFile(job)}><FilePlus2 size={14} /></Button><Button size="sm" variant="ghost" aria-label="Download production file" disabled={job.productionFileStatus !== "READY"} loading={working === job.id} onClick={() => download(job)}><Download size={14} /></Button></div> },
   ];
 
   return <DashboardLayout role="production"><div className="space-y-6"><div className="flex flex-wrap items-center justify-between gap-3"><div><h1 className="text-2xl font-bold text-brand-ink">{title}</h1><p className="text-sm text-brand-muted">Local film production jobs, print files, and queue status.</p></div><Button variant="secondary" onClick={load}><RefreshCw size={16} /> Refresh</Button></div>{error ? <ErrorState title="Could not load queue" description={error} /> : null}{loading ? <Skeleton className="h-64" /> : jobs.length === 0 ? <EmptyState title="No film jobs" description="Paid film orders for this queue will appear here." /> : <Card><DataTable rows={jobs} columns={columns} mobileMode="cards" /></Card>}</div></DashboardLayout>;

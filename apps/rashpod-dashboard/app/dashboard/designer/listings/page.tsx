@@ -22,10 +22,12 @@ import { Plus, Sparkles, Tag } from "lucide-react";
 import { useAuth } from "../../../auth/auth-provider";
 import DashboardLayout from "../../dashboard-layout";
 import { api, type Design, type Listing } from "../../../../lib/api";
+import { useToast } from "../../../../components/feedback/toast-provider";
 
 export default function DesignerListingsPage() {
   const router = useRouter();
   const { user, isLoading: authLoading } = useAuth();
+  const { toast } = useToast();
   const [designs, setDesigns] = useState<Design[]>([]);
   const [listings, setListings] = useState<Listing[]>([]);
   const [loading, setLoading] = useState(true);
@@ -105,9 +107,12 @@ export default function DesignerListingsPage() {
       });
       setCreateOpen(false);
       setForm({ designAssetId: "", type: "PRODUCT", title: "", description: "", price: "" });
+      toast({ tone: "success", title: "Listing draft created" });
       router.push(`/dashboard/designer/listings/${created.id}`);
     } catch (e) {
-      setSubmitError(e instanceof Error ? e.message : "Create failed");
+      const nextError = e instanceof Error ? e.message : "Create failed";
+      setSubmitError(nextError);
+      toast({ tone: "error", title: "Could not create listing", description: nextError });
     } finally {
       setSubmitting(false);
     }

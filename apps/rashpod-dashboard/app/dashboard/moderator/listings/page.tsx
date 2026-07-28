@@ -7,6 +7,7 @@ import { Button, Card, EmptyState, ErrorState, Input, Skeleton, StatusBadge, Tex
 import DashboardLayout from "../../dashboard-layout";
 import { api } from "../../../../lib/api";
 import { ModeratorActionDialog } from "../../../../components/moderator/ModeratorActionDialog";
+import { useDashboardFeedback } from "../../../../components/feedback/use-dashboard-feedback";
 
 type ListingRow = {
   id: string;
@@ -25,6 +26,7 @@ type ListingRow = {
 const STATUSES = ["", "DRAFT", "READY_TO_PUBLISH", "PUBLISHED", "REJECTED", "SUSPENDED"];
 
 export default function Page() {
+  const feedback = useDashboardFeedback();
   const [rows, setRows] = useState<ListingRow[]>([]);
   const [status, setStatus] = useState("");
   const [query, setQuery] = useState("");
@@ -92,10 +94,15 @@ export default function Page() {
     try {
       await api.post(`/admin/listings/${id}/status`, { status: nextStatus, reason: reason?.trim() || undefined });
       await load();
-      setMessage(nextStatus === "PUBLISHED" ? "Listing published." : "Listing rejected and the reason was recorded.");
+      const nextMessage = nextStatus === "PUBLISHED" ? "Listing published." : "Listing rejected and the reason was recorded.";
+      setMessage(nextMessage);
+      feedback.success({
+        title: nextStatus === "PUBLISHED" ? "Listing published" : "Listing rejected",
+        description: nextStatus === "PUBLISHED" ? "The listing is now available on published surfaces." : "The rejection reason was recorded.",
+      });
       return true;
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to update listing");
+      setError(feedback.error(err, { title: "Could not update listing", fallback: "Failed to update listing" }));
       return false;
     } finally {
       setSavingId("");

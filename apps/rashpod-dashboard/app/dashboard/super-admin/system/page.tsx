@@ -4,6 +4,7 @@ import { FormEvent, useEffect, useState } from "react";
 import { CloudCog, RefreshCw } from "lucide-react";
 import { Button, Card, ErrorState, Input, Skeleton } from "@rashpod/ui";
 import { api } from "../../../../lib/api";
+import { useDashboardFeedback } from "../../../../components/feedback/use-dashboard-feedback";
 import { ConfirmDialog, Feedback, FeedbackBanner, PageShell } from "../super-admin-ui";
 
 type SystemSettings = { companyName?: string; supportEmail?: string; metadata?: unknown };
@@ -15,6 +16,7 @@ type SystemHealth = {
 };
 
 export default function SuperAdminSystemPage() {
+  const actionFeedback = useDashboardFeedback();
   const [settings, setSettings] = useState<SystemSettings | null>(null);
   const [health, setHealth] = useState<SystemHealth | null>(null);
   const [loading, setLoading] = useState(true);
@@ -58,8 +60,9 @@ export default function SuperAdminSystemPage() {
       });
       setSettings(updated);
       setFeedback({ kind: "success", message: "Platform settings saved." });
+      actionFeedback.success({ title: "Platform settings saved", description: "The system configuration is now active." });
     } catch (error) {
-      setFeedback({ kind: "error", message: error instanceof Error ? error.message : "Could not save system settings" });
+      setFeedback({ kind: "error", message: actionFeedback.error(error, { title: "Could not save platform settings", fallback: "Could not save system settings" }) });
     } finally {
       setSaving(false);
       setConfirming(false);

@@ -1,6 +1,6 @@
 "use client";
 
-import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from "react";
+import { ChangeEvent, FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
   Button,
@@ -14,6 +14,8 @@ import { ArrowLeft, Upload as UploadIcon, FileImage, CheckCircle2, AlertCircle, 
 import { useAuth } from "../../../../auth/auth-provider";
 import DashboardLayout from "../../../dashboard-layout";
 import { DesignPreviewCard } from "../../../../../components/design/DesignPreviewCard";
+import { DesignerDesignStoryPanel } from "../../../../../components/design-story/DesignerDesignStoryPanel";
+import { useToast } from "../../../../../components/feedback/toast-provider";
 import { api, resolveUploadMimeType, uploadToSignedUrlWithProgress, type Design, type DesignWorkflowDetail, type UploadUrlResponse } from "../../../../../lib/api";
 
 const ACCEPTED = ["image/png", "image/jpeg", "image/svg+xml"];
@@ -41,6 +43,7 @@ function uploadStepMessage(step: string, err: unknown): string {
 
 export default function NewDesignPage() {
   const { user } = useAuth();
+  const { toast } = useToast();
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [file, setFile] = useState<File | null>(null);
@@ -51,9 +54,13 @@ export default function NewDesignPage() {
   const [createdId, setCreatedId] = useState<string | null>(null);
   const [submittingForReview, setSubmittingForReview] = useState(false);
   const [submittedForReview, setSubmittedForReview] = useState(false);
+  const [storySubmittedForReview, setStorySubmittedForReview] = useState(false);
   const [uploadedPreviewUrl, setUploadedPreviewUrl] = useState<string | null>(null);
 
   const localPreviewUrl = useMemo(() => (file ? URL.createObjectURL(file) : null), [file]);
+  const handleStoryStatusChange = useCallback((status: string | null) => {
+    setStorySubmittedForReview(status === "PENDING_REVIEW" || status === "PUBLISHED");
+  }, []);
 
   useEffect(() => {
     return () => {
@@ -102,8 +109,15 @@ export default function NewDesignPage() {
     try {
       await api.post(`/designer/designs/${createdId}/submit-for-moderation`);
       setSubmittedForReview(true);
+      toast({
+        tone: "success",
+        title: "Design sent for moderation",
+        description: "The moderator can now review the artwork and its submitted story.",
+      });
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Submit for moderation failed");
+      const nextError = err instanceof Error ? err.message : "Submit for moderation failed";
+      setError(nextError);
+      toast({ tone: "error", title: "Could not send design", description: nextError });
     } finally {
       setSubmittingForReview(false);
     }
@@ -188,6 +202,11 @@ export default function NewDesignPage() {
     setProgress("Verified and ready for moderation.");
     setCreatedId(design.id);
     setStep("success");
+    toast({
+      tone: "success",
+      title: "Design saved",
+      description: "Add its story below, then send both items for moderation.",
+    });
   }
 
   return (
@@ -204,26 +223,43 @@ export default function NewDesignPage() {
 
         {step === "success" && createdId ? (
           <div className="space-y-6">
+            <Card>
+              <ol className="grid gap-3 sm:grid-cols-3" aria-label="Design submission progress">
+                <UploadProgressStep number={1} label="Design uploaded" complete />
+                <UploadProgressStep number={2} label="Add story" complete={storySubmittedForReview} current={!storySubmittedForReview} />
+                <UploadProgressStep number={3} label="Send for moderation" complete={submittedForReview} current={storySubmittedForReview && !submittedForReview} />
+              </ol>
+            </Card>
             <DesignPreviewCard
               title="Uploaded design"
               src={uploadedPreviewUrl ?? localPreviewUrl}
               alt={title || "Uploaded design"}
             />
+            <DesignerDesignStoryPanel
+              designId={createdId}
+              designTitle={title}
+              onStatusChange={handleStoryStatusChange}
+            />
             <Card>
             <div className="flex flex-col items-center text-center py-6">
               <CheckCircle2 size={48} className="text-semantic-success mb-3" />
-              <h2 className="text-xl font-semibold text-brand-ink mb-2">Design uploaded</h2>
+              <h2 className="text-xl font-semibold text-brand-ink mb-2">Complete your submission</h2>
               <p className="text-brand-muted mb-6">
                 {submittedForReview ? (
-                  <>Your design is now <strong>pending moderation</strong>.</>
+                  <>Your design is now <strong>pending moderation</strong>. A submitted story will be reviewed alongside it.</>
                 ) : (
-                  <>It is saved as <strong>Draft</strong>. Submit it for moderator review when ready.</>
+                  <>The artwork is saved as a <strong>Draft</strong>. Finish the story above, submit it for approval, then send the design.</>
                 )}
               </p>
               {error ? <div className="mb-4 w-full"><ErrorState title="Submit failed" description={error} /></div> : null}
               <div className="flex flex-wrap justify-center gap-3">
                 {!submittedForReview ? (
-                  <Button variant="primaryBlue" loading={submittingForReview} onClick={() => void submitForModeration()}>
+                  <Button
+                    variant="primaryBlue"
+                    loading={submittingForReview}
+                    disabled={!storySubmittedForReview}
+                    onClick={() => void submitForModeration()}
+                  >
                     <Send size={16} /> Submit for moderation
                   </Button>
                 ) : null}
@@ -234,6 +270,11 @@ export default function NewDesignPage() {
                   <Button variant="secondary">Back to list</Button>
                 </Link>
               </div>
+              {!submittedForReview && !storySubmittedForReview ? (
+                <p className="mt-3 text-sm text-brand-muted">
+                  Submit the story for approval above to unlock the combined moderation request.
+                </p>
+              ) : null}
             </div>
           </Card>
           </div>
@@ -305,6 +346,26 @@ export default function NewDesignPage() {
         )}
       </div>
     </DashboardLayout>
+  );
+}
+
+function UploadProgressStep({ number, label, complete, current = false }: { number: number; label: string; complete: boolean; current?: boolean }) {
+  return (
+    <li
+      className={`flex min-h-12 items-center gap-3 rounded-2xl border px-4 py-3 ${
+        complete
+          ? "border-semantic-success/25 bg-semantic-successBg"
+          : current
+            ? "border-brand-blue/30 bg-brand-blue/5"
+            : "border-surface-borderSoft bg-white"
+      }`}
+      aria-current={current ? "step" : undefined}
+    >
+      <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-full text-sm font-bold ${complete ? "bg-semantic-success text-white" : current ? "bg-brand-blue text-white" : "bg-surface-card text-brand-muted"}`}>
+        {complete ? <CheckCircle2 size={18} aria-hidden="true" /> : number}
+      </span>
+      <span className="text-sm font-semibold text-brand-ink">{label}</span>
+    </li>
   );
 }
 

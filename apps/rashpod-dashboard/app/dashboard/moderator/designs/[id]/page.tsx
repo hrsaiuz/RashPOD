@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { AlertTriangle, ArrowLeft, ChevronDown, ChevronUp, Globe2, Loader2, MapPin, Plus, Trash2, XCircle } from "lucide-react";
+import { AlertTriangle, ArrowLeft, CheckCircle2, ChevronDown, ChevronUp, ClipboardCheck, FileText, Globe2, Image as ImageIcon, Loader2, MapPin, Plus, Trash2, XCircle } from "lucide-react";
 import { Button, Card, EmptyState, ErrorState, Input, ProductPickerGrid, Skeleton, StatusBadge } from "@rashpod/ui";
 import DashboardLayout from "../../../dashboard-layout";
 import { api, ApiError, type DesignWorkflowDetail } from "../../../../../lib/api";
@@ -14,6 +14,8 @@ import { DesignPreviewCard } from "../../../../../components/design/DesignPrevie
 import { ModeratorDesignStoryReview } from "../../../../../components/design-story/ModeratorDesignStoryReview";
 import { MockupErrorHint, PlacementChips, ReadinessChecklist } from "../../moderator-pipeline-helpers";
 import { buildModerationDecisionPayload } from "./moderation-decision-payload";
+import { useToast } from "../../../../../components/feedback/toast-provider";
+import { inferWorkflowStep, type WorkflowStep } from "./moderation-workflow";
 
 const REJECTION_REASONS = [
   ["COPYRIGHT_RISK", "Copyright or trademark risk"],
@@ -111,7 +113,6 @@ type PrintfulTemplateOption = {
 };
 
 type PipelineMode = "uzbek" | "global";
-
 type LocalSelectionForm = {
   id: string;
   localBaseProductId: string;
@@ -153,6 +154,7 @@ export default function Page() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
   const { user, isLoading: authLoading } = useAuth();
+  const { toast } = useToast();
   const [detail, setDetail] = useState<DesignWorkflowDetail | null>(null);
   const [baseProducts, setBaseProducts] = useState<BaseProductOption[]>([]);
   const [placementPresets, setPlacementPresets] = useState<PlacementPresetOption[]>([]);
@@ -173,12 +175,15 @@ export default function Page() {
   const [notes, setNotes] = useState("");
   const [pendingDecision, setPendingDecision] = useState<"APPROVE_LOCAL" | "APPROVE_GLOBAL" | "REJECT" | null>(null);
   const [pipelineMode, setPipelineMode] = useState<PipelineMode>("uzbek");
+  const [workflowStep, setWorkflowStep] = useState<WorkflowStep>(1);
   const [expandedLocal, setExpandedLocal] = useState<Record<string, boolean>>({});
   const [expandedGlobalNumeric, setExpandedGlobalNumeric] = useState<Record<string, boolean>>({});
   const [highlightMockups, setHighlightMockups] = useState(false);
   const mockupSectionRef = useRef<HTMLDivElement>(null);
   const prevMockupPending = useRef(false);
   const configLoadedRef = useRef(false);
+  const initialWorkflowStepSetRef = useRef(false);
+  const pendingScrollTargetRef = useRef<string | null>(null);
   const previewControllersRef = useRef(new Map<string, AbortController>());
 
   const activeBaseProducts = useMemo(() => baseProducts.filter((item) => item.isActive !== false), [baseProducts]);
@@ -253,7 +258,12 @@ export default function Page() {
       setLoadNotFound(false);
     }
     try {
-      setDetail(await api.get<DesignWorkflowDetail>(`/admin/designs/${params.id}/moderation-detail`));
+      const next = await api.get<DesignWorkflowDetail>(`/admin/designs/${params.id}/moderation-detail`);
+      setDetail(next);
+      if (!initialWorkflowStepSetRef.current) {
+        setWorkflowStep(inferWorkflowStep(next));
+        initialWorkflowStepSetRef.current = true;
+      }
     } catch (e) {
       if (e instanceof ApiError && e.status === 404) {
         setLoadNotFound(true);
@@ -546,9 +556,19 @@ export default function Page() {
         customRejectionReason: customReason,
         moderatorNotes: notes,
       });
-      setDetail(await api.post<DesignWorkflowDetail>(`/admin/designs/${params.id}/moderation-decision`, payload));
+      const next = await api.post<DesignWorkflowDetail>(`/admin/designs/${params.id}/moderation-decision`, payload);
+      setDetail(next);
+      if (decision === "REJECT") {
+        toast({ tone: "success", title: "Design returned to designer", description: "The rejection reason was recorded in the audit log." });
+        setWorkflowStep(1);
+      } else {
+        toast({ tone: "success", title: "Design approved", description: "Mockup generation has started." });
+        setWorkflowStep(3);
+      }
     } catch (e) {
-      setActionError(e instanceof Error ? e.message : "Failed to submit moderation decision");
+      const nextError = e instanceof Error ? e.message : "Failed to submit moderation decision";
+      setActionError(nextError);
+      toast({ tone: "error", title: "Moderation action failed", description: nextError });
     } finally {
       setSubmitting(false);
     }
@@ -583,6 +603,22 @@ export default function Page() {
 
   const designResolutionOk = Boolean(latest?.widthPx && latest?.heightPx && latest.widthPx >= 800 && latest.heightPx >= 800);
 
+  useEffect(() => {
+    const target = pendingScrollTargetRef.current;
+    if (!target) return;
+    pendingScrollTargetRef.current = null;
+    window.requestAnimationFrame(() => scrollToElement(target));
+  }, [workflowStep]);
+
+  function openWorkflowSection(step: WorkflowStep, target: string) {
+    if (workflowStep === step) {
+      scrollToElement(target);
+      return;
+    }
+    pendingScrollTargetRef.current = target;
+    setWorkflowStep(step);
+  }
+
   return (
     <DashboardLayout role="moderator">
       <div className="space-y-6">
@@ -592,15 +628,24 @@ export default function Page() {
           </Link>
           <div className="flex flex-wrap items-center justify-end gap-2">
             {detail?.previewImageUrl ? <a href={detail.previewImageUrl} target="_blank" rel="noopener noreferrer"><Button variant="secondary" size="sm">Download file</Button></a> : null}
-            {detail && canModerate ? <Button variant="secondary" size="sm" onClick={() => scrollToElement("moderation-rejection")}>Internal notes</Button> : null}
-            {detail && canModerate ? <Button variant="danger" size="sm" onClick={() => scrollToElement("moderation-rejection")}>Reject design</Button> : null}
-            {detail && canModerate ? <Button variant="primaryPeach" size="sm" onClick={() => scrollToElement("pipeline-approval")}>Approve</Button> : null}
+            {detail && canModerate ? <Button variant="secondary" size="sm" onClick={() => openWorkflowSection(1, "moderation-rejection")}>Internal notes</Button> : null}
+            {detail && canModerate ? <Button variant="danger" size="sm" onClick={() => openWorkflowSection(1, "moderation-rejection")}>Reject design</Button> : null}
+            {detail && canModerate ? <Button variant="primaryPeach" size="sm" onClick={() => openWorkflowSection(2, "pipeline-approval")}>Approve</Button> : null}
             {detail ? <StatusBadge status={detail.status} /> : null}
           </div>
         </div>
 
         {loadError ? <ErrorState title="Moderation issue" description={loadError} retry={<Button onClick={() => void load()}>Retry</Button>} /> : null}
         {actionError ? <ErrorState title="Action failed" description={actionError} retry={<Button onClick={() => setActionError("")}>Dismiss</Button>} /> : null}
+        {detail ? (
+          <ModerationWorkflowStepper
+            step={workflowStep}
+            canConfigure={canModerate}
+            hasSelections={Boolean(detail.productSelections?.length)}
+            hasListings={Boolean(detail.listings?.length)}
+            onChange={setWorkflowStep}
+          />
+        ) : null}
 
         {loading ? (
           <div aria-label="Loading design" className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
@@ -623,6 +668,8 @@ export default function Page() {
               </Card>
             ) : null}
             <div className="space-y-6">
+              {workflowStep === 1 ? (
+              <>
               <div className="grid items-start gap-6 lg:grid-cols-[minmax(280px,0.72fr)_minmax(0,1.28fr)]">
               <DesignPreviewCard
                 title="Design artwork"
@@ -648,9 +695,11 @@ export default function Page() {
               </Card>
               </div>
 
-              <ModeratorDesignStoryReview designId={String(params.id)} />
+              <ModeratorDesignStoryReview designId={String(params.id)} designStatus={detail.status} />
+              </>
+              ) : null}
 
-              {canModerate ? (
+              {workflowStep === 2 && canModerate ? (
               <Card id="pipeline-approval" className="scroll-mt-24">
                 <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
                   <div>
@@ -944,6 +993,7 @@ export default function Page() {
               </Card>
               ) : null}
 
+              {workflowStep === 1 ? (
               <Card>
                 <h2 className="mb-4 text-xl font-semibold text-brand-ink">Workflow History</h2>
                 {detail.moderationAudits?.length ? (
@@ -962,7 +1012,9 @@ export default function Page() {
                   <p className="text-brand-muted">No moderation decisions recorded yet.</p>
                 )}
               </Card>
+              ) : null}
 
+              {workflowStep === 3 ? (
               <Card ref={mockupSectionRef} className={highlightMockups ? "ring-2 ring-brand-blue/40" : undefined}>
                 <h2 className="mb-4 text-xl font-semibold text-brand-ink">Mockup & Listing Pipeline</h2>
                 {mockupPending ? (
@@ -1013,45 +1065,89 @@ export default function Page() {
                 ) : (
                   <p className="text-brand-muted">No product selections have been approved yet.</p>
                 )}
+                <div className="mt-5 flex justify-end">
+                  <Button
+                    onClick={() => setWorkflowStep(4)}
+                    disabled={!detail.listings?.length}
+                  >
+                    {detail.listings?.some((listing) => listing.status === "DRAFT") ? "Continue to listings" : "View listing status"}
+                  </Button>
+                </div>
               </Card>
+              ) : null}
 
-              {(detail.listings ?? []).filter((listing) => listing.status === "DRAFT").map((listing) => {
-                const selection = detail.productSelections?.find((item) => item.id === listing.designProductSelectionId);
-                return (
-                  <ModeratorListingWizard
-                    key={listing.id}
-                    listing={{
-                      ...listing,
-                      designProductSelection: selection
-                        ? {
-                            id: selection.id,
-                            pipeline: selection.pipeline,
-                            mockupAssets: selection.mockupAssets,
-                            localBaseProduct: selection.localBaseProduct as {
-                              name?: string;
-                              availableColors?: unknown;
-                              availableSizes?: unknown;
-                              defaultPrice?: string | number | null;
-                              currency?: string;
-                            } | null,
-                            printfulProductTemplate: selection.printfulProductTemplate as {
-                              displayName?: string;
-                              defaultRetailPrice?: string | number | null;
-                              currency?: string;
-                              allowedColorVariantIds?: unknown;
-                              allowedSizeVariantIds?: unknown;
-                            } | null,
-                          }
-                        : null,
-                    }}
-                    designTitle={detail.title}
-                    onSaved={load}
-                  />
-                );
-              })}
+              {workflowStep === 4 ? (
+                <>
+                  {(detail.listings ?? []).filter((listing) => listing.status === "DRAFT").map((listing) => {
+                    const selection = detail.productSelections?.find((item) => item.id === listing.designProductSelectionId);
+                    return (
+                      <ModeratorListingWizard
+                        key={listing.id}
+                        listing={{
+                          ...listing,
+                          designProductSelection: selection
+                            ? {
+                                id: selection.id,
+                                pipeline: selection.pipeline,
+                                mockupAssets: selection.mockupAssets,
+                                localBaseProduct: selection.localBaseProduct as {
+                                  name?: string;
+                                  availableColors?: unknown;
+                                  availableSizes?: unknown;
+                                  defaultPrice?: string | number | null;
+                                  currency?: string;
+                                } | null,
+                                printfulProductTemplate: selection.printfulProductTemplate as {
+                                  displayName?: string;
+                                  defaultRetailPrice?: string | number | null;
+                                  currency?: string;
+                                  allowedColorVariantIds?: unknown;
+                                  allowedSizeVariantIds?: unknown;
+                                } | null,
+                              }
+                            : null,
+                        }}
+                        designTitle={detail.title}
+                        onSaved={load}
+                      />
+                    );
+                  })}
+                  {!detail.listings?.some((listing) => listing.status === "DRAFT") ? (
+                    <Card>
+                      <div className="flex items-start gap-3">
+                        <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-semantic-successBg text-semantic-successText">
+                          <CheckCircle2 size={22} aria-hidden="true" />
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <h2 className="text-xl font-semibold text-brand-ink">Listing workflow complete</h2>
+                          <p className="mt-1 text-sm text-brand-muted">
+                            There are no remaining draft listings. Published and reviewed listings remain available below.
+                          </p>
+                        </div>
+                      </div>
+                      <div className="mt-5 grid gap-3">
+                        {(detail.listings ?? []).map((listing) => (
+                          <div key={listing.id} className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-brand-line bg-surface-card px-4 py-3">
+                            <div className="min-w-0">
+                              <p className="truncate font-semibold text-brand-ink">{listing.title}</p>
+                              <p className="mt-0.5 text-sm text-brand-muted">{listing.slug}</p>
+                            </div>
+                            <div className="flex flex-wrap items-center gap-3">
+                              <StatusBadge status={listing.status} />
+                              <Link href={`/dashboard/moderator/listings/${listing.id}`} className="inline-flex min-h-11 items-center font-semibold text-brand-blue underline decoration-brand-blue/30 underline-offset-4">
+                                Open listing
+                              </Link>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </Card>
+                  ) : null}
+                </>
+              ) : null}
             </div>
 
-            {canModerate ? (
+            {workflowStep === 1 && canModerate ? (
             <Card id="moderation-rejection" className="scroll-mt-24 border-semantic-danger/20">
               <div className="mb-4 flex items-center gap-2">
                 <AlertTriangle size={20} className="text-status-danger" />
@@ -1098,6 +1194,67 @@ export default function Page() {
         }}
       />
     </DashboardLayout>
+  );
+}
+
+function ModerationWorkflowStepper({
+  step,
+  canConfigure,
+  hasSelections,
+  hasListings,
+  onChange,
+}: {
+  step: WorkflowStep;
+  canConfigure: boolean;
+  hasSelections: boolean;
+  hasListings: boolean;
+  onChange: (step: WorkflowStep) => void;
+}) {
+  const steps: Array<{ id: WorkflowStep; label: string; description: string; icon: ReactNode; enabled: boolean }> = [
+    { id: 1, label: "Review", description: "Design and story", icon: <ClipboardCheck size={18} />, enabled: true },
+    { id: 2, label: "Placement", description: "Products and safe zones", icon: <MapPin size={18} />, enabled: canConfigure },
+    { id: 3, label: "Mockups", description: "Generated image set", icon: <ImageIcon size={18} />, enabled: hasSelections },
+    { id: 4, label: "Listing", description: "Copy, variants and publish", icon: <FileText size={18} />, enabled: hasListings },
+  ];
+
+  return (
+    <Card>
+      <div className="mb-4">
+        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-brand-blue">Create mockup & listing</p>
+        <h2 className="mt-1 text-xl font-semibold text-brand-ink">Four-step moderation workflow</h2>
+      </div>
+      <ol className="grid gap-3 md:grid-cols-2 xl:grid-cols-4" aria-label="Mockup and listing workflow">
+        {steps.map((item) => {
+          const current = item.id === step;
+          const complete = item.id < step && item.enabled;
+          return (
+            <li key={item.id}>
+              <button
+                type="button"
+                onClick={() => item.enabled && onChange(item.id)}
+                disabled={!item.enabled}
+                aria-current={current ? "step" : undefined}
+                className={`flex min-h-[76px] w-full items-center gap-3 rounded-2xl border px-4 py-3 text-left transition-colors focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-brand-blue/20 ${
+                  current
+                    ? "border-brand-blue bg-brand-blue/5"
+                    : complete
+                      ? "border-semantic-success/25 bg-semantic-successBg"
+                      : "border-surface-borderSoft bg-white disabled:cursor-not-allowed disabled:opacity-50"
+                }`}
+              >
+                <span className={`grid h-10 w-10 shrink-0 place-items-center rounded-full ${current ? "bg-brand-blue text-white" : complete ? "bg-semantic-success text-white" : "bg-surface-card text-brand-muted"}`}>
+                  {complete ? <CheckCircle2 size={18} aria-hidden="true" /> : item.icon}
+                </span>
+                <span>
+                  <span className="block text-sm font-semibold text-brand-ink">{item.id}. {item.label}</span>
+                  <span className="mt-0.5 block text-xs text-brand-muted">{item.description}</span>
+                </span>
+              </button>
+            </li>
+          );
+        })}
+      </ol>
+    </Card>
   );
 }
 

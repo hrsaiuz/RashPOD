@@ -16,6 +16,7 @@ import { useAuth } from "../../../../auth/auth-provider";
 import DashboardLayout from "../../../dashboard-layout";
 import { DesignPreviewCard } from "../../../../../components/design/DesignPreviewCard";
 import { DesignerDesignStoryPanel } from "../../../../../components/design-story/DesignerDesignStoryPanel";
+import { useToast } from "../../../../../components/feedback/toast-provider";
 import {
   api,
   resolveUploadMimeType,
@@ -44,6 +45,7 @@ export default function DesignDetailPage() {
   const router = useRouter();
   const params = useParams();
   const { user, isLoading: authLoading } = useAuth();
+  const { toast } = useToast();
   const id = String(params.id);
   const [design, setDesign] = useState<DesignerDesignDetail | null>(null);
   const [rights, setRights] = useState<CommercialRights | null>(null);
@@ -84,8 +86,11 @@ export default function DesignDetailPage() {
     try {
       await api.post(`/designer/designs/${id}/submit-for-moderation`);
       await load();
+      toast({ tone: "success", title: "Design sent for moderation" });
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Submit failed");
+      const nextError = e instanceof Error ? e.message : "Submit failed";
+      setError(nextError);
+      toast({ tone: "error", title: "Could not send design", description: nextError });
     } finally {
       setAction("");
     }
@@ -123,8 +128,11 @@ export default function DesignDetailPage() {
         dpi: 300,
       });
       await load();
+      toast({ tone: "success", title: "New design version uploaded" });
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Version upload failed");
+      const nextError = err instanceof Error ? err.message : "Version upload failed";
+      setError(nextError);
+      toast({ tone: "error", title: "Version upload failed", description: nextError });
     } finally {
       setAction("");
       if (fileInputRef.current) fileInputRef.current.value = "";

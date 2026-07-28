@@ -5,6 +5,7 @@ import { Button, Card, EmptyState, ErrorState, FormField, Input, Skeleton, Statu
 import { DollarSign } from "lucide-react";
 import DashboardLayout from "../../dashboard-layout";
 import { api } from "../../../../lib/api";
+import { useDashboardFeedback } from "../../../../components/feedback/use-dashboard-feedback";
 
 interface CurrencyConfig {
   code: string;
@@ -18,6 +19,7 @@ interface CurrencyConfig {
 }
 
 export default function AdminCurrenciesPage() {
+  const feedback = useDashboardFeedback();
   const [rows, setRows] = useState<CurrencyConfig[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -63,8 +65,9 @@ export default function AdminCurrenciesPage() {
         isPrimary: code === "UZS",
       });
       await load();
+      feedback.success({ title: "Currency settings saved", description: `${code} is updated across admin pricing controls.` });
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to save currency");
+      setError(feedback.error(err, { title: "Could not save currency", fallback: "Failed to save currency" }));
     } finally {
       setSaving(false);
     }

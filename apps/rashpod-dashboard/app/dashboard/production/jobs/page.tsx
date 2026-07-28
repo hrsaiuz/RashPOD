@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { Button, Card, DataTable, EmptyState, KpiTile, PageHeader, StatusBadge } from "@rashpod/ui";
 import { useAuth } from "../../../auth/auth-provider";
 import DashboardLayout from "../../dashboard-layout";
+import { useDashboardFeedback } from "../../../../components/feedback/use-dashboard-feedback";
 
 type ProductionJob = {
   id: string;
@@ -50,6 +51,7 @@ const SORTS = [
 ];
 
 export default function ProductionJobsPage() {
+  const feedback = useDashboardFeedback();
   const router = useRouter();
   const { user, isLoading } = useAuth();
   const [jobs, setJobs] = useState<ProductionJob[]>([]);
@@ -104,8 +106,12 @@ export default function ProductionJobsPage() {
         window.open(data.url, "_blank", "noopener,noreferrer");
       }
       await load();
+      feedback.success({
+        title: path === "download-file" ? "Production file opened" : "Production action completed",
+        description: productionActionDescription(path),
+      });
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Action failed.");
+      setError(feedback.error(e, { title: "Production action failed", fallback: "Action failed." }));
     } finally {
       setUpdating(null);
     }
@@ -276,6 +282,13 @@ export default function ProductionJobsPage() {
       />
     </DashboardLayout>
   );
+}
+
+function productionActionDescription(path: string) {
+  if (path === "assign") return "The production job assignment was updated.";
+  if (path === "request-file" || path === "retry-file") return "The production file job was queued.";
+  if (path === "download-file") return "The secure download opened in a new tab.";
+  return "The production queue has been refreshed.";
 }
 
 function ActionButton({
