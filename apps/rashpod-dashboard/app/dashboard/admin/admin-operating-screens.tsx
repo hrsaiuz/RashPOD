@@ -2,11 +2,12 @@
 
 import { FormEvent, ReactNode, useCallback, useEffect, useMemo, useState } from "react";
 import { Button, Card, EmptyState, ErrorState, Input, Select, Skeleton, StatusBadge, Textarea } from "@rashpod/ui";
-import { Activity, BadgePercent, CreditCard, Eye, FileText, Layers, ListChecks, Pencil, Plus, ShieldCheck, SlidersHorizontal, Trash2, Upload, X } from "lucide-react";
+import { Activity, BadgePercent, CreditCard, Eye, FileText, Images, Layers, ListChecks, Pencil, Plus, ShieldCheck, SlidersHorizontal, Star, Trash2, Upload, X } from "lucide-react";
 import { suggestDefaultPrintAreaRects, type PrintAreaRect } from "@rashpod/mockup";
 import DashboardLayout from "../dashboard-layout";
 import { api } from "../../../lib/api";
 import { PrintAreaVisualEditor } from "../../../components/mockup/PrintAreaVisualEditorDynamic";
+import { useDashboardFeedback } from "../../../components/feedback/use-dashboard-feedback";
 
 type IdRow = { id: string };
 type ProductType = IdRow & {
@@ -26,19 +27,45 @@ type ProductType = IdRow & {
   createdAt?: string;
 };
 type BaseProduct = IdRow & { name: string; skuPrefix?: string; productTypeId: string };
+type MockupView = IdRow & {
+  mockupTemplateId: string;
+  viewKey: string;
+  placementCode: string;
+  name: string;
+  blankImageKey: string;
+  mockupStyle?: string | null;
+  sortOrder: number;
+  isPrimary: boolean;
+  isActive: boolean;
+  _count?: { printAreas: number; galleryAssets: number };
+};
+type MockupGalleryAsset = IdRow & {
+  mockupTemplateId: string;
+  mockupViewId?: string | null;
+  role: "LIFESTYLE" | "DETAIL";
+  imageKey: string;
+  altText?: string | null;
+  sortOrder: number;
+  isActive: boolean;
+};
 type MockupTemplate = IdRow & {
   baseProductId: string;
   name: string;
   baseImageKey: string;
   lifestyleImageKey?: string | null;
   closeupImageKey?: string | null;
+  configurationVersion?: "LEGACY_V1" | "MULTI_VIEW_V2";
   isActive: boolean;
   sortOrder: number;
   createdAt?: string;
+  views?: MockupView[];
+  galleryAssets?: MockupGalleryAsset[];
 };
 type PrintArea = IdRow & {
   mockupTemplateId: string;
+  mockupViewId?: string | null;
   name: string;
+  placement?: "FRONT" | "BACK" | "LEFT_CHEST" | "RIGHT_CHEST" | "LEFT_SLEEVE" | "RIGHT_SLEEVE" | "FULL_WRAP" | "OTHER" | null;
   x: number;
   y: number;
   width: number;
@@ -105,6 +132,46 @@ type LoadState = "idle" | "loading" | "ready" | "error";
 
 function errorMessage(error: unknown, fallback = "Request failed") {
   return error instanceof Error ? error.message : fallback;
+}
+
+function useAdminDeleteAction() {
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const feedback = useDashboardFeedback();
+
+  const run = useCallback(async ({
+    id,
+    path,
+    confirmation,
+    successTitle,
+    successDescription,
+    failureTitle,
+    onDeleted,
+    onError,
+  }: {
+    id: string;
+    path: string;
+    confirmation: string;
+    successTitle: string;
+    successDescription?: string;
+    failureTitle: string;
+    onDeleted: () => Promise<void>;
+    onError: (message: string) => void;
+  }) => {
+    if (!confirm(confirmation)) return;
+    setDeletingId(id);
+    onError("");
+    try {
+      await api.delete(path);
+      feedback.success({ title: successTitle, description: successDescription });
+      await onDeleted();
+    } catch (cause) {
+      onError(feedback.error(cause, { title: failureTitle, fallback: "The selected item could not be deleted." }));
+    } finally {
+      setDeletingId(null);
+    }
+  }, [feedback]);
+
+  return { deletingId, run };
 }
 
 function asNumber(value: string) {
@@ -214,6 +281,7 @@ export function ProductTypesScreen() {
   const [error, setError] = useState("");
   const [editing, setEditing] = useState<(typeof PRODUCT_TYPE_EMPTY & { id?: string }) | null>(null);
   const [saving, setSaving] = useState(false);
+  const deletion = useAdminDeleteAction();
 
   async function load() {
     setState("loading");
@@ -267,13 +335,16 @@ export function ProductTypesScreen() {
   }
 
   async function remove(item: ProductType) {
-    if (!confirm(`Delete product type ${item.name}?`)) return;
-    try {
-      await api.delete(`/admin/product-types/${item.id}`);
-      await load();
-    } catch (err) {
-      setError(errorMessage(err));
-    }
+    await deletion.run({
+      id: item.id,
+      path: `/admin/product-types/${item.id}`,
+      confirmation: `Delete product type ${item.name}?`,
+      successTitle: "Product type deleted",
+      successDescription: `${item.name} was removed.`,
+      failureTitle: "Could not delete product type",
+      onDeleted: load,
+      onError: setError,
+    });
   }
 
   return (
@@ -282,16 +353,16 @@ export function ProductTypesScreen() {
       {state === "loading" ? <Skeleton className="h-64" /> : state === "error" ? <Notice message={error} onRetry={load} /> : items.length === 0 ? (
         <Card><EmptyState icon={<SlidersHorizontal className="text-brand-peach" size={32} />} title="No product types" description="Create the first configurable product type before adding base products or mockup templates." action={<Button onClick={() => open()}><Plus size={16} /> Add product type</Button>} /></Card>
       ) : (
-        <Card className="!p-0 overflow-hidden"><div className="overflow-x-auto"><table className="w-full text-sm"><thead className="bg-surface-app text-brand-muted"><tr><th className="px-5 py-3 text-left">Product</th><th className="px-5 py-3 text-left">Channels</th><th className="px-5 py-3 text-left">Method</th><th className="px-5 py-3 text-left">Cost / Margin</th><th className="px-5 py-3 text-left">Status</th><th className="px-5 py-3 text-right">Actions</th></tr></thead><tbody className="divide-y divide-surface-borderSoft">{items.map((item) => <tr key={item.id}><td className="px-5 py-4"><p className="font-semibold text-brand-ink">{item.name}</p><p className="text-xs text-brand-muted">{item.slug} · {item.category}</p></td><td className="px-5 py-4"><div className="flex flex-wrap gap-1 text-xs text-brand-muted">{item.availableForDesigners && <span>Designers</span>}{item.availableInShop && <span>Shop</span>}{item.availableForCorporate && <span>Corporate</span>}{item.availableForMarketplace && <span>Marketplace</span>}{item.supportsFilmSale && <span>Film</span>}</div></td><td className="px-5 py-4">{item.productionMethod}</td><td className="px-5 py-4">{decimal(item.baseCost) || "-"} / {decimal(item.defaultMargin) || "-"}</td><td className="px-5 py-4"><StatusBadge status={item.isActive ? "ACTIVE" : "INACTIVE"} /></td><td className="px-5 py-4"><RowActions><Button size="sm" variant="secondary" onClick={() => open(item)}><Pencil size={14} /> Edit</Button><Button size="sm" variant="ghost" onClick={() => remove(item)}><Trash2 size={14} /> Delete</Button></RowActions></td></tr>)}</tbody></table></div></Card>
+        <Card className="!p-0 overflow-hidden"><div className="overflow-x-auto"><table className="w-full text-sm"><thead className="bg-surface-app text-brand-muted"><tr><th className="px-5 py-3 text-left">Product</th><th className="px-5 py-3 text-left">Channels</th><th className="px-5 py-3 text-left">Method</th><th className="px-5 py-3 text-left">Cost / Margin</th><th className="px-5 py-3 text-left">Status</th><th className="px-5 py-3 text-right">Actions</th></tr></thead><tbody className="divide-y divide-surface-borderSoft">{items.map((item) => <tr key={item.id}><td className="px-5 py-4"><p className="font-semibold text-brand-ink">{item.name}</p><p className="text-xs text-brand-muted">{item.slug} · {item.category}</p></td><td className="px-5 py-4"><div className="flex flex-wrap gap-1 text-xs text-brand-muted">{item.availableForDesigners && <span>Designers</span>}{item.availableInShop && <span>Shop</span>}{item.availableForCorporate && <span>Corporate</span>}{item.availableForMarketplace && <span>Marketplace</span>}{item.supportsFilmSale && <span>Film</span>}</div></td><td className="px-5 py-4">{item.productionMethod}</td><td className="px-5 py-4">{decimal(item.baseCost) || "-"} / {decimal(item.defaultMargin) || "-"}</td><td className="px-5 py-4"><StatusBadge status={item.isActive ? "ACTIVE" : "INACTIVE"} /></td><td className="px-5 py-4"><RowActions><Button size="sm" variant="secondary" onClick={() => open(item)}><Pencil size={14} /> Edit</Button><Button size="sm" variant="ghost" onClick={() => remove(item)} loading={deletion.deletingId === item.id} disabled={deletion.deletingId !== null}><Trash2 size={14} /> Delete</Button></RowActions></td></tr>)}</tbody></table></div></Card>
       )}
       {editing && <Drawer title={editing.id ? "Edit product type" : "New product type"} onClose={() => setEditing(null)}><form className="space-y-4" onSubmit={save}><div className="grid grid-cols-1 md:grid-cols-2 gap-4"><Field label="Name"><Input required value={editing.name} onChange={(e) => setEditing({ ...editing, name: e.target.value, slug: editing.slug || e.target.value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "") })} /></Field><Field label="Slug"><Input required value={editing.slug} onChange={(e) => setEditing({ ...editing, slug: e.target.value })} /></Field><Field label="Category"><Input required value={editing.category} onChange={(e) => setEditing({ ...editing, category: e.target.value })} /></Field><Field label="Production method"><Input required value={editing.productionMethod} onChange={(e) => setEditing({ ...editing, productionMethod: e.target.value })} /></Field><Field label="Base cost"><Input inputMode="decimal" value={editing.baseCost} onChange={(e) => setEditing({ ...editing, baseCost: e.target.value })} /></Field><Field label="Default margin"><Input inputMode="decimal" value={editing.defaultMargin} onChange={(e) => setEditing({ ...editing, defaultMargin: e.target.value })} /></Field></div><div className="grid grid-cols-1 md:grid-cols-2 gap-3"><ToggleField label="Active" checked={editing.isActive} onChange={(v) => setEditing({ ...editing, isActive: v })} /><ToggleField label="Available for designers" checked={editing.availableForDesigners} onChange={(v) => setEditing({ ...editing, availableForDesigners: v })} /><ToggleField label="Available in shop" checked={editing.availableInShop} onChange={(v) => setEditing({ ...editing, availableInShop: v })} /><ToggleField label="Available for corporate" checked={editing.availableForCorporate} onChange={(v) => setEditing({ ...editing, availableForCorporate: v })} /><ToggleField label="Available for marketplace" checked={editing.availableForMarketplace} onChange={(v) => setEditing({ ...editing, availableForMarketplace: v })} /><ToggleField label="Requires mockup" checked={editing.requiresMockup} onChange={(v) => setEditing({ ...editing, requiresMockup: v })} /><ToggleField label="Supports film sale" checked={editing.supportsFilmSale} onChange={(v) => setEditing({ ...editing, supportsFilmSale: v })} /></div><div className="flex justify-end gap-3"><Button type="button" variant="secondary" onClick={() => setEditing(null)}>Cancel</Button><Button type="submit" loading={saving}>Save product type</Button></div></form></Drawer>}
     </PageShell>
   );
 }
 
-const MOCKUP_EMPTY = { baseProductId: "", name: "", baseImageKey: "", lifestyleImageKey: "", closeupImageKey: "", isActive: true, sortOrder: "0" };
+const MOCKUP_EMPTY = { baseProductId: "", name: "", baseImageKey: "", isActive: true, sortOrder: "0" };
 
-type MockupImageField = "baseImageKey" | "lifestyleImageKey" | "closeupImageKey";
+type MockupImageField = "baseImageKey";
 
 type MockupEditingState = typeof MOCKUP_EMPTY & {
   id?: string;
@@ -300,25 +371,37 @@ type MockupEditingState = typeof MOCKUP_EMPTY & {
 
 type MediaAssetRow = { objectKey: string; publicUrl?: string | null };
 
-const MOCKUP_IMAGE_SPECS: Record<MockupImageField, { label: string; required: boolean; description: string; optimal: string }> = {
-  baseImageKey: {
-    label: "Base product image",
-    required: true,
-    description: "The blank product photo the renderer composites the design onto. This is the main mockup canvas for listing image #1.",
-    optimal: "2000×2000 px or larger, PNG or JPG, neutral or transparent background, front-facing view, print area clearly visible, even studio lighting.",
-  },
-  lifestyleImageKey: {
-    label: "Lifestyle image",
-    required: false,
-    description: "A contextual or worn-product shot for the shop gallery. Shown as listing image #2 when present; otherwise the base image is reused.",
-    optimal: "1600×2000 px+, JPG or PNG, model or styled scene, product readable at a glance, minimal clutter, brand-safe background.",
-  },
-  closeupImageKey: {
-    label: "Close-up detail",
-    required: false,
-    description: "A tight crop highlighting print quality, fabric, or finishing. Shown as listing image #3 when present; otherwise the base image is reused.",
-    optimal: "1200×1200 px+, PNG or JPG, sharp focus on print area or texture, high contrast, no heavy filters.",
-  },
+type MockupUploadSpec = { label: string; required: boolean; description: string; optimal: string };
+
+const PRIMARY_VIEW_IMAGE_SPEC: MockupUploadSpec = {
+  label: "Primary product view",
+  required: true,
+  description: "Upload the first blank rendering canvas. You can add back, sleeve, label, and custom views in step 2.",
+  optimal: "2000×2000 px or larger, PNG or JPG, neutral or transparent background, print surface clearly visible, even studio lighting.",
+};
+
+type MockupViewEditingState = {
+  id?: string;
+  viewKey: string;
+  placementCode: string;
+  name: string;
+  blankImageKey: string;
+  mockupStyle: string;
+  sortOrder: string;
+  isPrimary: boolean;
+  isActive: boolean;
+  previewUrl?: string;
+};
+
+type MockupGalleryEditingState = {
+  id?: string;
+  mockupViewId: string;
+  role: "LIFESTYLE" | "DETAIL";
+  imageKey: string;
+  altText: string;
+  sortOrder: string;
+  isActive: boolean;
+  previewUrl?: string;
 };
 
 async function uploadMockupTemplateImage(file: File, title: string) {
@@ -364,7 +447,7 @@ function MockupImageUploadField({
   onUpload,
   onClear,
 }: {
-  spec: (typeof MOCKUP_IMAGE_SPECS)[MockupImageField];
+  spec: MockupUploadSpec;
   objectKey: string;
   previewUrl?: string;
   uploading: boolean;
@@ -423,8 +506,13 @@ export function MockupTemplatesScreen() {
   const [state, setState] = useState<LoadState>("loading");
   const [error, setError] = useState("");
   const [editing, setEditing] = useState<MockupEditingState | null>(null);
+  const [managing, setManaging] = useState<MockupTemplate | null>(null);
+  const [viewEditing, setViewEditing] = useState<MockupViewEditingState | null>(null);
+  const [galleryEditing, setGalleryEditing] = useState<MockupGalleryEditingState | null>(null);
   const [saving, setSaving] = useState(false);
-  const [uploadingField, setUploadingField] = useState<MockupImageField | null>(null);
+  const [managerBusy, setManagerBusy] = useState<string | null>(null);
+  const [uploadingField, setUploadingField] = useState<string | null>(null);
+  const deletion = useAdminDeleteAction();
 
   async function loadMediaPreviews() {
     try {
@@ -481,14 +569,10 @@ export function MockupTemplatesScreen() {
         baseProductId: item.baseProductId,
         name: item.name,
         baseImageKey: item.baseImageKey,
-        lifestyleImageKey: item.lifestyleImageKey || "",
-        closeupImageKey: item.closeupImageKey || "",
         isActive: item.isActive,
         sortOrder: String(item.sortOrder ?? 0),
         previews: {
           baseImageKey: previewFor("baseImageKey", item.baseImageKey),
-          lifestyleImageKey: item.lifestyleImageKey ? previewFor("lifestyleImageKey", item.lifestyleImageKey) : undefined,
-          closeupImageKey: item.closeupImageKey ? previewFor("closeupImageKey", item.closeupImageKey) : undefined,
         },
       });
       return;
@@ -496,12 +580,188 @@ export function MockupTemplatesScreen() {
     setEditing({ ...MOCKUP_EMPTY, baseProductId: baseProducts[0]?.id ?? "", previews: {} });
   }
 
+  async function openManager(templateId: string) {
+    setManagerBusy("load");
+    setError("");
+    try {
+      const detail = await api.get<MockupTemplate>(`/admin/mockup-templates/${templateId}`);
+      setManaging(detail);
+      setViewEditing(null);
+      setGalleryEditing(null);
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
+      setManagerBusy(null);
+    }
+  }
+
+  async function refreshManager() {
+    if (!managing) return;
+    const detail = await api.get<MockupTemplate>(`/admin/mockup-templates/${managing.id}`);
+    setManaging(detail);
+    await load();
+  }
+
+  function startViewEditor(view?: MockupView) {
+    const viewCount = managing?.views?.length ?? 0;
+    setViewEditing(
+      view
+        ? {
+            id: view.id,
+            viewKey: view.viewKey,
+            placementCode: view.placementCode,
+            name: view.name,
+            blankImageKey: view.blankImageKey,
+            mockupStyle: view.mockupStyle ?? "",
+            sortOrder: String(view.sortOrder),
+            isPrimary: view.isPrimary,
+            isActive: view.isActive,
+            previewUrl: mediaByObjectKey.get(view.blankImageKey),
+          }
+        : {
+            viewKey: "",
+            placementCode: "",
+            name: "",
+            blankImageKey: "",
+            mockupStyle: "",
+            sortOrder: String(viewCount),
+            isPrimary: viewCount === 0,
+            isActive: true,
+          },
+    );
+  }
+
+  function startGalleryEditor(asset?: MockupGalleryAsset) {
+    setGalleryEditing(
+      asset
+        ? {
+            id: asset.id,
+            mockupViewId: asset.mockupViewId ?? "",
+            role: asset.role,
+            imageKey: asset.imageKey,
+            altText: asset.altText ?? "",
+            sortOrder: String(asset.sortOrder),
+            isActive: asset.isActive,
+            previewUrl: mediaByObjectKey.get(asset.imageKey),
+          }
+        : {
+            mockupViewId: managing?.views?.find((view) => view.isPrimary)?.id ?? "",
+            role: "LIFESTYLE",
+            imageKey: "",
+            altText: "",
+            sortOrder: String(managing?.galleryAssets?.length ?? 0),
+            isActive: true,
+          },
+    );
+  }
+
+  async function handleManagerImageUpload(target: "view" | "gallery", file: File) {
+    if (!managing) return;
+    const uploadKey = `${target}-${target === "view" ? viewEditing?.id ?? "new" : galleryEditing?.id ?? "new"}`;
+    setUploadingField(uploadKey);
+    setError("");
+    try {
+      const label = target === "view" ? viewEditing?.name || "Product view" : `${galleryEditing?.role ?? "Gallery"} image`;
+      const uploaded = await uploadMockupTemplateImage(file, `${managing.name} — ${label}`);
+      setMediaByObjectKey((current) => new Map(current).set(uploaded.objectKey, uploaded.publicUrl ?? ""));
+      if (target === "view") {
+        setViewEditing((current) => current ? { ...current, blankImageKey: uploaded.objectKey, previewUrl: uploaded.publicUrl } : current);
+      } else {
+        setGalleryEditing((current) => current ? { ...current, imageKey: uploaded.objectKey, previewUrl: uploaded.publicUrl } : current);
+      }
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
+      setUploadingField(null);
+    }
+  }
+
+  async function saveManagedView(event: FormEvent) {
+    event.preventDefault();
+    if (!managing || !viewEditing?.blankImageKey) return;
+    setManagerBusy("view-save");
+    setError("");
+    try {
+      const payload = {
+        viewKey: viewEditing.viewKey || viewEditing.placementCode,
+        placementCode: viewEditing.placementCode,
+        name: viewEditing.name,
+        blankImageKey: viewEditing.blankImageKey,
+        mockupStyle: viewEditing.mockupStyle || undefined,
+        sortOrder: Number(viewEditing.sortOrder),
+        isPrimary: viewEditing.isPrimary,
+        isActive: viewEditing.isActive,
+      };
+      if (viewEditing.id) await api.patch(`/admin/mockup-views/${viewEditing.id}`, payload);
+      else await api.post(`/admin/mockup-templates/${managing.id}/views`, payload);
+      setViewEditing(null);
+      await refreshManager();
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
+      setManagerBusy(null);
+    }
+  }
+
+  async function removeManagedView(view: MockupView) {
+    if (!confirm(`Delete ${view.name}? Views with print areas must be reassigned first.`)) return;
+    setManagerBusy(`view-delete-${view.id}`);
+    setError("");
+    try {
+      await api.delete(`/admin/mockup-views/${view.id}`);
+      await refreshManager();
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
+      setManagerBusy(null);
+    }
+  }
+
+  async function saveManagedGalleryAsset(event: FormEvent) {
+    event.preventDefault();
+    if (!managing || !galleryEditing?.imageKey) return;
+    setManagerBusy("gallery-save");
+    setError("");
+    try {
+      const payload = {
+        mockupViewId: galleryEditing.mockupViewId || null,
+        role: galleryEditing.role,
+        imageKey: galleryEditing.imageKey,
+        altText: galleryEditing.altText || undefined,
+        sortOrder: Number(galleryEditing.sortOrder),
+        isActive: galleryEditing.isActive,
+      };
+      if (galleryEditing.id) await api.patch(`/admin/mockup-gallery-assets/${galleryEditing.id}`, payload);
+      else await api.post(`/admin/mockup-templates/${managing.id}/gallery-assets`, payload);
+      setGalleryEditing(null);
+      await refreshManager();
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
+      setManagerBusy(null);
+    }
+  }
+
+  async function removeManagedGalleryAsset(asset: MockupGalleryAsset) {
+    if (!confirm(`Delete this ${asset.role.toLowerCase()} image?`)) return;
+    setManagerBusy(`gallery-delete-${asset.id}`);
+    setError("");
+    try {
+      await api.delete(`/admin/mockup-gallery-assets/${asset.id}`);
+      await refreshManager();
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
+      setManagerBusy(null);
+    }
+  }
+
   async function handleImageUpload(field: MockupImageField, file: File) {
     if (!editing) return;
     setUploadingField(field);
     setError("");
     try {
-      const title = `${editing.name || "Mockup template"} — ${MOCKUP_IMAGE_SPECS[field].label}`;
+      const title = `${editing.name || "Mockup template"} — ${PRIMARY_VIEW_IMAGE_SPEC.label}`;
       const uploaded = await uploadMockupTemplateImage(file, title);
       setMediaByObjectKey((current) => new Map(current).set(uploaded.objectKey, uploaded.publicUrl ?? ""));
       setEditing((current) =>
@@ -534,13 +794,15 @@ export function MockupTemplatesScreen() {
         baseProductId: editing.baseProductId,
         name: editing.name,
         baseImageKey: editing.baseImageKey,
-        lifestyleImageKey: editing.lifestyleImageKey || undefined,
-        closeupImageKey: editing.closeupImageKey || undefined,
         isActive: editing.isActive,
         sortOrder: Number(editing.sortOrder),
       };
-      if (editing.id) await api.patch(`/admin/mockup-templates/${editing.id}`, payload);
-      else await api.post("/admin/mockup-templates", payload);
+      if (editing.id) {
+        await api.patch(`/admin/mockup-templates/${editing.id}`, payload);
+      } else {
+        const created = await api.post<MockupTemplate>("/admin/mockup-templates", payload);
+        await openManager(created.id);
+      }
       setEditing(null);
       await load();
     } catch (err) {
@@ -551,19 +813,22 @@ export function MockupTemplatesScreen() {
   }
 
   async function remove(item: MockupTemplate) {
-    if (!confirm(`Delete mockup template ${item.name}?`)) return;
-    try {
-      await api.delete(`/admin/mockup-templates/${item.id}`);
-      await load();
-    } catch (err) {
-      setError(errorMessage(err));
-    }
+    await deletion.run({
+      id: item.id,
+      path: `/admin/mockup-templates/${item.id}`,
+      confirmation: `Delete mockup template ${item.name}? Its unused print areas will also be deleted.`,
+      successTitle: "Mockup template deleted",
+      successDescription: `${item.name} and its unused print areas were removed.`,
+      failureTitle: "Could not delete mockup template",
+      onDeleted: load,
+      onError: setError,
+    });
   }
 
   return (
     <PageShell
       title="Mockup Templates"
-      description="Upload base, lifestyle, and close-up photos for each product mockup. Images are stored in the media library and referenced by the listing renderer."
+      description="Configure product views such as front, back, sleeves, and labels. Printable areas are defined against each view, while lifestyle and detail images remain separate gallery assets."
       icon={<Layers size={22} />}
       action={
         <Button onClick={() => open()} disabled={!baseProducts.length}>
@@ -581,7 +846,7 @@ export function MockupTemplatesScreen() {
           <EmptyState
             icon={<Layers className="text-brand-peach" size={32} />}
             title="No mockup templates"
-            description="Create a template after adding a base product. Upload the three listing images with notes on each role."
+            description="Create a template after adding a base product, then configure its supported product views and gallery images."
           />
         </Card>
       ) : (
@@ -607,11 +872,11 @@ export function MockupTemplatesScreen() {
                     <td className="px-5 py-4">{baseName.get(item.baseProductId) || item.baseProductId}</td>
                     <td className="px-5 py-4">
                       <div className="flex gap-2">
-                        {[item.baseImageKey, item.lifestyleImageKey, item.closeupImageKey].filter(Boolean).map((key) => {
+                        {(item.views?.length ? item.views.map((view) => view.blankImageKey) : [item.baseImageKey]).slice(0, 4).map((key) => {
                           const url = mediaByObjectKey.get(String(key));
                           return url ? (
                             // eslint-disable-next-line @next/next/no-img-element
-                            <img key={String(key)} src={url} alt="" className="h-12 w-12 rounded-lg border border-surface-borderSoft object-cover" />
+                            <img key={String(key)} src={url} alt="" loading="lazy" className="h-12 w-12 rounded-lg border border-surface-borderSoft object-cover" />
                           ) : (
                             <span key={String(key)} className="inline-flex h-12 w-12 items-center justify-center rounded-lg border border-dashed border-surface-borderSoft text-[10px] text-brand-muted">
                               IMG
@@ -619,16 +884,22 @@ export function MockupTemplatesScreen() {
                           );
                         })}
                       </div>
+                      <p className="mt-1 text-xs text-brand-muted">
+                        {item.views?.length ?? 1} view{(item.views?.length ?? 1) === 1 ? "" : "s"} · {item.galleryAssets?.length ?? 0} gallery
+                      </p>
                     </td>
                     <td className="px-5 py-4">
                       <StatusBadge status={item.isActive ? "ACTIVE" : "INACTIVE"} />
                     </td>
                     <td className="px-5 py-4">
                       <RowActions>
-                        <Button size="sm" variant="secondary" onClick={() => open(item)}>
-                          <Pencil size={14} /> Edit
+                        <Button size="sm" onClick={() => void openManager(item.id)} loading={managerBusy === "load"}>
+                          <Images size={14} /> Manage views
                         </Button>
-                        <Button size="sm" variant="ghost" onClick={() => remove(item)}>
+                        <Button size="sm" variant="secondary" onClick={() => open(item)}>
+                          <Pencil size={14} /> Details
+                        </Button>
+                        <Button size="sm" variant="ghost" onClick={() => remove(item)} loading={deletion.deletingId === item.id} disabled={deletion.deletingId !== null}>
                           <Trash2 size={14} /> Delete
                         </Button>
                       </RowActions>
@@ -641,8 +912,16 @@ export function MockupTemplatesScreen() {
         </Card>
       )}
       {editing ? (
-        <Drawer title={editing.id ? "Edit mockup template" : "New mockup template"} onClose={() => setEditing(null)}>
+        <Drawer title={editing.id ? "Edit template details" : "New mockup template · Step 1 of 2"} onClose={() => setEditing(null)}>
           <form className="space-y-4" onSubmit={save}>
+            <div className="rounded-2xl border border-brand-blue/20 bg-brand-blueLight/25 p-4">
+              <p className="text-sm font-semibold text-brand-ink">Template basics</p>
+              <p className="mt-1 text-sm text-brand-muted">
+                {editing.id
+                  ? "Update the catalog identity here. Product-view images are managed separately."
+                  : "Start with the primary blank product view. After saving, add back, sleeves, labels, lifestyle shots, and detail images."}
+              </p>
+            </div>
             <Field label="Base product">
               <Select required value={editing.baseProductId} onChange={(e) => setEditing({ ...editing, baseProductId: e.target.value })}>
                 <option value="">Select base product</option>
@@ -661,38 +940,273 @@ export function MockupTemplatesScreen() {
                 <Input inputMode="numeric" value={editing.sortOrder} onChange={(e) => setEditing({ ...editing, sortOrder: e.target.value })} />
               </Field>
             </div>
-            {(Object.keys(MOCKUP_IMAGE_SPECS) as MockupImageField[]).map((field) => (
+            {!editing.id ? (
               <MockupImageUploadField
-                key={field}
-                spec={MOCKUP_IMAGE_SPECS[field]}
-                objectKey={editing[field]}
-                previewUrl={previewFor(field, editing[field], editing.previews)}
-                uploading={uploadingField === field}
-                onUpload={(file) => void handleImageUpload(field, file)}
-                onClear={
-                  field === "baseImageKey"
-                    ? undefined
-                    : () => setEditing((current) => (current ? { ...current, [field]: "", previews: { ...current.previews, [field]: undefined } } : current))
-                }
+                spec={PRIMARY_VIEW_IMAGE_SPEC}
+                objectKey={editing.baseImageKey}
+                previewUrl={previewFor("baseImageKey", editing.baseImageKey, editing.previews)}
+                uploading={uploadingField === "baseImageKey"}
+                onUpload={(file) => void handleImageUpload("baseImageKey", file)}
               />
-            ))}
+            ) : null}
             <ToggleField label="Active" checked={editing.isActive} onChange={(v) => setEditing({ ...editing, isActive: v })} />
             <div className="flex justify-end gap-3">
               <Button type="button" variant="secondary" onClick={() => setEditing(null)}>
                 Cancel
               </Button>
               <Button type="submit" loading={saving} disabled={!editing.baseImageKey}>
-                Save template
+                {editing.id ? "Save details" : "Save and add views"}
               </Button>
             </div>
           </form>
+        </Drawer>
+      ) : null}
+      {managing ? (
+        <Drawer title={`${managing.name} · Step 2 of 2`} onClose={() => setManaging(null)} size="wide">
+          <div className="space-y-8">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="rounded-2xl border border-semantic-success/30 bg-semantic-successBg p-4">
+                <p className="text-xs font-semibold uppercase tracking-wide text-semantic-successText">Step 1 complete</p>
+                <p className="mt-1 font-semibold text-brand-ink">Template basics</p>
+              </div>
+              <div className="rounded-2xl border border-brand-blue bg-brand-blueLight/35 p-4" aria-current="step">
+                <p className="text-xs font-semibold uppercase tracking-wide text-brand-blue">Step 2 of 2</p>
+                <p className="mt-1 font-semibold text-brand-ink">Product views and gallery</p>
+              </div>
+            </div>
+
+            {error ? <p role="alert" className="rounded-2xl border border-semantic-danger/30 bg-semantic-dangerBg p-4 text-sm text-semantic-dangerText">{error}</p> : null}
+
+            <section aria-labelledby="mockup-product-views-heading" className="space-y-4">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <h3 id="mockup-product-views-heading" className="text-lg font-semibold text-brand-ink">Product views</h3>
+                  <p className="mt-1 max-w-3xl text-sm text-brand-muted">
+                    Each view is an independent blank rendering canvas. Add front, back, sleeves, labels, wraps, or a custom placement supported by this product.
+                  </p>
+                </div>
+                <Button type="button" onClick={() => startViewEditor()}>
+                  <Plus size={16} /> Add product view
+                </Button>
+              </div>
+
+              {viewEditing ? (
+                <form className="space-y-4 rounded-3xl border border-brand-blue/25 bg-brand-blueLight/15 p-5" onSubmit={saveManagedView}>
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="font-semibold text-brand-ink">{viewEditing.id ? "Edit product view" : "New product view"}</p>
+                      <p className="text-sm text-brand-muted">The placement code remains provider-neutral; provider mappings translate it later.</p>
+                    </div>
+                    <Button type="button" size="sm" variant="ghost" onClick={() => setViewEditing(null)}>Cancel</Button>
+                  </div>
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <Field label="View name" helper="Customer-friendly admin label, for example Back or Left sleeve.">
+                      <Input
+                        required
+                        value={viewEditing.name}
+                        onChange={(event) => setViewEditing((current) => current ? { ...current, name: event.target.value } : current)}
+                      />
+                    </Field>
+                    <Field label="Placement code" helper="Examples: front, back, sleeve_left, label_inside, full_wrap.">
+                      <Input
+                        required
+                        value={viewEditing.placementCode}
+                        onChange={(event) => {
+                          const placementCode = event.target.value;
+                          setViewEditing((current) => current
+                            ? {
+                                ...current,
+                                placementCode,
+                                viewKey: current.viewKey || placementCode.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, ""),
+                              }
+                            : current);
+                        }}
+                      />
+                    </Field>
+                    <Field label="View key" helper="Unique within this template. Change it when adding multiple styles for one placement.">
+                      <Input required value={viewEditing.viewKey} onChange={(event) => setViewEditing((current) => current ? { ...current, viewKey: event.target.value } : current)} />
+                    </Field>
+                    <Field label="Mockup style" helper="Optional, for example studio, flat lay, or model.">
+                      <Input value={viewEditing.mockupStyle} onChange={(event) => setViewEditing((current) => current ? { ...current, mockupStyle: event.target.value } : current)} />
+                    </Field>
+                    <Field label="Sort order">
+                      <Input inputMode="numeric" value={viewEditing.sortOrder} onChange={(event) => setViewEditing((current) => current ? { ...current, sortOrder: event.target.value } : current)} />
+                    </Field>
+                  </div>
+                  <MockupImageUploadField
+                    spec={{
+                      label: "Blank rendering image",
+                      required: true,
+                      description: "The renderer composites artwork onto this exact product angle.",
+                      optimal: "2000×2000 px+, PNG or JPG, surface unobstructed, consistent lighting and scale.",
+                    }}
+                    objectKey={viewEditing.blankImageKey}
+                    previewUrl={viewEditing.previewUrl || mediaByObjectKey.get(viewEditing.blankImageKey)}
+                    uploading={uploadingField === `view-${viewEditing.id ?? "new"}`}
+                    onUpload={(file) => void handleManagerImageUpload("view", file)}
+                    onClear={() => setViewEditing((current) => current ? { ...current, blankImageKey: "", previewUrl: undefined } : current)}
+                  />
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <ToggleField label="Primary view" helper="Used as the default product angle." checked={viewEditing.isPrimary} onChange={(value) => setViewEditing((current) => current ? { ...current, isPrimary: value } : current)} />
+                    <ToggleField label="Active" checked={viewEditing.isActive} onChange={(value) => setViewEditing((current) => current ? { ...current, isActive: value } : current)} />
+                  </div>
+                  <div className="flex justify-end">
+                    <Button type="submit" loading={managerBusy === "view-save"} disabled={!viewEditing.name || !viewEditing.placementCode || !viewEditing.blankImageKey}>
+                      Save product view
+                    </Button>
+                  </div>
+                </form>
+              ) : null}
+
+              {managing.views?.length ? (
+                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                  {managing.views.map((view) => {
+                    const preview = mediaByObjectKey.get(view.blankImageKey);
+                    return (
+                      <article key={view.id} className="overflow-hidden rounded-3xl border border-surface-borderSoft bg-white shadow-soft">
+                        <div className="aspect-square bg-surface-app">
+                          {preview ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={preview} alt={`${view.name} blank product view`} loading="lazy" className="h-full w-full object-contain" />
+                          ) : (
+                            <div className="flex h-full items-center justify-center text-sm text-brand-muted">Preview unavailable</div>
+                          )}
+                        </div>
+                        <div className="space-y-3 p-4">
+                          <div className="flex items-start justify-between gap-3">
+                            <div>
+                              <div className="flex flex-wrap items-center gap-2">
+                                <h4 className="font-semibold text-brand-ink">{view.name}</h4>
+                                {view.isPrimary ? <span className="inline-flex items-center gap-1 rounded-full bg-brand-blueLight px-2 py-1 text-xs font-semibold text-brand-blue"><Star size={12} /> Primary</span> : null}
+                              </div>
+                              <p className="mt-1 font-mono text-xs text-brand-muted">{view.placementCode} · {view.viewKey}</p>
+                            </div>
+                            <StatusBadge status={view.isActive ? "ACTIVE" : "INACTIVE"} />
+                          </div>
+                          <p className="text-xs text-brand-muted">{view._count?.printAreas ?? 0} print area{(view._count?.printAreas ?? 0) === 1 ? "" : "s"}</p>
+                          <div className="flex flex-wrap gap-2">
+                            <Button type="button" size="sm" variant="secondary" onClick={() => startViewEditor(view)}><Pencil size={14} /> Edit</Button>
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => void removeManagedView(view)}
+                              loading={managerBusy === `view-delete-${view.id}`}
+                              disabled={(view._count?.printAreas ?? 0) > 0}
+                            >
+                              <Trash2 size={14} /> Delete
+                            </Button>
+                          </div>
+                        </div>
+                      </article>
+                    );
+                  })}
+                </div>
+              ) : (
+                <Card>
+                  <EmptyState title="No product views" description="Add the first blank rendering canvas before defining printable areas." action={<Button onClick={() => startViewEditor()}><Plus size={16} /> Add view</Button>} />
+                </Card>
+              )}
+            </section>
+
+            <section aria-labelledby="mockup-gallery-assets-heading" className="space-y-4 border-t border-surface-borderSoft pt-8">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <h3 id="mockup-gallery-assets-heading" className="text-lg font-semibold text-brand-ink">Gallery assets</h3>
+                  <p className="mt-1 max-w-3xl text-sm text-brand-muted">Add any number of lifestyle and detail images. These are listing-gallery roles, not printable product views.</p>
+                </div>
+                <Button type="button" variant="secondary" onClick={() => startGalleryEditor()}><Plus size={16} /> Add gallery image</Button>
+              </div>
+
+              {galleryEditing ? (
+                <form className="space-y-4 rounded-3xl border border-brand-peach/35 bg-brand-peachLight/20 p-5" onSubmit={saveManagedGalleryAsset}>
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="font-semibold text-brand-ink">{galleryEditing.id ? "Edit gallery image" : "New gallery image"}</p>
+                    <Button type="button" size="sm" variant="ghost" onClick={() => setGalleryEditing(null)}>Cancel</Button>
+                  </div>
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <Field label="Gallery role">
+                      <Select value={galleryEditing.role} onChange={(event) => setGalleryEditing((current) => current ? { ...current, role: event.target.value as "LIFESTYLE" | "DETAIL" } : current)}>
+                        <option value="LIFESTYLE">Lifestyle</option>
+                        <option value="DETAIL">Detail / close-up</option>
+                      </Select>
+                    </Field>
+                    <Field label="Related product view" helper="Optional. Associate the shot with a specific surface.">
+                      <Select value={galleryEditing.mockupViewId} onChange={(event) => setGalleryEditing((current) => current ? { ...current, mockupViewId: event.target.value } : current)}>
+                        <option value="">No specific view</option>
+                        {(managing.views ?? []).map((view) => <option key={view.id} value={view.id}>{view.name}</option>)}
+                      </Select>
+                    </Field>
+                    <Field label="Alternative text" helper="Describe the product and angle for accessibility.">
+                      <Input value={galleryEditing.altText} onChange={(event) => setGalleryEditing((current) => current ? { ...current, altText: event.target.value } : current)} />
+                    </Field>
+                    <Field label="Sort order">
+                      <Input inputMode="numeric" value={galleryEditing.sortOrder} onChange={(event) => setGalleryEditing((current) => current ? { ...current, sortOrder: event.target.value } : current)} />
+                    </Field>
+                  </div>
+                  <MockupImageUploadField
+                    spec={{
+                      label: galleryEditing.role === "LIFESTYLE" ? "Lifestyle image" : "Detail image",
+                      required: true,
+                      description: galleryEditing.role === "LIFESTYLE" ? "A worn, styled, or contextual product shot." : "A close view of print quality, material, or finishing.",
+                      optimal: galleryEditing.role === "LIFESTYLE" ? "1600×2000 px+, uncluttered and brand-safe." : "1200×1200 px+, sharp focus and natural color.",
+                    }}
+                    objectKey={galleryEditing.imageKey}
+                    previewUrl={galleryEditing.previewUrl || mediaByObjectKey.get(galleryEditing.imageKey)}
+                    uploading={uploadingField === `gallery-${galleryEditing.id ?? "new"}`}
+                    onUpload={(file) => void handleManagerImageUpload("gallery", file)}
+                    onClear={() => setGalleryEditing((current) => current ? { ...current, imageKey: "", previewUrl: undefined } : current)}
+                  />
+                  <ToggleField label="Active" checked={galleryEditing.isActive} onChange={(value) => setGalleryEditing((current) => current ? { ...current, isActive: value } : current)} />
+                  <div className="flex justify-end">
+                    <Button type="submit" loading={managerBusy === "gallery-save"} disabled={!galleryEditing.imageKey}>Save gallery image</Button>
+                  </div>
+                </form>
+              ) : null}
+
+              {managing.galleryAssets?.length ? (
+                <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                  {managing.galleryAssets.map((asset) => {
+                    const preview = mediaByObjectKey.get(asset.imageKey);
+                    return (
+                      <article key={asset.id} className="overflow-hidden rounded-3xl border border-surface-borderSoft bg-white">
+                        <div className="aspect-square bg-surface-app">
+                          {preview ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={preview} alt={asset.altText || `${asset.role.toLowerCase()} product image`} loading="lazy" className="h-full w-full object-cover" />
+                          ) : <div className="flex h-full items-center justify-center text-sm text-brand-muted">Preview unavailable</div>}
+                        </div>
+                        <div className="space-y-3 p-4">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="rounded-full bg-brand-peachLight px-2 py-1 text-xs font-semibold text-brand-ink">{asset.role === "LIFESTYLE" ? "Lifestyle" : "Detail"}</span>
+                            <StatusBadge status={asset.isActive ? "ACTIVE" : "INACTIVE"} />
+                          </div>
+                          <p className="line-clamp-2 text-sm text-brand-muted">{asset.altText || "No alternative text provided"}</p>
+                          <div className="flex flex-wrap gap-2">
+                            <Button type="button" size="sm" variant="secondary" onClick={() => startGalleryEditor(asset)}><Pencil size={14} /> Edit</Button>
+                            <Button type="button" size="sm" variant="ghost" onClick={() => void removeManagedGalleryAsset(asset)} loading={managerBusy === `gallery-delete-${asset.id}`}><Trash2 size={14} /> Delete</Button>
+                          </div>
+                        </div>
+                      </article>
+                    );
+                  })}
+                </div>
+              ) : (
+                <Card><EmptyState title="No gallery assets" description="Lifestyle and detail images are optional and can be added whenever the product photography is ready." /></Card>
+              )}
+            </section>
+
+            <div className="flex justify-end border-t border-surface-borderSoft pt-5">
+              <Button type="button" onClick={() => setManaging(null)}>Done</Button>
+            </div>
+          </div>
         </Drawer>
       ) : null}
     </PageShell>
   );
 }
 
-const PRINT_AREA_EMPTY = { mockupTemplateId: "", name: "Front print area", x: "300", y: "260", width: "800", height: "900", safeX: "340", safeY: "300", safeWidth: "720", safeHeight: "820", allowMove: true, allowResize: true, allowRotate: false, minScale: "0.1", maxScale: "2" };
+const PRINT_AREA_EMPTY = { mockupTemplateId: "", mockupViewId: "", name: "Front print area", placement: "FRONT", x: "300", y: "260", width: "800", height: "900", safeX: "340", safeY: "300", safeWidth: "720", safeHeight: "820", allowMove: true, allowResize: true, allowRotate: false, minScale: "0.1", maxScale: "2" };
 
 type PrintAreaEditingState = typeof PRINT_AREA_EMPTY & { id?: string };
 
@@ -739,7 +1253,8 @@ export function PrintAreasScreen() {
   const [editing, setEditing] = useState<PrintAreaEditingState | null>(null);
   const [saving, setSaving] = useState(false);
   const [activeLayer, setActiveLayer] = useState<"print" | "safe">("print");
-  const [suggestedForTemplateId, setSuggestedForTemplateId] = useState<string | null>(null);
+  const [suggestedForViewId, setSuggestedForViewId] = useState<string | null>(null);
+  const deletion = useAdminDeleteAction();
 
   async function loadMediaPreviews() {
     try {
@@ -777,22 +1292,38 @@ export function PrintAreasScreen() {
   }, []);
 
   const templateName = useMemo(() => new Map(templates.map((item) => [item.id, item.name])), [templates]);
+  const viewName = useMemo(
+    () => new Map(templates.flatMap((template) => (template.views ?? []).map((view) => [view.id, view.name] as const))),
+    [templates],
+  );
   const selectedTemplate = useMemo(
     () => templates.find((item) => item.id === editing?.mockupTemplateId),
     [editing?.mockupTemplateId, templates],
   );
-  const templateImageUrl = selectedTemplate?.baseImageKey ? mediaByObjectKey.get(selectedTemplate.baseImageKey) ?? null : null;
-  const canSavePrintArea = Boolean(selectedTemplate?.baseImageKey && templateImageUrl);
+  const selectedView = useMemo(
+    () => selectedTemplate?.views?.find((view) => view.id === editing?.mockupViewId),
+    [editing?.mockupViewId, selectedTemplate],
+  );
+  const selectedImageKey = selectedView?.blankImageKey ?? selectedTemplate?.baseImageKey;
+  const templateImageUrl = selectedImageKey ? mediaByObjectKey.get(selectedImageKey) ?? null : null;
+  const canSavePrintArea = Boolean(selectedImageKey && templateImageUrl);
 
   function open(item?: PrintArea) {
     setActiveLayer("print");
-    setSuggestedForTemplateId(null);
+    setSuggestedForViewId(null);
+    const template = templates.find((candidate) => candidate.id === item?.mockupTemplateId) ?? templates[0];
+    const defaultView = template?.views?.find((view) => view.id === item?.mockupViewId)
+      ?? template?.views?.find((view) => view.isPrimary && view.isActive)
+      ?? template?.views?.find((view) => view.isActive)
+      ?? template?.views?.[0];
     setEditing(
       item
         ? {
             id: item.id,
             mockupTemplateId: item.mockupTemplateId,
+            mockupViewId: item.mockupViewId ?? defaultView?.id ?? "",
             name: item.name,
+            placement: item.placement ?? "FRONT",
             x: String(item.x),
             y: String(item.y),
             width: String(item.width),
@@ -807,14 +1338,20 @@ export function PrintAreasScreen() {
             minScale: String(item.minScale),
             maxScale: String(item.maxScale),
           }
-        : { ...PRINT_AREA_EMPTY, mockupTemplateId: templates[0]?.id ?? "" },
+        : {
+            ...PRINT_AREA_EMPTY,
+            mockupTemplateId: template?.id ?? "",
+            mockupViewId: defaultView?.id ?? "",
+            placement: defaultView?.placementCode?.toUpperCase() ?? PRINT_AREA_EMPTY.placement,
+            name: defaultView ? `${defaultView.name} print area` : PRINT_AREA_EMPTY.name,
+          },
     );
   }
 
   const applySuggestedDefaults = useCallback(
-    (templateId: string, width: number, height: number) => {
+    (viewId: string, width: number, height: number) => {
       setEditing((current) => {
-        if (!current || current.id || current.mockupTemplateId !== templateId) return current;
+        if (!current || current.id || current.mockupViewId !== viewId) return current;
         if (!shouldSuggestPrintAreaDefaults(current)) return current;
         const { print, safe } = suggestDefaultPrintAreaRects(width, height);
         return {
@@ -829,15 +1366,36 @@ export function PrintAreasScreen() {
           safeHeight: String(safe.height),
         };
       });
-      setSuggestedForTemplateId(templateId);
+      setSuggestedForViewId(viewId);
     },
     [],
   );
 
   function handleTemplateChange(mockupTemplateId: string) {
     if (!editing) return;
-    setSuggestedForTemplateId(null);
-    setEditing({ ...editing, mockupTemplateId });
+    const template = templates.find((candidate) => candidate.id === mockupTemplateId);
+    const view = template?.views?.find((candidate) => candidate.isPrimary && candidate.isActive)
+      ?? template?.views?.find((candidate) => candidate.isActive)
+      ?? template?.views?.[0];
+    setSuggestedForViewId(null);
+    setEditing({
+      ...editing,
+      mockupTemplateId,
+      mockupViewId: view?.id ?? "",
+      placement: view?.placementCode?.toUpperCase() ?? editing.placement,
+    });
+  }
+
+  function handleViewChange(mockupViewId: string) {
+    if (!editing) return;
+    const view = selectedTemplate?.views?.find((candidate) => candidate.id === mockupViewId);
+    setSuggestedForViewId(null);
+    setEditing({
+      ...editing,
+      mockupViewId,
+      placement: view?.placementCode?.toUpperCase() ?? editing.placement,
+      name: editing.id || !view ? editing.name : `${view.name} print area`,
+    });
   }
 
   function handleVisualChange(rect: PrintAreaRect) {
@@ -847,11 +1405,11 @@ export function PrintAreasScreen() {
 
   const handleImageDimensions = useCallback(
     (width: number, height: number) => {
-      if (!editing || editing.id || !editing.mockupTemplateId) return;
-      if (suggestedForTemplateId === editing.mockupTemplateId) return;
-      applySuggestedDefaults(editing.mockupTemplateId, width, height);
+      if (!editing || editing.id || !editing.mockupViewId) return;
+      if (suggestedForViewId === editing.mockupViewId) return;
+      applySuggestedDefaults(editing.mockupViewId, width, height);
     },
-    [applySuggestedDefaults, editing, suggestedForTemplateId],
+    [applySuggestedDefaults, editing, suggestedForViewId],
   );
 
   async function save(event: FormEvent) {
@@ -884,13 +1442,16 @@ export function PrintAreasScreen() {
   }
 
   async function remove(item: PrintArea) {
-    if (!confirm(`Delete print area ${item.name}?`)) return;
-    try {
-      await api.delete(`/admin/print-areas/${item.id}`);
-      await load();
-    } catch (err) {
-      setError(errorMessage(err));
-    }
+    await deletion.run({
+      id: item.id,
+      path: `/admin/print-areas/${item.id}`,
+      confirmation: `Delete print area ${item.name}?`,
+      successTitle: "Print area deleted",
+      successDescription: `${item.name} was removed.`,
+      failureTitle: "Could not delete print area",
+      onDeleted: load,
+      onError: setError,
+    });
   }
 
   const numberFields: Array<keyof typeof PRINT_AREA_EMPTY> = [
@@ -947,8 +1508,14 @@ export function PrintAreasScreen() {
               <tbody className="divide-y divide-surface-borderSoft">
                 {items.map((item) => (
                   <tr key={item.id}>
-                    <td className="px-5 py-4 font-semibold text-brand-ink">{item.name}</td>
-                    <td className="px-5 py-4">{templateName.get(item.mockupTemplateId) || item.mockupTemplateId}</td>
+                    <td className="px-5 py-4">
+                      <p className="font-semibold text-brand-ink">{item.name}</p>
+                      <p className="text-xs text-brand-muted">{item.placement?.replaceAll("_", " ") ?? "Any placement"}</p>
+                    </td>
+                    <td className="px-5 py-4">
+                      <p>{templateName.get(item.mockupTemplateId) || item.mockupTemplateId}</p>
+                      <p className="text-xs text-brand-muted">{item.mockupViewId ? viewName.get(item.mockupViewId) ?? "Unknown view" : "Legacy primary view"}</p>
+                    </td>
                     <td className="px-5 py-4 font-mono text-xs">
                       {item.x},{item.y} · {item.width}x{item.height}
                     </td>
@@ -967,7 +1534,7 @@ export function PrintAreasScreen() {
                         <Button size="sm" variant="secondary" onClick={() => open(item)}>
                           <Pencil size={14} /> Edit
                         </Button>
-                        <Button size="sm" variant="ghost" onClick={() => remove(item)}>
+                        <Button size="sm" variant="ghost" onClick={() => remove(item)} loading={deletion.deletingId === item.id} disabled={deletion.deletingId !== null}>
                           <Trash2 size={14} /> Delete
                         </Button>
                       </RowActions>
@@ -994,6 +1561,30 @@ export function PrintAreasScreen() {
             </Field>
             <Field label="Name">
               <Input required value={editing.name} onChange={(e) => setEditing({ ...editing, name: e.target.value })} />
+            </Field>
+            <Field label="Placement">
+              <Select
+                required
+                value={editing.placement}
+                onChange={(e) => setEditing({ ...editing, placement: e.target.value })}
+              >
+                {["FRONT", "BACK", "LEFT_CHEST", "RIGHT_CHEST", "LEFT_SLEEVE", "RIGHT_SLEEVE", "FULL_WRAP", "OTHER"].map((placement) => (
+                  <option key={placement} value={placement}>{placement.replaceAll("_", " ")}</option>
+                ))}
+              </Select>
+            </Field>
+            <Field label="Product view">
+              <Select required value={editing.mockupViewId} onChange={(e) => handleViewChange(e.target.value)}>
+                <option value="">Select product view</option>
+                {(selectedTemplate?.views ?? []).filter((view) => view.isActive || view.id === editing.mockupViewId).map((view) => (
+                  <option key={view.id} value={view.id}>
+                    {view.name}{view.isPrimary ? " · Primary" : ""} · {view.placementCode.replaceAll("_", " ")}
+                  </option>
+                ))}
+              </Select>
+              {selectedTemplate && !(selectedTemplate.views?.length) ? (
+                <p className="mt-1 text-xs text-brand-muted">This legacy template has no product views yet. Open Mockup Templates and add one first.</p>
+              ) : null}
             </Field>
             <PrintAreaVisualEditor
               imageUrl={templateImageUrl}
@@ -1024,7 +1615,7 @@ export function PrintAreasScreen() {
               <ToggleField label="Allow rotate" checked={editing.allowRotate} onChange={(v) => setEditing({ ...editing, allowRotate: v })} />
             </div>
             {!canSavePrintArea ? (
-              <p className="text-sm text-brand-muted">Upload a base image on the selected mockup template before saving this print area.</p>
+              <p className="text-sm text-brand-muted">Select a product view with an uploaded blank image before saving this print area.</p>
             ) : null}
             <div className="flex justify-end gap-3">
               <Button type="button" variant="secondary" onClick={() => setEditing(null)}>
@@ -1049,12 +1640,24 @@ export function RoyaltyRulesScreen() {
   const [error, setError] = useState("");
   const [editing, setEditing] = useState<(typeof ROYALTY_EMPTY & { id?: string }) | null>(null);
   const [saving, setSaving] = useState(false);
+  const deletion = useAdminDeleteAction();
   async function load() { setState("loading"); setError(""); try { const rows = await api.get<RoyaltyRule[]>("/admin/royalty-rules"); setItems(Array.isArray(rows) ? rows : []); setState("ready"); } catch (err) { setError(errorMessage(err)); setState("error"); } }
   useEffect(() => { void load(); }, []);
   function open(item?: RoyaltyRule) { setEditing(item ? { id: item.id, scope: item.scope, basis: item.basis, value: decimal(item.value), isActive: item.isActive, effectiveAt: isoDateInput(item.effectiveAt) } : ROYALTY_EMPTY); }
   async function save(event: FormEvent) { event.preventDefault(); if (!editing) return; setSaving(true); try { const payload = { ...editing, value: Number(editing.value), effectiveAt: new Date(editing.effectiveAt).toISOString() }; if (editing.id) await api.patch(`/admin/royalty-rules/${editing.id}`, payload); else await api.post("/admin/royalty-rules", payload); setEditing(null); await load(); } catch (err) { setError(errorMessage(err)); } finally { setSaving(false); } }
-  async function remove(item: RoyaltyRule) { if (!confirm(`Delete royalty rule ${item.scope}?`)) return; try { await api.delete(`/admin/royalty-rules/${item.id}`); await load(); } catch (err) { setError(errorMessage(err)); } }
-  return <PageShell title="Royalty Rules" description="Configure designer royalty basis, scope, values, activation state, and effective dates." icon={<BadgePercent size={22} />} action={<Button onClick={() => open()}><Plus size={16} /> New rule</Button>}>{error && state !== "error" ? <Notice message={error} /> : null}{state === "loading" ? <Skeleton className="h-64" /> : state === "error" ? <Notice message={error} onRetry={load} /> : items.length === 0 ? <Card><EmptyState icon={<BadgePercent className="text-brand-peach" size={32} />} title="No royalty rules" description="Create a default rule before publishing paid listings." /></Card> : <Card className="!p-0 overflow-hidden"><div className="overflow-x-auto"><table className="w-full text-sm"><thead className="bg-surface-app text-brand-muted"><tr><th className="px-5 py-3 text-left">Scope</th><th className="px-5 py-3 text-left">Basis</th><th className="px-5 py-3 text-left">Value</th><th className="px-5 py-3 text-left">Effective</th><th className="px-5 py-3 text-left">Status</th><th className="px-5 py-3 text-right">Actions</th></tr></thead><tbody className="divide-y divide-surface-borderSoft">{items.map((item) => <tr key={item.id}><td className="px-5 py-4 font-semibold text-brand-ink">{item.scope}</td><td className="px-5 py-4">{item.basis}</td><td className="px-5 py-4">{decimal(item.value)}</td><td className="px-5 py-4">{formatDate(item.effectiveAt)}</td><td className="px-5 py-4"><StatusBadge status={item.isActive ? "ACTIVE" : "INACTIVE"} /></td><td className="px-5 py-4"><RowActions><Button size="sm" variant="secondary" onClick={() => open(item)}><Pencil size={14} /> Edit</Button><Button size="sm" variant="ghost" onClick={() => remove(item)}><Trash2 size={14} /> Delete</Button></RowActions></td></tr>)}</tbody></table></div></Card>}{editing && <Drawer title={editing.id ? "Edit royalty rule" : "New royalty rule"} onClose={() => setEditing(null)}><form className="space-y-4" onSubmit={save}><div className="grid grid-cols-1 md:grid-cols-2 gap-4"><Field label="Scope"><Select value={editing.scope} onChange={(e) => setEditing({ ...editing, scope: e.target.value })}>{["DEFAULT", "PRODUCT_TYPE", "DESIGNER", "CHANNEL", "CAMPAIGN"].map((v) => <option key={v}>{v}</option>)}</Select></Field><Field label="Basis"><Select value={editing.basis} onChange={(e) => setEditing({ ...editing, basis: e.target.value })}>{["SALE_PRICE_PERCENT", "NET_PROFIT_PERCENT", "FIXED_AMOUNT"].map((v) => <option key={v}>{v}</option>)}</Select></Field><Field label="Value"><Input required inputMode="decimal" value={editing.value} onChange={(e) => setEditing({ ...editing, value: e.target.value })} /></Field><Field label="Effective date"><Input required type="date" value={editing.effectiveAt} onChange={(e) => setEditing({ ...editing, effectiveAt: e.target.value })} /></Field></div><ToggleField label="Active" checked={editing.isActive} onChange={(v) => setEditing({ ...editing, isActive: v })} /><div className="flex justify-end gap-3"><Button type="button" variant="secondary" onClick={() => setEditing(null)}>Cancel</Button><Button type="submit" loading={saving}>Save royalty rule</Button></div></form></Drawer>}</PageShell>;
+  async function remove(item: RoyaltyRule) {
+    await deletion.run({
+      id: item.id,
+      path: `/admin/royalty-rules/${item.id}`,
+      confirmation: `Delete royalty rule ${item.scope}?`,
+      successTitle: "Royalty rule deleted",
+      successDescription: `${item.scope} was removed.`,
+      failureTitle: "Could not delete royalty rule",
+      onDeleted: load,
+      onError: setError,
+    });
+  }
+  return <PageShell title="Royalty Rules" description="Configure designer royalty basis, scope, values, activation state, and effective dates." icon={<BadgePercent size={22} />} action={<Button onClick={() => open()}><Plus size={16} /> New rule</Button>}>{error && state !== "error" ? <Notice message={error} /> : null}{state === "loading" ? <Skeleton className="h-64" /> : state === "error" ? <Notice message={error} onRetry={load} /> : items.length === 0 ? <Card><EmptyState icon={<BadgePercent className="text-brand-peach" size={32} />} title="No royalty rules" description="Create a default rule before publishing paid listings." /></Card> : <Card className="!p-0 overflow-hidden"><div className="overflow-x-auto"><table className="w-full text-sm"><thead className="bg-surface-app text-brand-muted"><tr><th className="px-5 py-3 text-left">Scope</th><th className="px-5 py-3 text-left">Basis</th><th className="px-5 py-3 text-left">Value</th><th className="px-5 py-3 text-left">Effective</th><th className="px-5 py-3 text-left">Status</th><th className="px-5 py-3 text-right">Actions</th></tr></thead><tbody className="divide-y divide-surface-borderSoft">{items.map((item) => <tr key={item.id}><td className="px-5 py-4 font-semibold text-brand-ink">{item.scope}</td><td className="px-5 py-4">{item.basis}</td><td className="px-5 py-4">{decimal(item.value)}</td><td className="px-5 py-4">{formatDate(item.effectiveAt)}</td><td className="px-5 py-4"><StatusBadge status={item.isActive ? "ACTIVE" : "INACTIVE"} /></td><td className="px-5 py-4"><RowActions><Button size="sm" variant="secondary" onClick={() => open(item)}><Pencil size={14} /> Edit</Button><Button size="sm" variant="ghost" onClick={() => remove(item)} loading={deletion.deletingId === item.id} disabled={deletion.deletingId !== null}><Trash2 size={14} /> Delete</Button></RowActions></td></tr>)}</tbody></table></div></Card>}{editing && <Drawer title={editing.id ? "Edit royalty rule" : "New royalty rule"} onClose={() => setEditing(null)}><form className="space-y-4" onSubmit={save}><div className="grid grid-cols-1 md:grid-cols-2 gap-4"><Field label="Scope"><Select value={editing.scope} onChange={(e) => setEditing({ ...editing, scope: e.target.value })}>{["DEFAULT", "PRODUCT_TYPE", "DESIGNER", "CHANNEL", "CAMPAIGN"].map((v) => <option key={v}>{v}</option>)}</Select></Field><Field label="Basis"><Select value={editing.basis} onChange={(e) => setEditing({ ...editing, basis: e.target.value })}>{["SALE_PRICE_PERCENT", "NET_PROFIT_PERCENT", "FIXED_AMOUNT"].map((v) => <option key={v}>{v}</option>)}</Select></Field><Field label="Value"><Input required inputMode="decimal" value={editing.value} onChange={(e) => setEditing({ ...editing, value: e.target.value })} /></Field><Field label="Effective date"><Input required type="date" value={editing.effectiveAt} onChange={(e) => setEditing({ ...editing, effectiveAt: e.target.value })} /></Field></div><ToggleField label="Active" checked={editing.isActive} onChange={(v) => setEditing({ ...editing, isActive: v })} /><div className="flex justify-end gap-3"><Button type="button" variant="secondary" onClick={() => setEditing(null)}>Cancel</Button><Button type="submit" loading={saving}>Save royalty rule</Button></div></form></Drawer>}</PageShell>;
 }
 
 export function FilmSaleSettingsScreen() {

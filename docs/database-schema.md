@@ -50,8 +50,10 @@ CommercialRights(id, designAssetId, designVersionId, allowProductSales, allowMar
 ProductType(id, name, slug, category, isActive, availableForDesigners, availableInShop, availableForCorporate, availableForMarketplace, requiresMockup, supportsFilmSale, defaultProductionMethod, baseCost, defaultMargin, metadataJson)
 BaseProduct(id, productTypeId, name, skuPrefix, description, isActive, baseCost, defaultPrice, availableColorsJson, availableSizesJson)
 ProductVariant(id, baseProductId, sku, color, size, material, baseCost, price, isActive)
-MockupTemplate(id, baseProductId, name, templateType, baseImageFileId, lifestyleImageFileId, closeupImageFileId, isActive, sortOrder)
-PrintArea(id, mockupTemplateId, name, x, y, width, height, safeX, safeY, safeWidth, safeHeight, allowMove, allowResize, allowRotate, minScale, maxScale, maxPrintWidthMm, maxPrintHeightMm)
+MockupTemplate(id, baseProductId, name, configurationVersion, legacyBaseImageKey, legacyLifestyleImageKey, legacyCloseupImageKey, isActive, sortOrder)
+MockupView(id, mockupTemplateId, viewKey, placementCode, name, blankImageKey, mockupStyle, sortOrder, isPrimary, isActive, metadataJson)
+MockupGalleryAsset(id, mockupTemplateId, mockupViewId, role, imageKey, altText, sortOrder, isActive, metadataJson)
+PrintArea(id, mockupTemplateId, mockupViewId, name, x, y, width, height, safeX, safeY, safeWidth, safeHeight, allowMove, allowResize, allowRotate, minScale, maxScale, maxPrintWidthMm, maxPrintHeightMm)
 DesignPlacement(id, designAssetId, designVersionId, mockupTemplateId, printAreaId, x, y, scale, rotation, width, height, approvedByDesigner, approvedAt)
 GeneratedAsset(id, sourceDesignPlacementId, type, status, fileId, widthPx, heightPx, errorMessage)
 ```

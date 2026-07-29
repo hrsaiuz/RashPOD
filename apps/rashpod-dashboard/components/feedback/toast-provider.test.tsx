@@ -30,6 +30,7 @@ describe("ToastProvider", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
 
+    expect(screen.getByTestId("toast-viewport")).toHaveClass("right-4", "top-20", "sm:right-6", "z-toast");
     expect(screen.getByRole("status")).toHaveTextContent("Design saved");
     expect(screen.getByText("Ready for moderation.")).toBeInTheDocument();
 

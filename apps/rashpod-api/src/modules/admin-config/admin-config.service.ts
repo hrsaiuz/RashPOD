@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from "@nestjs/common";
 import { BaseProduct, PipelineType, PlacementAlignment, PlacementKind, PlacementUnits, Prisma, ProviderType } from "@prisma/client";
 import { AuditService } from "../audit/audit.service";
 import { PrismaService } from "../../prisma/prisma.service";
@@ -7,6 +7,8 @@ import { CreateRoyaltyRuleDto } from "./dto/create-royalty-rule.dto";
 import { UpdateRoyaltyRuleDto } from "./dto/update-royalty-rule.dto";
 import { CreateBaseProductDto } from "./dto/create-base-product.dto";
 import { CreateMockupTemplateDto } from "./dto/create-mockup-template.dto";
+import { CreateMockupViewDto } from "./dto/create-mockup-view.dto";
+import { CreateMockupGalleryAssetDto } from "./dto/create-mockup-gallery-asset.dto";
 import { CreatePrintAreaDto } from "./dto/create-print-area.dto";
 import { UpsertFilmSaleSettingsDto } from "./dto/upsert-film-sale-settings.dto";
 import { CreateDeliverySettingDto } from "./dto/create-delivery-setting.dto";
@@ -14,6 +16,8 @@ import { UpdateDeliverySettingDto } from "./dto/update-delivery-setting.dto";
 import { UpdateProductTypeDto } from "./dto/update-product-type.dto";
 import { UpdateBaseProductDto } from "./dto/update-base-product.dto";
 import { UpdateMockupTemplateDto } from "./dto/update-mockup-template.dto";
+import { UpdateMockupViewDto } from "./dto/update-mockup-view.dto";
+import { UpdateMockupGalleryAssetDto } from "./dto/update-mockup-gallery-asset.dto";
 import { UpdatePrintAreaDto } from "./dto/update-print-area.dto";
 import { CreatePlacementPresetDto } from "./dto/create-placement-preset.dto";
 import { UpdatePlacementPresetDto } from "./dto/update-placement-preset.dto";
@@ -183,9 +187,14 @@ export class AdminConfigService {
   }
 
   async deleteProductType(actorId: string, id: string) {
-    const baseProducts = await this.prisma.baseProduct.count({ where: { productTypeId: id } });
-    if (baseProducts > 0) {
-      throw new BadRequestException("Product type is used by base products and cannot be deleted");
+    const [baseProducts, marketplaceMappings, providerMappings, intakeItems] = await Promise.all([
+      this.prisma.baseProduct.count({ where: { productTypeId: id } }),
+      this.prisma.marketplaceCategoryMapping.count({ where: { productTypeId: id } }),
+      this.prisma.podProductMapping.count({ where: { productTypeId: id } }),
+      this.prisma.externalOrderIntakeItem.count({ where: { productTypeId: id } }),
+    ]);
+    if (baseProducts + marketplaceMappings + providerMappings + intakeItems > 0) {
+      throw new ConflictException("Product type is in use and cannot be deleted. Remove its unused catalog mappings or deactivate it instead.");
     }
     const item = await this.prisma.productType.delete({ where: { id } });
     await this.audit.log({ actorId, action: "product-type.delete", entityType: "ProductType", entityId: item.id });
@@ -230,6 +239,10 @@ export class AdminConfigService {
   }
 
   async deleteRoyaltyRule(actorId: string, id: string) {
+    const ledgerEntries = await this.prisma.royaltyLedgerEntry.count({ where: { royaltyRuleId: id } });
+    if (ledgerEntries > 0) {
+      throw new ConflictException("Royalty rule has payment history and cannot be deleted. Deactivate it instead.");
+    }
     const rule = await this.prisma.royaltyRule.delete({ where: { id } });
     await this.audit.log({ actorId, action: "royalty-rule.delete", entityType: "RoyaltyRule", entityId: rule.id });
     return rule;
@@ -293,33 +306,118 @@ export class AdminConfigService {
   }
 
   async deleteBaseProduct(actorId: string, id: string) {
-    const item = await this.prisma.baseProduct.delete({ where: { id } });
+    const [selections, presetSelections, listings, marketplaceMappings, providerMappings, intakeItems] = await Promise.all([
+      this.prisma.designProductSelection.count({ where: { localBaseProductId: id } }),
+      this.prisma.designProductSelection.count({ where: { placementPreset: { localBaseProductId: id } } }),
+      this.prisma.commerceListing.count({ where: { localBaseProductId: id } }),
+      this.prisma.marketplaceCategoryMapping.count({ where: { baseProductId: id } }),
+      this.prisma.podProductMapping.count({ where: { baseProductId: id } }),
+      this.prisma.externalOrderIntakeItem.count({ where: { baseProductId: id } }),
+    ]);
+    if (selections + presetSelections + listings + marketplaceMappings + providerMappings + intakeItems > 0) {
+      throw new ConflictException("Base product is used by workflow history and cannot be deleted. Deactivate it instead.");
+    }
+
+    const item = await this.prisma.$transaction(async (tx) => {
+      const templateIds = (await tx.mockupTemplate.findMany({
+        where: { baseProductId: id },
+        select: { id: true },
+      })).map((template) => template.id);
+
+      if (templateIds.length) {
+        const [placements, printAreaMappings] = await Promise.all([
+          tx.mockupPlacement.count({ where: { mockupTemplateId: { in: templateIds } } }),
+          tx.podPrintAreaMapping.count({ where: { printArea: { mockupTemplateId: { in: templateIds } } } }),
+        ]);
+        if (placements + printAreaMappings > 0) {
+          throw new ConflictException("Base product mockups are used by workflow history and cannot be deleted. Deactivate it instead.");
+        }
+        await tx.printArea.deleteMany({ where: { mockupTemplateId: { in: templateIds } } });
+        await tx.mockupTemplate.deleteMany({ where: { id: { in: templateIds } } });
+      }
+      await tx.placementPreset.deleteMany({ where: { localBaseProductId: id } });
+      return tx.baseProduct.delete({ where: { id } });
+    });
     await this.audit.log({ actorId, action: "base-product.delete", entityType: "BaseProduct", entityId: item.id });
     return item;
   }
 
   listMockupTemplates() {
-    return this.prisma.mockupTemplate.findMany({ orderBy: { createdAt: "desc" } });
+    return this.prisma.mockupTemplate.findMany({
+      orderBy: { createdAt: "desc" },
+      include: {
+        views: { orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }] },
+        galleryAssets: { orderBy: [{ role: "asc" }, { sortOrder: "asc" }, { createdAt: "asc" }] },
+      },
+    });
   }
 
   async createMockupTemplate(actorId: string, dto: CreateMockupTemplateDto) {
-    const item = await this.prisma.mockupTemplate.create({
-      data: {
-        baseProductId: dto.baseProductId,
-        name: dto.name,
-        baseImageKey: dto.baseImageKey,
-        lifestyleImageKey: dto.lifestyleImageKey,
-        closeupImageKey: dto.closeupImageKey,
-        isActive: dto.isActive ?? true,
-        sortOrder: dto.sortOrder ?? 0,
-      },
+    const item = await this.prisma.$transaction(async (tx) => {
+      const template = await tx.mockupTemplate.create({
+        data: {
+          baseProductId: dto.baseProductId,
+          name: dto.name,
+          baseImageKey: dto.baseImageKey,
+          lifestyleImageKey: dto.lifestyleImageKey,
+          closeupImageKey: dto.closeupImageKey,
+          configurationVersion: "MULTI_VIEW_V2",
+          isActive: dto.isActive ?? true,
+          sortOrder: dto.sortOrder ?? 0,
+        },
+      });
+      const primaryView = await tx.mockupView.create({
+        data: {
+          mockupTemplateId: template.id,
+          viewKey: "primary",
+          placementCode: "front",
+          name: "Front",
+          blankImageKey: dto.baseImageKey,
+          sortOrder: 0,
+          isPrimary: true,
+          isActive: dto.isActive ?? true,
+        },
+      });
+      const galleryAssets = [
+        dto.lifestyleImageKey
+          ? {
+              mockupTemplateId: template.id,
+              mockupViewId: primaryView.id,
+              role: "LIFESTYLE" as const,
+              imageKey: dto.lifestyleImageKey,
+              sortOrder: 0,
+              isActive: dto.isActive ?? true,
+            }
+          : null,
+        dto.closeupImageKey
+          ? {
+              mockupTemplateId: template.id,
+              mockupViewId: primaryView.id,
+              role: "DETAIL" as const,
+              imageKey: dto.closeupImageKey,
+              sortOrder: 0,
+              isActive: dto.isActive ?? true,
+            }
+          : null,
+      ].filter((asset): asset is NonNullable<typeof asset> => Boolean(asset));
+      if (galleryAssets.length) await tx.mockupGalleryAsset.createMany({ data: galleryAssets });
+      return template;
     });
     await this.audit.log({ actorId, action: "mockup-template.create", entityType: "MockupTemplate", entityId: item.id });
     return item;
   }
 
   async getMockupTemplate(id: string) {
-    const item = await this.prisma.mockupTemplate.findUnique({ where: { id } });
+    const item = await this.prisma.mockupTemplate.findUnique({
+      where: { id },
+      include: {
+        views: {
+          orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+          include: { _count: { select: { printAreas: true, galleryAssets: true } } },
+        },
+        galleryAssets: { orderBy: [{ role: "asc" }, { sortOrder: "asc" }, { createdAt: "asc" }] },
+      },
+    });
     if (!item) throw new NotFoundException("Mockup template not found");
     return item;
   }
@@ -342,8 +440,217 @@ export class AdminConfigService {
   }
 
   async deleteMockupTemplate(actorId: string, id: string) {
-    const item = await this.prisma.mockupTemplate.delete({ where: { id } });
+    const [placements, printAreaMappings] = await Promise.all([
+      this.prisma.mockupPlacement.count({ where: { mockupTemplateId: id } }),
+      this.prisma.podPrintAreaMapping.count({ where: { printArea: { mockupTemplateId: id } } }),
+    ]);
+    if (placements + printAreaMappings > 0) {
+      throw new ConflictException("Mockup template is used by workflow history and cannot be deleted. Deactivate it instead.");
+    }
+    const item = await this.prisma.$transaction(async (tx) => {
+      await tx.printArea.deleteMany({ where: { mockupTemplateId: id } });
+      return tx.mockupTemplate.delete({ where: { id } });
+    });
     await this.audit.log({ actorId, action: "mockup-template.delete", entityType: "MockupTemplate", entityId: item.id });
+    return item;
+  }
+
+  listMockupViews(mockupTemplateId: string) {
+    return this.prisma.mockupView.findMany({
+      where: { mockupTemplateId },
+      orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+      include: { _count: { select: { printAreas: true, galleryAssets: true } } },
+    });
+  }
+
+  async getMockupView(id: string) {
+    const item = await this.prisma.mockupView.findUnique({
+      where: { id },
+      include: {
+        printAreas: { orderBy: { createdAt: "asc" } },
+        galleryAssets: { orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }] },
+      },
+    });
+    if (!item) throw new NotFoundException("Mockup view not found");
+    return item;
+  }
+
+  async createMockupView(actorId: string, mockupTemplateId: string, dto: CreateMockupViewDto) {
+    await this.assertMockupTemplateExists(mockupTemplateId);
+    const viewKey = this.normalizeMockupKey(dto.viewKey, "view key");
+    const placementCode = this.normalizeMockupKey(dto.placementCode, "placement code");
+    const duplicate = await this.prisma.mockupView.findFirst({ where: { mockupTemplateId, viewKey }, select: { id: true } });
+    if (duplicate) throw new ConflictException("A mockup view with this key already exists for the template");
+
+    const item = await this.prisma.$transaction(async (tx) => {
+      const viewCount = await tx.mockupView.count({ where: { mockupTemplateId } });
+      const isPrimary = dto.isPrimary ?? viewCount === 0;
+      if (isPrimary) {
+        await tx.mockupView.updateMany({ where: { mockupTemplateId, isPrimary: true }, data: { isPrimary: false } });
+      }
+      const view = await tx.mockupView.create({
+        data: {
+          mockupTemplateId,
+          viewKey,
+          placementCode,
+          name: dto.name.trim(),
+          blankImageKey: dto.blankImageKey.trim(),
+          mockupStyle: dto.mockupStyle?.trim(),
+          sortOrder: dto.sortOrder ?? 0,
+          isPrimary,
+          isActive: dto.isActive ?? true,
+          metadataJson: dto.metadataJson as Prisma.InputJsonValue | undefined,
+        },
+      });
+      await tx.mockupTemplate.update({
+        where: { id: mockupTemplateId },
+        data: { configurationVersion: "MULTI_VIEW_V2" },
+      });
+      return view;
+    });
+
+    await this.audit.log({
+      actorId,
+      action: "mockup-view.create",
+      entityType: "MockupView",
+      entityId: item.id,
+      metadata: { mockupTemplateId, viewKey, placementCode },
+    });
+    return item;
+  }
+
+  async updateMockupView(actorId: string, id: string, dto: UpdateMockupViewDto) {
+    const existing = await this.prisma.mockupView.findUnique({ where: { id } });
+    if (!existing) throw new NotFoundException("Mockup view not found");
+    const viewKey = dto.viewKey === undefined ? undefined : this.normalizeMockupKey(dto.viewKey, "view key");
+    const placementCode = dto.placementCode === undefined ? undefined : this.normalizeMockupKey(dto.placementCode, "placement code");
+    if (viewKey && viewKey !== existing.viewKey) {
+      const duplicate = await this.prisma.mockupView.findFirst({
+        where: { mockupTemplateId: existing.mockupTemplateId, viewKey, NOT: { id } },
+        select: { id: true },
+      });
+      if (duplicate) throw new ConflictException("A mockup view with this key already exists for the template");
+    }
+
+    const item = await this.prisma.$transaction(async (tx) => {
+      if (dto.isPrimary === true) {
+        await tx.mockupView.updateMany({
+          where: { mockupTemplateId: existing.mockupTemplateId, isPrimary: true, NOT: { id } },
+          data: { isPrimary: false },
+        });
+      }
+      return tx.mockupView.update({
+        where: { id },
+        data: {
+          viewKey,
+          placementCode,
+          name: dto.name?.trim(),
+          blankImageKey: dto.blankImageKey?.trim(),
+          mockupStyle: dto.mockupStyle?.trim(),
+          sortOrder: dto.sortOrder,
+          isPrimary: dto.isPrimary,
+          isActive: dto.isActive,
+          metadataJson: dto.metadataJson as Prisma.InputJsonValue | undefined,
+        },
+      });
+    });
+
+    await this.audit.log({
+      actorId,
+      action: "mockup-view.update",
+      entityType: "MockupView",
+      entityId: item.id,
+      metadata: { mockupTemplateId: existing.mockupTemplateId },
+    });
+    return item;
+  }
+
+  async deleteMockupView(actorId: string, id: string) {
+    const existing = await this.prisma.mockupView.findUnique({ where: { id } });
+    if (!existing) throw new NotFoundException("Mockup view not found");
+    const printAreas = await this.prisma.printArea.count({ where: { mockupViewId: id } });
+    if (printAreas > 0) {
+      throw new ConflictException("Mockup view has print areas and cannot be deleted. Reassign or remove those areas first.");
+    }
+
+    const item = await this.prisma.$transaction(async (tx) => {
+      const deleted = await tx.mockupView.delete({ where: { id } });
+      if (existing.isPrimary) {
+        const replacement = await tx.mockupView.findFirst({
+          where: { mockupTemplateId: existing.mockupTemplateId, isActive: true },
+          orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+          select: { id: true },
+        });
+        if (replacement) await tx.mockupView.update({ where: { id: replacement.id }, data: { isPrimary: true } });
+      }
+      return deleted;
+    });
+
+    await this.audit.log({ actorId, action: "mockup-view.delete", entityType: "MockupView", entityId: item.id });
+    return item;
+  }
+
+  listMockupGalleryAssets(mockupTemplateId: string) {
+    return this.prisma.mockupGalleryAsset.findMany({
+      where: { mockupTemplateId },
+      orderBy: [{ role: "asc" }, { sortOrder: "asc" }, { createdAt: "asc" }],
+    });
+  }
+
+  async createMockupGalleryAsset(actorId: string, mockupTemplateId: string, dto: CreateMockupGalleryAssetDto) {
+    await this.assertMockupTemplateExists(mockupTemplateId);
+    if (dto.mockupViewId) await this.assertMockupViewForTemplate(dto.mockupViewId, mockupTemplateId);
+    const item = await this.prisma.mockupGalleryAsset.create({
+      data: {
+        mockupTemplateId,
+        mockupViewId: dto.mockupViewId,
+        role: dto.role,
+        imageKey: dto.imageKey.trim(),
+        altText: dto.altText?.trim(),
+        sortOrder: dto.sortOrder ?? 0,
+        isActive: dto.isActive ?? true,
+        metadataJson: dto.metadataJson as Prisma.InputJsonValue | undefined,
+      },
+    });
+    await this.audit.log({
+      actorId,
+      action: "mockup-gallery-asset.create",
+      entityType: "MockupGalleryAsset",
+      entityId: item.id,
+      metadata: { mockupTemplateId, role: item.role },
+    });
+    return item;
+  }
+
+  async updateMockupGalleryAsset(actorId: string, id: string, dto: UpdateMockupGalleryAssetDto) {
+    const existing = await this.prisma.mockupGalleryAsset.findUnique({ where: { id } });
+    if (!existing) throw new NotFoundException("Mockup gallery asset not found");
+    if (dto.mockupViewId) await this.assertMockupViewForTemplate(dto.mockupViewId, existing.mockupTemplateId);
+    const item = await this.prisma.mockupGalleryAsset.update({
+      where: { id },
+      data: {
+        mockupViewId: dto.mockupViewId,
+        role: dto.role,
+        imageKey: dto.imageKey?.trim(),
+        altText: dto.altText?.trim(),
+        sortOrder: dto.sortOrder,
+        isActive: dto.isActive,
+        metadataJson: dto.metadataJson as Prisma.InputJsonValue | undefined,
+      },
+    });
+    await this.audit.log({
+      actorId,
+      action: "mockup-gallery-asset.update",
+      entityType: "MockupGalleryAsset",
+      entityId: item.id,
+      metadata: { mockupTemplateId: existing.mockupTemplateId },
+    });
+    return item;
+  }
+
+  async deleteMockupGalleryAsset(actorId: string, id: string) {
+    const item = await this.prisma.mockupGalleryAsset.delete({ where: { id } });
+    await this.audit.log({ actorId, action: "mockup-gallery-asset.delete", entityType: "MockupGalleryAsset", entityId: item.id });
     return item;
   }
 
@@ -352,10 +659,13 @@ export class AdminConfigService {
   }
 
   async createPrintArea(actorId: string, dto: CreatePrintAreaDto) {
+    if (dto.mockupViewId) await this.assertMockupViewForTemplate(dto.mockupViewId, dto.mockupTemplateId);
     const item = await this.prisma.printArea.create({
       data: {
         mockupTemplateId: dto.mockupTemplateId,
+        mockupViewId: dto.mockupViewId,
         name: dto.name,
+        placement: dto.placement,
         x: dto.x,
         y: dto.y,
         width: dto.width,
@@ -382,11 +692,22 @@ export class AdminConfigService {
   }
 
   async updatePrintArea(actorId: string, id: string, dto: UpdatePrintAreaDto) {
+    const existing = dto.mockupViewId !== undefined || dto.mockupTemplateId !== undefined
+      ? await this.prisma.printArea.findUnique({ where: { id } })
+      : null;
+    if ((dto.mockupViewId !== undefined || dto.mockupTemplateId !== undefined) && !existing) {
+      throw new NotFoundException("Print area not found");
+    }
+    const targetTemplateId = dto.mockupTemplateId ?? existing?.mockupTemplateId;
+    const targetViewId = dto.mockupViewId === undefined ? existing?.mockupViewId : dto.mockupViewId;
+    if (targetViewId && targetTemplateId) await this.assertMockupViewForTemplate(targetViewId, targetTemplateId);
     const item = await this.prisma.printArea.update({
       where: { id },
       data: {
         mockupTemplateId: dto.mockupTemplateId,
+        mockupViewId: dto.mockupViewId,
         name: dto.name,
+        placement: dto.placement,
         x: dto.x,
         y: dto.y,
         width: dto.width,
@@ -407,9 +728,39 @@ export class AdminConfigService {
   }
 
   async deletePrintArea(actorId: string, id: string) {
+    const [placements, providerMappings] = await Promise.all([
+      this.prisma.mockupPlacement.count({ where: { printAreaId: id } }),
+      this.prisma.podPrintAreaMapping.count({ where: { printAreaId: id } }),
+    ]);
+    if (placements + providerMappings > 0) {
+      throw new ConflictException("Print area is used by workflow history and cannot be deleted. Deactivate its template instead.");
+    }
     const item = await this.prisma.printArea.delete({ where: { id } });
     await this.audit.log({ actorId, action: "print-area.delete", entityType: "PrintArea", entityId: item.id });
     return item;
+  }
+
+  private async assertMockupTemplateExists(id: string) {
+    const template = await this.prisma.mockupTemplate.findUnique({ where: { id }, select: { id: true } });
+    if (!template) throw new NotFoundException("Mockup template not found");
+  }
+
+  private async assertMockupViewForTemplate(id: string, mockupTemplateId: string) {
+    const view = await this.prisma.mockupView.findUnique({
+      where: { id },
+      select: { id: true, mockupTemplateId: true },
+    });
+    if (!view) throw new NotFoundException("Mockup view not found");
+    if (view.mockupTemplateId !== mockupTemplateId) {
+      throw new BadRequestException("Mockup view does not belong to the selected mockup template");
+    }
+    return view;
+  }
+
+  private normalizeMockupKey(value: string, label: string) {
+    const normalized = value.trim().toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
+    if (!normalized) throw new BadRequestException(`${label} must contain letters or numbers`);
+    return normalized;
   }
 
   getFilmSaleSettings() {

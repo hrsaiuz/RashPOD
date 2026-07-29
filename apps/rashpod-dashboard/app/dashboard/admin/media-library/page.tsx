@@ -4,6 +4,8 @@ import { ChangeEvent, useEffect, useMemo, useState } from "react";
 import { Button, Card, EmptyState, Skeleton, StatusBadge } from "@rashpod/ui";
 import { Images, Upload, Trash2, Filter } from "lucide-react";
 import DashboardLayout from "../../dashboard-layout";
+import { api } from "../../../../lib/api";
+import { useDashboardFeedback } from "../../../../components/feedback/use-dashboard-feedback";
 
 type MediaCategory =
   | "UI_ASSET"
@@ -62,6 +64,8 @@ export default function MediaLibraryPage() {
   const [uploadTitle, setUploadTitle] = useState("");
   const [uploadDescription, setUploadDescription] = useState("");
   const [error, setError] = useState("");
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const feedback = useDashboardFeedback();
 
   useEffect(() => {
     void load();
@@ -135,10 +139,22 @@ export default function MediaLibraryPage() {
     }
   }
 
-  async function handleDelete(id: string) {
-    if (!confirm("Delete this asset? Files used in branding/UI will disappear immediately.")) return;
-    const res = await fetch(`/api/proxy/admin/media/${id}`, { method: "DELETE" });
-    if (res.ok) await load();
+  async function handleDelete(asset: MediaAsset) {
+    if (!confirm(`Delete ${asset.title}? Files used in branding or UI will disappear immediately.`)) return;
+    setDeletingId(asset.id);
+    setError("");
+    try {
+      await api.delete(`/admin/media/${asset.id}`);
+      feedback.success({ title: "Media asset deleted", description: `${asset.title} was removed.` });
+      await load();
+    } catch (cause) {
+      setError(feedback.error(cause, {
+        title: "Could not delete media asset",
+        fallback: "The media asset could not be deleted.",
+      }));
+    } finally {
+      setDeletingId(null);
+    }
   }
 
   async function copyUrl(url: string) {
@@ -268,7 +284,15 @@ export default function MediaLibraryPage() {
                         Copy URL
                       </Button>
                     )}
-                    <Button size="sm" variant="ghost" onClick={() => handleDelete(a.id)}>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="min-h-11 min-w-11 px-0"
+                      onClick={() => handleDelete(a)}
+                      loading={deletingId === a.id}
+                      disabled={deletingId !== null}
+                      aria-label={`Delete ${a.title}`}
+                    >
                       <Trash2 size={14} />
                     </Button>
                   </div>

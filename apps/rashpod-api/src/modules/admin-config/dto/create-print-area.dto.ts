@@ -1,11 +1,20 @@
-import { IsBoolean, IsInt, IsNumber, IsOptional, IsString, Min } from "class-validator";
+import { IsBoolean, IsEnum, IsInt, IsNumber, IsOptional, IsString, Min } from "class-validator";
+import { PlacementKind } from "@prisma/client";
 
 export class CreatePrintAreaDto {
   @IsString()
   mockupTemplateId!: string;
 
   @IsString()
+  @IsOptional()
+  mockupViewId?: string;
+
+  @IsString()
   name!: string;
+
+  @IsEnum(PlacementKind)
+  @IsOptional()
+  placement?: PlacementKind;
 
   @IsInt()
   x!: number;

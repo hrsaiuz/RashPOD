@@ -114,6 +114,12 @@
 - [ ] Product type CRUD works.
 - [ ] Base product CRUD works.
 - [ ] Mockup template CRUD works.
+- [ ] Admin can add front, back, sleeve, label, and custom mockup views.
+- [ ] Each mockup view has an independent blank rendering image.
+- [ ] Multiple lifestyle and detail assets can be attached to one template.
+- [ ] A print area cannot reference a view from another template.
+- [ ] A view with print areas cannot be deleted accidentally.
+- [ ] Legacy single-image templates continue to load.
 - [ ] Print area setup works.
 - [ ] Royalty rules work.
 - [ ] Film-sale rules work.

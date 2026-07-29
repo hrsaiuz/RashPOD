@@ -97,9 +97,22 @@ PATCH  /admin/base-products/:id
 GET    /admin/mockup-templates
 POST   /admin/mockup-templates
 PATCH  /admin/mockup-templates/:id
+GET    /admin/mockup-templates/:id/views
+POST   /admin/mockup-templates/:id/views
+GET    /admin/mockup-views/:id
+PATCH  /admin/mockup-views/:id
+DELETE /admin/mockup-views/:id
+GET    /admin/mockup-templates/:id/gallery-assets
+POST   /admin/mockup-templates/:id/gallery-assets
+PATCH  /admin/mockup-gallery-assets/:id
+DELETE /admin/mockup-gallery-assets/:id
 POST   /admin/mockup-templates/:id/print-area
 PATCH  /admin/print-areas/:id
 ```
+
+Multi-view templates use repeatable `MockupView` records for rendering canvases such as front, back, sleeves, and labels.
+Lifestyle and detail images are repeatable gallery assets rather than product-view definitions. Legacy template image fields
+remain readable while existing templates are migrated.
 
 ## Mockup Studio
 ```text

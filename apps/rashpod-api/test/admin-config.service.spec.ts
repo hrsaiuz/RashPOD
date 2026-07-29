@@ -1,4 +1,5 @@
-import { Prisma } from "@prisma/client";
+import { PlacementKind, Prisma } from "@prisma/client";
+import { ConflictException } from "@nestjs/common";
 import { AdminConfigService } from "../src/modules/admin-config/admin-config.service";
 
 describe("AdminConfigService.updateDeliverySetting", () => {
@@ -51,6 +52,31 @@ describe("AdminConfigService.updateDeliverySetting", () => {
 });
 
 describe("AdminConfigService catalog CRUD parity", () => {
+  it("persists an explicit print-area placement", async () => {
+    const create = jest.fn().mockResolvedValue({ id: "area_1", placement: "FRONT" });
+    const prisma: any = { printArea: { create } };
+    const audit = { log: jest.fn().mockResolvedValue(undefined) } as any;
+    const service = new AdminConfigService(prisma, audit);
+
+    await service.createPrintArea("admin_1", {
+      mockupTemplateId: "template_1",
+      name: "Front",
+      placement: PlacementKind.FRONT,
+      x: 10,
+      y: 20,
+      width: 500,
+      height: 600,
+      safeX: 20,
+      safeY: 30,
+      safeWidth: 460,
+      safeHeight: 540,
+    });
+
+    expect(create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ placement: "FRONT" }),
+    });
+  });
+
   it("gets product type by id and throws when missing", async () => {
     const prisma: any = {
       productType: { findUnique: jest.fn().mockResolvedValueOnce({ id: "pt_1" }).mockResolvedValueOnce(null) },
@@ -62,24 +88,90 @@ describe("AdminConfigService catalog CRUD parity", () => {
   });
 
   it("updates and deletes base product with audit log", async () => {
+    const tx = {
+      mockupTemplate: {
+        findMany: jest.fn().mockResolvedValue([]),
+        deleteMany: jest.fn(),
+      },
+      printArea: { deleteMany: jest.fn() },
+      placementPreset: { deleteMany: jest.fn() },
+      baseProduct: { delete: jest.fn().mockResolvedValue({ id: "bp_1" }) },
+    };
     const prisma: any = {
       baseProduct: {
         update: jest.fn().mockResolvedValue({ id: "bp_1" }),
-        delete: jest.fn().mockResolvedValue({ id: "bp_1" }),
       },
+      designProductSelection: { count: jest.fn().mockResolvedValue(0) },
+      commerceListing: { count: jest.fn().mockResolvedValue(0) },
+      marketplaceCategoryMapping: { count: jest.fn().mockResolvedValue(0) },
+      podProductMapping: { count: jest.fn().mockResolvedValue(0) },
+      externalOrderIntakeItem: { count: jest.fn().mockResolvedValue(0) },
+      $transaction: jest.fn(async (operation: (client: typeof tx) => unknown) => operation(tx)),
     };
     const audit = { log: jest.fn().mockResolvedValue(undefined) } as any;
     const service = new AdminConfigService(prisma, audit);
 
-    await service.updateBaseProduct("admin_1", "bp_1", { name: "Updated" });
+    await service.updateBaseProduct("admin_1", "bp_1", {
+      name: "Updated",
+      description: null,
+      imageUrl: null,
+      availableColors: [],
+      availableSizes: [],
+    });
     await service.deleteBaseProduct("admin_1", "bp_1");
 
+    expect(prisma.baseProduct.update).toHaveBeenCalledWith({
+      where: { id: "bp_1" },
+      data: expect.objectContaining({
+        name: "Updated",
+        description: null,
+        imageUrl: null,
+        availableColors: [],
+        availableSizes: [],
+      }),
+    });
     expect(audit.log).toHaveBeenCalledWith(
       expect.objectContaining({ action: "base-product.update", entityType: "BaseProduct", entityId: "bp_1" }),
     );
     expect(audit.log).toHaveBeenCalledWith(
       expect.objectContaining({ action: "base-product.delete", entityType: "BaseProduct", entityId: "bp_1" }),
     );
+  });
+
+  it("deletes an unused mockup template together with its print areas", async () => {
+    const tx = {
+      printArea: { deleteMany: jest.fn().mockResolvedValue({ count: 2 }) },
+      mockupTemplate: { delete: jest.fn().mockResolvedValue({ id: "template_1" }) },
+    };
+    const prisma: any = {
+      mockupPlacement: { count: jest.fn().mockResolvedValue(0) },
+      podPrintAreaMapping: { count: jest.fn().mockResolvedValue(0) },
+      $transaction: jest.fn(async (operation: (client: typeof tx) => unknown) => operation(tx)),
+    };
+    const audit = { log: jest.fn().mockResolvedValue(undefined) } as any;
+    const service = new AdminConfigService(prisma, audit);
+
+    await expect(service.deleteMockupTemplate("admin_1", "template_1")).resolves.toEqual({ id: "template_1" });
+
+    expect(tx.printArea.deleteMany).toHaveBeenCalledWith({ where: { mockupTemplateId: "template_1" } });
+    expect(tx.mockupTemplate.delete).toHaveBeenCalledWith({ where: { id: "template_1" } });
+    expect(audit.log).toHaveBeenCalledWith(
+      expect.objectContaining({ action: "mockup-template.delete", entityId: "template_1" }),
+    );
+  });
+
+  it("returns an actionable error instead of deleting mockup workflow history", async () => {
+    const prisma: any = {
+      mockupPlacement: { count: jest.fn().mockResolvedValue(1) },
+      podPrintAreaMapping: { count: jest.fn().mockResolvedValue(0) },
+      $transaction: jest.fn(),
+    };
+    const service = new AdminConfigService(prisma, { log: jest.fn() } as any);
+
+    await expect(service.deleteMockupTemplate("admin_1", "template_1")).rejects.toThrow(
+      "Mockup template is used by workflow history and cannot be deleted. Deactivate it instead.",
+    );
+    expect(prisma.$transaction).not.toHaveBeenCalled();
   });
 
   it("normalizes base product JSON arrays for list responses", async () => {
@@ -116,13 +208,17 @@ describe("AdminConfigService catalog CRUD parity", () => {
   it("blocks deleting product types that are used by base products", async () => {
     const prisma: any = {
       baseProduct: { count: jest.fn().mockResolvedValue(1) },
+      marketplaceCategoryMapping: { count: jest.fn().mockResolvedValue(0) },
+      podProductMapping: { count: jest.fn().mockResolvedValue(0) },
+      externalOrderIntakeItem: { count: jest.fn().mockResolvedValue(0) },
       productType: { delete: jest.fn() },
     };
     const service = new AdminConfigService(prisma, { log: jest.fn() } as any);
 
-    await expect(service.deleteProductType("admin_1", "pt_1")).rejects.toThrow(
-      "Product type is used by base products and cannot be deleted",
-    );
+    await expect(service.deleteProductType("admin_1", "pt_1")).rejects.toMatchObject({
+      constructor: ConflictException,
+      message: expect.stringContaining("Product type is in use and cannot be deleted"),
+    });
     expect(prisma.productType.delete).not.toHaveBeenCalled();
   });
 });

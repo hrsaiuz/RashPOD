@@ -19,11 +19,11 @@ export class UpdateBaseProductDto {
 
   @IsString()
   @IsOptional()
-  imageUrl?: string;
+  imageUrl?: string | null;
 
   @IsString()
   @IsOptional()
-  description?: string;
+  description?: string | null;
 
   @IsArray()
   @IsOptional()

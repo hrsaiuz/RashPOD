@@ -68,9 +68,10 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     <ToastContext.Provider value={value}>
       {children}
       <div
-        className="pointer-events-none fixed right-4 top-4 z-toast flex w-[min(24rem,calc(100vw-2rem))] flex-col gap-3 sm:right-6 sm:top-6"
+        className="pointer-events-none fixed right-4 top-20 z-toast flex w-[min(24rem,calc(100vw-2rem))] flex-col gap-3 sm:right-6"
         aria-live="polite"
         aria-atomic="false"
+        data-testid="toast-viewport"
       >
         {toasts.map((item) => (
           <ToastCard key={item.id} item={item} onDismiss={() => dismissToast(item.id)} />

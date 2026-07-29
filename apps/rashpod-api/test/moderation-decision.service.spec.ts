@@ -70,6 +70,172 @@ describe("DesignWorkflowService moderation validation", () => {
     ).rejects.toThrow(BadRequestException);
   });
 
+  it("accepts a legacy placement-agnostic print area for the selected preset", async () => {
+    const area = {
+      id: "area_1",
+      mockupTemplateId: "template_1",
+      name: "Front print area",
+      placement: null,
+      widthCm: 30,
+      heightCm: 36,
+      x: 0,
+      y: 0,
+      width: 1000,
+      height: 1000,
+      safeX: 0,
+      safeY: 0,
+      safeWidth: 1000,
+      safeHeight: 1000,
+      allowMove: true,
+      allowResize: true,
+      allowRotate: false,
+      minScale: 0.1,
+      maxScale: 2,
+      isActive: true,
+    };
+    const tx = {
+      baseProduct: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: "product_1",
+          isActive: true,
+          productType: { isActive: true },
+          mockupTemplates: [{
+            id: "template_1",
+            isActive: true,
+            baseImageKey: "mockups/front.png",
+            lifestyleImageKey: null,
+            closeupImageKey: null,
+            printAreas: [area],
+          }],
+        }),
+      },
+      placementPreset: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: "preset_1",
+          active: true,
+          pipeline: "LOCAL",
+          localBaseProductId: "product_1",
+          placement: "FRONT",
+        }),
+      },
+      designProductSelection: {
+        upsert: jest.fn().mockResolvedValue({ id: "selection_1" }),
+      },
+    };
+    const { service } = createService();
+    jest.spyOn(service as any, "ensurePendingMockupAssets").mockResolvedValue(undefined);
+
+    await expect((service as any).createLocalSelection(tx, "mod_1", "design_1", {
+      localBaseProductId: "product_1",
+      mockupTemplateId: "template_1",
+      printAreaId: "area_1",
+      placementPresetId: "preset_1",
+      placement: "FRONT",
+      unit: "PX",
+      anchor: "TOP_LEFT",
+      position: {
+        widthPx: 500,
+        heightPx: 500,
+        xPx: 100,
+        yPx: 100,
+        scale: 1,
+        rotation: 0,
+      },
+    })).resolves.toBeUndefined();
+
+    expect(tx.designProductSelection.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        create: expect.objectContaining({ placement: "FRONT" }),
+      }),
+    );
+  });
+
+  it("still rejects an explicitly mismatched print-area placement", async () => {
+    const tx = {
+      baseProduct: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: "product_1",
+          isActive: true,
+          productType: { isActive: true },
+          mockupTemplates: [{
+            id: "template_1",
+            isActive: true,
+            printAreas: [{
+              id: "area_1",
+              placement: "BACK",
+              isActive: true,
+            }],
+          }],
+        }),
+      },
+      placementPreset: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: "preset_1",
+          active: true,
+          pipeline: "LOCAL",
+          localBaseProductId: "product_1",
+          placement: "FRONT",
+        }),
+      },
+    };
+    const { service } = createService();
+
+    await expect((service as any).createLocalSelection(tx, "mod_1", "design_1", {
+      localBaseProductId: "product_1",
+      mockupTemplateId: "template_1",
+      printAreaId: "area_1",
+      placementPresetId: "preset_1",
+      placement: "FRONT",
+      unit: "PX",
+      position: { widthPx: 100, heightPx: 100, xPx: 0, yPx: 0 },
+    })).rejects.toThrow("printable area placement does not match selection");
+  });
+
+  it("rejects a mismatched print area before opening the mockup editor", async () => {
+    const { service } = createService({
+      designAsset: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: "design_1",
+          versions: [{ id: "version_1", fileKey: "designs/design.png" }],
+        }),
+      },
+      baseProduct: {
+        findUnique: jest.fn().mockResolvedValue({ id: "product_1", isActive: true }),
+      },
+      mockupTemplate: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: "template_1",
+          baseProductId: "product_1",
+          isActive: true,
+        }),
+      },
+      printArea: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: "area_1",
+          mockupTemplateId: "template_1",
+          placement: "BACK",
+          isActive: true,
+        }),
+      },
+      placementPreset: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: "preset_1",
+          pipeline: "LOCAL",
+          localBaseProductId: "product_1",
+          placement: "FRONT",
+          active: true,
+        }),
+      },
+    });
+
+    await expect(service.mockupEditorContext("design_1", {
+      localBaseProductId: "product_1",
+      mockupTemplateId: "template_1",
+      printAreaId: "area_1",
+      placementPresetId: "preset_1",
+    })).rejects.toThrow("printable area placement does not match preset");
+  });
+
   it("returns the linked pending story when the design is rejected", async () => {
     const tx = {
       designAsset: {

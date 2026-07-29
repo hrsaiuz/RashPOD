@@ -190,6 +190,12 @@ export class DesignWorkflowService {
     if (!preset?.active || preset.pipeline !== PipelineType.LOCAL) {
       throw new BadRequestException("INVALID_PLACEMENT: placement preset is not active for local pipeline");
     }
+    if (preset.localBaseProductId && preset.localBaseProductId !== baseProduct.id) {
+      throw new BadRequestException("INVALID_PLACEMENT: preset does not belong to local product");
+    }
+    if (printArea.placement && printArea.placement !== preset.placement) {
+      throw new BadRequestException("INVALID_PLACEMENT: printable area placement does not match preset");
+    }
 
     const printAreaRect: PrintAreaRect = {
       x: printArea.x,
@@ -730,7 +736,12 @@ export class DesignWorkflowService {
       : selectedTemplate.printAreas.find((item) => item.isActive && item.placement === placement);
     if (!area) throw new BadRequestException("INVALID_PLACEMENT: printable area not found for local product");
     if (!area.isActive) throw new BadRequestException("INVALID_PLACEMENT: printable area is not active");
-    if (area.placement !== placement) throw new BadRequestException("INVALID_PLACEMENT: printable area placement does not match selection");
+    // Older/admin-created print areas are intentionally placement-agnostic because
+    // the admin DTO did not historically expose a placement field. Treat null as
+    // compatible with the selected preset; only reject an explicit mismatch.
+    if (area.placement && area.placement !== placement) {
+      throw new BadRequestException("INVALID_PLACEMENT: printable area placement does not match selection");
+    }
 
     const unit = selection.unit === "PX" ? PlacementUnits.PX : PlacementUnits.CM;
     const anchor = selection.anchor ?? "TOP_LEFT";

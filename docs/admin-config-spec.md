@@ -48,15 +48,24 @@ Fields:
 Fields:
 - Base product.
 - Template name.
-- Template image.
-- Lifestyle image.
-- Close-up image.
-- Print area.
+- Configuration version.
+- Repeatable product views.
+- View key and placement code.
+- Blank rendering image per view.
+- Repeatable lifestyle images.
+- Repeatable close-up/detail images.
+- One or more print areas per view.
 - Safe area.
 - Transform rules.
 - Output dimensions.
 - Sort order.
 - Active/inactive.
+
+Product views and gallery roles are separate concepts. Front, back, sleeve, label, wrap, and custom views define rendering
+canvases. Lifestyle and detail assets support the listing gallery and may optionally reference a particular view.
+
+Placement codes are provider-neutral strings so products are not restricted to a fixed apparel-only list. Provider-specific
+placement identifiers are handled by POD mappings.
 
 ## Royalty Settings
 Basis options:

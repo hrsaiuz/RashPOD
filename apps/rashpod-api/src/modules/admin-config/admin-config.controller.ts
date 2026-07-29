@@ -9,6 +9,8 @@ import { CreateRoyaltyRuleDto } from "./dto/create-royalty-rule.dto";
 import { UpdateRoyaltyRuleDto } from "./dto/update-royalty-rule.dto";
 import { CreateBaseProductDto } from "./dto/create-base-product.dto";
 import { CreateMockupTemplateDto } from "./dto/create-mockup-template.dto";
+import { CreateMockupViewDto } from "./dto/create-mockup-view.dto";
+import { CreateMockupGalleryAssetDto } from "./dto/create-mockup-gallery-asset.dto";
 import { CreatePrintAreaDto } from "./dto/create-print-area.dto";
 import { UpsertFilmSaleSettingsDto } from "./dto/upsert-film-sale-settings.dto";
 import { CreateDeliverySettingDto } from "./dto/create-delivery-setting.dto";
@@ -16,6 +18,8 @@ import { UpdateDeliverySettingDto } from "./dto/update-delivery-setting.dto";
 import { UpdateProductTypeDto } from "./dto/update-product-type.dto";
 import { UpdateBaseProductDto } from "./dto/update-base-product.dto";
 import { UpdateMockupTemplateDto } from "./dto/update-mockup-template.dto";
+import { UpdateMockupViewDto } from "./dto/update-mockup-view.dto";
+import { UpdateMockupGalleryAssetDto } from "./dto/update-mockup-gallery-asset.dto";
 import { UpdatePrintAreaDto } from "./dto/update-print-area.dto";
 import { CreatePlacementPresetDto } from "./dto/create-placement-preset.dto";
 import { UpdatePlacementPresetDto } from "./dto/update-placement-preset.dto";
@@ -140,6 +144,72 @@ export class AdminConfigController {
   @RequirePermission("mockup-template:manage")
   deleteMockupTemplate(@CurrentUser() user: RequestUser, @Param("id") id: string) {
     return this.service.deleteMockupTemplate(user.sub, id);
+  }
+
+  @Get("mockup-templates/:templateId/views")
+  @RequirePermission("pipeline-config:read")
+  listMockupViews(@Param("templateId") templateId: string) {
+    return this.service.listMockupViews(templateId);
+  }
+
+  @Post("mockup-templates/:templateId/views")
+  @RequirePermission("mockup-template:manage")
+  createMockupView(
+    @CurrentUser() user: RequestUser,
+    @Param("templateId") templateId: string,
+    @Body() dto: CreateMockupViewDto,
+  ) {
+    return this.service.createMockupView(user.sub, templateId, dto);
+  }
+
+  @Get("mockup-views/:id")
+  @RequirePermission("pipeline-config:read")
+  getMockupView(@Param("id") id: string) {
+    return this.service.getMockupView(id);
+  }
+
+  @Patch("mockup-views/:id")
+  @RequirePermission("mockup-template:manage")
+  updateMockupView(@CurrentUser() user: RequestUser, @Param("id") id: string, @Body() dto: UpdateMockupViewDto) {
+    return this.service.updateMockupView(user.sub, id, dto);
+  }
+
+  @Delete("mockup-views/:id")
+  @RequirePermission("mockup-template:manage")
+  deleteMockupView(@CurrentUser() user: RequestUser, @Param("id") id: string) {
+    return this.service.deleteMockupView(user.sub, id);
+  }
+
+  @Get("mockup-templates/:templateId/gallery-assets")
+  @RequirePermission("pipeline-config:read")
+  listMockupGalleryAssets(@Param("templateId") templateId: string) {
+    return this.service.listMockupGalleryAssets(templateId);
+  }
+
+  @Post("mockup-templates/:templateId/gallery-assets")
+  @RequirePermission("mockup-template:manage")
+  createMockupGalleryAsset(
+    @CurrentUser() user: RequestUser,
+    @Param("templateId") templateId: string,
+    @Body() dto: CreateMockupGalleryAssetDto,
+  ) {
+    return this.service.createMockupGalleryAsset(user.sub, templateId, dto);
+  }
+
+  @Patch("mockup-gallery-assets/:id")
+  @RequirePermission("mockup-template:manage")
+  updateMockupGalleryAsset(
+    @CurrentUser() user: RequestUser,
+    @Param("id") id: string,
+    @Body() dto: UpdateMockupGalleryAssetDto,
+  ) {
+    return this.service.updateMockupGalleryAsset(user.sub, id, dto);
+  }
+
+  @Delete("mockup-gallery-assets/:id")
+  @RequirePermission("mockup-template:manage")
+  deleteMockupGalleryAsset(@CurrentUser() user: RequestUser, @Param("id") id: string) {
+    return this.service.deleteMockupGalleryAsset(user.sub, id);
   }
 
   @Get("print-areas")
