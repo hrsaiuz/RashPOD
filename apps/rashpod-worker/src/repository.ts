@@ -170,12 +170,35 @@ export interface NotificationDeliveryRecord {
   payloadJson?: unknown;
 }
 
+export interface LegacyPlacementRenderContext {
+  id: string;
+  pipeline: "LOCAL";
+  placement?: string;
+  latestDesignVersion?: {
+    fileKey: string;
+    widthPx?: number | null;
+    heightPx?: number | null;
+    dpi?: number | null;
+    hasTransparency?: boolean | null;
+  } | null;
+  width?: number | null;
+  height?: number | null;
+  x?: number | null;
+  y?: number | null;
+  scale?: number | null;
+  rotation?: number | null;
+  units: "PX";
+  placementConfigJson: unknown;
+  localBaseProduct?: { name?: string } | null;
+}
+
 export interface WorkerRepository {
   getGeneratedAsset(id: string): Promise<GeneratedAssetRecord | null>;
   updateGeneratedAsset(
     id: string,
     data: Partial<Pick<GeneratedAssetRecord, "status" | "fileKey" | "objectKey" | "contentType" | "format" | "errorMessage" | "widthPx" | "heightPx">>,
   ): Promise<GeneratedAssetRecord>;
+  getLegacyPlacementRenderContext?(placementId: string): Promise<LegacyPlacementRenderContext | null>;
   getProductionJob?(id: string): Promise<ProductionJobRecord | null>;
   updateProductionJob?(
     id: string,

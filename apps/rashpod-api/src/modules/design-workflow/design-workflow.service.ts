@@ -172,7 +172,7 @@ export class DesignWorkflowService {
       }),
       this.prisma.baseProduct.findUnique({ where: { id: query.localBaseProductId } }),
       this.prisma.mockupTemplate.findUnique({ where: { id: query.mockupTemplateId } }),
-      this.prisma.printArea.findUnique({ where: { id: query.printAreaId } }),
+      this.prisma.printArea.findUnique({ where: { id: query.printAreaId }, include: { mockupView: true } }),
       this.prisma.placementPreset.findUnique({ where: { id: query.placementPresetId } }),
     ]);
 
@@ -186,6 +186,9 @@ export class DesignWorkflowService {
     }
     if (!printArea?.isActive || printArea.mockupTemplateId !== template.id) {
       throw new BadRequestException("INVALID_PLACEMENT: printable area is not active");
+    }
+    if (printArea.mockupView?.isActive === false) {
+      throw new BadRequestException("INVALID_PLACEMENT: printable area's product view is not active");
     }
     if (!preset?.active || preset.pipeline !== PipelineType.LOCAL) {
       throw new BadRequestException("INVALID_PLACEMENT: placement preset is not active for local pipeline");
@@ -210,9 +213,10 @@ export class DesignWorkflowService {
       heightCm: printArea.heightCm,
     };
 
+    const templateImageKey = printArea.mockupView?.blankImageKey ?? template.baseImageKey;
     const templateImageUrl = this.storage.isCloudStorageConfigured()
-      ? this.storage.buildPublicUrl(template.baseImageKey)
-      : await this.storage.createPublicSignedReadUrl({ objectKey: template.baseImageKey, expiresSeconds: 60 * 60 });
+      ? this.storage.buildPublicUrl(templateImageKey)
+      : await this.storage.createPublicSignedReadUrl({ objectKey: templateImageKey, expiresSeconds: 60 * 60 });
     const designImageUrl = await this.safeSignedUrl(latestVersion.fileKey);
 
     const initialPlacement = presetToInitialPlacement(
@@ -716,7 +720,18 @@ export class DesignWorkflowService {
     const [baseProduct, preset] = await Promise.all([
       tx.baseProduct.findUnique({
         where: { id: selection.localBaseProductId },
-        include: { productType: true, mockupTemplates: { include: { printAreas: true } } },
+        include: {
+          productType: true,
+          mockupTemplates: {
+            include: {
+              printAreas: { include: { mockupView: true } },
+              galleryAssets: {
+                where: { isActive: true },
+                orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+              },
+            },
+          },
+        },
       }),
       tx.placementPreset.findUnique({ where: { id: selection.placementPresetId } }),
     ]);
@@ -736,6 +751,9 @@ export class DesignWorkflowService {
       : selectedTemplate.printAreas.find((item) => item.isActive && item.placement === placement);
     if (!area) throw new BadRequestException("INVALID_PLACEMENT: printable area not found for local product");
     if (!area.isActive) throw new BadRequestException("INVALID_PLACEMENT: printable area is not active");
+    if (area.mockupView?.isActive === false) {
+      throw new BadRequestException("INVALID_PLACEMENT: printable area's product view is not active");
+    }
     // Older/admin-created print areas are intentionally placement-agnostic because
     // the admin DTO did not historically expose a placement field. Treat null as
     // compatible with the selected preset; only reject an explicit mismatch.
@@ -969,7 +987,20 @@ export class DesignWorkflowService {
   }
 
   private localPlacementConfig(input: {
-    template: { id: string; name: string; baseImageKey: string; lifestyleImageKey: string | null; closeupImageKey: string | null };
+    template: {
+      id: string;
+      name: string;
+      baseImageKey: string;
+      lifestyleImageKey: string | null;
+      closeupImageKey: string | null;
+      galleryAssets?: Array<{
+        id: string;
+        mockupViewId: string | null;
+        role: "LIFESTYLE" | "DETAIL";
+        imageKey: string;
+        sortOrder: number;
+      }>;
+    };
     area: {
       id: string;
       name: string;
@@ -989,21 +1020,57 @@ export class DesignWorkflowService {
       allowRotate: boolean;
       minScale: number;
       maxScale: number;
+      mockupView: {
+        id: string;
+        viewKey: string;
+        placementCode: string;
+        name: string;
+        blankImageKey: string;
+      } | null;
     };
     preset: { id: string; name: string; alignment: unknown };
     unit: PlacementUnits;
     anchor: string;
     position: { width?: number; height?: number; x?: number; y?: number; scale: number; rotation: number };
   }) {
+    const galleryAsset = (role: "LIFESTYLE" | "DETAIL") => {
+      const forRole = (input.template.galleryAssets ?? []).filter((asset) => asset.role === role);
+      return (
+        forRole.find((asset) => asset.mockupViewId === input.area.mockupView?.id)
+        ?? forRole.find((asset) => asset.mockupViewId === null)
+        ?? forRole[0]
+      );
+    };
+    const lifestyleAsset = galleryAsset("LIFESTYLE");
+    const detailAsset = galleryAsset("DETAIL");
+
     return {
       version: 1,
       mockupTemplate: {
         id: input.template.id,
         name: input.template.name,
-        baseImageKey: input.template.baseImageKey,
-        lifestyleImageKey: input.template.lifestyleImageKey,
-        closeupImageKey: input.template.closeupImageKey,
+        baseImageKey: input.area.mockupView?.blankImageKey ?? input.template.baseImageKey,
+        lifestyleImageKey: lifestyleAsset?.imageKey ?? input.template.lifestyleImageKey,
+        closeupImageKey: detailAsset?.imageKey ?? input.template.closeupImageKey,
       },
+      mockupView: input.area.mockupView
+        ? {
+            id: input.area.mockupView.id,
+            viewKey: input.area.mockupView.viewKey,
+            placementCode: input.area.mockupView.placementCode,
+            name: input.area.mockupView.name,
+            blankImageKey: input.area.mockupView.blankImageKey,
+          }
+        : null,
+      galleryAssets: [lifestyleAsset, detailAsset]
+        .filter((asset): asset is NonNullable<typeof asset> => Boolean(asset))
+        .map((asset) => ({
+          id: asset.id,
+          mockupViewId: asset.mockupViewId,
+          role: asset.role,
+          imageKey: asset.imageKey,
+          sortOrder: asset.sortOrder,
+        })),
       printArea: {
         id: input.area.id,
         name: input.area.name,

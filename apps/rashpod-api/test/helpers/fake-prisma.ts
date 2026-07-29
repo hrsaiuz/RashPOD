@@ -64,8 +64,8 @@ type ModerationCase = {
 };
 type ProductType = { id: string; name: string; slug: string; category: string; productionMethod: string; createdAt: Date; updatedAt: Date };
 type BaseProduct = { id: string; productTypeId: string; name: string; skuPrefix: string; isActive: boolean; createdAt: Date; updatedAt: Date };
-type MockupTemplate = { id: string; baseProductId: string; name: string; baseImageKey: string; createdAt: Date; updatedAt: Date };
-type PrintArea = { id: string; mockupTemplateId: string; name: string; x: number; y: number; width: number; height: number; safeX: number; safeY: number; safeWidth: number; safeHeight: number; createdAt: Date; updatedAt: Date };
+type MockupTemplate = { id: string; baseProductId: string; name: string; baseImageKey: string; isActive: boolean; createdAt: Date; updatedAt: Date };
+type PrintArea = { id: string; mockupTemplateId: string; mockupViewId?: string | null; name: string; x: number; y: number; width: number; height: number; safeX: number; safeY: number; safeWidth: number; safeHeight: number; isActive: boolean; createdAt: Date; updatedAt: Date };
 type MockupPlacement = { id: string; designAssetId: string; designVersionId: string; mockupTemplateId: string; printAreaId: string; x: number; y: number; width: number; height: number; scale: number; rotation: number; approvedByDesigner: boolean; approvedAt?: Date | null; createdAt: Date; updatedAt: Date };
 type GeneratedAsset = { id: string; sourcePlacementId: string; type: string; status: string; createdAt: Date; updatedAt: Date };
 type WorkerJob = { id: string; type: string; status: string; payloadJson: Record<string, unknown>; attempts: number; maxAttempts: number; errorMessage?: string | null; nextRunAt: Date; lastErrorAt?: Date | null; claimedAt?: Date | null; completedAt?: Date | null; createdAt: Date; updatedAt: Date };
@@ -295,6 +295,7 @@ export function createFakePrisma(): any {
         versions
           .filter((v) => (!where?.designAssetId ? true : v.designAssetId === where.designAssetId))
           .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())[0] ?? null,
+      findUnique: async ({ where }: any) => versions.find((version) => version.id === where.id) ?? null,
     },
     designModerationCase: {
       create: async ({ data }: any) => {
@@ -326,17 +327,30 @@ export function createFakePrisma(): any {
     mockupTemplate: {
       create: async ({ data }: any) => {
         const now = new Date();
-        const row: MockupTemplate = { id: nextId("mtp"), createdAt: now, updatedAt: now, ...data };
+        const row: MockupTemplate = { id: nextId("mtp"), createdAt: now, updatedAt: now, isActive: true, ...data };
         mockupTemplates.push(row);
         return row;
+      },
+      findUnique: async ({ where, include }: any) => {
+        const row = mockupTemplates.find((template) => template.id === where.id) ?? null;
+        if (!row || !include?.baseProduct) return row;
+        return {
+          ...row,
+          baseProduct: baseProducts.find((product) => product.id === row.baseProductId) ?? null,
+        };
       },
     },
     printArea: {
       create: async ({ data }: any) => {
         const now = new Date();
-        const row: PrintArea = { id: nextId("par"), createdAt: now, updatedAt: now, ...data };
+        const row: PrintArea = { id: nextId("par"), createdAt: now, updatedAt: now, isActive: true, ...data };
         printAreas.push(row);
         return row;
+      },
+      findUnique: async ({ where, include }: any) => {
+        const row = printAreas.find((area) => area.id === where.id) ?? null;
+        if (!row || !include?.mockupView) return row;
+        return { ...row, mockupView: null };
       },
     },
     mockupPlacement: {
@@ -352,7 +366,14 @@ export function createFakePrisma(): any {
         mockupPlacements.push(row);
         return row;
       },
-      findUnique: async ({ where }: any) => mockupPlacements.find((p) => p.id === where.id) ?? null,
+      findUnique: async ({ where, include }: any) => {
+        const row = mockupPlacements.find((placement) => placement.id === where.id) ?? null;
+        if (!row || !include?.printArea) return row;
+        return {
+          ...row,
+          printArea: printAreas.find((area) => area.id === row.printAreaId) ?? null,
+        };
+      },
       update: async ({ where, data }: any) => {
         const row = mockupPlacements.find((p) => p.id === where.id)!;
         Object.assign(row, data, { updatedAt: new Date() });

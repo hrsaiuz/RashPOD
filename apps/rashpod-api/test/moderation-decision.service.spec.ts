@@ -92,6 +92,13 @@ describe("DesignWorkflowService moderation validation", () => {
       minScale: 0.1,
       maxScale: 2,
       isActive: true,
+      mockupView: {
+        id: "view_front",
+        viewKey: "front",
+        placementCode: "front",
+        name: "Front",
+        blankImageKey: "mockups/front-view.png",
+      },
     };
     const tx = {
       baseProduct: {
@@ -105,6 +112,11 @@ describe("DesignWorkflowService moderation validation", () => {
             baseImageKey: "mockups/front.png",
             lifestyleImageKey: null,
             closeupImageKey: null,
+            galleryAssets: [
+              { id: "lifestyle_global", mockupViewId: null, role: "LIFESTYLE", imageKey: "mockups/lifestyle-global.png", sortOrder: 0 },
+              { id: "lifestyle_front", mockupViewId: "view_front", role: "LIFESTYLE", imageKey: "mockups/lifestyle-front.png", sortOrder: 1 },
+              { id: "detail_global", mockupViewId: null, role: "DETAIL", imageKey: "mockups/detail-global.png", sortOrder: 0 },
+            ],
             printAreas: [area],
           }],
         }),
@@ -145,7 +157,21 @@ describe("DesignWorkflowService moderation validation", () => {
 
     expect(tx.designProductSelection.upsert).toHaveBeenCalledWith(
       expect.objectContaining({
-        create: expect.objectContaining({ placement: "FRONT" }),
+        create: expect.objectContaining({
+          placement: "FRONT",
+          placementConfigJson: expect.objectContaining({
+            mockupTemplate: expect.objectContaining({
+              baseImageKey: "mockups/front-view.png",
+              lifestyleImageKey: "mockups/lifestyle-front.png",
+              closeupImageKey: "mockups/detail-global.png",
+            }),
+            mockupView: expect.objectContaining({ id: "view_front", blankImageKey: "mockups/front-view.png" }),
+            galleryAssets: expect.arrayContaining([
+              expect.objectContaining({ id: "lifestyle_front", role: "LIFESTYLE" }),
+              expect.objectContaining({ id: "detail_global", role: "DETAIL" }),
+            ]),
+          }),
+        }),
       }),
     );
   });
@@ -189,6 +215,48 @@ describe("DesignWorkflowService moderation validation", () => {
       unit: "PX",
       position: { widthPx: 100, heightPx: 100, xPx: 0, yPx: 0 },
     })).rejects.toThrow("printable area placement does not match selection");
+  });
+
+  it("rejects a print area whose linked product view is inactive", async () => {
+    const tx = {
+      baseProduct: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: "product_1",
+          isActive: true,
+          productType: { isActive: true },
+          mockupTemplates: [{
+            id: "template_1",
+            isActive: true,
+            printAreas: [{
+              id: "area_1",
+              placement: "FRONT",
+              isActive: true,
+              mockupView: { id: "view_front", isActive: false },
+            }],
+          }],
+        }),
+      },
+      placementPreset: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: "preset_1",
+          active: true,
+          pipeline: "LOCAL",
+          localBaseProductId: "product_1",
+          placement: "FRONT",
+        }),
+      },
+    };
+    const { service } = createService();
+
+    await expect((service as any).createLocalSelection(tx, "mod_1", "design_1", {
+      localBaseProductId: "product_1",
+      mockupTemplateId: "template_1",
+      printAreaId: "area_1",
+      placementPresetId: "preset_1",
+      placement: "FRONT",
+      unit: "PX",
+      position: { widthPx: 100, heightPx: 100, xPx: 0, yPx: 0 },
+    })).rejects.toThrow("product view is not active");
   });
 
   it("rejects a mismatched print area before opening the mockup editor", async () => {

@@ -1,5 +1,5 @@
 import { MockupGalleryAssetRole } from "@prisma/client";
-import { IsBoolean, IsEnum, IsInt, IsNotEmpty, IsObject, IsOptional, IsString, MaxLength, Min } from "class-validator";
+import { IsBoolean, IsEnum, IsInt, IsNotEmpty, IsObject, IsOptional, IsString, Matches, MaxLength, Min } from "class-validator";
 
 export class UpdateMockupGalleryAssetDto {
   @IsString()
@@ -12,6 +12,7 @@ export class UpdateMockupGalleryAssetDto {
 
   @IsString()
   @IsNotEmpty()
+  @Matches(/\S/)
   @MaxLength(1024)
   @IsOptional()
   imageKey?: string;

@@ -20,8 +20,8 @@ export class MockupController {
 
   @Get(":id")
   @RequirePermission("design:read-own")
-  get(@Param("id") id: string) {
-    return this.mockupService.getPlacement(id);
+  get(@CurrentUser() user: RequestUser, @Param("id") id: string) {
+    return this.mockupService.getPlacement(user.sub, id);
   }
 
   @Patch(":id")

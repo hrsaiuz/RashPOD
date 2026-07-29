@@ -6,7 +6,7 @@ const forbiddenFiles = tracked.filter((file) => /(^|\/)\.env(\.|$)?/.test(file) 
 const secretPatterns = [
   { name: "OpenAI API key", pattern: /sk-[A-Za-z0-9_-]{32,}/ },
   { name: "Telegram bot token", pattern: /\b\d{7,12}:[A-Za-z0-9_-]{30,}\b/ },
-  { name: "Google private key", pattern: /-----BEGIN PRIVATE KEY-----/ },
+  { name: "Google private key", pattern: new RegExp(["-----BEGIN", "PRIVATE KEY-----"].join(" ")) },
   { name: "JWT-like token", pattern: /eyJ[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}/ },
 ];
 const ignored = [/^package-lock\.json$/, /^docs\/SEED_CREDENTIALS\.md$/];

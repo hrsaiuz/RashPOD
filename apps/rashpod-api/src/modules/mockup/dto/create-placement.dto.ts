@@ -14,12 +14,16 @@ export class CreatePlacementDto {
   printAreaId!: string;
 
   @IsInt()
+  @Min(0)
   x!: number;
   @IsInt()
+  @Min(0)
   y!: number;
   @IsInt()
+  @Min(1)
   width!: number;
   @IsInt()
+  @Min(1)
   height!: number;
 
   @IsNumber()

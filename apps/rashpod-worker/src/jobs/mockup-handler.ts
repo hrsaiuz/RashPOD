@@ -1,11 +1,12 @@
-import { GeneratedAssetRecord, ProductionJobRecord, WorkerRepository } from "../repository";
-import { RenderedFile, SharpRenderer } from "../renderer";
+import { GeneratedAssetRecord, LegacyPlacementRenderContext, ProductionJobRecord, WorkerRepository } from "../repository";
+import { PipelineRenderContext, RenderedFile, SharpRenderer } from "../renderer";
 
 export interface MockupRendererPort {
   renderPreview(placementId: string): Promise<RenderedFile>;
   renderListingVariant(placementId: string, variant: "main" | "lifestyle" | "closeup"): Promise<RenderedFile>;
   renderFilmPreview(placementId: string): Promise<RenderedFile>;
   renderProductionFile(placementId: string): Promise<RenderedFile>;
+  renderPipelineMockup?(context: PipelineRenderContext, variant: "main" | "lifestyle" | "closeup" | "preview"): Promise<RenderedFile>;
   renderFilmProductionFile?(input: { productionJobId: string; queueType: string; widthCm?: number | null; heightCm?: number | null; quantity?: number | null }): Promise<RenderedFile>;
   renderGangSheetProductionFile?(input: { productionJobId: string; queueType: string; snapshot: Record<string, unknown>; quantity?: number | null }): Promise<RenderedFile>;
 }
@@ -19,7 +20,10 @@ export class MockupJobHandler {
   async handlePreview(input: { placementId: string; generatedAssetId: string }) {
     await this.repo.updateGeneratedAsset(input.generatedAssetId, { status: "PROCESSING", errorMessage: undefined });
     try {
-      const rendered = await this.renderer.renderPreview(input.placementId);
+      const context = await this.getPlacementContext(input.placementId);
+      const rendered = context && this.renderer.renderPipelineMockup
+        ? await this.renderer.renderPipelineMockup(context, "preview")
+        : await this.renderer.renderPreview(input.placementId);
       return await this.repo.updateGeneratedAsset(input.generatedAssetId, {
         status: "READY",
         fileKey: rendered.fileKey,
@@ -39,11 +43,26 @@ export class MockupJobHandler {
 
   async handleListingPack(input: { placementId: string; generatedAssetIds: string[] }) {
     const results = [];
+    let context: LegacyPlacementRenderContext | null;
+    try {
+      context = await this.getPlacementContext(input.placementId);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Mockup placement context is unavailable";
+      for (const id of input.generatedAssetIds) {
+        results.push(await this.repo.updateGeneratedAsset(id, {
+          status: "FAILED",
+          errorMessage,
+        }));
+      }
+      return results;
+    }
     for (const id of input.generatedAssetIds) {
       await this.repo.updateGeneratedAsset(id, { status: "PROCESSING", errorMessage: undefined });
       try {
         const variant = this.getVariantByIndex(id, input.generatedAssetIds);
-        const rendered = await this.renderer.renderListingVariant(input.placementId, variant);
+        const rendered = context && this.renderer.renderPipelineMockup
+          ? await this.renderer.renderPipelineMockup(context, variant)
+          : await this.renderer.renderListingVariant(input.placementId, variant);
         const updated = await this.repo.updateGeneratedAsset(id, {
           status: "READY",
           fileKey: rendered.fileKey,
@@ -149,6 +168,13 @@ export class MockupJobHandler {
         failureReason: error instanceof Error ? error.message : "Unknown film production file generation error",
       });
     }
+  }
+
+  private async getPlacementContext(placementId: string): Promise<LegacyPlacementRenderContext | null> {
+    if (!this.repo.getLegacyPlacementRenderContext) return null;
+    const context = await this.repo.getLegacyPlacementRenderContext(placementId);
+    if (!context) throw new Error(`Mockup placement ${placementId} not found`);
+    return context;
   }
 
   private objectJson(value: unknown): Record<string, unknown> {

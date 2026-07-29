@@ -52,6 +52,20 @@ export interface PlacementConfigV1 {
     lifestyleImageKey?: string | null;
     closeupImageKey?: string | null;
   };
+  mockupView?: {
+    id: string;
+    viewKey: string;
+    placementCode: string;
+    name: string;
+    blankImageKey: string;
+  } | null;
+  galleryAssets?: Array<{
+    id: string;
+    mockupViewId?: string | null;
+    role: "LIFESTYLE" | "DETAIL";
+    imageKey: string;
+    sortOrder?: number;
+  }>;
   printArea: PrintAreaRect & {
     id?: string;
     name?: string;

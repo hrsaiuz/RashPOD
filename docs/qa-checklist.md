@@ -40,6 +40,24 @@
 ## Mockup Studio
 - [ ] Product type selector works.
 - [ ] Mockup template selector works.
+- [ ] Product view selector switches the editor canvas between front, back, sleeves, and labels.
+- [ ] Saved print area remains linked to its selected product view.
+- [ ] Promoting a product view updates the template's primary image.
+- [ ] The primary view cannot be directly deactivated or unmarked.
+- [ ] Deleting a primary view promotes the next active view.
+- [ ] Gallery create/edit/delete keeps legacy lifestyle and close-up image fallbacks synchronized.
+- [ ] V2 print areas require an active product view.
+- [ ] Invalid safe-zone bounds and inverted scale ranges are rejected on create and update.
+- [ ] A V2 template without an active primary view cannot be activated.
+- [ ] Creating an inactive template leaves its primary view active so the template can later be reactivated.
+- [ ] Editing the legacy base image keeps the primary view image synchronized.
+- [ ] Legacy placement preview/listing jobs render the linked product view and normalized gallery assets.
+- [ ] Missing placement context fails every asset in the requested listing pack.
+- [ ] Moderator print-area options identify the linked front/back/sleeve/label view.
+- [ ] Print areas belonging to inactive views cannot be selected or approved.
+- [ ] Placement creation rejects a print area or design version from another parent record.
+- [ ] Placement create/update rejects artwork outside the safe zone or outside scale/rotation limits.
+- [ ] A designer cannot read another designer's placement by ID.
 - [ ] Print area displays.
 - [ ] Safe area displays.
 - [ ] Design drag works.
@@ -52,6 +70,7 @@
 - [ ] Worker receives job.
 - [ ] Worker downloads from GCS.
 - [ ] Sharp renders main image.
+- [ ] Local renderer uses the blank image from the print area's selected product view.
 - [ ] Sharp renders lifestyle image.
 - [ ] Sharp renders close-up image.
 - [ ] Outputs upload to GCS.
@@ -118,6 +137,9 @@
 - [ ] Each mockup view has an independent blank rendering image.
 - [ ] Multiple lifestyle and detail assets can be attached to one template.
 - [ ] A print area cannot reference a view from another template.
+- [ ] Inside-label, outside-label, and custom view codes save print areas under the `OTHER` placement category.
+- [ ] Editing an existing print area does not send its immutable ID in the PATCH body.
+- [ ] Print areas can be activated and deactivated from the admin editor.
 - [ ] A view with print areas cannot be deleted accidentally.
 - [ ] Legacy single-image templates continue to load.
 - [ ] Print area setup works.

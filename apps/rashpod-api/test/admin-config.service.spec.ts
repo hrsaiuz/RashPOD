@@ -54,7 +54,12 @@ describe("AdminConfigService.updateDeliverySetting", () => {
 describe("AdminConfigService catalog CRUD parity", () => {
   it("persists an explicit print-area placement", async () => {
     const create = jest.fn().mockResolvedValue({ id: "area_1", placement: "FRONT" });
-    const prisma: any = { printArea: { create } };
+    const prisma: any = {
+      mockupTemplate: {
+        findUnique: jest.fn().mockResolvedValue({ id: "template_1", configurationVersion: "LEGACY_V1" }),
+      },
+      printArea: { create },
+    };
     const audit = { log: jest.fn().mockResolvedValue(undefined) } as any;
     const service = new AdminConfigService(prisma, audit);
 
@@ -75,6 +80,116 @@ describe("AdminConfigService catalog CRUD parity", () => {
     expect(create).toHaveBeenCalledWith({
       data: expect.objectContaining({ placement: "FRONT" }),
     });
+  });
+
+  it("requires an active product view for V2 print areas", async () => {
+    const prisma: any = {
+      mockupTemplate: {
+        findUnique: jest.fn().mockResolvedValue({ id: "template_1", configurationVersion: "MULTI_VIEW_V2" }),
+      },
+      mockupView: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: "view_back",
+          mockupTemplateId: "template_1",
+          isActive: false,
+        }),
+      },
+      printArea: { create: jest.fn() },
+    };
+    const service = new AdminConfigService(prisma, { log: jest.fn() } as any);
+    const input = {
+      mockupTemplateId: "template_1",
+      name: "Back",
+      placement: PlacementKind.BACK,
+      x: 10,
+      y: 20,
+      width: 500,
+      height: 600,
+      safeX: 20,
+      safeY: 30,
+      safeWidth: 460,
+      safeHeight: 540,
+    };
+
+    await expect(service.createPrintArea("admin_1", input))
+      .rejects.toThrow("product view is required");
+    await expect(service.createPrintArea("admin_1", { ...input, mockupViewId: "view_back" }))
+      .rejects.toThrow("active mockup view");
+    expect(prisma.printArea.create).not.toHaveBeenCalled();
+  });
+
+  it("rejects safe zones outside the print-area rectangle", async () => {
+    const prisma: any = {
+      mockupTemplate: {
+        findUnique: jest.fn().mockResolvedValue({ id: "template_1", configurationVersion: "MULTI_VIEW_V2" }),
+      },
+      mockupView: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: "view_front",
+          mockupTemplateId: "template_1",
+          isActive: true,
+        }),
+      },
+      printArea: { create: jest.fn() },
+    };
+    const service = new AdminConfigService(prisma, { log: jest.fn() } as any);
+
+    await expect(service.createPrintArea("admin_1", {
+      mockupTemplateId: "template_1",
+      mockupViewId: "view_front",
+      name: "Front",
+      x: 100,
+      y: 100,
+      width: 500,
+      height: 600,
+      safeX: 90,
+      safeY: 120,
+      safeWidth: 460,
+      safeHeight: 540,
+    })).rejects.toThrow("Safe zone must stay inside");
+    expect(prisma.printArea.create).not.toHaveBeenCalled();
+  });
+
+  it("validates the merged print-area geometry during partial updates", async () => {
+    const prisma: any = {
+      printArea: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: "area_1",
+          mockupTemplateId: "template_1",
+          mockupViewId: "view_front",
+          x: 100,
+          y: 100,
+          width: 500,
+          height: 600,
+          safeX: 120,
+          safeY: 120,
+          safeWidth: 460,
+          safeHeight: 540,
+          minScale: 0.5,
+          maxScale: 2,
+        }),
+        update: jest.fn(),
+      },
+      mockupTemplate: {
+        findUnique: jest.fn().mockResolvedValue({ id: "template_1", configurationVersion: "MULTI_VIEW_V2" }),
+      },
+      mockupView: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: "view_front",
+          mockupTemplateId: "template_1",
+          isActive: true,
+        }),
+      },
+    };
+    const service = new AdminConfigService(prisma, { log: jest.fn() } as any);
+
+    await expect(service.updatePrintArea("admin_1", "area_1", {
+      safeWidth: 600,
+    })).rejects.toThrow("Safe zone must stay inside");
+    await expect(service.updatePrintArea("admin_1", "area_1", {
+      minScale: 3,
+    })).rejects.toThrow("Minimum scale cannot exceed maximum scale");
+    expect(prisma.printArea.update).not.toHaveBeenCalled();
   });
 
   it("gets product type by id and throws when missing", async () => {

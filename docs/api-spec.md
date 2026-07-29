@@ -113,6 +113,29 @@ PATCH  /admin/print-areas/:id
 Multi-view templates use repeatable `MockupView` records for rendering canvases such as front, back, sleeves, and labels.
 Lifestyle and detail images are repeatable gallery assets rather than product-view definitions. Legacy template image fields
 remain readable while existing templates are migrated.
+Editor previews and local render jobs resolve the blank image from the print area's linked view, with `baseImageKey` retained
+only as a fallback for legacy records.
+For the MVP three-image listing contract, lifestyle and detail rendering select the first active asset for the linked view,
+then the first template-wide asset by admin sort order, then the corresponding legacy image column.
+Placement creation rejects mismatched design versions, templates, print areas, or inactive linked views and records the
+resolved identifiers in the audit log.
+Placement create/update validates positive dimensions, safe-zone bounds (including scaled/rotated bounds), allowed rotation,
+and per-area scale limits. Placement reads enforce design ownership.
+An active template always retains an active primary view. Promoting or editing that view synchronizes the legacy
+`baseImageKey`; deleting a primary view promotes the next active view or rejects the operation when none exists. Primary
+views remain active while their parent template is inactive so an administrator can safely reactivate the template later.
+Gallery create/update/delete operations similarly synchronize legacy lifestyle and close-up keys using the primary-view,
+template-wide, and sorted fallback priority.
+Multi-view print areas require an active linked view. Their print/safe rectangles must have positive dimensions, the safe
+zone must remain inside the print rectangle, and minimum scale cannot exceed maximum scale. Custom view codes such as
+`inside_label` and `outside_label` use the legacy `OTHER` placement category while preserving their precise view code.
+Reactivating a V2 template requires an active primary view. Legacy `baseImageKey` edits on a V2 template update that
+primary view in the same transaction. V2 lifestyle and detail edits must use gallery-asset endpoints so normalized assets
+and legacy fallback columns cannot diverge.
+Legacy `/mockup/placements` preview and listing jobs load a normalized render snapshot from the linked view and gallery
+assets before Sharp compositing, with legacy image fallbacks for unlinked records.
+Print-area responses include linked view identity and status. Moderator selection excludes inactive views, and both editor
+context and approval validation reject print areas whose linked view has been deactivated.
 
 ## Mockup Studio
 ```text

@@ -356,11 +356,11 @@ export class AdminConfigService {
     const item = await this.prisma.$transaction(async (tx) => {
       const template = await tx.mockupTemplate.create({
         data: {
-          baseProductId: dto.baseProductId,
-          name: dto.name,
-          baseImageKey: dto.baseImageKey,
-          lifestyleImageKey: dto.lifestyleImageKey,
-          closeupImageKey: dto.closeupImageKey,
+          baseProductId: dto.baseProductId.trim(),
+          name: dto.name.trim(),
+          baseImageKey: dto.baseImageKey.trim(),
+          lifestyleImageKey: dto.lifestyleImageKey?.trim(),
+          closeupImageKey: dto.closeupImageKey?.trim(),
           configurationVersion: "MULTI_VIEW_V2",
           isActive: dto.isActive ?? true,
           sortOrder: dto.sortOrder ?? 0,
@@ -372,10 +372,10 @@ export class AdminConfigService {
           viewKey: "primary",
           placementCode: "front",
           name: "Front",
-          blankImageKey: dto.baseImageKey,
+          blankImageKey: dto.baseImageKey.trim(),
           sortOrder: 0,
           isPrimary: true,
-          isActive: dto.isActive ?? true,
+          isActive: true,
         },
       });
       const galleryAssets = [
@@ -384,9 +384,9 @@ export class AdminConfigService {
               mockupTemplateId: template.id,
               mockupViewId: primaryView.id,
               role: "LIFESTYLE" as const,
-              imageKey: dto.lifestyleImageKey,
+              imageKey: dto.lifestyleImageKey.trim(),
               sortOrder: 0,
-              isActive: dto.isActive ?? true,
+              isActive: true,
             }
           : null,
         dto.closeupImageKey
@@ -394,9 +394,9 @@ export class AdminConfigService {
               mockupTemplateId: template.id,
               mockupViewId: primaryView.id,
               role: "DETAIL" as const,
-              imageKey: dto.closeupImageKey,
+              imageKey: dto.closeupImageKey.trim(),
               sortOrder: 0,
-              isActive: dto.isActive ?? true,
+              isActive: true,
             }
           : null,
       ].filter((asset): asset is NonNullable<typeof asset> => Boolean(asset));
@@ -423,17 +423,52 @@ export class AdminConfigService {
   }
 
   async updateMockupTemplate(actorId: string, id: string, dto: UpdateMockupTemplateDto) {
-    const item = await this.prisma.mockupTemplate.update({
+    const existing = await this.prisma.mockupTemplate.findUnique({
       where: { id },
-      data: {
-        baseProductId: dto.baseProductId,
-        name: dto.name,
-        baseImageKey: dto.baseImageKey,
-        lifestyleImageKey: dto.lifestyleImageKey,
-        closeupImageKey: dto.closeupImageKey,
-        isActive: dto.isActive,
-        sortOrder: dto.sortOrder,
-      },
+      select: { id: true, configurationVersion: true },
+    });
+    if (!existing) throw new NotFoundException("Mockup template not found");
+    if (
+      existing.configurationVersion === "MULTI_VIEW_V2"
+      && (dto.lifestyleImageKey !== undefined || dto.closeupImageKey !== undefined)
+    ) {
+      throw new BadRequestException("Use mockup gallery asset endpoints to update multi-view lifestyle and detail images");
+    }
+    const item = await this.prisma.$transaction(async (tx) => {
+      if (dto.isActive === true && existing.configurationVersion === "MULTI_VIEW_V2") {
+        const primary = await tx.mockupView.findFirst({
+          where: { mockupTemplateId: id, isPrimary: true, isActive: true },
+          select: { id: true },
+        });
+        if (!primary) {
+          throw new BadRequestException("A multi-view template requires an active primary view before activation");
+        }
+      }
+      const updated = await tx.mockupTemplate.update({
+        where: { id },
+        data: {
+          baseProductId: dto.baseProductId?.trim(),
+          name: dto.name?.trim(),
+          baseImageKey: dto.baseImageKey?.trim(),
+          lifestyleImageKey: dto.lifestyleImageKey?.trim(),
+          closeupImageKey: dto.closeupImageKey?.trim(),
+          isActive: dto.isActive,
+          sortOrder: dto.sortOrder,
+        },
+      });
+      if (existing.configurationVersion === "MULTI_VIEW_V2" && dto.baseImageKey) {
+        const primary = await tx.mockupView.findFirst({
+          where: { mockupTemplateId: id, isPrimary: true },
+          select: { id: true },
+        });
+        if (primary) {
+          await tx.mockupView.update({
+            where: { id: primary.id },
+            data: { blankImageKey: dto.baseImageKey.trim() },
+          });
+        }
+      }
+      return updated;
     });
     await this.audit.log({ actorId, action: "mockup-template.update", entityType: "MockupTemplate", entityId: item.id });
     return item;
@@ -485,6 +520,10 @@ export class AdminConfigService {
     const item = await this.prisma.$transaction(async (tx) => {
       const viewCount = await tx.mockupView.count({ where: { mockupTemplateId } });
       const isPrimary = dto.isPrimary ?? viewCount === 0;
+      const isActive = dto.isActive ?? true;
+      if (isPrimary && !isActive) {
+        throw new BadRequestException("The primary mockup view must be active");
+      }
       if (isPrimary) {
         await tx.mockupView.updateMany({ where: { mockupTemplateId, isPrimary: true }, data: { isPrimary: false } });
       }
@@ -498,14 +537,21 @@ export class AdminConfigService {
           mockupStyle: dto.mockupStyle?.trim(),
           sortOrder: dto.sortOrder ?? 0,
           isPrimary,
-          isActive: dto.isActive ?? true,
+          isActive,
           metadataJson: dto.metadataJson as Prisma.InputJsonValue | undefined,
         },
       });
       await tx.mockupTemplate.update({
         where: { id: mockupTemplateId },
-        data: { configurationVersion: "MULTI_VIEW_V2" },
+        data: {
+          configurationVersion: "MULTI_VIEW_V2",
+          ...(isPrimary ? { baseImageKey: dto.blankImageKey.trim() } : {}),
+        },
       });
+      if (isPrimary) {
+        await this.syncLegacyGalleryRole(tx, mockupTemplateId, "LIFESTYLE");
+        await this.syncLegacyGalleryRole(tx, mockupTemplateId, "DETAIL");
+      }
       return view;
     });
 
@@ -531,6 +577,12 @@ export class AdminConfigService {
       });
       if (duplicate) throw new ConflictException("A mockup view with this key already exists for the template");
     }
+    if (existing.isPrimary && dto.isPrimary === false) {
+      throw new BadRequestException("Promote another view instead of removing the current primary flag");
+    }
+    if ((existing.isPrimary || dto.isPrimary === true) && dto.isActive === false) {
+      throw new BadRequestException("The primary mockup view must be active");
+    }
 
     const item = await this.prisma.$transaction(async (tx) => {
       if (dto.isPrimary === true) {
@@ -539,7 +591,7 @@ export class AdminConfigService {
           data: { isPrimary: false },
         });
       }
-      return tx.mockupView.update({
+      const updated = await tx.mockupView.update({
         where: { id },
         data: {
           viewKey,
@@ -553,6 +605,18 @@ export class AdminConfigService {
           metadataJson: dto.metadataJson as Prisma.InputJsonValue | undefined,
         },
       });
+      if (updated.isPrimary) {
+        await tx.mockupTemplate.update({
+          where: { id: existing.mockupTemplateId },
+          data: {
+            configurationVersion: "MULTI_VIEW_V2",
+            baseImageKey: updated.blankImageKey,
+          },
+        });
+        await this.syncLegacyGalleryRole(tx, existing.mockupTemplateId, "LIFESTYLE");
+        await this.syncLegacyGalleryRole(tx, existing.mockupTemplateId, "DETAIL");
+      }
+      return updated;
     });
 
     await this.audit.log({
@@ -581,7 +645,26 @@ export class AdminConfigService {
           orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
           select: { id: true },
         });
-        if (replacement) await tx.mockupView.update({ where: { id: replacement.id }, data: { isPrimary: true } });
+        if (replacement) {
+          const promoted = await tx.mockupView.update({
+            where: { id: replacement.id },
+            data: { isPrimary: true },
+          });
+          await tx.mockupTemplate.update({
+            where: { id: existing.mockupTemplateId },
+            data: { baseImageKey: promoted.blankImageKey },
+          });
+          await this.syncLegacyGalleryRole(tx, existing.mockupTemplateId, "LIFESTYLE");
+          await this.syncLegacyGalleryRole(tx, existing.mockupTemplateId, "DETAIL");
+        } else {
+          const template = await tx.mockupTemplate.findUnique({
+            where: { id: existing.mockupTemplateId },
+            select: { isActive: true },
+          });
+          if (template?.isActive) {
+            throw new ConflictException("An active mockup template must keep an active primary view");
+          }
+        }
       }
       return deleted;
     });
@@ -600,17 +683,21 @@ export class AdminConfigService {
   async createMockupGalleryAsset(actorId: string, mockupTemplateId: string, dto: CreateMockupGalleryAssetDto) {
     await this.assertMockupTemplateExists(mockupTemplateId);
     if (dto.mockupViewId) await this.assertMockupViewForTemplate(dto.mockupViewId, mockupTemplateId);
-    const item = await this.prisma.mockupGalleryAsset.create({
-      data: {
-        mockupTemplateId,
-        mockupViewId: dto.mockupViewId,
-        role: dto.role,
-        imageKey: dto.imageKey.trim(),
-        altText: dto.altText?.trim(),
-        sortOrder: dto.sortOrder ?? 0,
-        isActive: dto.isActive ?? true,
-        metadataJson: dto.metadataJson as Prisma.InputJsonValue | undefined,
-      },
+    const item = await this.prisma.$transaction(async (tx) => {
+      const created = await tx.mockupGalleryAsset.create({
+        data: {
+          mockupTemplateId,
+          mockupViewId: dto.mockupViewId,
+          role: dto.role,
+          imageKey: dto.imageKey.trim(),
+          altText: dto.altText?.trim(),
+          sortOrder: dto.sortOrder ?? 0,
+          isActive: dto.isActive ?? true,
+          metadataJson: dto.metadataJson as Prisma.InputJsonValue | undefined,
+        },
+      });
+      await this.syncLegacyGalleryRole(tx, mockupTemplateId, dto.role);
+      return created;
     });
     await this.audit.log({
       actorId,
@@ -626,17 +713,24 @@ export class AdminConfigService {
     const existing = await this.prisma.mockupGalleryAsset.findUnique({ where: { id } });
     if (!existing) throw new NotFoundException("Mockup gallery asset not found");
     if (dto.mockupViewId) await this.assertMockupViewForTemplate(dto.mockupViewId, existing.mockupTemplateId);
-    const item = await this.prisma.mockupGalleryAsset.update({
-      where: { id },
-      data: {
-        mockupViewId: dto.mockupViewId,
-        role: dto.role,
-        imageKey: dto.imageKey?.trim(),
-        altText: dto.altText?.trim(),
-        sortOrder: dto.sortOrder,
-        isActive: dto.isActive,
-        metadataJson: dto.metadataJson as Prisma.InputJsonValue | undefined,
-      },
+    const item = await this.prisma.$transaction(async (tx) => {
+      const updated = await tx.mockupGalleryAsset.update({
+        where: { id },
+        data: {
+          mockupViewId: dto.mockupViewId,
+          role: dto.role,
+          imageKey: dto.imageKey?.trim(),
+          altText: dto.altText?.trim(),
+          sortOrder: dto.sortOrder,
+          isActive: dto.isActive,
+          metadataJson: dto.metadataJson as Prisma.InputJsonValue | undefined,
+        },
+      });
+      await this.syncLegacyGalleryRole(tx, existing.mockupTemplateId, existing.role);
+      if (updated.role !== existing.role) {
+        await this.syncLegacyGalleryRole(tx, existing.mockupTemplateId, updated.role);
+      }
+      return updated;
     });
     await this.audit.log({
       actorId,
@@ -649,17 +743,47 @@ export class AdminConfigService {
   }
 
   async deleteMockupGalleryAsset(actorId: string, id: string) {
-    const item = await this.prisma.mockupGalleryAsset.delete({ where: { id } });
+    const existing = await this.prisma.mockupGalleryAsset.findUnique({ where: { id } });
+    if (!existing) throw new NotFoundException("Mockup gallery asset not found");
+    const item = await this.prisma.$transaction(async (tx) => {
+      const deleted = await tx.mockupGalleryAsset.delete({ where: { id } });
+      await this.syncLegacyGalleryRole(tx, existing.mockupTemplateId, existing.role);
+      return deleted;
+    });
     await this.audit.log({ actorId, action: "mockup-gallery-asset.delete", entityType: "MockupGalleryAsset", entityId: item.id });
     return item;
   }
 
   listPrintAreas() {
-    return this.prisma.printArea.findMany({ orderBy: { createdAt: "desc" } });
+    return this.prisma.printArea.findMany({
+      orderBy: { createdAt: "desc" },
+      include: {
+        mockupView: {
+          select: {
+            id: true,
+            name: true,
+            viewKey: true,
+            placementCode: true,
+            blankImageKey: true,
+            isPrimary: true,
+            isActive: true,
+          },
+        },
+      },
+    });
   }
 
   async createPrintArea(actorId: string, dto: CreatePrintAreaDto) {
-    if (dto.mockupViewId) await this.assertMockupViewForTemplate(dto.mockupViewId, dto.mockupTemplateId);
+    const template = await this.prisma.mockupTemplate.findUnique({
+      where: { id: dto.mockupTemplateId },
+      select: { id: true, configurationVersion: true },
+    });
+    if (!template) throw new NotFoundException("Mockup template not found");
+    if (template.configurationVersion === "MULTI_VIEW_V2" && !dto.mockupViewId) {
+      throw new BadRequestException("A product view is required for multi-view print areas");
+    }
+    if (dto.mockupViewId) await this.assertActiveMockupViewForTemplate(dto.mockupViewId, dto.mockupTemplateId);
+    this.validatePrintAreaGeometry(dto);
     const item = await this.prisma.printArea.create({
       data: {
         mockupTemplateId: dto.mockupTemplateId,
@@ -679,6 +803,7 @@ export class AdminConfigService {
         allowRotate: dto.allowRotate ?? false,
         minScale: dto.minScale ?? 0.1,
         maxScale: dto.maxScale ?? 2,
+        isActive: dto.isActive ?? true,
       },
     });
     await this.audit.log({ actorId, action: "print-area.create", entityType: "PrintArea", entityId: item.id });
@@ -692,15 +817,31 @@ export class AdminConfigService {
   }
 
   async updatePrintArea(actorId: string, id: string, dto: UpdatePrintAreaDto) {
-    const existing = dto.mockupViewId !== undefined || dto.mockupTemplateId !== undefined
-      ? await this.prisma.printArea.findUnique({ where: { id } })
-      : null;
-    if ((dto.mockupViewId !== undefined || dto.mockupTemplateId !== undefined) && !existing) {
-      throw new NotFoundException("Print area not found");
-    }
+    const existing = await this.prisma.printArea.findUnique({ where: { id } });
+    if (!existing) throw new NotFoundException("Print area not found");
     const targetTemplateId = dto.mockupTemplateId ?? existing?.mockupTemplateId;
     const targetViewId = dto.mockupViewId === undefined ? existing?.mockupViewId : dto.mockupViewId;
-    if (targetViewId && targetTemplateId) await this.assertMockupViewForTemplate(targetViewId, targetTemplateId);
+    const template = await this.prisma.mockupTemplate.findUnique({
+      where: { id: targetTemplateId },
+      select: { id: true, configurationVersion: true },
+    });
+    if (!template) throw new NotFoundException("Mockup template not found");
+    if (template.configurationVersion === "MULTI_VIEW_V2" && !targetViewId) {
+      throw new BadRequestException("A product view is required for multi-view print areas");
+    }
+    if (targetViewId) await this.assertActiveMockupViewForTemplate(targetViewId, targetTemplateId);
+    this.validatePrintAreaGeometry({
+      x: dto.x ?? existing.x,
+      y: dto.y ?? existing.y,
+      width: dto.width ?? existing.width,
+      height: dto.height ?? existing.height,
+      safeX: dto.safeX ?? existing.safeX,
+      safeY: dto.safeY ?? existing.safeY,
+      safeWidth: dto.safeWidth ?? existing.safeWidth,
+      safeHeight: dto.safeHeight ?? existing.safeHeight,
+      minScale: dto.minScale ?? existing.minScale,
+      maxScale: dto.maxScale ?? existing.maxScale,
+    });
     const item = await this.prisma.printArea.update({
       where: { id },
       data: {
@@ -721,6 +862,7 @@ export class AdminConfigService {
         allowRotate: dto.allowRotate,
         minScale: dto.minScale,
         maxScale: dto.maxScale,
+        isActive: dto.isActive,
       },
     });
     await this.audit.log({ actorId, action: "print-area.update", entityType: "PrintArea", entityId: item.id });
@@ -755,6 +897,84 @@ export class AdminConfigService {
       throw new BadRequestException("Mockup view does not belong to the selected mockup template");
     }
     return view;
+  }
+
+  private async assertActiveMockupViewForTemplate(id: string, mockupTemplateId: string) {
+    const view = await this.prisma.mockupView.findUnique({
+      where: { id },
+      select: { id: true, mockupTemplateId: true, isActive: true },
+    });
+    if (!view) throw new NotFoundException("Mockup view not found");
+    if (view.mockupTemplateId !== mockupTemplateId) {
+      throw new BadRequestException("Mockup view does not belong to the selected mockup template");
+    }
+    if (!view.isActive) throw new BadRequestException("Print areas require an active mockup view");
+    return view;
+  }
+
+  private validatePrintAreaGeometry(area: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+    safeX: number;
+    safeY: number;
+    safeWidth: number;
+    safeHeight: number;
+    minScale?: number;
+    maxScale?: number;
+  }) {
+    if (area.width <= 0 || area.height <= 0 || area.safeWidth <= 0 || area.safeHeight <= 0) {
+      throw new BadRequestException("Print and safe-zone dimensions must be positive");
+    }
+    if (
+      area.safeX < area.x
+      || area.safeY < area.y
+      || area.safeX + area.safeWidth > area.x + area.width
+      || area.safeY + area.safeHeight > area.y + area.height
+    ) {
+      throw new BadRequestException("Safe zone must stay inside the print area");
+    }
+    const minScale = area.minScale ?? 0.1;
+    const maxScale = area.maxScale ?? 2;
+    if (minScale > maxScale) {
+      throw new BadRequestException("Minimum scale cannot exceed maximum scale");
+    }
+  }
+
+  private async syncLegacyGalleryRole(
+    tx: Prisma.TransactionClient,
+    mockupTemplateId: string,
+    role: "LIFESTYLE" | "DETAIL",
+  ) {
+    const primary = await tx.mockupView.findFirst({
+      where: { mockupTemplateId, isPrimary: true, isActive: true },
+      select: { id: true },
+    });
+    const ordered = { sortOrder: "asc" as const };
+    const selected = (
+      primary
+        ? await tx.mockupGalleryAsset.findFirst({
+            where: { mockupTemplateId, mockupViewId: primary.id, role, isActive: true },
+            orderBy: [ordered, { createdAt: "asc" }],
+            select: { imageKey: true },
+          })
+        : null
+    ) ?? await tx.mockupGalleryAsset.findFirst({
+      where: { mockupTemplateId, mockupViewId: null, role, isActive: true },
+      orderBy: [ordered, { createdAt: "asc" }],
+      select: { imageKey: true },
+    }) ?? await tx.mockupGalleryAsset.findFirst({
+      where: { mockupTemplateId, role, isActive: true },
+      orderBy: [ordered, { createdAt: "asc" }],
+      select: { imageKey: true },
+    });
+    await tx.mockupTemplate.update({
+      where: { id: mockupTemplateId },
+      data: role === "LIFESTYLE"
+        ? { lifestyleImageKey: selected?.imageKey ?? null }
+        : { closeupImageKey: selected?.imageKey ?? null },
+    });
   }
 
   private normalizeMockupKey(value: string, label: string) {

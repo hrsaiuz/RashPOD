@@ -79,6 +79,7 @@ type PrintArea = IdRow & {
   allowRotate: boolean;
   minScale: number;
   maxScale: number;
+  isActive: boolean;
 };
 type RoyaltyRule = IdRow & { scope: string; basis: string; value: string | number; isActive: boolean; effectiveAt: string; createdAt?: string };
 type FilmSaleSettings = {
@@ -223,10 +224,10 @@ function Field({ label, children, helper }: { label: string; children: ReactNode
   );
 }
 
-function ToggleField({ label, checked, onChange, helper }: { label: string; checked: boolean; onChange: (value: boolean) => void; helper?: string }) {
+function ToggleField({ label, checked, onChange, helper, disabled = false }: { label: string; checked: boolean; onChange: (value: boolean) => void; helper?: string; disabled?: boolean }) {
   return (
-    <label className="flex items-start gap-3 rounded-2xl border border-surface-borderSoft bg-white p-3">
-      <input className="mt-1 h-4 w-4 accent-brand-blue" type="checkbox" checked={checked} onChange={(event) => onChange(event.target.checked)} />
+    <label className={`flex items-start gap-3 rounded-2xl border border-surface-borderSoft bg-white p-3 ${disabled ? "cursor-not-allowed opacity-60" : ""}`}>
+      <input className="mt-1 h-4 w-4 accent-brand-blue" type="checkbox" checked={checked} disabled={disabled} onChange={(event) => onChange(event.target.checked)} />
       <span>
         <span className="block text-sm font-semibold text-brand-ink">{label}</span>
         {helper ? <span className="block text-xs text-brand-muted">{helper}</span> : null}
@@ -872,13 +873,13 @@ export function MockupTemplatesScreen() {
                     <td className="px-5 py-4">{baseName.get(item.baseProductId) || item.baseProductId}</td>
                     <td className="px-5 py-4">
                       <div className="flex gap-2">
-                        {(item.views?.length ? item.views.map((view) => view.blankImageKey) : [item.baseImageKey]).slice(0, 4).map((key) => {
+                        {(item.views?.length ? item.views.map((view) => view.blankImageKey) : [item.baseImageKey]).slice(0, 4).map((key, index) => {
                           const url = mediaByObjectKey.get(String(key));
                           return url ? (
                             // eslint-disable-next-line @next/next/no-img-element
-                            <img key={String(key)} src={url} alt="" loading="lazy" className="h-12 w-12 rounded-lg border border-surface-borderSoft object-cover" />
+                            <img key={`${String(key)}-${index}`} src={url} alt="" loading="lazy" className="h-12 w-12 rounded-lg border border-surface-borderSoft object-cover" />
                           ) : (
-                            <span key={String(key)} className="inline-flex h-12 w-12 items-center justify-center rounded-lg border border-dashed border-surface-borderSoft text-[10px] text-brand-muted">
+                            <span key={`${String(key)}-${index}`} className="inline-flex h-12 w-12 items-center justify-center rounded-lg border border-dashed border-surface-borderSoft text-[10px] text-brand-muted">
                               IMG
                             </span>
                           );
@@ -949,7 +950,23 @@ export function MockupTemplatesScreen() {
                 onUpload={(file) => void handleImageUpload("baseImageKey", file)}
               />
             ) : null}
-            <ToggleField label="Active" checked={editing.isActive} onChange={(v) => setEditing({ ...editing, isActive: v })} />
+            <ToggleField
+              label="Active"
+              checked={editing.isActive}
+              disabled={Boolean(
+                editing.id
+                && !editing.isActive
+                && !(items.find((template) => template.id === editing.id)?.views ?? []).some((view) => view.isPrimary && view.isActive),
+              )}
+              helper={
+                editing.id
+                && !editing.isActive
+                && !(items.find((template) => template.id === editing.id)?.views ?? []).some((view) => view.isPrimary && view.isActive)
+                  ? "Add or promote an active primary product view before activating this template."
+                  : undefined
+              }
+              onChange={(v) => setEditing({ ...editing, isActive: v })}
+            />
             <div className="flex justify-end gap-3">
               <Button type="button" variant="secondary" onClick={() => setEditing(null)}>
                 Cancel
@@ -1047,8 +1064,26 @@ export function MockupTemplatesScreen() {
                     onClear={() => setViewEditing((current) => current ? { ...current, blankImageKey: "", previewUrl: undefined } : current)}
                   />
                   <div className="grid gap-3 md:grid-cols-2">
-                    <ToggleField label="Primary view" helper="Used as the default product angle." checked={viewEditing.isPrimary} onChange={(value) => setViewEditing((current) => current ? { ...current, isPrimary: value } : current)} />
-                    <ToggleField label="Active" checked={viewEditing.isActive} onChange={(value) => setViewEditing((current) => current ? { ...current, isActive: value } : current)} />
+                    <ToggleField
+                      label="Primary view"
+                      helper={viewEditing.id && managing.views?.find((view) => view.id === viewEditing.id)?.isPrimary
+                        ? "Promote another view to replace the current primary."
+                        : "Used as the default product angle."}
+                      checked={viewEditing.isPrimary}
+                      disabled={Boolean(viewEditing.id && managing.views?.find((view) => view.id === viewEditing.id)?.isPrimary)}
+                      onChange={(value) => setViewEditing((current) => current ? { ...current, isPrimary: value, isActive: value ? true : current.isActive } : current)}
+                    />
+                    <ToggleField
+                      label="Active"
+                      helper={viewEditing.isPrimary
+                        ? viewEditing.isActive
+                          ? "Primary views must remain active."
+                          : "Activate this legacy primary view before activating its template."
+                        : undefined}
+                      checked={viewEditing.isActive}
+                      disabled={viewEditing.isPrimary && viewEditing.isActive}
+                      onChange={(value) => setViewEditing((current) => current ? { ...current, isActive: value } : current)}
+                    />
                   </div>
                   <div className="flex justify-end">
                     <Button type="submit" loading={managerBusy === "view-save"} disabled={!viewEditing.name || !viewEditing.placementCode || !viewEditing.blankImageKey}>
@@ -1062,6 +1097,8 @@ export function MockupTemplatesScreen() {
                 <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
                   {managing.views.map((view) => {
                     const preview = mediaByObjectKey.get(view.blankImageKey);
+                    const hasActiveReplacement = (managing.views ?? []).some((candidate) => candidate.id !== view.id && candidate.isActive);
+                    const deleteBlocked = (view._count?.printAreas ?? 0) > 0 || (view.isPrimary && managing.isActive && !hasActiveReplacement);
                     return (
                       <article key={view.id} className="overflow-hidden rounded-3xl border border-surface-borderSoft bg-white shadow-soft">
                         <div className="aspect-square bg-surface-app">
@@ -1092,7 +1129,12 @@ export function MockupTemplatesScreen() {
                               variant="ghost"
                               onClick={() => void removeManagedView(view)}
                               loading={managerBusy === `view-delete-${view.id}`}
-                              disabled={(view._count?.printAreas ?? 0) > 0}
+                              disabled={deleteBlocked}
+                              title={(view._count?.printAreas ?? 0) > 0
+                                ? "Reassign or remove this view's print areas first."
+                                : view.isPrimary && managing.isActive && !hasActiveReplacement
+                                  ? "An active template must keep an active primary view."
+                                  : undefined}
                             >
                               <Trash2 size={14} /> Delete
                             </Button>
@@ -1206,7 +1248,17 @@ export function MockupTemplatesScreen() {
   );
 }
 
-const PRINT_AREA_EMPTY = { mockupTemplateId: "", mockupViewId: "", name: "Front print area", placement: "FRONT", x: "300", y: "260", width: "800", height: "900", safeX: "340", safeY: "300", safeWidth: "720", safeHeight: "820", allowMove: true, allowResize: true, allowRotate: false, minScale: "0.1", maxScale: "2" };
+const PRINT_AREA_PLACEMENTS = ["FRONT", "BACK", "LEFT_CHEST", "RIGHT_CHEST", "LEFT_SLEEVE", "RIGHT_SLEEVE", "FULL_WRAP", "OTHER"] as const;
+type PrintAreaPlacement = (typeof PRINT_AREA_PLACEMENTS)[number];
+
+function placementKindForViewCode(value: string | undefined, fallback: PrintAreaPlacement = "OTHER"): PrintAreaPlacement {
+  const normalized = value?.trim().toUpperCase().replace(/[-\s]+/g, "_");
+  return PRINT_AREA_PLACEMENTS.includes(normalized as PrintAreaPlacement)
+    ? normalized as PrintAreaPlacement
+    : fallback;
+}
+
+const PRINT_AREA_EMPTY = { mockupTemplateId: "", mockupViewId: "", name: "Front print area", placement: "FRONT" as PrintAreaPlacement, x: "300", y: "260", width: "800", height: "900", safeX: "340", safeY: "300", safeWidth: "720", safeHeight: "820", allowMove: true, allowResize: true, allowRotate: false, minScale: "0.1", maxScale: "2", isActive: true };
 
 type PrintAreaEditingState = typeof PRINT_AREA_EMPTY & { id?: string };
 
@@ -1337,12 +1389,13 @@ export function PrintAreasScreen() {
             allowRotate: item.allowRotate,
             minScale: String(item.minScale),
             maxScale: String(item.maxScale),
+            isActive: item.isActive,
           }
         : {
             ...PRINT_AREA_EMPTY,
             mockupTemplateId: template?.id ?? "",
             mockupViewId: defaultView?.id ?? "",
-            placement: defaultView?.placementCode?.toUpperCase() ?? PRINT_AREA_EMPTY.placement,
+            placement: placementKindForViewCode(defaultView?.placementCode, PRINT_AREA_EMPTY.placement),
             name: defaultView ? `${defaultView.name} print area` : PRINT_AREA_EMPTY.name,
           },
     );
@@ -1382,7 +1435,7 @@ export function PrintAreasScreen() {
       ...editing,
       mockupTemplateId,
       mockupViewId: view?.id ?? "",
-      placement: view?.placementCode?.toUpperCase() ?? editing.placement,
+      placement: placementKindForViewCode(view?.placementCode, editing.placement),
     });
   }
 
@@ -1393,7 +1446,7 @@ export function PrintAreasScreen() {
     setEditing({
       ...editing,
       mockupViewId,
-      placement: view?.placementCode?.toUpperCase() ?? editing.placement,
+      placement: placementKindForViewCode(view?.placementCode, editing.placement),
       name: editing.id || !view ? editing.name : `${view.name} print area`,
     });
   }
@@ -1417,8 +1470,9 @@ export function PrintAreasScreen() {
     if (!editing || !canSavePrintArea) return;
     setSaving(true);
     try {
+      const { id, ...form } = editing;
       const payload = {
-        ...editing,
+        ...form,
         x: Number(editing.x),
         y: Number(editing.y),
         width: Number(editing.width),
@@ -1430,7 +1484,7 @@ export function PrintAreasScreen() {
         minScale: Number(editing.minScale),
         maxScale: Number(editing.maxScale),
       };
-      if (editing.id) await api.patch(`/admin/print-areas/${editing.id}`, payload);
+      if (id) await api.patch(`/admin/print-areas/${id}`, payload);
       else await api.post("/admin/print-areas", payload);
       setEditing(null);
       await load();
@@ -1509,7 +1563,10 @@ export function PrintAreasScreen() {
                 {items.map((item) => (
                   <tr key={item.id}>
                     <td className="px-5 py-4">
-                      <p className="font-semibold text-brand-ink">{item.name}</p>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="font-semibold text-brand-ink">{item.name}</p>
+                        <StatusBadge status={item.isActive ? "ACTIVE" : "INACTIVE"} />
+                      </div>
                       <p className="text-xs text-brand-muted">{item.placement?.replaceAll("_", " ") ?? "Any placement"}</p>
                     </td>
                     <td className="px-5 py-4">
@@ -1566,9 +1623,9 @@ export function PrintAreasScreen() {
               <Select
                 required
                 value={editing.placement}
-                onChange={(e) => setEditing({ ...editing, placement: e.target.value })}
+                onChange={(e) => setEditing({ ...editing, placement: e.target.value as PrintAreaPlacement })}
               >
-                {["FRONT", "BACK", "LEFT_CHEST", "RIGHT_CHEST", "LEFT_SLEEVE", "RIGHT_SLEEVE", "FULL_WRAP", "OTHER"].map((placement) => (
+                {PRINT_AREA_PLACEMENTS.map((placement) => (
                   <option key={placement} value={placement}>{placement.replaceAll("_", " ")}</option>
                 ))}
               </Select>
@@ -1594,6 +1651,7 @@ export function PrintAreasScreen() {
               onActiveLayerChange={setActiveLayer}
               onImageDimensions={handleImageDimensions}
             />
+            <ToggleField label="Active" helper="Inactive print areas are hidden from new moderator selections." checked={editing.isActive} onChange={(value) => setEditing({ ...editing, isActive: value })} />
             <details className="rounded-2xl border border-surface-borderSoft bg-surface-app/40 p-4">
               <summary className="cursor-pointer text-sm font-semibold text-brand-ink">Advanced coordinates</summary>
               <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-4">

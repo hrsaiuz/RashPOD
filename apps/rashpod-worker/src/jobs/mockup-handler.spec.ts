@@ -54,6 +54,69 @@ describe("MockupJobHandler", () => {
     }
   });
 
+  it("uses normalized placement context for preview and listing variants when available", async () => {
+    const repo = new InMemoryWorkerRepository([
+      { id: "preview", status: "PENDING" },
+      { id: "main", status: "PENDING" },
+      { id: "lifestyle", status: "PENDING" },
+      { id: "detail", status: "PENDING" },
+    ]) as InMemoryWorkerRepository & { getLegacyPlacementRenderContext: jest.Mock };
+    repo.getLegacyPlacementRenderContext = jest.fn().mockResolvedValue({
+      id: "placement_back",
+      pipeline: "LOCAL",
+      units: "PX",
+      latestDesignVersion: { fileKey: "designs/art.png" },
+      placementConfigJson: {
+        version: 1,
+        mockupTemplate: { id: "template_1", name: "Tee", baseImageKey: "views/back.png" },
+        mockupView: { id: "view_back", blankImageKey: "views/back.png" },
+        printArea: { x: 100, y: 100, width: 500, height: 600, safeX: 120, safeY: 120, safeWidth: 460, safeHeight: 560 },
+        position: { x: 150, y: 150, width: 200, height: 240, scale: 1, rotation: 0 },
+      },
+    });
+    const normalizedRenderer = {
+      ...fakeRenderer,
+      renderPipelineMockup: jest.fn(async (context: { id: string }, variant: string) => {
+        const fileKey = `pipeline-mockups/${context.id}/${variant}.png`;
+        return { fileKey, objectKey: fileKey, contentType: "image/png", format: "png", widthPx: 2000, heightPx: 2000 };
+      }),
+    };
+    const handler = new MockupJobHandler(repo, normalizedRenderer);
+
+    await handler.handlePreview({ placementId: "placement_back", generatedAssetId: "preview" });
+    await handler.handleListingPack({
+      placementId: "placement_back",
+      generatedAssetIds: ["main", "lifestyle", "detail"],
+    });
+
+    expect(repo.getLegacyPlacementRenderContext).toHaveBeenCalledTimes(2);
+    expect(normalizedRenderer.renderPipelineMockup.mock.calls.map((call) => call[1]))
+      .toEqual(["preview", "main", "lifestyle", "closeup"]);
+  });
+
+  it("marks the full listing pack failed when normalized placement context is missing", async () => {
+    const repo = new InMemoryWorkerRepository([
+      { id: "main", status: "PENDING" },
+      { id: "lifestyle", status: "PENDING" },
+      { id: "detail", status: "PENDING" },
+    ]) as InMemoryWorkerRepository & { getLegacyPlacementRenderContext: jest.Mock };
+    repo.getLegacyPlacementRenderContext = jest.fn().mockResolvedValue(null);
+    const normalizedRenderer = {
+      ...fakeRenderer,
+      renderPipelineMockup: jest.fn(),
+    };
+    const handler = new MockupJobHandler(repo, normalizedRenderer);
+
+    const results = await handler.handleListingPack({
+      placementId: "missing",
+      generatedAssetIds: ["main", "lifestyle", "detail"],
+    });
+
+    expect(results.map((asset) => asset.status)).toEqual(["FAILED", "FAILED", "FAILED"]);
+    expect(results.every((asset) => asset.errorMessage?.includes("not found"))).toBe(true);
+    expect(normalizedRenderer.renderPipelineMockup).not.toHaveBeenCalled();
+  });
+
   it("transitions film preview asset to ready", async () => {
     const repo = new InMemoryWorkerRepository([{ id: "f1", status: "PENDING" }]);
     const handler = new MockupJobHandler(repo, fakeRenderer);

@@ -77,6 +77,16 @@ type MockupTemplateOption = {
 type PrintAreaOption = {
   id: string;
   mockupTemplateId: string;
+  mockupViewId?: string | null;
+  mockupView?: {
+    id: string;
+    name: string;
+    viewKey: string;
+    placementCode: string;
+    blankImageKey: string;
+    isPrimary: boolean;
+    isActive: boolean;
+  } | null;
   name: string;
   placement?: string | null;
   widthCm?: number | null;
@@ -188,7 +198,10 @@ export default function Page() {
 
   const activeBaseProducts = useMemo(() => baseProducts.filter((item) => item.isActive !== false), [baseProducts]);
   const activeMockupTemplates = useMemo(() => mockupTemplates.filter((item) => item.isActive !== false), [mockupTemplates]);
-  const activePrintAreas = useMemo(() => printAreas.filter((item) => item.isActive !== false), [printAreas]);
+  const activePrintAreas = useMemo(
+    () => printAreas.filter((item) => item.isActive !== false && item.mockupView?.isActive !== false),
+    [printAreas],
+  );
   const activePrintfulTemplates = useMemo(() => printfulTemplates.filter((item) => item.active !== false), [printfulTemplates]);
 
   useEffect(() => {
@@ -768,7 +781,15 @@ export default function Page() {
                           <div className="mt-4 grid gap-3 md:grid-cols-2">
                             <SelectField label="Placement preset" value={selection.placementPresetId} onChange={(value) => selectLocalPreset(index, value)} options={localPresetsFor(selection.localBaseProductId).map((item) => ({ value: item.id, label: `${item.name} - ${item.placement}` }))} />
                             <SelectField label="Mockup template" value={selection.mockupTemplateId} onChange={(value) => selectLocalTemplate(index, value)} options={localTemplatesFor(selection.localBaseProductId).map((item) => ({ value: item.id, label: item.name }))} />
-                            <SelectField label="Print area / safe zone" value={selection.printAreaId} onChange={(value) => selectPrintArea(index, value)} options={printAreasFor(selection.mockupTemplateId, selection.placementPresetId).map((item) => ({ value: item.id, label: `${item.name} - safe ${item.safeWidth}x${item.safeHeight}px` }))} />
+                            <SelectField
+                              label="Product view / print area"
+                              value={selection.printAreaId}
+                              onChange={(value) => selectPrintArea(index, value)}
+                              options={printAreasFor(selection.mockupTemplateId, selection.placementPresetId).map((item) => ({
+                                value: item.id,
+                                label: `${item.mockupView?.name ?? "Legacy primary view"} · ${item.name} · safe ${item.safeWidth}x${item.safeHeight}px`,
+                              }))}
+                            />
                           </div>
                           <div className="mt-4">
                             <ReadinessChecklist
@@ -1350,7 +1371,8 @@ function printAreaSummary(area?: PrintAreaOption) {
   if (!area) return "Print area unavailable.";
   const transforms = [area.allowMove ? "move" : "fixed position", area.allowResize ? "resize" : "fixed size", area.allowRotate ? "rotate" : "no rotation"].join(" · ");
   const cm = area.widthCm && area.heightCm ? ` · ${area.widthCm}x${area.heightCm} cm` : "";
-  return `${area.name}: print ${area.width}x${area.height}px, safe ${area.safeWidth}x${area.safeHeight}px${cm} · scale ${area.minScale}-${area.maxScale} · ${transforms}`;
+  const view = area.mockupView ? `${area.mockupView.name} (${area.mockupView.placementCode})` : "Legacy primary view";
+  return `${view} · ${area.name}: print ${area.width}x${area.height}px, safe ${area.safeWidth}x${area.safeHeight}px${cm} · scale ${area.minScale}-${area.maxScale} · ${transforms}`;
 }
 
 function Info({ label, value }: { label: string; value: string }) {

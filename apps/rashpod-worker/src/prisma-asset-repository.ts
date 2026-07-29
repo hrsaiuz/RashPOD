@@ -186,6 +186,108 @@ export class PrismaAssetRepository implements WorkerRepository {
     return updated;
   }
 
+  async getLegacyPlacementRenderContext(placementId: string) {
+    const placement = await this.prisma.mockupPlacement.findUnique({
+      where: { id: placementId },
+      include: {
+        designVersion: true,
+        mockupTemplate: {
+          include: {
+            baseProduct: true,
+            galleryAssets: {
+              where: { isActive: true },
+              orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+            },
+          },
+        },
+        printArea: { include: { mockupView: true } },
+      },
+    });
+    if (!placement) return null;
+
+    const viewId = placement.printArea.mockupView?.id;
+    const galleryAsset = (role: "LIFESTYLE" | "DETAIL") => {
+      const assets = placement.mockupTemplate.galleryAssets.filter((asset) => asset.role === role);
+      return assets.find((asset) => asset.mockupViewId === viewId)
+        ?? assets.find((asset) => asset.mockupViewId === null)
+        ?? assets[0];
+    };
+    const lifestyle = galleryAsset("LIFESTYLE");
+    const detail = galleryAsset("DETAIL");
+    const view = placement.printArea.mockupView;
+
+    return {
+      id: placement.id,
+      pipeline: "LOCAL" as const,
+      placement: placement.printArea.placement ?? undefined,
+      latestDesignVersion: {
+        fileKey: placement.designVersion.fileKey,
+        widthPx: placement.designVersion.widthPx,
+        heightPx: placement.designVersion.heightPx,
+        dpi: placement.designVersion.dpi,
+        hasTransparency: placement.designVersion.hasTransparency,
+      },
+      width: placement.width,
+      height: placement.height,
+      x: placement.x,
+      y: placement.y,
+      scale: placement.scale,
+      rotation: placement.rotation,
+      units: "PX" as const,
+      localBaseProduct: { name: placement.mockupTemplate.baseProduct.name },
+      placementConfigJson: {
+        version: 1,
+        mockupTemplate: {
+          id: placement.mockupTemplate.id,
+          name: placement.mockupTemplate.name,
+          baseImageKey: view?.blankImageKey ?? placement.mockupTemplate.baseImageKey,
+          lifestyleImageKey: lifestyle?.imageKey ?? placement.mockupTemplate.lifestyleImageKey,
+          closeupImageKey: detail?.imageKey ?? placement.mockupTemplate.closeupImageKey,
+        },
+        mockupView: view
+          ? {
+              id: view.id,
+              viewKey: view.viewKey,
+              placementCode: view.placementCode,
+              name: view.name,
+              blankImageKey: view.blankImageKey,
+            }
+          : null,
+        galleryAssets: [lifestyle, detail]
+          .filter((asset): asset is NonNullable<typeof asset> => Boolean(asset))
+          .map((asset) => ({
+            id: asset.id,
+            mockupViewId: asset.mockupViewId,
+            role: asset.role,
+            imageKey: asset.imageKey,
+            sortOrder: asset.sortOrder,
+          })),
+        printArea: {
+          id: placement.printArea.id,
+          name: placement.printArea.name,
+          placement: placement.printArea.placement,
+          x: placement.printArea.x,
+          y: placement.printArea.y,
+          width: placement.printArea.width,
+          height: placement.printArea.height,
+          safeX: placement.printArea.safeX,
+          safeY: placement.printArea.safeY,
+          safeWidth: placement.printArea.safeWidth,
+          safeHeight: placement.printArea.safeHeight,
+        },
+        unit: "PX",
+        position: {
+          x: placement.x,
+          y: placement.y,
+          width: placement.width,
+          height: placement.height,
+          scale: placement.scale,
+          rotation: placement.rotation,
+        },
+      },
+    };
+  }
+
   async getPrintfulFulfillmentOrderContext(orderId: string, storeId: string) {
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },

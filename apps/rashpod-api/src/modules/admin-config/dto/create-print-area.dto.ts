@@ -17,20 +17,28 @@ export class CreatePrintAreaDto {
   placement?: PlacementKind;
 
   @IsInt()
+  @Min(0)
   x!: number;
   @IsInt()
+  @Min(0)
   y!: number;
   @IsInt()
+  @Min(1)
   width!: number;
   @IsInt()
+  @Min(1)
   height!: number;
   @IsInt()
+  @Min(0)
   safeX!: number;
   @IsInt()
+  @Min(0)
   safeY!: number;
   @IsInt()
+  @Min(1)
   safeWidth!: number;
   @IsInt()
+  @Min(1)
   safeHeight!: number;
 
   @IsBoolean()
@@ -52,4 +60,8 @@ export class CreatePrintAreaDto {
   @IsOptional()
   @Min(0.01)
   maxScale?: number;
+
+  @IsBoolean()
+  @IsOptional()
+  isActive?: boolean;
 }

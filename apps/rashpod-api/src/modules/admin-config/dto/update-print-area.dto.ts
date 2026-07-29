@@ -20,34 +20,42 @@ export class UpdatePrintAreaDto {
 
   @IsInt()
   @IsOptional()
+  @Min(0)
   x?: number;
 
   @IsInt()
   @IsOptional()
+  @Min(0)
   y?: number;
 
   @IsInt()
   @IsOptional()
+  @Min(1)
   width?: number;
 
   @IsInt()
   @IsOptional()
+  @Min(1)
   height?: number;
 
   @IsInt()
   @IsOptional()
+  @Min(0)
   safeX?: number;
 
   @IsInt()
   @IsOptional()
+  @Min(0)
   safeY?: number;
 
   @IsInt()
   @IsOptional()
+  @Min(1)
   safeWidth?: number;
 
   @IsInt()
   @IsOptional()
+  @Min(1)
   safeHeight?: number;
 
   @IsBoolean()
@@ -71,4 +79,8 @@ export class UpdatePrintAreaDto {
   @IsOptional()
   @Min(0.01)
   maxScale?: number;
+
+  @IsBoolean()
+  @IsOptional()
+  isActive?: boolean;
 }

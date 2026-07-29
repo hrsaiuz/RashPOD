@@ -1,4 +1,4 @@
-import { IsBoolean, IsInt, IsNotEmpty, IsObject, IsOptional, IsString, MaxLength, Min } from "class-validator";
+import { IsBoolean, IsInt, IsNotEmpty, IsObject, IsOptional, IsString, Matches, MaxLength, Min } from "class-validator";
 
 export class UpdateMockupViewDto {
   @IsString()
@@ -15,12 +15,14 @@ export class UpdateMockupViewDto {
 
   @IsString()
   @IsNotEmpty()
+  @Matches(/\S/)
   @MaxLength(120)
   @IsOptional()
   name?: string;
 
   @IsString()
   @IsNotEmpty()
+  @Matches(/\S/)
   @MaxLength(1024)
   @IsOptional()
   blankImageKey?: string;
