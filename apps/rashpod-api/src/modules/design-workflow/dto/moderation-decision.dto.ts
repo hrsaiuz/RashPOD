@@ -1,5 +1,5 @@
 import { Type } from "class-transformer";
-import { IsArray, IsIn, IsNumber, IsOptional, IsString, ValidateNested } from "class-validator";
+import { IsArray, IsIn, IsNotEmpty, IsNumber, IsOptional, IsString, ValidateNested } from "class-validator";
 
 export class ModerationPositionDto {
   @IsNumber()
@@ -72,7 +72,9 @@ export class LocalSelectionDto {
   printAreaId?: string;
 
   @IsString()
-  placementPresetId!: string;
+  @IsNotEmpty()
+  @IsOptional()
+  placementPresetId?: string;
 
   @IsString()
   placement!: string;
@@ -109,10 +111,12 @@ export class GlobalPrintfulSelectionDto {
   position!: ModerationPositionDto;
 
   @IsArray()
+  @IsString({ each: true })
   @IsOptional()
   targetMarketplaces?: string[];
 
   @IsArray()
+  @IsString({ each: true })
   @IsOptional()
   selectedVariantIds?: string[];
 }

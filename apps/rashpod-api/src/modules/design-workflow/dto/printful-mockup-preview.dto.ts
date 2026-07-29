@@ -14,6 +14,7 @@ export class PrintfulMockupPreviewDto {
   technique?: string;
 
   @IsArray()
+  @IsString({ each: true })
   @IsOptional()
   selectedVariantIds?: string[];
 

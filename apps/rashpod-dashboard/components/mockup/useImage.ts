@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 
-export function useImage(url: string | null | undefined) {
+export function useImage(url: string | null | undefined, retryKey = 0) {
   const [image, setImage] = useState<HTMLImageElement | null>(null);
   const [error, setError] = useState(false);
 
@@ -22,7 +22,7 @@ export function useImage(url: string | null | undefined) {
       img.onload = null;
       img.onerror = null;
     };
-  }, [url]);
+  }, [retryKey, url]);
 
   return { image, error };
 }

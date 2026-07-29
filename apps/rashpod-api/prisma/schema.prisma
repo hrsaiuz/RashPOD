@@ -1820,7 +1820,7 @@ model DesignProductSelection {
   pipeline                  PipelineType
   localBaseProductId        String?
   printfulProductTemplateId String?
-  placementPresetId         String
+  placementPresetId         String?
   placement                 PlacementKind
   technique                 String?
   width                     Float?
@@ -1844,7 +1844,7 @@ model DesignProductSelection {
   design                  DesignAsset              @relation(fields: [designId], references: [id], onDelete: Cascade)
   localBaseProduct        BaseProduct?             @relation(fields: [localBaseProductId], references: [id])
   printfulProductTemplate PrintfulProductTemplate? @relation(fields: [printfulProductTemplateId], references: [id])
-  placementPreset         PlacementPreset          @relation(fields: [placementPresetId], references: [id])
+  placementPreset         PlacementPreset?         @relation(fields: [placementPresetId], references: [id])
   mockupAssets            MockupAsset[]
   productListing          CommerceListing?
 

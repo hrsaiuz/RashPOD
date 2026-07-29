@@ -19,21 +19,23 @@ export function useMockupEditorState(input: {
   viewportHeight: number;
   reducedMotion?: boolean;
 }) {
-  const [placement, setPlacement] = useState<EditorPlacementState>(input.initialPlacement);
+  const [placement, setPlacement] = useState<EditorPlacementState>(() =>
+    clampPlacementToPrintArea(input.initialPlacement, input.printArea, input.constraints),
+  );
   const [stageScale, setStageScale] = useState(0.4);
   const [stagePosition, setStagePosition] = useState({ x: 24, y: 24 });
 
   useEffect(() => {
-    setPlacement(input.initialPlacement);
-  }, [input.initialPlacement]);
+    setPlacement(clampPlacementToPrintArea(input.initialPlacement, input.printArea, input.constraints));
+  }, [input.constraints, input.initialPlacement, input.printArea]);
 
   const applyPlacement = useCallback(
     (next: EditorPlacementState) => {
-      const clamped = clampPlacementToPrintArea(next, input.printArea);
+      const clamped = clampPlacementToPrintArea(next, input.printArea, input.constraints);
       setPlacement(clamped);
       return clamped;
     },
-    [input.printArea],
+    [input.constraints, input.printArea],
   );
 
   const fitToViewport = useCallback(() => {
@@ -67,22 +69,13 @@ export function useMockupEditorState(input: {
     applyPlacement(snapPlacementToCenter(placement, input.printArea));
   }, [applyPlacement, input.printArea, placement]);
 
-  useEffect(() => {
-    function onKeyDown(event: KeyboardEvent) {
-      if (!["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(event.key)) return;
-      event.preventDefault();
-      const step = event.shiftKey ? 10 : 1;
-      const delta = { x: 0, y: 0 };
-      if (event.key === "ArrowUp") delta.y = -step;
-      if (event.key === "ArrowDown") delta.y = step;
-      if (event.key === "ArrowLeft") delta.x = -step;
-      if (event.key === "ArrowRight") delta.x = step;
+  const nudgePlacement = useCallback(
+    (deltaX: number, deltaY: number) => {
       if (input.constraints.allowMove === false) return;
-      applyPlacement({ ...placement, x: placement.x + delta.x, y: placement.y + delta.y });
-    }
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [applyPlacement, input.constraints.allowMove, placement]);
+      applyPlacement({ ...placement, x: placement.x + deltaX, y: placement.y + deltaY });
+    },
+    [applyPlacement, input.constraints.allowMove, placement],
+  );
 
   return {
     placement,
@@ -95,5 +88,6 @@ export function useMockupEditorState(input: {
     zoomOut: () => zoomBy(input.reducedMotion ? -0.15 : -0.1),
     resetPlacement,
     centerPlacement,
+    nudgePlacement,
   };
 }

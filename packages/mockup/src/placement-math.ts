@@ -6,6 +6,7 @@ import type {
   PlacementUnit,
   PrintAreaRect,
 } from "./types";
+import { renderedPlacementBounds } from "./placement-geometry";
 
 export function round2(value: number) {
   return Math.round(value * 100) / 100;
@@ -22,24 +23,53 @@ export function convertInToCm(value: number) {
 export function presetToInitialPlacement(
   preset: PlacementPresetDefaults | null | undefined,
   printArea: PrintAreaRect,
+  sourceAspectRatio?: number | null,
 ): EditorPlacementState {
-  const targetWidth = preset?.defaultWidthCm && printArea.widthCm
+  let targetWidth = preset?.defaultWidthCm && printArea.widthCm
     ? Math.round((preset.defaultWidthCm / printArea.widthCm) * printArea.width)
     : Math.round(printArea.safeWidth * 0.8);
-  const targetHeight = preset?.defaultHeightCm && printArea.heightCm
+  let targetHeight = preset?.defaultHeightCm && printArea.heightCm
     ? Math.round((preset.defaultHeightCm / printArea.heightCm) * printArea.height)
     : Math.round(printArea.safeHeight * 0.8);
+  if (sourceAspectRatio && Number.isFinite(sourceAspectRatio) && sourceAspectRatio > 0) {
+    if (preset?.defaultWidthCm && !preset.defaultHeightCm) {
+      targetHeight = Math.round(targetWidth / sourceAspectRatio);
+    } else if (!preset?.defaultWidthCm && preset?.defaultHeightCm) {
+      targetWidth = Math.round(targetHeight * sourceAspectRatio);
+    }
+  }
+  if (
+    !preset?.defaultWidthCm &&
+    !preset?.defaultHeightCm &&
+    sourceAspectRatio &&
+    Number.isFinite(sourceAspectRatio) &&
+    sourceAspectRatio > 0
+  ) {
+    const availableWidth = printArea.safeWidth * 0.8;
+    const availableHeight = printArea.safeHeight * 0.8;
+    targetWidth = Math.round(Math.min(availableWidth, availableHeight * sourceAspectRatio));
+    targetHeight = Math.round(targetWidth / sourceAspectRatio);
+  }
 
-  const width = Math.max(20, Math.min(targetWidth, printArea.safeWidth));
-  const height = Math.max(20, Math.min(targetHeight, printArea.safeHeight));
+  const placementScale = preset?.defaultScale && Number.isFinite(preset.defaultScale) && preset.defaultScale > 0
+    ? preset.defaultScale
+    : 1;
+  const maxWidth = printArea.safeWidth / placementScale;
+  const maxHeight = printArea.safeHeight / placementScale;
+  const minWidth = Math.min(20 / placementScale, maxWidth);
+  const minHeight = Math.min(20 / placementScale, maxHeight);
+  const width = Math.max(minWidth, Math.min(targetWidth, maxWidth));
+  const height = Math.max(minHeight, Math.min(targetHeight, maxHeight));
+  const renderedWidth = width * placementScale;
+  const renderedHeight = height * placementScale;
 
   const alignment = typeof preset?.alignment === "string" ? preset.alignment : "CENTER";
-  let x = printArea.safeX + (printArea.safeWidth - width) / 2;
-  let y = printArea.safeY + (printArea.safeHeight - height) / 2;
+  let x = printArea.safeX + (printArea.safeWidth - renderedWidth) / 2;
+  let y = printArea.safeY + (printArea.safeHeight - renderedHeight) / 2;
 
   if (alignment === "TOP_CENTER") {
     y = printArea.safeY;
-    x = printArea.safeX + (printArea.safeWidth - width) / 2;
+    x = printArea.safeX + (printArea.safeWidth - renderedWidth) / 2;
   } else if (alignment === "LEFT_CHEST") {
     x = printArea.safeX;
     y = printArea.safeY;
@@ -53,7 +83,7 @@ export function presetToInitialPlacement(
     y: Math.round(y),
     width,
     height,
-    scale: preset?.defaultScale ?? 1,
+    scale: placementScale,
     rotation: 0,
   };
 }
@@ -61,39 +91,99 @@ export function presetToInitialPlacement(
 export function clampPlacementToPrintArea(
   state: EditorPlacementState,
   printArea: PrintAreaRect,
-  constraints: { allowOverflow?: boolean } = {},
+  constraints: {
+    allowOverflow?: boolean;
+    allowRotate?: boolean;
+    minScale?: number | null;
+    maxScale?: number | null;
+  } = {},
 ): EditorPlacementState {
   const zone = constraints.allowOverflow
     ? { x: printArea.x, y: printArea.y, width: printArea.width, height: printArea.height }
     : { x: printArea.safeX, y: printArea.safeY, width: printArea.safeWidth, height: printArea.safeHeight };
 
-  const minWidth = 20;
-  const minHeight = 20;
   let { x, y, width, height, scale, rotation } = state;
+  x = Number.isFinite(x) ? x : zone.x;
+  y = Number.isFinite(y) ? y : zone.y;
+  width = Number.isFinite(width) && width > 0 ? width : zone.width;
+  height = Number.isFinite(height) && height > 0 ? height : zone.height;
+  const minimumScale = Number.isFinite(constraints.minScale) && (constraints.minScale ?? 0) > 0
+    ? constraints.minScale!
+    : Number.EPSILON;
+  const maximumScale = Number.isFinite(constraints.maxScale) && (constraints.maxScale ?? 0) >= minimumScale
+    ? constraints.maxScale!
+    : Number.POSITIVE_INFINITY;
+  const placementScale = Math.max(
+    minimumScale,
+    Math.min(maximumScale, Number.isFinite(scale) && scale > 0 ? scale : 1),
+  );
+  rotation = constraints.allowRotate === false || !Number.isFinite(rotation) ? 0 : rotation;
+  const maxWidth = zone.width / placementScale;
+  const maxHeight = zone.height / placementScale;
+  const minWidth = Math.min(20 / placementScale, maxWidth);
+  const minHeight = Math.min(20 / placementScale, maxHeight);
 
-  width = Math.max(minWidth, Math.min(width, zone.width));
-  height = Math.max(minHeight, Math.min(height, zone.height));
+  width = Math.max(minWidth, Math.min(width, maxWidth));
+  height = Math.max(minHeight, Math.min(height, maxHeight));
+  let rendered = renderedPlacementBounds({ x, y, width, height, scale: placementScale, rotation });
+  if (rendered.width > zone.width || rendered.height > zone.height) {
+    const shrink = Math.min(zone.width / rendered.width, zone.height / rendered.height) * 0.999;
+    width *= shrink;
+    height *= shrink;
+    rendered = renderedPlacementBounds({ x, y, width, height, scale: placementScale, rotation });
+  }
 
-  if (x < zone.x) x = zone.x;
-  if (y < zone.y) y = zone.y;
-  if (x + width > zone.x + zone.width) x = zone.x + zone.width - width;
-  if (y + height > zone.y + zone.height) y = zone.y + zone.height - height;
+  if (rendered.left < zone.x) x += zone.x - rendered.left;
+  if (rendered.top < zone.y) y += zone.y - rendered.top;
+  if (rendered.left + rendered.width > zone.x + zone.width) {
+    x -= rendered.left + rendered.width - (zone.x + zone.width);
+  }
+  if (rendered.top + rendered.height > zone.y + zone.height) {
+    y -= rendered.top + rendered.height - (zone.y + zone.height);
+  }
 
-  return {
+  const clamped: EditorPlacementState = {
     x: Math.round(x),
     y: Math.round(y),
     width: Math.round(width),
     height: Math.round(height),
-    scale,
+    scale: placementScale,
     rotation,
   };
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    const integerBounds = renderedPlacementBounds(clamped);
+    if (integerBounds.width > zone.width || integerBounds.height > zone.height) {
+      clamped.width = Math.max(1, clamped.width - 1);
+      clamped.height = Math.max(1, clamped.height - 1);
+      continue;
+    }
+    if (integerBounds.left < zone.x) clamped.x += Math.ceil(zone.x - integerBounds.left);
+    if (integerBounds.top < zone.y) clamped.y += Math.ceil(zone.y - integerBounds.top);
+    if (integerBounds.left + integerBounds.width > zone.x + zone.width) {
+      clamped.x -= Math.ceil(integerBounds.left + integerBounds.width - (zone.x + zone.width));
+    }
+    if (integerBounds.top + integerBounds.height > zone.y + zone.height) {
+      clamped.y -= Math.ceil(integerBounds.top + integerBounds.height - (zone.y + zone.height));
+    }
+    const verified = renderedPlacementBounds(clamped);
+    if (
+      verified.left >= zone.x
+      && verified.top >= zone.y
+      && verified.left + verified.width <= zone.x + zone.width
+      && verified.top + verified.height <= zone.y + zone.height
+    ) {
+      break;
+    }
+  }
+  return clamped;
 }
 
 export function snapPlacementToCenter(state: EditorPlacementState, printArea: PrintAreaRect): EditorPlacementState {
+  const placementScale = Number.isFinite(state.scale) && state.scale > 0 ? state.scale : 1;
   return {
     ...state,
-    x: Math.round(printArea.safeX + (printArea.safeWidth - state.width) / 2),
-    y: Math.round(printArea.safeY + (printArea.safeHeight - state.height) / 2),
+    x: Math.round(printArea.safeX + (printArea.safeWidth - state.width * placementScale) / 2),
+    y: Math.round(printArea.safeY + (printArea.safeHeight - state.height * placementScale) / 2),
   };
 }
 
@@ -182,13 +272,25 @@ export function computeCompositeBox(
 ): EditorPlacementState {
   const printArea = config.printArea ?? { x: 0, y: 0, width: 2000, height: 2000, safeX: 0, safeY: 0, safeWidth: 2000, safeHeight: 2000 };
   const position = config.position ?? {};
-  const base: EditorPlacementState = {
+  const placementScale = position.scale && Number.isFinite(position.scale) && position.scale > 0
+    ? position.scale
+    : 1;
+  const placement: EditorPlacementState = {
     x: position.x ?? printArea.safeX,
     y: position.y ?? printArea.safeY,
     width: position.width ?? printArea.safeWidth,
     height: position.height ?? printArea.safeHeight,
-    scale: position.scale ?? 1,
+    scale: placementScale,
     rotation: position.rotation ?? 0,
+  };
+  const rendered = renderedPlacementBounds(placement);
+  const base: EditorPlacementState = {
+    x: rendered.left,
+    y: rendered.top,
+    width: rendered.width,
+    height: rendered.height,
+    scale: 1,
+    rotation: 0,
   };
 
   if (variant !== "closeup") return base;

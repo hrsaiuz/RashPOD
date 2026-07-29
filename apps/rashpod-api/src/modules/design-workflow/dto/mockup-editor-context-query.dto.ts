@@ -1,4 +1,4 @@
-import { IsString } from "class-validator";
+import { IsNotEmpty, IsOptional, IsString } from "class-validator";
 
 export class MockupEditorContextQueryDto {
   @IsString()
@@ -11,5 +11,7 @@ export class MockupEditorContextQueryDto {
   printAreaId!: string;
 
   @IsString()
-  placementPresetId!: string;
+  @IsNotEmpty()
+  @IsOptional()
+  placementPresetId?: string;
 }

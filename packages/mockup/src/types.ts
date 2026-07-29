@@ -75,7 +75,7 @@ export interface PlacementConfigV1 {
     id: string;
     name: string;
     alignment?: unknown;
-  };
+  } | null;
   unit?: PlacementUnit;
   anchor?: string;
   position: EditorPlacementState;
@@ -112,6 +112,10 @@ export interface PositionInput {
 }
 
 export interface PrintableAreaBounds {
+  xPx?: number | null;
+  yPx?: number | null;
+  xIn?: number | null;
+  yIn?: number | null;
   widthPx?: number | null;
   heightPx?: number | null;
   widthCm?: number | null;

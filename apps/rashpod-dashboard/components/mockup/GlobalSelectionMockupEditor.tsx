@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { editorStateToPrintfulPosition, type EditorPlacementState } from "@rashpod/mockup";
+import { useEffect, useMemo, useState } from "react";
+import { editorStateToPrintfulPosition, printfulInchesToEditorState, type EditorPlacementState } from "@rashpod/mockup";
 import { api } from "../../lib/api";
 import { MockupPlacementEditor } from "./MockupPlacementEditorDynamic";
 import type { PrintfulMockupEditorContextResponse } from "./types";
@@ -12,6 +12,12 @@ export function GlobalSelectionMockupEditor(props: {
     printfulProductTemplateId: string;
     placementPresetId: string;
     placement: string;
+    preferContextInitialPlacement: boolean;
+    widthIn: number;
+    heightIn: number;
+    leftIn: number;
+    topIn: number;
+    scale: number;
   };
   onPlacementChange: (payload: {
     widthIn: number;
@@ -24,13 +30,17 @@ export function GlobalSelectionMockupEditor(props: {
   const [context, setContext] = useState<PrintfulMockupEditorContextResponse | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [retryKey, setRetryKey] = useState(0);
 
   useEffect(() => {
     if (!props.designId || !props.selection.printfulProductTemplateId || !props.selection.placementPresetId || !props.selection.placement) {
       setContext(null);
+      setLoading(false);
+      setError("");
       return;
     }
     let cancelled = false;
+    setContext(null);
     setLoading(true);
     setError("");
     const params = new URLSearchParams({
@@ -52,7 +62,37 @@ export function GlobalSelectionMockupEditor(props: {
     return () => {
       cancelled = true;
     };
-  }, [props.designId, props.selection.printfulProductTemplateId, props.selection.placementPresetId, props.selection.placement]);
+  }, [props.designId, props.selection.printfulProductTemplateId, props.selection.placementPresetId, props.selection.placement, retryKey]);
+
+  const editorContext = useMemo(
+    () => context
+      ? {
+          ...context,
+          initialPlacement: props.selection.preferContextInitialPlacement
+            ? context.initialPlacement
+            : printfulInchesToEditorState(
+                {
+                  widthIn: props.selection.widthIn,
+                  heightIn: props.selection.heightIn,
+                  leftIn: props.selection.leftIn,
+                  topIn: props.selection.topIn,
+                  scale: props.selection.scale,
+                },
+                context.printArea,
+                context.printAreaInches,
+              ),
+        }
+      : null,
+    [
+      context,
+      props.selection.heightIn,
+      props.selection.leftIn,
+      props.selection.preferContextInitialPlacement,
+      props.selection.scale,
+      props.selection.topIn,
+      props.selection.widthIn,
+    ],
+  );
 
   function handleChange(placement: EditorPlacementState) {
     if (!context?.printAreaInches) return;
@@ -61,14 +101,31 @@ export function GlobalSelectionMockupEditor(props: {
   }
 
   if (loading) {
-    return <div className="rounded-2xl border border-surface-borderSoft bg-white p-4 text-sm text-brand-muted">Loading Printful placement editor...</div>;
+    return <div className="rounded-2xl border border-surface-borderSoft bg-white p-4 text-sm text-brand-muted" role="status">Loading Printful placement editor...</div>;
   }
   if (error) {
-    return <div className="rounded-2xl border border-status-danger/30 bg-status-danger/5 p-4 text-sm text-status-danger">{error}</div>;
+    return (
+      <div className="rounded-2xl border border-status-danger/30 bg-status-danger/5 p-4 text-sm text-status-danger" role="alert">
+        <p>{error}</p>
+        <button
+          type="button"
+          className="mt-3 inline-flex min-h-11 items-center rounded-xl border border-status-danger/40 px-4 font-semibold outline-none hover:bg-status-danger/10 focus-visible:ring-4 focus-visible:ring-status-danger/20"
+          onClick={() => setRetryKey((current) => current + 1)}
+        >
+          Try again
+        </button>
+      </div>
+    );
   }
-  if (!context) return null;
+  if (!context || !editorContext) return null;
 
   const reducedMotion = typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-  return <MockupPlacementEditor context={context} onChange={handleChange} reducedMotion={reducedMotion} />;
+  const editorKey = [
+    props.selection.printfulProductTemplateId,
+    props.selection.placementPresetId,
+    props.selection.placement,
+  ].join(":");
+
+  return <MockupPlacementEditor key={editorKey} context={editorContext} onChange={handleChange} reducedMotion={reducedMotion} />;
 }

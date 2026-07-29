@@ -8,7 +8,7 @@ export function PlacementChips(props: {
   onSelect: (presetId: string) => void;
 }) {
   if (!props.presets.length) {
-    return <p className="text-xs text-brand-muted">No placement presets configured.</p>;
+    return <p className="text-xs text-brand-muted">No optional placement shortcuts configured. Use the admin-defined print area and safe zone below.</p>;
   }
 
   const placements = [...new Set(props.presets.map((item) => item.placement))];

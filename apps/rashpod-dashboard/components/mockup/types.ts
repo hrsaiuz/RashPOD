@@ -8,7 +8,7 @@ export interface MockupEditorContextResponse {
   printArea: PrintAreaRect;
   constraints: PlacementConstraints;
   initialPlacement: EditorPlacementState;
-  preset: { id: string; name: string; alignment?: unknown };
+  preset: { id: string; name: string; alignment?: unknown } | null;
 }
 
 export interface PrintfulMockupEditorContextResponse extends MockupEditorContextResponse {

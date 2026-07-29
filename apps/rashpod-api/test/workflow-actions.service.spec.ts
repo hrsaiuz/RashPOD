@@ -7,7 +7,7 @@ function createService(prismaOverrides: any = {}) {
   const prisma: any = {
     commerceListing: { findUnique: jest.fn(), update: jest.fn() },
     marketplacePublication: { update: jest.fn(), findUnique: jest.fn() },
-    designProductSelection: { findUnique: jest.fn(), update: jest.fn() },
+    designProductSelection: { findUnique: jest.fn(), update: jest.fn(), updateMany: jest.fn() },
     mockupAsset: { updateMany: jest.fn() },
     ...prismaOverrides,
   };
@@ -38,15 +38,18 @@ describe("DesignWorkflowService workflow actions", () => {
   it("queues retry mockup job for local selections", async () => {
     const { service, prisma, jobs } = createService({
       designProductSelection: {
-        findUnique: jest.fn().mockResolvedValue({ id: "sel_1", pipeline: "LOCAL" }),
+        findUnique: jest.fn().mockResolvedValue({ id: "sel_1", pipeline: "LOCAL", status: "MOCKUP_FAILED" }),
         update: jest.fn().mockResolvedValue({ id: "sel_1" }),
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
       mockupAsset: { updateMany: jest.fn().mockResolvedValue({ count: 3 }) },
     });
 
     await service.retryMockup("admin_1", "sel_1");
 
-    expect(prisma.designProductSelection.update).toHaveBeenCalledWith(expect.objectContaining({ where: { id: "sel_1" } }));
+    expect(prisma.designProductSelection.updateMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: "sel_1", status: "MOCKUP_FAILED" },
+    }));
     expect(jobs.enqueue).toHaveBeenCalledWith("GENERATE_LOCAL_MOCKUPS", { designProductSelectionId: "sel_1" });
   });
 
@@ -54,8 +57,9 @@ describe("DesignWorkflowService workflow actions", () => {
     const update = jest.fn().mockResolvedValue({ id: "sel_1" });
     const { service, prisma, jobs } = createService({
       designProductSelection: {
-        findUnique: jest.fn().mockResolvedValue({ id: "sel_1", pipeline: "LOCAL" }),
+        findUnique: jest.fn().mockResolvedValue({ id: "sel_1", pipeline: "LOCAL", status: "MOCKUP_FAILED" }),
         update,
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
       },
       mockupAsset: { updateMany: jest.fn().mockResolvedValue({ count: 3 }) },
     });
@@ -70,6 +74,19 @@ describe("DesignWorkflowService workflow actions", () => {
         errorMessage: "queue unavailable",
       },
     });
+  });
+
+  it("does not queue duplicate retries for a mockup that is already pending", async () => {
+    const { service, jobs } = createService({
+      designProductSelection: {
+        findUnique: jest.fn().mockResolvedValue({ id: "sel_1", pipeline: "LOCAL", status: "MOCKUP_PENDING" }),
+        update: jest.fn(),
+        updateMany: jest.fn(),
+      },
+    });
+
+    await expect(service.retryMockup("admin_1", "sel_1")).rejects.toThrow("MOCKUP_RETRY_NOT_ALLOWED");
+    expect(jobs.enqueue).not.toHaveBeenCalled();
   });
 
   it("blocks publishing Amazon rows that were not held for review", async () => {

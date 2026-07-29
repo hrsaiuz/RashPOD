@@ -76,17 +76,20 @@ export function presetToInitialPrintfulPlacement(
 ): EditorPlacementState {
   const defaultWidthIn = preset?.defaultWidthIn ?? areaInches.printAreaWidthIn * 0.8;
   const defaultHeightIn = preset?.defaultHeightIn ?? areaInches.printAreaHeightIn * 0.8;
+  const placementScale = preset?.defaultScale && Number.isFinite(preset.defaultScale) && preset.defaultScale > 0
+    ? preset.defaultScale
+    : 1;
   const alignment = typeof preset?.alignment === "string" ? preset.alignment : "CENTER";
 
   let leftIn = preset?.defaultX ?? 0;
   let topIn = preset?.defaultY ?? 0;
 
   if (alignment === "CENTER" || alignment === "TOP_CENTER") {
-    leftIn = (areaInches.printAreaWidthIn - defaultWidthIn) / 2 + (areaInches.areaLeftIn ?? 0);
+    leftIn = (areaInches.printAreaWidthIn - defaultWidthIn * placementScale) / 2 + (areaInches.areaLeftIn ?? 0);
     topIn =
       alignment === "TOP_CENTER"
         ? areaInches.areaTopIn ?? 0
-        : (areaInches.printAreaHeightIn - defaultHeightIn) / 2 + (areaInches.areaTopIn ?? 0);
+        : (areaInches.printAreaHeightIn - defaultHeightIn * placementScale) / 2 + (areaInches.areaTopIn ?? 0);
   } else if (alignment === "LEFT_CHEST") {
     leftIn = areaInches.areaLeftIn ?? 0;
     topIn = areaInches.areaTopIn ?? 0;
@@ -98,7 +101,7 @@ export function presetToInitialPrintfulPlacement(
       heightIn: defaultHeightIn,
       leftIn,
       topIn,
-      scale: preset?.defaultScale ?? 1,
+      scale: placementScale,
     },
     printArea,
     areaInches,

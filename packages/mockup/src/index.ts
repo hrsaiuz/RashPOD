@@ -1,5 +1,6 @@
 export * from "./types";
 export * from "./placement-math";
+export * from "./placement-geometry";
 export * from "./placement-math-printful";
 export * from "./placement-converters";
 export * from "./placement-validation";

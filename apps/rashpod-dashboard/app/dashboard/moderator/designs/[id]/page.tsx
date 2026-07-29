@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { AlertTriangle, ArrowLeft, CheckCircle2, ChevronDown, ChevronUp, ClipboardCheck, FileText, Globe2, Image as ImageIcon, Loader2, MapPin, Plus, Trash2, XCircle } from "lucide-react";
 import { Button, Card, EmptyState, ErrorState, Input, ProductPickerGrid, Skeleton, StatusBadge } from "@rashpod/ui";
+import { clampPlacementToPrintArea, presetToInitialPlacement, toLocalSelectionPosition } from "@rashpod/mockup";
 import DashboardLayout from "../../../dashboard-layout";
 import { api, ApiError, type DesignWorkflowDetail } from "../../../../../lib/api";
 import { useAuth } from "../../../../auth/auth-provider";
@@ -61,6 +62,7 @@ type PlacementPresetOption = {
   defaultX?: string | number | null;
   defaultY?: string | number | null;
   defaultScale?: string | number | null;
+  alignment?: string | null;
   active?: boolean;
 };
 
@@ -141,6 +143,8 @@ type LocalSelectionForm = {
   yPx: string;
   scale: string;
   rotation: string;
+  editorReady: boolean;
+  preferContextInitialPlacement: boolean;
 };
 
 type GlobalSelectionForm = {
@@ -158,6 +162,8 @@ type GlobalSelectionForm = {
   previewTaskKey?: string;
   previewUrls?: string[];
   previewLoading?: boolean;
+  editorReady: boolean;
+  preferContextInitialPlacement: boolean;
 };
 
 export default function Page() {
@@ -277,6 +283,7 @@ export default function Page() {
         setWorkflowStep(inferWorkflowStep(next));
         initialWorkflowStepSetRef.current = true;
       }
+      return next;
     } catch (e) {
       if (e instanceof ApiError && e.status === 404) {
         setLoadNotFound(true);
@@ -285,6 +292,7 @@ export default function Page() {
         setLoadError(e instanceof Error ? e.message : "Failed to load design");
         if (!options.background) setDetail(null);
       }
+      return null;
     } finally {
       if (!options.background) setLoading(false);
     }
@@ -324,6 +332,9 @@ export default function Page() {
   }
 
   function printAreasFor(templateId: string, placementPresetId: string) {
+    if (!placementPresetId) {
+      return activePrintAreas.filter((item) => item.mockupTemplateId === templateId);
+    }
     const placement = presetPlacement(placementPresetId);
     return activePrintAreas.filter((item) => item.mockupTemplateId === templateId && (!item.placement || item.placement === placement));
   }
@@ -378,11 +389,34 @@ export default function Page() {
     setGlobalSelections((current) => current.map((selection, currentIndex) => currentIndex === index ? { ...selection, ...patch } : selection));
   }
 
+  function invalidateGlobalPreview(index: number, patch: Partial<GlobalSelectionForm>) {
+    const taskKey = globalSelections[index]?.previewTaskKey;
+    if (taskKey) {
+      previewControllersRef.current.get(taskKey)?.abort();
+      previewControllersRef.current.delete(taskKey);
+    }
+    updateGlobalSelection(index, {
+      ...patch,
+      previewTaskKey: undefined,
+      previewUrls: undefined,
+      previewLoading: false,
+    });
+  }
+
+  function removeGlobalSelection(index: number) {
+    const taskKey = globalSelections[index]?.previewTaskKey;
+    if (taskKey) {
+      previewControllersRef.current.get(taskKey)?.abort();
+      previewControllersRef.current.delete(taskKey);
+    }
+    setGlobalSelections((current) => current.filter((_, itemIndex) => itemIndex !== index));
+  }
+
   function selectPrintfulTemplate(index: number, templateId: string) {
     const preset = globalPresetsFor(templateId)[0];
     const template = printfulTemplates.find((item) => item.id === templateId);
     const variantIds = variantIdsFromTemplate(template);
-    updateGlobalSelection(index, {
+    invalidateGlobalPreview(index, {
       ...globalDefaultsFromPreset(preset),
       printfulProductTemplateId: templateId,
       placementPresetId: preset?.id ?? "",
@@ -395,16 +429,27 @@ export default function Page() {
 
   function selectGlobalPreset(index: number, presetId: string) {
     const preset = placementPresets.find((item) => item.id === presetId);
-    updateGlobalSelection(index, { ...globalDefaultsFromPreset(preset), placementPresetId: presetId });
+    invalidateGlobalPreview(index, { ...globalDefaultsFromPreset(preset), placementPresetId: presetId });
   }
 
   function toggleVariant(index: number, variantId: string) {
+    const taskKey = globalSelections[index]?.previewTaskKey;
+    if (taskKey) {
+      previewControllersRef.current.get(taskKey)?.abort();
+      previewControllersRef.current.delete(taskKey);
+    }
     setGlobalSelections((current) => current.map((selection, currentIndex) => {
       if (currentIndex !== index) return selection;
       const selectedVariantIds = selection.selectedVariantIds.includes(variantId)
         ? selection.selectedVariantIds.filter((item) => item !== variantId)
         : [...selection.selectedVariantIds, variantId];
-      return { ...selection, selectedVariantIds: selectedVariantIds.length ? selectedVariantIds : [variantId] };
+      return {
+        ...selection,
+        selectedVariantIds: selectedVariantIds.length ? selectedVariantIds : [variantId],
+        previewTaskKey: undefined,
+        previewUrls: undefined,
+        previewLoading: false,
+      };
     }));
   }
 
@@ -412,6 +457,9 @@ export default function Page() {
     const local = localSelections[localIndex];
     const global = globalSelections[globalIndex];
     if (!local?.printAreaId || !global?.printfulProductTemplateId) return;
+    const originalGlobalPosition = [global.widthIn, global.heightIn, global.leftIn, global.topIn, global.scale].join(":");
+    setActionError("");
+    invalidateGlobalPreview(globalIndex, { editorReady: false, preferContextInitialPlacement: false });
     try {
       const suggested = await api.post<{ widthIn: number; heightIn: number; leftIn: number; topIn: number; scale: number }>(
         `/admin/designs/${params.id}/suggest-printful-placement`,
@@ -426,13 +474,23 @@ export default function Page() {
             : { widthCm: numberValue(local.widthCm), heightCm: numberValue(local.heightCm), xCm: numberValue(local.xCm), yCm: numberValue(local.yCm), scale: numberValue(local.scale), rotation: numberValue(local.rotation) },
         },
       );
-      updateGlobalSelection(globalIndex, {
-        widthIn: String(suggested.widthIn),
-        heightIn: String(suggested.heightIn),
-        leftIn: String(suggested.leftIn),
-        topIn: String(suggested.topIn),
-        scale: String(suggested.scale ?? 1),
-      });
+      setGlobalSelections((current) => current.map((selection) =>
+        selection.id === global.id
+        && selection.printfulProductTemplateId === global.printfulProductTemplateId
+        && selection.placementPresetId === global.placementPresetId
+        && [selection.widthIn, selection.heightIn, selection.leftIn, selection.topIn, selection.scale].join(":") === originalGlobalPosition
+          ? {
+              ...selection,
+              widthIn: String(suggested.widthIn),
+              heightIn: String(suggested.heightIn),
+              leftIn: String(suggested.leftIn),
+              topIn: String(suggested.topIn),
+              scale: String(suggested.scale ?? 1),
+              editorReady: false,
+              preferContextInitialPlacement: false,
+            }
+          : selection,
+      ));
     } catch (e) {
       setActionError(e instanceof Error ? e.message : "Failed to copy placement");
     }
@@ -441,8 +499,11 @@ export default function Page() {
   async function previewPrintfulMockup(index: number) {
     const selection = globalSelections[index];
     if (!selection?.printfulProductTemplateId) return;
-    let previewTaskKey = "";
-    updateGlobalSelection(index, { previewLoading: true, previewUrls: undefined });
+    const requestKey = `request:${crypto.randomUUID()}`;
+    const controller = new AbortController();
+    previewControllersRef.current.set(requestKey, controller);
+    setActionError("");
+    updateGlobalSelection(index, { previewLoading: true, previewUrls: undefined, previewTaskKey: requestKey });
     try {
       const started = await api.post<{ taskKey: string; status: string }>(`/admin/designs/${params.id}/printful-mockup-preview`, {
         printfulProductTemplateId: selection.printfulProductTemplateId,
@@ -457,38 +518,51 @@ export default function Page() {
           scale: numberValue(selection.scale),
         },
       });
-      previewTaskKey = started.taskKey;
-      updateGlobalSelection(index, { previewTaskKey: started.taskKey });
-      const controller = new AbortController();
-      previewControllersRef.current.set(started.taskKey, controller);
-      await pollPrintfulPreview(index, started.taskKey, controller.signal);
+      if (controller.signal.aborted) return;
+      await pollPrintfulPreview(selection.id, started.taskKey, requestKey, controller.signal);
     } catch (e) {
       if (e instanceof DOMException && e.name === "AbortError") return;
-      updateGlobalSelection(index, { previewLoading: false });
+      setGlobalSelections((current) => current.map((item) =>
+        item.id === selection.id && item.previewTaskKey === requestKey
+          ? { ...item, previewLoading: false, previewTaskKey: undefined }
+          : item,
+      ));
       setActionError(e instanceof Error ? e.message : "Printful preview failed");
     } finally {
-      if (previewTaskKey) previewControllersRef.current.delete(previewTaskKey);
+      previewControllersRef.current.delete(requestKey);
     }
   }
 
-  async function pollPrintfulPreview(index: number, taskKey: string, signal: AbortSignal, attempt = 0) {
+  async function pollPrintfulPreview(selectionId: string, taskKey: string, requestKey: string, signal: AbortSignal, attempt = 0) {
     if (attempt > 12) {
-      updateGlobalSelection(index, { previewLoading: false });
+      setGlobalSelections((current) => current.map((selection) =>
+        selection.id === selectionId && selection.previewTaskKey === requestKey
+          ? { ...selection, previewLoading: false, previewTaskKey: undefined }
+          : selection,
+      ));
       setActionError("Printful preview timed out");
       return;
     }
     const result = await api.get<{ status: string; mockupUrls: string[] }>(`/admin/designs/printful/mockup-tasks/${taskKey}`, { signal });
     if ((result.status === "completed" || result.mockupUrls.length > 0) && result.mockupUrls.length) {
-      updateGlobalSelection(index, { previewLoading: false, previewUrls: result.mockupUrls });
+      setGlobalSelections((current) => current.map((selection) =>
+        selection.id === selectionId && selection.previewTaskKey === requestKey
+          ? { ...selection, previewLoading: false, previewTaskKey: undefined, previewUrls: result.mockupUrls }
+          : selection,
+      ));
       return;
     }
     if (result.status === "failed") {
-      updateGlobalSelection(index, { previewLoading: false });
+      setGlobalSelections((current) => current.map((selection) =>
+        selection.id === selectionId && selection.previewTaskKey === requestKey
+          ? { ...selection, previewLoading: false, previewTaskKey: undefined }
+          : selection,
+      ));
       setActionError("Printful preview failed");
       return;
     }
     await abortableDelay(Math.min(5000, 1000 * (attempt + 1)), signal);
-    await pollPrintfulPreview(index, taskKey, signal, attempt + 1);
+    await pollPrintfulPreview(selectionId, taskKey, requestKey, signal, attempt + 1);
   }
 
   function toggleMarketplace(index: number, marketplace: string) {
@@ -506,8 +580,8 @@ export default function Page() {
       localBaseProductId: selection.localBaseProductId,
       mockupTemplateId: selection.mockupTemplateId,
       printAreaId: selection.printAreaId,
-      placementPresetId: selection.placementPresetId,
-      placement: presetPlacement(selection.placementPresetId),
+      placementPresetId: selection.placementPresetId || undefined,
+      placement: localPlacement(selection, printAreas, placementPresets),
       unit: selection.unit,
       anchor: selection.anchor,
       position: selection.unit === "PX"
@@ -583,8 +657,24 @@ export default function Page() {
       }
     } catch (e) {
       const nextError = e instanceof Error ? e.message : "Failed to submit moderation decision";
-      setActionError(nextError);
-      toast({ tone: "error", title: "Moderation action failed", description: nextError });
+      const refreshed = await load({ background: true });
+      const expectedStatus = decision === "REJECT"
+        ? "REJECTED"
+        : decision === "APPROVE_GLOBAL"
+          ? "APPROVED_GLOBAL"
+          : "APPROVED_LOCAL";
+      if (refreshed?.status === expectedStatus) {
+        setActionError("");
+        setWorkflowStep(decision === "REJECT" ? 1 : 3);
+        toast({
+          tone: "info",
+          title: decision === "REJECT" ? "Design rejection confirmed" : "Design approval confirmed",
+          description: "The response was interrupted, but the saved moderation state was verified.",
+        });
+      } else {
+        setActionError(nextError);
+        toast({ tone: "error", title: "Moderation action failed", description: nextError });
+      }
     } finally {
       setSubmitting(false);
     }
@@ -607,13 +697,13 @@ export default function Page() {
 
   const localReady = useMemo(
     () => localSelections.every((selection) =>
-      selection.localBaseProductId && selection.mockupTemplateId && selection.printAreaId && selection.placementPresetId),
+      selection.localBaseProductId && selection.mockupTemplateId && selection.printAreaId && selection.editorReady),
     [localSelections],
   );
 
   const globalReady = useMemo(
     () => globalSelections.every((selection) =>
-      selection.printfulProductTemplateId && selection.placementPresetId && selection.selectedVariantIds.length),
+      selection.printfulProductTemplateId && selection.placementPresetId && selection.selectedVariantIds.length && selection.editorReady),
     [globalSelections],
   );
 
@@ -779,7 +869,7 @@ export default function Page() {
                             />
                           </div>
                           <div className="mt-4 grid gap-3 md:grid-cols-2">
-                            <SelectField label="Placement preset" value={selection.placementPresetId} onChange={(value) => selectLocalPreset(index, value)} options={localPresetsFor(selection.localBaseProductId).map((item) => ({ value: item.id, label: `${item.name} - ${item.placement}` }))} />
+                            <SelectField label="Placement preset (optional)" value={selection.placementPresetId} onChange={(value) => selectLocalPreset(index, value)} options={localPresetsFor(selection.localBaseProductId).map((item) => ({ value: item.id, label: `${item.name} - ${item.placement}` }))} />
                             <SelectField label="Mockup template" value={selection.mockupTemplateId} onChange={(value) => selectLocalTemplate(index, value)} options={localTemplatesFor(selection.localBaseProductId).map((item) => ({ value: item.id, label: item.name }))} />
                             <SelectField
                               label="Product view / print area"
@@ -797,12 +887,13 @@ export default function Page() {
                                 { label: "Base product selected", ok: Boolean(selection.localBaseProductId) },
                                 { label: "Mockup template selected", ok: Boolean(selection.mockupTemplateId) },
                                 { label: "Print area configured", ok: Boolean(selection.printAreaId) },
-                                { label: "Placement preset selected", ok: Boolean(selection.placementPresetId) },
+                                { label: selection.placementPresetId ? "Placement preset applied" : "Using print-area default placement", ok: true },
+                                { label: "Visual placement validated", ok: selection.editorReady },
                                 { label: "Design resolution adequate (800px+)", ok: designResolutionOk, warn: !designResolutionOk && Boolean(latest?.widthPx) },
                               ]}
                             />
                           </div>
-                          {selection.localBaseProductId && selection.mockupTemplateId && selection.printAreaId && selection.placementPresetId && params.id ? (
+                          {selection.localBaseProductId && selection.mockupTemplateId && selection.printAreaId && params.id ? (
                             <div className="mt-4">
                               <p className="mb-2 text-sm font-medium text-brand-ink">Visual placement</p>
                               <LocalSelectionMockupEditor
@@ -812,11 +903,21 @@ export default function Page() {
                                   mockupTemplateId: selection.mockupTemplateId,
                                   printAreaId: selection.printAreaId,
                                   placementPresetId: selection.placementPresetId,
+                                  preferContextInitialPlacement: selection.preferContextInitialPlacement,
                                   unit: selection.unit,
+                                  widthPx: numberValue(selection.widthPx),
+                                  heightPx: numberValue(selection.heightPx),
+                                  xPx: numberValue(selection.xPx),
+                                  yPx: numberValue(selection.yPx),
+                                  widthCm: numberValue(selection.widthCm),
+                                  heightCm: numberValue(selection.heightCm),
+                                  xCm: numberValue(selection.xCm),
+                                  yCm: numberValue(selection.yCm),
+                                  scale: numberValue(selection.scale),
+                                  rotation: numberValue(selection.rotation),
                                 }}
                                 onPlacementChange={(payload) =>
                                   updateLocalSelection(index, {
-                                    unit: "PX",
                                     widthPx: String(payload.widthPx),
                                     heightPx: String(payload.heightPx),
                                     xPx: String(payload.xPx),
@@ -827,6 +928,8 @@ export default function Page() {
                                     yCm: String(payload.yCm),
                                     scale: String(payload.scale),
                                     rotation: String(payload.rotation),
+                                    editorReady: true,
+                                    preferContextInitialPlacement: false,
                                   })
                                 }
                               />
@@ -843,17 +946,29 @@ export default function Page() {
                           {expandedLocal[selection.id] ? (
                             <>
                               <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                                <SelectField label="Unit" value={selection.unit} onChange={(value) => updateLocalSelection(index, { unit: value as LocalSelectionForm["unit"] })} options={[{ value: "CM", label: "Centimeters" }, { value: "PX", label: "Pixels" }]} />
-                                <SelectField label="Anchor" value={selection.anchor} onChange={(value) => updateLocalSelection(index, { anchor: value as LocalSelectionForm["anchor"] })} options={[{ value: "TOP_LEFT", label: "Top left" }, { value: "CENTER", label: "Center" }]} />
-                                <NumberField label="Scale" value={selection.scale} onChange={(value) => updateLocalSelection(index, { scale: value })} />
-                                <NumberField label="Rotation" value={selection.rotation} onChange={(value) => updateLocalSelection(index, { rotation: value })} />
+                                <SelectField
+                                  label="Unit"
+                                  value={selection.unit}
+                                  onChange={(value) => updateLocalSelection(index, { unit: value as LocalSelectionForm["unit"], editorReady: false, preferContextInitialPlacement: false })}
+                                  options={[
+                                    ...(printAreas.find((item) => item.id === selection.printAreaId)?.widthCm
+                                      && printAreas.find((item) => item.id === selection.printAreaId)?.heightCm
+                                      ? [{ value: "CM", label: "Centimeters" }]
+                                      : []),
+                                    { value: "PX", label: "Pixels" },
+                                  ]}
+                                />
+                                <SelectField label="Anchor" value={selection.anchor} onChange={(value) => updateLocalSelection(index, { anchor: value as LocalSelectionForm["anchor"], editorReady: false, preferContextInitialPlacement: false })} options={[{ value: "TOP_LEFT", label: "Top left" }, { value: "CENTER", label: "Center" }]} />
+                                <NumberField label="Scale" value={selection.scale} onChange={(value) => updateLocalSelection(index, { scale: value, editorReady: false, preferContextInitialPlacement: false })} disabled={printAreas.find((item) => item.id === selection.printAreaId)?.allowResize === false} />
+                                <NumberField label="Rotation" value={selection.rotation} onChange={(value) => updateLocalSelection(index, { rotation: value, editorReady: false, preferContextInitialPlacement: false })} disabled={printAreas.find((item) => item.id === selection.printAreaId)?.allowRotate === false} />
                               </div>
                               <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                                <NumberField label="X px" value={selection.xPx} onChange={(value) => updateLocalSelection(index, { xPx: value })} />
-                                <NumberField label="Y px" value={selection.yPx} onChange={(value) => updateLocalSelection(index, { yPx: value })} />
-                                <NumberField label="Width px" value={selection.widthPx} onChange={(value) => updateLocalSelection(index, { widthPx: value })} />
-                                <NumberField label="Height px" value={selection.heightPx} onChange={(value) => updateLocalSelection(index, { heightPx: value })} />
+                                <NumberField label="X px" value={selection.xPx} onChange={(value) => updateLocalSelection(index, { xPx: value, editorReady: false, preferContextInitialPlacement: false })} disabled={printAreas.find((item) => item.id === selection.printAreaId)?.allowMove === false} />
+                                <NumberField label="Y px" value={selection.yPx} onChange={(value) => updateLocalSelection(index, { yPx: value, editorReady: false, preferContextInitialPlacement: false })} disabled={printAreas.find((item) => item.id === selection.printAreaId)?.allowMove === false} />
+                                <NumberField label="Width px" value={selection.widthPx} onChange={(value) => updateLocalSelection(index, { widthPx: value, editorReady: false, preferContextInitialPlacement: false })} disabled={printAreas.find((item) => item.id === selection.printAreaId)?.allowResize === false} />
+                                <NumberField label="Height px" value={selection.heightPx} onChange={(value) => updateLocalSelection(index, { heightPx: value, editorReady: false, preferContextInitialPlacement: false })} disabled={printAreas.find((item) => item.id === selection.printAreaId)?.allowResize === false} />
                               </div>
+                              {!selection.editorReady ? <p className="mt-2 text-xs text-status-warning">Use the visual placement controls once to validate numeric changes.</p> : null}
                             </>
                           ) : null}
                           {selection.printAreaId ? <p className="mt-3 text-xs text-brand-muted">{printAreaSummary(printAreas.find((item) => item.id === selection.printAreaId))}</p> : <p className="mt-3 text-xs text-status-danger">Select an active print area before approval.</p>}
@@ -875,7 +990,7 @@ export default function Page() {
                   <DecisionSection icon={<Globe2 size={20} />} title="Printful Products">
                     <div className="space-y-4">
                       {globalSelections.map((selection, index) => (
-                        <SelectionPanel key={selection.id} title={`Printful selection ${index + 1}`} onRemove={globalSelections.length > 1 ? () => setGlobalSelections((current) => current.filter((_, itemIndex) => itemIndex !== index)) : undefined}>
+                        <SelectionPanel key={selection.id} title={`Printful selection ${index + 1}`} onRemove={globalSelections.length > 1 ? () => removeGlobalSelection(index) : undefined}>
                           <div>
                             <p className="mb-2 text-sm font-medium text-brand-ink">Printful template</p>
                             <ProductPickerGrid
@@ -903,7 +1018,7 @@ export default function Page() {
                               </div>
                               <div className="mt-4 grid gap-3 md:grid-cols-2 lg:grid-cols-3">
                                 <SelectField label="Placement preset" value={selection.placementPresetId} onChange={(value) => selectGlobalPreset(index, value)} options={globalPresetsFor(selection.printfulProductTemplateId).map((item) => ({ value: item.id, label: `${item.name} - ${item.placement}` }))} />
-                                <SelectField label="Technique" value={selection.technique} onChange={(value) => updateGlobalSelection(index, { technique: value })} options={techniqueOptionsFor(selection.printfulProductTemplateId, printfulTemplates)} />
+                                <SelectField label="Technique" value={selection.technique} onChange={(value) => invalidateGlobalPreview(index, { technique: value })} options={techniqueOptionsFor(selection.printfulProductTemplateId, printfulTemplates)} />
                               </div>
                               <div className="mt-4">
                                 <p className="mb-2 text-sm font-medium text-brand-ink">Variants for mockup</p>
@@ -934,21 +1049,29 @@ export default function Page() {
                                       printfulProductTemplateId: selection.printfulProductTemplateId,
                                       placementPresetId: selection.placementPresetId,
                                       placement: presetPlacement(selection.placementPresetId),
+                                      preferContextInitialPlacement: selection.preferContextInitialPlacement,
+                                      widthIn: numberValue(selection.widthIn),
+                                      heightIn: numberValue(selection.heightIn),
+                                      leftIn: numberValue(selection.leftIn),
+                                      topIn: numberValue(selection.topIn),
+                                      scale: numberValue(selection.scale),
                                     }}
                                     onPlacementChange={(payload) =>
-                                      updateGlobalSelection(index, {
+                                      invalidateGlobalPreview(index, {
                                         widthIn: String(payload.widthIn),
                                         heightIn: String(payload.heightIn),
                                         leftIn: String(payload.leftIn),
                                         topIn: String(payload.topIn),
                                         scale: String(payload.scale),
+                                        editorReady: true,
+                                        preferContextInitialPlacement: false,
                                       })
                                     }
                                   />
                                 </div>
                               ) : null}
                               <div className="mt-4 flex flex-wrap gap-2">
-                                <Button size="sm" variant="secondary" onClick={() => previewPrintfulMockup(index)} disabled={selection.previewLoading || submitting} loading={selection.previewLoading}>
+                                <Button size="sm" variant="secondary" onClick={() => previewPrintfulMockup(index)} disabled={selection.previewLoading || submitting || !selection.editorReady} loading={selection.previewLoading}>
                                   Preview Printful mockup
                                 </Button>
                               </div>
@@ -972,13 +1095,14 @@ export default function Page() {
                               </button>
                               {expandedGlobalNumeric[selection.id] ? (
                                 <div className="mt-3 grid gap-3 sm:grid-cols-3 lg:grid-cols-6">
-                                  <NumberField label="Width in" value={selection.widthIn} onChange={(value) => updateGlobalSelection(index, { widthIn: value })} />
-                                  <NumberField label="Height in" value={selection.heightIn} onChange={(value) => updateGlobalSelection(index, { heightIn: value })} />
-                                  <NumberField label="Left in" value={selection.leftIn} onChange={(value) => updateGlobalSelection(index, { leftIn: value })} />
-                                  <NumberField label="Top in" value={selection.topIn} onChange={(value) => updateGlobalSelection(index, { topIn: value })} />
-                                  <NumberField label="Scale" value={selection.scale} onChange={(value) => updateGlobalSelection(index, { scale: value })} />
+                                  <NumberField label="Width in" value={selection.widthIn} onChange={(value) => invalidateGlobalPreview(index, { widthIn: value, editorReady: false, preferContextInitialPlacement: false })} />
+                                  <NumberField label="Height in" value={selection.heightIn} onChange={(value) => invalidateGlobalPreview(index, { heightIn: value, editorReady: false, preferContextInitialPlacement: false })} />
+                                  <NumberField label="Left in" value={selection.leftIn} onChange={(value) => invalidateGlobalPreview(index, { leftIn: value, editorReady: false, preferContextInitialPlacement: false })} />
+                                  <NumberField label="Top in" value={selection.topIn} onChange={(value) => invalidateGlobalPreview(index, { topIn: value, editorReady: false, preferContextInitialPlacement: false })} />
+                                  <NumberField label="Scale" value={selection.scale} onChange={(value) => invalidateGlobalPreview(index, { scale: value, editorReady: false, preferContextInitialPlacement: false })} />
                                 </div>
                               ) : null}
+                              {!selection.editorReady ? <p className="mt-2 text-xs text-status-warning">Use the visual placement controls once to validate numeric changes.</p> : null}
                             </>
                           ) : null}
                           <div className="mt-4 flex flex-wrap gap-2">
@@ -1286,7 +1410,7 @@ function createLocalSelection(products: BaseProductOption[], presets: PlacementP
   const product = products.find((item) => item.isActive !== false);
   const preset = presets.find((item) => item.active !== false && item.pipeline === "LOCAL" && (!item.localBaseProductId || item.localBaseProductId === product?.id));
   const template = templates.find((item) => item.isActive !== false && item.baseProductId === product?.id);
-  const area = areas.find((item) => item.isActive !== false && item.mockupTemplateId === template?.id && (!item.placement || item.placement === preset?.placement));
+  const area = areas.find((item) => item.isActive !== false && item.mockupTemplateId === template?.id && (!preset || !item.placement || item.placement === preset.placement));
   return { id: crypto.randomUUID(), localBaseProductId: product?.id ?? "", mockupTemplateId: template?.id ?? "", printAreaId: area?.id ?? "", placementPresetId: preset?.id ?? "", ...localDefaultsFromPreset(preset, area) };
 }
 
@@ -1325,20 +1449,48 @@ function techniqueOptionsFor(templateId: string, templates: PrintfulTemplateOpti
 }
 
 function localDefaultsFromPreset(preset?: PlacementPresetOption, area?: PrintAreaOption): Omit<LocalSelectionForm, "id" | "localBaseProductId" | "mockupTemplateId" | "printAreaId" | "placementPresetId"> {
+  const configuredScale = optionalNumber(preset?.defaultScale) ?? 1;
+  const scale = area
+    ? Math.max(area.minScale, Math.min(area.maxScale, configuredScale))
+    : configuredScale;
+  const placement = area
+    ? clampPlacementToPrintArea(presetToInitialPlacement(
+        {
+          defaultWidthCm: optionalNumber(preset?.defaultWidthCm),
+          defaultHeightCm: optionalNumber(preset?.defaultHeightCm),
+          defaultX: optionalNumber(preset?.defaultX),
+          defaultY: optionalNumber(preset?.defaultY),
+          defaultScale: scale,
+          alignment: preset?.alignment,
+        },
+        area,
+      ), area)
+    : { x: 0, y: 0, width: 400, height: 400, scale, rotation: 0 };
+  const cmPosition = area ? toLocalSelectionPosition(placement, area, "CM") : null;
+
   return {
-    unit: "CM",
+    unit: "PX",
     anchor: "TOP_LEFT",
-    widthCm: stringValue(preset?.defaultWidthCm, "10"),
-    heightCm: stringValue(preset?.defaultHeightCm, "10"),
-    xCm: stringValue(preset?.defaultX, "0"),
-    yCm: stringValue(preset?.defaultY, "0"),
-    widthPx: stringValue(area?.safeWidth, "800"),
-    heightPx: stringValue(area?.safeHeight, "800"),
-    xPx: stringValue(area?.safeX, "0"),
-    yPx: stringValue(area?.safeY, "0"),
-    scale: stringValue(preset?.defaultScale, "1"),
-    rotation: "0",
+    widthCm: cmPosition && "widthCm" in cmPosition ? String(cmPosition.widthCm) : "10",
+    heightCm: cmPosition && "heightCm" in cmPosition ? String(cmPosition.heightCm) : "10",
+    xCm: cmPosition && "xCm" in cmPosition ? String(cmPosition.xCm) : "0",
+    yCm: cmPosition && "yCm" in cmPosition ? String(cmPosition.yCm) : "0",
+    widthPx: String(placement.width),
+    heightPx: String(placement.height),
+    xPx: String(placement.x),
+    yPx: String(placement.y),
+    scale: String(placement.scale),
+    rotation: String(placement.rotation),
+    editorReady: false,
+    preferContextInitialPlacement: true,
   };
+}
+
+function localPlacement(selection: LocalSelectionForm, areas: PrintAreaOption[], presets: PlacementPresetOption[]) {
+  const preset = presets.find((item) => item.id === selection.placementPresetId);
+  if (preset?.placement) return preset.placement;
+  const area = areas.find((item) => item.id === selection.printAreaId);
+  return area?.placement || area?.mockupView?.placementCode || "FRONT";
 }
 
 function globalDefaultsFromPreset(preset?: PlacementPresetOption): Omit<GlobalSelectionForm, "id" | "printfulProductTemplateId" | "placementPresetId" | "technique" | "targetMarketplaces" | "selectedVariantIds" | "previewTaskKey" | "previewUrls" | "previewLoading"> {
@@ -1348,6 +1500,8 @@ function globalDefaultsFromPreset(preset?: PlacementPresetOption): Omit<GlobalSe
     leftIn: stringValue(preset?.defaultX, "0"),
     topIn: stringValue(preset?.defaultY, "0"),
     scale: stringValue(preset?.defaultScale, "1"),
+    editorReady: false,
+    preferContextInitialPlacement: true,
   };
 }
 
@@ -1365,6 +1519,12 @@ function stringValue(value: unknown, fallback: string) {
 function numberValue(value: string) {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function optionalNumber(value: string | number | null | undefined) {
+  if (value == null || value === "") return undefined;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : undefined;
 }
 
 function printAreaSummary(area?: PrintAreaOption) {
@@ -1448,15 +1608,15 @@ function SelectField({ label, value, onChange, options }: { label: string; value
   );
 }
 
-function NumberField({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
-  return <TextField label={label} value={value} onChange={onChange} type="number" />;
+function NumberField({ label, value, onChange, disabled = false }: { label: string; value: string; onChange: (value: string) => void; disabled?: boolean }) {
+  return <TextField label={label} value={value} onChange={onChange} type="number" disabled={disabled} />;
 }
 
-function TextField({ label, value, onChange, type = "text" }: { label: string; value: string; onChange: (value: string) => void; type?: string }) {
+function TextField({ label, value, onChange, type = "text", disabled = false }: { label: string; value: string; onChange: (value: string) => void; type?: string; disabled?: boolean }) {
   return (
     <label className="block text-sm font-medium text-brand-ink">
       {label}
-      <input value={value} type={type} step={type === "number" ? "0.01" : undefined} onChange={(event) => onChange(event.target.value)} className="mt-2 h-12 w-full rounded-xl border border-surface-borderSoft bg-white px-3 text-sm outline-none focus:border-brand-blue focus:ring-4 focus:ring-brand-blue/20" />
+      <input value={value} type={type} step={type === "number" ? "0.01" : undefined} onChange={(event) => onChange(event.target.value)} disabled={disabled} className="mt-2 h-12 w-full rounded-xl border border-surface-borderSoft bg-white px-3 text-sm outline-none focus:border-brand-blue focus:ring-4 focus:ring-brand-blue/20 disabled:cursor-not-allowed disabled:bg-surface-card disabled:text-brand-muted" />
     </label>
   );
 }

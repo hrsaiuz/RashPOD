@@ -26,4 +26,16 @@ describe("printful placement math", () => {
     assert.ok(Math.abs(restored.x - initial.x) <= 2);
     assert.ok(Math.abs(restored.y - initial.y) <= 2);
   });
+
+  it("centers a scaled preset by its rendered dimensions", () => {
+    const initial = presetToInitialPrintfulPlacement(
+      { defaultWidthIn: 3, defaultHeightIn: 4, alignment: "CENTER", defaultScale: 2 },
+      printArea,
+      areaInches,
+    );
+    const inches = editorStateToPrintfulPosition(initial, printArea, areaInches);
+
+    assert.ok(Math.abs(inches.leftIn - 3) <= 0.02);
+    assert.ok(Math.abs(inches.topIn - 4) <= 0.02);
+  });
 });

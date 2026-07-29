@@ -9,6 +9,7 @@ export function EditorToolbar(props: {
   onFit: () => void;
   onReset: () => void;
   onCenter: () => void;
+  canCenter?: boolean;
 }) {
   return (
     <div className="flex flex-wrap items-center gap-2">
@@ -21,7 +22,7 @@ export function EditorToolbar(props: {
       <Button type="button" size="sm" variant="secondary" onClick={props.onFit}>
         <Maximize2 size={16} /> Fit
       </Button>
-      <Button type="button" size="sm" variant="secondary" onClick={props.onCenter}>
+      <Button type="button" size="sm" variant="secondary" onClick={props.onCenter} disabled={props.canCenter === false}>
         <Crosshair size={16} /> Center
       </Button>
       <Button type="button" size="sm" variant="secondary" onClick={props.onReset}>
