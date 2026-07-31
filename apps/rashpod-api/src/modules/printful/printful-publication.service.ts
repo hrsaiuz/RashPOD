@@ -83,14 +83,22 @@ export class PrintfulPublicationService {
 
   async listCategories() {
     const response = await this.client.listCategories();
-    return (response.result ?? [])
+    const result: unknown = response.result;
+    const nestedCategories = this.record(result).categories;
+    const rows: unknown[] = Array.isArray(result)
+      ? result
+      : Array.isArray(nestedCategories)
+        ? nestedCategories
+        : [];
+    return rows
+      .map((category) => this.record(category))
       .filter((category) => category.id != null)
       .map((category) => ({
         id: Number(category.id),
         parentId: category.parent_id == null ? null : Number(category.parent_id),
-        title: category.title || `Category ${category.id}`,
-        imageUrl: category.image_url || null,
-        size: category.size || null,
+        title: String(category.title || `Category ${category.id}`),
+        imageUrl: category.image_url == null ? null : String(category.image_url),
+        size: category.size == null ? null : String(category.size),
       }))
       .sort((a, b) => a.title.localeCompare(b.title));
   }

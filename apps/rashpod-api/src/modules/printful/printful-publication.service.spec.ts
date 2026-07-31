@@ -52,4 +52,23 @@ describe("PrintfulPublicationService approved configuration", () => {
 
     await expect(service.publish("moderator-1", "listing-1", dto)).rejects.toThrow("variants differ from the approved mockups");
   });
+
+  it("reads categories from Printful's categories envelope", async () => {
+    const client = {
+      listCategories: jest.fn().mockResolvedValue({
+        result: {
+          categories: [
+            { id: 24, parent_id: 1, title: "T-Shirts", image_url: "https://example.test/t-shirts.png" },
+            { id: 25, title: "Hoodies" },
+          ],
+        },
+      }),
+    };
+    const service = new PrintfulPublicationService({} as never, client as never, {} as never, {} as never);
+
+    await expect(service.listCategories()).resolves.toEqual([
+      { id: 25, parentId: null, title: "Hoodies", imageUrl: null, size: null },
+      { id: 24, parentId: 1, title: "T-Shirts", imageUrl: "https://example.test/t-shirts.png", size: null },
+    ]);
+  });
 });

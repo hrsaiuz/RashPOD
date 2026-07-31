@@ -93,7 +93,9 @@ export class PrintfulApiClient {
 
   listCategories() {
     return this.request<{
-      result?: Array<{ id?: number; parent_id?: number; title?: string; image_url?: string; size?: string }>;
+      result?:
+        | Array<{ id?: number; parent_id?: number; title?: string; image_url?: string; size?: string }>
+        | { categories?: Array<{ id?: number; parent_id?: number; title?: string; image_url?: string; size?: string }> };
     }>({ path: "/categories" });
   }
 
