@@ -8,8 +8,20 @@ export type StorefrontBranding = {
   homeHeroImageAlt?: string | null;
   homeDesignerSectionImageUrl?: string | null;
   homeDesignerSectionImageAlt?: string | null;
+  homeCategoryTiles: HomeCategoryTile[];
   theme: { storeName?: string; storeTagline?: string };
   customOrderProductTypes: Array<{ key: string; label: string; title: string; mediaAssetId: string | null; imageUrl: string | null; altText: string }>;
+};
+
+export type HomeCategoryTile = {
+  key: string;
+  category: string;
+  productName: string;
+  href: string;
+  imageUrl?: string | null;
+  altText?: string | null;
+  variant?: "blue" | "peach";
+  size?: "wide" | "standard";
 };
 
 const getOptionalString = (value: unknown) =>
@@ -71,6 +83,11 @@ export async function getStorefrontBranding(): Promise<StorefrontBranding | null
         getOptionalString(data.homeDesignerSectionImageAlt) ??
         getOptionalString(theme.homeDesignerSectionImageAlt) ??
         null,
+      homeCategoryTiles: Array.isArray(data.homeCategoryTiles)
+        ? (data.homeCategoryTiles as HomeCategoryTile[])
+        : Array.isArray(theme.homeCategoryTiles)
+          ? (theme.homeCategoryTiles as HomeCategoryTile[])
+          : [],
       theme: theme as StorefrontBranding["theme"],
       customOrderProductTypes: Array.isArray(data.customOrderProductTypes)
         ? (data.customOrderProductTypes as StorefrontBranding["customOrderProductTypes"])

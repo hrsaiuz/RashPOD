@@ -22,6 +22,7 @@ export default async function HomePage({ params }: Props) {
     homeHeroImageAlt: branding?.homeHeroImageAlt ?? undefined,
     homeDesignerSectionImageUrl: branding?.homeDesignerSectionImageUrl ?? undefined,
     homeDesignerSectionImageAlt: branding?.homeDesignerSectionImageAlt ?? undefined,
+    homeCategoryTiles: branding?.homeCategoryTiles ?? [],
   };
 
   return (

@@ -22,7 +22,10 @@ export async function POST(req: NextRequest) {
 
     const { accessToken } = (await loginRes.json()) as { accessToken: string };
     const meRes = await fetch(`${API_URL}/auth/me`, { headers: { Authorization: `Bearer ${accessToken}` } });
-    const user = meRes.ok ? await meRes.json() : null;
+    if (!meRes.ok) {
+      return NextResponse.json({ error: "Your session could not be started. Please try again." }, { status: 502 });
+    }
+    const user = await meRes.json();
 
     const res = NextResponse.json({ user, role: user?.role || "CUSTOMER" });
     res.cookies.set(TOKEN_COOKIE, accessToken, {

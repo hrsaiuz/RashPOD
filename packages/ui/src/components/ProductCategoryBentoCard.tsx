@@ -14,6 +14,8 @@ export interface ProductCategoryBentoCardProps {
   variant?: "blue" | "peach";
   /** Optional product image URL (admin-uploaded via media library) */
   imageUrl?: string | null;
+  /** Accessible description for the uploaded product image */
+  imageAlt?: string;
   /** Whether to show the "SHOP NOW" pill button */
   showShopButton?: boolean;
   /** Additional CSS classes */
@@ -27,6 +29,7 @@ export function ProductCategoryBentoCard({
   productName,
   variant = "blue",
   imageUrl,
+  imageAlt,
   showShopButton = false,
   className,
   onClick,
@@ -115,7 +118,7 @@ export function ProductCategoryBentoCard({
             animate={{ y: 0, opacity: 1 }}
             transition={{ type: "spring", stiffness: 220, damping: 22 }}
             src={imageUrl}
-            alt={productName}
+            alt={imageAlt || productName}
             className="relative w-[90%] h-[88%] object-contain drop-shadow-lg"
             draggable={false}
           />

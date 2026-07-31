@@ -22,11 +22,15 @@ For local development, `docker-compose.yml` starts PostgreSQL with `POSTGRES_USE
 ```env
 JWT_SECRET=
 JWT_EXPIRES_IN=7d
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=
 PASSWORD_RESET_SECRET=
 EMAIL_VERIFICATION_SECRET=
 DESIGNER_INVITATION_TTL_HOURS=168
 INTAKE_SYSTEM_OWNER_ID=
 ```
+
+Google OAuth uses the storefront callback URL `https://<storefront-origin>/api/auth/google/callback`. Add the exact URL to the OAuth web client's authorized redirect URIs. The API needs `GOOGLE_CLIENT_ID`; the storefront service needs both Google values.
 
 `INTAKE_SYSTEM_OWNER_ID` must be the UUID of a dedicated, non-human database user used only to own anonymous
 storefront uploads. Designer portfolio, identity, and selfie evidence stays private and is exposed to authorized

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Button, ErrorState, Skeleton } from "@rashpod/ui";
+import { Button, ErrorState, Skeleton, DecoratedPanel } from "@rashpod/ui";
 import { api, type Order } from "../../../../lib/api";
 
 export default function CheckoutSuccessClient({ orderId, paymentId }: { orderId?: string; paymentId?: string }) {
@@ -42,11 +42,12 @@ export default function CheckoutSuccessClient({ orderId, paymentId }: { orderId?
   const pending = order && ["PAYMENT_PENDING", "DRAFT"].includes(order.status);
 
   return (
-    <section className="relative mx-auto mt-24 min-h-[390px] max-w-[760px] overflow-hidden rounded-md bg-brand-peachLight px-8 py-16 text-center sm:mt-32 sm:px-12">
-      <h1 className="mt-1 text-h3 font-bold text-brand-ink">
+    <DecoratedPanel dark={!failed && !pending} className="mx-auto mt-12 min-h-[430px] max-w-[980px] px-7 py-16 text-center sm:mt-20 sm:px-12">
+      <div role="status" aria-live="polite" className="mx-auto flex min-h-[300px] max-w-[720px] flex-col items-center justify-center">
+      <h1 className={`text-h3 font-bold ${failed || pending ? "text-brand-ink" : "text-white"}`}>
         {failed ? "Payment was not completed" : pending ? "Payment is still processing" : "Your order is confirmed. Thank you!"}
       </h1>
-      <div className="mx-auto mt-10 max-w-[640px] space-y-4 text-body leading-relaxed text-brand-text">
+      <div className={`mx-auto mt-10 max-w-[640px] space-y-4 text-body leading-relaxed ${failed || pending ? "text-brand-text" : "text-white/90"}`}>
         {failed ? (
           <p>Your order was created, but payment did not complete. You can retry payment from your account.</p>
         ) : pending ? (
@@ -63,6 +64,7 @@ export default function CheckoutSuccessClient({ orderId, paymentId }: { orderId?
           <Button variant="primaryBlue">{failed ? "Retry from account" : "View receipt"}</Button>
         </Link>
       </div>
-    </section>
+      </div>
+    </DecoratedPanel>
   );
 }

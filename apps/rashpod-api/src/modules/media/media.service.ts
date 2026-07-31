@@ -189,6 +189,9 @@ export class MediaService {
       return typeof value === "string" && value.trim().length > 0 ? value : null;
     };
     const customOrderProductTypes = await this.customOrderProducts();
+    const homeCategoryTiles = Array.isArray(themeRaw.homeCategoryTiles)
+      ? (themeRaw.homeCategoryTiles as Array<Record<string, unknown>>).slice(0, 6)
+      : [];
     return {
       storefrontLogoUrl: pick(MediaCategory.BRANDING_LOGO_WEB),
       dashboardLogoUrl: pick(MediaCategory.BRANDING_LOGO_DASHBOARD),
@@ -199,6 +202,7 @@ export class MediaService {
       homeHeroImageAlt: themeString("homeHeroImageAlt"),
       homeDesignerSectionImageUrl: themeString("homeDesignerSectionImageUrl"),
       homeDesignerSectionImageAlt: themeString("homeDesignerSectionImageAlt"),
+      homeCategoryTiles,
       theme: themeRaw,
       customOrderProductTypes,
     };

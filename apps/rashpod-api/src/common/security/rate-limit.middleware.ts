@@ -16,7 +16,7 @@ interface Bucket {
 const buckets = new Map<string, Bucket>();
 
 export const defaultRateLimitRules: RateLimitRule[] = [
-  { id: "auth-login", method: "POST", path: /^\/auth\/(login|register|forgot-password|reset-password|otp\/request|otp\/verify)/, max: 10, windowMs: 60_000 },
+  { id: "auth-login", method: "POST", path: /^\/auth\/(login|google|register|forgot-password|reset-password|otp\/request|otp\/verify)/, max: 10, windowMs: 60_000 },
   { id: "upload-sign", method: "POST", path: /^\/files\/upload-url/, max: 30, windowMs: 60_000 },
   { id: "intake-upload-sign", method: "POST", path: /^\/intake\/files\/upload-url/, max: 20, windowMs: 60_000 },
   { id: "intake-submit", method: "POST", path: /^\/intake\/(custom-order-requests|designer-applications|contact-messages)/, max: 10, windowMs: 60_000 },

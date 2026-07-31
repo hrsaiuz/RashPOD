@@ -20,6 +20,8 @@ Production secrets must be injected from Secret Manager or the existing Cloud Ru
 |---|---|---|---|
 | `DATABASE_URL` | `DATABASE_URL` | API, worker, migrate job | Cloud SQL connection string. |
 | `JWT_SECRET` | `JWT_SECRET` | API | Required in production. Never use `rashpod-dev-secret`. |
+| `GOOGLE_CLIENT_ID` | `GOOGLE_CLIENT_ID` | API, web | OAuth 2.0 web client ID; authorize the storefront callback URL. |
+| `GOOGLE_CLIENT_SECRET` | `GOOGLE_CLIENT_SECRET` | web | OAuth 2.0 web client secret used only by the server callback. |
 | `CLICK_SECRET_KEY` | `CLICK_SECRET_KEY` | API | Payment provider credential. |
 | `CLICK_WEBHOOK_SECRET` | `CLICK_WEBHOOK_SECRET` | API | Required for webhook signature validation. |
 | `TELEGRAM_BOT_TOKEN` | `telegram-bot-token` | worker | `Telegram_BOT_TOKEN` is accepted only for legacy local envs. |

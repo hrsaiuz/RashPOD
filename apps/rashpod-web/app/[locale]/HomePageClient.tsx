@@ -10,8 +10,9 @@ import {
   PackageCheck,
   Tags,
 } from "lucide-react";
-import { Button, EmptyState, ErrorState, getApiBase, ProductCard } from "@rashpod/ui";
+import { Button, EmptyState, ErrorState, getApiBase, ProductCard, ProductCategoryBentoCard } from "@rashpod/ui";
 import type { DesignerSummary, ProductListing } from "../../lib/catalog";
+import type { HomeCategoryTile } from "../../lib/branding";
 import { normalizeDesigners, normalizeProducts } from "../../lib/catalog";
 import { Link } from "../../i18n/navigation";
 
@@ -20,6 +21,7 @@ export interface HomeBrandingMedia {
   homeHeroImageAlt?: string;
   homeDesignerSectionImageUrl?: string;
   homeDesignerSectionImageAlt?: string;
+  homeCategoryTiles?: HomeCategoryTile[];
 }
 
 const MARKETPLACES = [
@@ -117,6 +119,7 @@ export default function HomePageClient({
     <div className="bg-white text-brand-ink">
       <FigmaHero media={homeMedia} />
       <ServiceStrip />
+      <CategoryMosaic tiles={homeMedia.homeCategoryTiles ?? []} />
       <HomepageProductCarousel
         title="Bestselling Designs"
         products={products.slice(0, 4)}
@@ -318,6 +321,56 @@ function MarketplaceLogoStrip() {
         </motion.div>
       </div>
     </section>
+  );
+}
+
+const DEFAULT_CATEGORY_TILES: HomeCategoryTile[] = [
+  { key: "t-shirt", category: "clothes", productName: "t-shirt", href: "/shop?categories=t-shirt", variant: "blue", size: "wide" },
+  { key: "postal-card", category: "prints", productName: "postal card", href: "/shop?categories=postal-card", variant: "peach" },
+  { key: "mug", category: "ceramics", productName: "mug", href: "/shop?categories=mug", variant: "blue" },
+  { key: "hoodie", category: "clothes", productName: "hoodie", href: "/shop?categories=hoodie", variant: "peach" },
+  { key: "hat", category: "clothes", productName: "hat", href: "/shop?categories=hat", variant: "blue" },
+  { key: "poster", category: "prints", productName: "poster in frame", href: "/shop?categories=poster", variant: "peach", size: "wide" },
+];
+
+function CategoryMosaic({ tiles }: { tiles: HomeCategoryTile[] }) {
+  const configured = DEFAULT_CATEGORY_TILES.map((fallback) => ({
+    ...fallback,
+    ...(tiles.find((tile) => tile.key === fallback.key) ?? {}),
+  }));
+
+  return (
+    <motion.section {...fadeUp} className="bg-white py-12 sm:py-16" aria-labelledby="home-categories-title">
+      <div className={`mx-auto ${HOME_MAX} ${HOME_GUTTER}`}>
+        <div className="mb-7 flex items-end justify-between gap-4">
+          <div>
+            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-brand-peach">Made your way</p>
+            <h2 id="home-categories-title" className="mt-2 text-[clamp(31px,3vw,44px)] font-normal text-black">Browse by category</h2>
+          </div>
+          <Link href="/shop" className="hidden text-sm font-semibold text-brand-blue hover:underline sm:inline">View all products</Link>
+        </div>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {configured.map((tile, index) => (
+            <Link
+              key={tile.key}
+              href={tile.href}
+              className={tile.size === "wide" ? "sm:col-span-2" : ""}
+              aria-label={`Shop ${tile.productName}`}
+            >
+              <ProductCategoryBentoCard
+                category={tile.category}
+                productName={tile.productName}
+                imageUrl={tile.imageUrl}
+                imageAlt={tile.altText ?? undefined}
+                variant={tile.variant ?? (index % 2 === 0 ? "blue" : "peach")}
+                showShopButton={tile.size === "wide"}
+                className="h-full"
+              />
+            </Link>
+          ))}
+        </div>
+      </div>
+    </motion.section>
   );
 }
 

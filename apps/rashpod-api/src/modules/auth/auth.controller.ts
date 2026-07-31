@@ -12,6 +12,7 @@ import { VerifyEmailDto } from "./dto/verify-email.dto";
 import { VerifyEmailTokenDto } from "./dto/verify-email-token.dto";
 import { RequestEmailOtpDto } from "./dto/request-email-otp.dto";
 import { VerifyEmailOtpDto } from "./dto/verify-email-otp.dto";
+import { GoogleLoginDto } from "./dto/google-login.dto";
 
 @Controller("auth")
 export class AuthController {
@@ -28,6 +29,11 @@ export class AuthController {
   @Post("login")
   login(@Body() dto: LoginDto) {
     return this.authService.login(dto);
+  }
+
+  @Post("google")
+  googleLogin(@Body() dto: GoogleLoginDto) {
+    return this.authService.loginWithGoogle(dto.idToken);
   }
 
   @Get("me")

@@ -10,6 +10,7 @@ import { AuditService } from "../audit/audit.service";
 import { AuthSessionStore } from "./auth-session.store";
 import { MailerService } from "../mailer/mailer.service";
 import { EmailTemplatesService } from "../email-templates/email-templates.service";
+import { OAuth2Client } from "google-auth-library";
 
 @Injectable()
 export class AuthService {
@@ -97,6 +98,58 @@ export class AuthService {
       );
     }
     await this.audit.log({ actorId: user.id, action: "auth.login", entityType: "User", entityId: user.id });
+    const tenantId = await this.resolvePreferredTenantId(user.id, user.role);
+    return this.sign(user.id, user.role, user.email, tenantId);
+  }
+
+  async loginWithGoogle(idToken: string) {
+    const clientId = process.env.GOOGLE_CLIENT_ID;
+    if (!clientId) throw new ForbiddenException("Google sign-in is not configured");
+
+    let payload;
+    try {
+      const ticket = await new OAuth2Client(clientId).verifyIdToken({ idToken, audience: clientId });
+      payload = ticket.getPayload();
+    } catch {
+      throw new UnauthorizedException("Google sign-in could not be verified");
+    }
+
+    const email = payload?.email?.trim().toLowerCase();
+    if (!email || !payload?.email_verified) {
+      throw new UnauthorizedException("A verified Google email address is required");
+    }
+
+    let user = await this.prisma.user.findUnique({ where: { email } });
+    if (!user) {
+      const displayName = payload.name?.trim() || email.split("@")[0];
+      user = await this.prisma.user.create({
+        data: {
+          email,
+          displayName,
+          handle: await this.createUniqueHandle(displayName),
+          passwordHash: await bcrypt.hash(`google_${randomUUID()}_${Date.now()}`, 10),
+          role: UserRole.CUSTOMER,
+          designerStatus: "ACTIVE",
+          emailVerifiedAt: new Date(),
+          avatarUrl: payload.picture || undefined,
+        },
+      });
+      await this.audit.log({ actorId: user.id, action: "auth.google.register", entityType: "User", entityId: user.id });
+      void this.sendWelcomeEmail(user.id, user.email, user.displayName, user.role);
+    } else {
+      if (user.role === UserRole.DESIGNER && user.designerStatus !== "ACTIVE") {
+        throw new ForbiddenException(
+          user.designerStatus === "SUSPENDED"
+            ? "This designer account is suspended"
+            : "Your designer account is awaiting activation",
+        );
+      }
+      if (!user.emailVerifiedAt) {
+        user = await this.prisma.user.update({ where: { id: user.id }, data: { emailVerifiedAt: new Date() } });
+      }
+      await this.audit.log({ actorId: user.id, action: "auth.google.login", entityType: "User", entityId: user.id });
+    }
+
     const tenantId = await this.resolvePreferredTenantId(user.id, user.role);
     return this.sign(user.id, user.role, user.email, tenantId);
   }

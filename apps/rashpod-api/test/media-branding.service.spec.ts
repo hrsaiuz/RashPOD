@@ -25,4 +25,19 @@ describe("MediaService storefront media", () => {
     expect(products.find((product) => product.key === "mug")).toEqual(expect.objectContaining({ mediaAssetId: "asset-1", imageUrl: "/mug.svg", altText: "Blue mug" }));
     expect(products.find((product) => product.key === "hoodie")?.imageUrl).toBeNull();
   });
+
+  it("exposes the configured homepage category tiles through public branding", async () => {
+    const tiles = [{ key: "mug", category: "ceramics", productName: "mug", imageUrl: "/mug.png" }];
+    const prisma: any = {
+      mediaAsset: { findMany: jest.fn().mockResolvedValue([]) },
+      platformSetting: {
+        findUnique: jest.fn()
+          .mockResolvedValueOnce({ value: { homeCategoryTiles: tiles } })
+          .mockResolvedValueOnce(null),
+      },
+    };
+    const service = new MediaService(prisma, { log: jest.fn() } as any, {} as any);
+    const branding = await service.branding();
+    expect(branding.homeCategoryTiles).toEqual(tiles);
+  });
 });

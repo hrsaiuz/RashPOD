@@ -42,6 +42,7 @@ database records store `https://storage.googleapis.com/...` public URLs.
 Store in Secret Manager:
 - Database URL.
 - JWT secret.
+- Google OAuth client ID and client secret.
 - ZeptoMail API key.
 - OpenAI API key.
 - Click credentials.
