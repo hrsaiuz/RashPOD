@@ -5,6 +5,7 @@ import { InMemoryWorkerRepository } from "./mock-repository";
 import { PrismaAssetRepository } from "./prisma-asset-repository";
 import { QueueRepository } from "./queue-repository";
 import { WorkerProcessor } from "./processor";
+import { WorkerPoller } from "./poller";
 import { WorkerJob } from "./types";
 import { workerLogger } from "./logger";
 import { assertWorkerEnvironment, validateWorkerEnvironment } from "./runtime-config";
@@ -62,15 +63,15 @@ function bootstrap() {
 
   const queue = new QueueRepository();
   const processor = new WorkerProcessor(queue, dispatcher);
-  const tick = async () => void processor.processOnce();
-  const timer = setInterval(() => void tick(), Number(process.env.WORKER_POLL_MS || 1500));
-  timer.unref();
+  const poller = new WorkerPoller(processor, Number(process.env.WORKER_POLL_MS || 1500));
+  poller.start();
 
   const shutdown = async (signal: string) => {
     stopping = true;
     workerLogger.info(JSON.stringify({ level: "info", event: "worker.shutdown.start", signal }));
-    clearInterval(timer);
+    const pollerStopped = poller.stop();
     server.close(async () => {
+      await pollerStopped;
       await closePrismaClient();
       workerLogger.info(JSON.stringify({ level: "info", event: "worker.shutdown.complete", signal }));
       process.exit(0);

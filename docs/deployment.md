@@ -70,6 +70,10 @@ Seed jobs must use `prisma migrate deploy` before `tsx prisma/seed.ts`. Do not u
 ## Worker
 Separate deployable service for mockups, film previews, AI jobs, emails, PDFs.
 
+The database-polling worker requires at least one warm Cloud Run instance and always-allocated CPU. Deploy
+`rashpod-worker` with `--min-instances=1 --no-cpu-throttling`; request-based CPU allocation is not compatible with its
+background polling loop. Polls are serialized so a slow database query or render cannot start overlapping queue claims.
+
 ## Webhook Endpoints
 ```text
 /api/payments/click/webhook
