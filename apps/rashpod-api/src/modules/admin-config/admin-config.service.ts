@@ -124,6 +124,31 @@ export class AdminConfigService {
     };
   }
 
+  private automaticPrintAreaPresetData(input: {
+    name: string;
+    baseProductId: string;
+    placement?: PlacementKind | null;
+    isActive: boolean;
+  }) {
+    return {
+      name: `${input.name} default`,
+      pipeline: PipelineType.LOCAL,
+      localBaseProductId: input.baseProductId,
+      productTemplateId: null,
+      placement: input.placement ?? PlacementKind.OTHER,
+      defaultWidthCm: null,
+      defaultHeightCm: null,
+      defaultWidthIn: null,
+      defaultHeightIn: null,
+      defaultX: null,
+      defaultY: null,
+      defaultScale: 1,
+      alignment: PlacementAlignment.CENTER,
+      units: PlacementUnits.PX,
+      active: input.isActive,
+    };
+  }
+
   private async assertProductTypeExists(productTypeId: string) {
     const exists = await this.prisma.productType.findUnique({ where: { id: productTypeId }, select: { id: true } });
     if (!exists) throw new BadRequestException("Product type not found for base product");
@@ -776,7 +801,7 @@ export class AdminConfigService {
   async createPrintArea(actorId: string, dto: CreatePrintAreaDto) {
     const template = await this.prisma.mockupTemplate.findUnique({
       where: { id: dto.mockupTemplateId },
-      select: { id: true, configurationVersion: true },
+      select: { id: true, baseProductId: true, configurationVersion: true },
     });
     if (!template) throw new NotFoundException("Mockup template not found");
     if (template.configurationVersion === "MULTI_VIEW_V2" && !dto.mockupViewId) {
@@ -784,29 +809,48 @@ export class AdminConfigService {
     }
     if (dto.mockupViewId) await this.assertActiveMockupViewForTemplate(dto.mockupViewId, dto.mockupTemplateId);
     this.validatePrintAreaGeometry(dto);
-    const item = await this.prisma.printArea.create({
-      data: {
-        mockupTemplateId: dto.mockupTemplateId,
-        mockupViewId: dto.mockupViewId,
-        name: dto.name,
-        placement: dto.placement,
-        x: dto.x,
-        y: dto.y,
-        width: dto.width,
-        height: dto.height,
-        safeX: dto.safeX,
-        safeY: dto.safeY,
-        safeWidth: dto.safeWidth,
-        safeHeight: dto.safeHeight,
-        allowMove: dto.allowMove ?? true,
-        allowResize: dto.allowResize ?? true,
-        allowRotate: dto.allowRotate ?? false,
-        minScale: dto.minScale ?? 0.1,
-        maxScale: dto.maxScale ?? 2,
-        isActive: dto.isActive ?? true,
-      },
+    const isActive = dto.isActive ?? true;
+    const item = await this.prisma.$transaction(async (tx) => {
+      const preset = await tx.placementPreset.create({
+        data: this.automaticPrintAreaPresetData({
+          name: dto.name,
+          baseProductId: template.baseProductId,
+          placement: dto.placement,
+          isActive,
+        }),
+      });
+      return tx.printArea.create({
+        data: {
+          mockupTemplateId: dto.mockupTemplateId,
+          mockupViewId: dto.mockupViewId,
+          name: dto.name,
+          placement: dto.placement,
+          defaultPresetId: preset.id,
+          x: dto.x,
+          y: dto.y,
+          width: dto.width,
+          height: dto.height,
+          safeX: dto.safeX,
+          safeY: dto.safeY,
+          safeWidth: dto.safeWidth,
+          safeHeight: dto.safeHeight,
+          allowMove: dto.allowMove ?? true,
+          allowResize: dto.allowResize ?? true,
+          allowRotate: dto.allowRotate ?? false,
+          minScale: dto.minScale ?? 0.1,
+          maxScale: dto.maxScale ?? 2,
+          isActive,
+        },
+      });
     });
     await this.audit.log({ actorId, action: "print-area.create", entityType: "PrintArea", entityId: item.id });
+    await this.audit.log({
+      actorId,
+      action: "placement-preset.auto-create",
+      entityType: "PlacementPreset",
+      entityId: item.defaultPresetId!,
+      metadata: { printAreaId: item.id },
+    });
     return item;
   }
 
@@ -823,7 +867,7 @@ export class AdminConfigService {
     const targetViewId = dto.mockupViewId === undefined ? existing?.mockupViewId : dto.mockupViewId;
     const template = await this.prisma.mockupTemplate.findUnique({
       where: { id: targetTemplateId },
-      select: { id: true, configurationVersion: true },
+      select: { id: true, baseProductId: true, configurationVersion: true },
     });
     if (!template) throw new NotFoundException("Mockup template not found");
     if (template.configurationVersion === "MULTI_VIEW_V2" && !targetViewId) {
@@ -842,28 +886,50 @@ export class AdminConfigService {
       minScale: dto.minScale ?? existing.minScale,
       maxScale: dto.maxScale ?? existing.maxScale,
     });
-    const item = await this.prisma.printArea.update({
-      where: { id },
-      data: {
-        mockupTemplateId: dto.mockupTemplateId,
-        mockupViewId: dto.mockupViewId,
-        name: dto.name,
-        placement: dto.placement,
-        x: dto.x,
-        y: dto.y,
-        width: dto.width,
-        height: dto.height,
-        safeX: dto.safeX,
-        safeY: dto.safeY,
-        safeWidth: dto.safeWidth,
-        safeHeight: dto.safeHeight,
-        allowMove: dto.allowMove,
-        allowResize: dto.allowResize,
-        allowRotate: dto.allowRotate,
-        minScale: dto.minScale,
-        maxScale: dto.maxScale,
-        isActive: dto.isActive,
-      },
+    const presetData = this.automaticPrintAreaPresetData({
+      name: dto.name ?? existing.name,
+      baseProductId: template.baseProductId,
+      placement: dto.placement ?? existing.placement,
+      isActive: dto.isActive ?? existing.isActive,
+    });
+    const item = await this.prisma.$transaction(async (tx) => {
+      let defaultPresetId = existing.defaultPresetId;
+      if (defaultPresetId) {
+        const preset = await tx.placementPreset.findUnique({ where: { id: defaultPresetId }, select: { id: true } });
+        if (preset) {
+          await tx.placementPreset.update({ where: { id: defaultPresetId }, data: presetData });
+        } else {
+          const created = await tx.placementPreset.create({ data: presetData });
+          defaultPresetId = created.id;
+        }
+      } else {
+        const created = await tx.placementPreset.create({ data: presetData });
+        defaultPresetId = created.id;
+      }
+      return tx.printArea.update({
+        where: { id },
+        data: {
+          mockupTemplateId: dto.mockupTemplateId,
+          mockupViewId: dto.mockupViewId,
+          name: dto.name,
+          placement: dto.placement,
+          defaultPresetId,
+          x: dto.x,
+          y: dto.y,
+          width: dto.width,
+          height: dto.height,
+          safeX: dto.safeX,
+          safeY: dto.safeY,
+          safeWidth: dto.safeWidth,
+          safeHeight: dto.safeHeight,
+          allowMove: dto.allowMove,
+          allowResize: dto.allowResize,
+          allowRotate: dto.allowRotate,
+          minScale: dto.minScale,
+          maxScale: dto.maxScale,
+          isActive: dto.isActive,
+        },
+      });
     });
     await this.audit.log({ actorId, action: "print-area.update", entityType: "PrintArea", entityId: item.id });
     return item;
@@ -877,7 +943,15 @@ export class AdminConfigService {
     if (placements + providerMappings > 0) {
       throw new ConflictException("Print area is used by workflow history and cannot be deleted. Deactivate its template instead.");
     }
-    const item = await this.prisma.printArea.delete({ where: { id } });
+    const existing = await this.prisma.printArea.findUnique({ where: { id }, select: { defaultPresetId: true } });
+    if (!existing) throw new NotFoundException("Print area not found");
+    const item = await this.prisma.$transaction(async (tx) => {
+      const deleted = await tx.printArea.delete({ where: { id } });
+      if (existing.defaultPresetId) {
+        await tx.placementPreset.updateMany({ where: { id: existing.defaultPresetId }, data: { active: false } });
+      }
+      return deleted;
+    });
     await this.audit.log({ actorId, action: "print-area.delete", entityType: "PrintArea", entityId: item.id });
     return item;
   }

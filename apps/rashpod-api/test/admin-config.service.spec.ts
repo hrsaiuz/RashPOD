@@ -53,12 +53,17 @@ describe("AdminConfigService.updateDeliverySetting", () => {
 
 describe("AdminConfigService catalog CRUD parity", () => {
   it("persists an explicit print-area placement", async () => {
-    const create = jest.fn().mockResolvedValue({ id: "area_1", placement: "FRONT" });
+    const create = jest.fn().mockResolvedValue({ id: "area_1", placement: "FRONT", defaultPresetId: "preset_1" });
+    const createPreset = jest.fn().mockResolvedValue({ id: "preset_1" });
+    const tx = {
+      placementPreset: { create: createPreset },
+      printArea: { create },
+    };
     const prisma: any = {
       mockupTemplate: {
-        findUnique: jest.fn().mockResolvedValue({ id: "template_1", configurationVersion: "LEGACY_V1" }),
+        findUnique: jest.fn().mockResolvedValue({ id: "template_1", baseProductId: "base_1", configurationVersion: "LEGACY_V1" }),
       },
-      printArea: { create },
+      $transaction: jest.fn(async (operation: (client: typeof tx) => unknown) => operation(tx)),
     };
     const audit = { log: jest.fn().mockResolvedValue(undefined) } as any;
     const service = new AdminConfigService(prisma, audit);
@@ -78,7 +83,18 @@ describe("AdminConfigService catalog CRUD parity", () => {
     });
 
     expect(create).toHaveBeenCalledWith({
-      data: expect.objectContaining({ placement: "FRONT" }),
+      data: expect.objectContaining({ placement: "FRONT", defaultPresetId: "preset_1" }),
+    });
+    expect(createPreset).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        name: "Front default",
+        pipeline: "LOCAL",
+        localBaseProductId: "base_1",
+        placement: "FRONT",
+        alignment: "CENTER",
+        units: "PX",
+        active: true,
+      }),
     });
   });
 

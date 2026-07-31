@@ -64,6 +64,7 @@ type MockupTemplate = IdRow & {
 type PrintArea = IdRow & {
   mockupTemplateId: string;
   mockupViewId?: string | null;
+  defaultPresetId?: string | null;
   name: string;
   placement?: "FRONT" | "BACK" | "LEFT_CHEST" | "RIGHT_CHEST" | "LEFT_SLEEVE" | "RIGHT_SLEEVE" | "FULL_WRAP" | "OTHER" | null;
   x: number;
@@ -1524,7 +1525,7 @@ export function PrintAreasScreen() {
   return (
     <PageShell
       title="Print Areas / Safe Zones"
-      description="Define print rectangles, safe rectangles, and allowed transforms for each mockup template."
+      description="Define print and safe rectangles for each product view. RashPOD automatically keeps a matching moderator placement preset in sync."
       icon={<ListChecks size={22} />}
       action={
         <Button onClick={() => open()} disabled={!templates.length}>
@@ -1651,6 +1652,10 @@ export function PrintAreasScreen() {
               onActiveLayerChange={setActiveLayer}
               onImageDimensions={handleImageDimensions}
             />
+            <div className="rounded-2xl border border-brand-blue/20 bg-brand-blue/5 px-4 py-3 text-sm text-brand-ink" role="status">
+              <p className="font-semibold">Automatic placement preset</p>
+              <p className="mt-1 text-brand-muted">Saving this area creates or updates a centered local preset. Its initial artwork position is calculated from the safe zone, so moderators always start inside the allowed bounds.</p>
+            </div>
             <ToggleField label="Active" helper="Inactive print areas are hidden from new moderator selections." checked={editing.isActive} onChange={(value) => setEditing({ ...editing, isActive: value })} />
             <details className="rounded-2xl border border-surface-borderSoft bg-surface-app/40 p-4">
               <summary className="cursor-pointer text-sm font-semibold text-brand-ink">Advanced coordinates</summary>

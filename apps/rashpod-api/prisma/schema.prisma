@@ -1534,10 +1534,12 @@ model PrintArea {
 
   mockupTemplate       MockupTemplate        @relation(fields: [mockupTemplateId], references: [id])
   mockupView           MockupView?           @relation(fields: [mockupViewId], references: [id], onDelete: Restrict)
+  defaultPreset        PlacementPreset?      @relation(fields: [defaultPresetId], references: [id], onDelete: SetNull)
   placements           MockupPlacement[]
   podPrintAreaMappings PodPrintAreaMapping[]
 
   @@index([mockupViewId])
+  @@index([defaultPresetId])
 }
 
 model PrintfulProductTemplate {
@@ -1595,6 +1597,7 @@ model PlacementPreset {
   printfulProductTemplate PrintfulProductTemplate? @relation(fields: [productTemplateId], references: [id])
   localBaseProduct        BaseProduct?             @relation(fields: [localBaseProductId], references: [id])
   productSelections       DesignProductSelection[]
+  defaultForPrintAreas    PrintArea[]
 
   @@index([pipeline, active])
 }

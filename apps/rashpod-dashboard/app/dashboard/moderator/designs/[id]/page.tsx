@@ -15,6 +15,7 @@ import { DesignPreviewCard } from "../../../../../components/design/DesignPrevie
 import { ModeratorDesignStoryReview } from "../../../../../components/design-story/ModeratorDesignStoryReview";
 import { MockupErrorHint, PlacementChips, ReadinessChecklist } from "../../moderator-pipeline-helpers";
 import { buildModerationDecisionPayload } from "./moderation-decision-payload";
+import { moderatorPrintAreasForTemplate, preferredAreaForPreset } from "./local-print-area-selection";
 import { useToast } from "../../../../../components/feedback/toast-provider";
 import { inferWorkflowStep, type WorkflowStep } from "./moderation-workflow";
 
@@ -79,6 +80,7 @@ type MockupTemplateOption = {
 type PrintAreaOption = {
   id: string;
   mockupTemplateId: string;
+  defaultPresetId?: string | null;
   mockupViewId?: string | null;
   mockupView?: {
     id: string;
@@ -204,10 +206,6 @@ export default function Page() {
 
   const activeBaseProducts = useMemo(() => baseProducts.filter((item) => item.isActive !== false), [baseProducts]);
   const activeMockupTemplates = useMemo(() => mockupTemplates.filter((item) => item.isActive !== false), [mockupTemplates]);
-  const activePrintAreas = useMemo(
-    () => printAreas.filter((item) => item.isActive !== false && item.mockupView?.isActive !== false),
-    [printAreas],
-  );
   const activePrintfulTemplates = useMemo(() => printfulTemplates.filter((item) => item.active !== false), [printfulTemplates]);
 
   useEffect(() => {
@@ -331,12 +329,8 @@ export default function Page() {
     return activeMockupTemplates.filter((item) => item.baseProductId === productId);
   }
 
-  function printAreasFor(templateId: string, placementPresetId: string) {
-    if (!placementPresetId) {
-      return activePrintAreas.filter((item) => item.mockupTemplateId === templateId);
-    }
-    const placement = presetPlacement(placementPresetId);
-    return activePrintAreas.filter((item) => item.mockupTemplateId === templateId && (!item.placement || item.placement === placement));
+  function printAreasFor(templateId: string) {
+    return moderatorPrintAreasForTemplate(printAreas, templateId);
   }
 
   function globalPresetsFor(templateId: string) {
@@ -357,9 +351,11 @@ export default function Page() {
 
   function selectLocalProduct(index: number, productId: string) {
     const presets = localPresetsFor(productId);
-    const preset = presets.find((item) => item.name.toLowerCase().includes("center")) ?? presets[0];
     const template = localTemplatesFor(productId)[0];
-    const area = template ? printAreasFor(template.id, preset?.id ?? "")[0] : undefined;
+    const area = template ? printAreasFor(template.id)[0] : undefined;
+    const preset = presets.find((item) => item.id === area?.defaultPresetId)
+      ?? presets.find((item) => item.name.toLowerCase().includes("center"))
+      ?? presets[0];
     updateLocalSelection(index, { ...localDefaultsFromPreset(preset, area), localBaseProductId: productId, placementPresetId: preset?.id ?? "", mockupTemplateId: template?.id ?? "", printAreaId: area?.id ?? "" });
   }
 
@@ -370,19 +366,27 @@ export default function Page() {
   function selectLocalPreset(index: number, presetId: string) {
     const preset = placementPresets.find((item) => item.id === presetId);
     const current = localSelections[index];
-    const area = printAreasFor(current.mockupTemplateId, presetId)[0];
+    const candidates = printAreasFor(current.mockupTemplateId);
+    const area = preferredAreaForPreset(candidates, preset, current.printAreaId);
     updateLocalSelection(index, { ...localDefaultsFromPreset(preset, area), placementPresetId: presetId, printAreaId: area?.id ?? "" });
   }
 
   function selectLocalTemplate(index: number, templateId: string) {
     const current = localSelections[index];
-    const area = printAreasFor(templateId, current.placementPresetId)[0];
-    updateLocalSelection(index, { ...localDefaultsFromPreset(placementPresets.find((item) => item.id === current.placementPresetId), area), mockupTemplateId: templateId, printAreaId: area?.id ?? "" });
+    const candidates = printAreasFor(templateId);
+    const area = candidates.find((item) => item.defaultPresetId === current.placementPresetId)
+      ?? candidates.find((item) => item.placement === presetPlacement(current.placementPresetId))
+      ?? candidates[0];
+    const preset = placementPresets.find((item) => item.id === area?.defaultPresetId)
+      ?? placementPresets.find((item) => item.id === current.placementPresetId);
+    updateLocalSelection(index, { ...localDefaultsFromPreset(preset, area), mockupTemplateId: templateId, printAreaId: area?.id ?? "", placementPresetId: preset?.id ?? "" });
   }
 
   function selectPrintArea(index: number, printAreaId: string) {
     const area = printAreas.find((item) => item.id === printAreaId);
-    updateLocalSelection(index, { ...localDefaultsFromPreset(placementPresets.find((item) => item.id === localSelections[index].placementPresetId), area), printAreaId });
+    const preset = placementPresets.find((item) => item.id === area?.defaultPresetId)
+      ?? placementPresets.find((item) => item.id === localSelections[index].placementPresetId);
+    updateLocalSelection(index, { ...localDefaultsFromPreset(preset, area), printAreaId, placementPresetId: preset?.id ?? "" });
   }
 
   function updateGlobalSelection(index: number, patch: Partial<GlobalSelectionForm>) {
@@ -875,7 +879,7 @@ export default function Page() {
                               label="Product view / print area"
                               value={selection.printAreaId}
                               onChange={(value) => selectPrintArea(index, value)}
-                              options={printAreasFor(selection.mockupTemplateId, selection.placementPresetId).map((item) => ({
+                              options={printAreasFor(selection.mockupTemplateId).map((item) => ({
                                 value: item.id,
                                 label: `${item.mockupView?.name ?? "Legacy primary view"} · ${item.name} · safe ${item.safeWidth}x${item.safeHeight}px`,
                               }))}
@@ -1408,9 +1412,10 @@ function ModerationWorkflowStepper({
 
 function createLocalSelection(products: BaseProductOption[], presets: PlacementPresetOption[], templates: MockupTemplateOption[], areas: PrintAreaOption[]): LocalSelectionForm {
   const product = products.find((item) => item.isActive !== false);
-  const preset = presets.find((item) => item.active !== false && item.pipeline === "LOCAL" && (!item.localBaseProductId || item.localBaseProductId === product?.id));
   const template = templates.find((item) => item.isActive !== false && item.baseProductId === product?.id);
-  const area = areas.find((item) => item.isActive !== false && item.mockupTemplateId === template?.id && (!preset || !item.placement || item.placement === preset.placement));
+  const area = areas.find((item) => item.isActive !== false && item.mockupView?.isActive !== false && item.mockupTemplateId === template?.id);
+  const preset = presets.find((item) => item.id === area?.defaultPresetId && item.active !== false)
+    ?? presets.find((item) => item.active !== false && item.pipeline === "LOCAL" && (!item.localBaseProductId || item.localBaseProductId === product?.id));
   return { id: crypto.randomUUID(), localBaseProductId: product?.id ?? "", mockupTemplateId: template?.id ?? "", printAreaId: area?.id ?? "", placementPresetId: preset?.id ?? "", ...localDefaultsFromPreset(preset, area) };
 }
 
