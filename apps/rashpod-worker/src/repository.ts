@@ -32,6 +32,7 @@ export interface PipelineSelectionRecord {
   design?: { id: string; title: string; designerId: string };
   latestDesignVersion?: { id: string; fileKey: string; widthPx?: number | null; heightPx?: number | null; dpi?: number | null; hasTransparency?: boolean | null } | null;
   placement?: string;
+  providerPlacement?: string | null;
   technique?: string | null;
   width?: number | null;
   height?: number | null;

@@ -13,6 +13,7 @@ import { ModeratorListingWizard } from "../../moderator-listing-wizard";
 import { GlobalSelectionMockupEditor, LocalSelectionMockupEditor } from "../../../../../components/mockup";
 import { DesignPreviewCard } from "../../../../../components/design/DesignPreviewCard";
 import { ModeratorDesignStoryReview } from "../../../../../components/design-story/ModeratorDesignStoryReview";
+import { PrintfulModerationCatalog, type PreparedPrintfulProduct, type PrintfulCatalogVariant } from "../../../../../components/moderator/PrintfulModerationCatalog";
 import { MockupErrorHint, PlacementChips, ReadinessChecklist } from "../../moderator-pipeline-helpers";
 import { buildModerationDecisionPayload } from "./moderation-decision-payload";
 import { moderatorPrintAreasForTemplate, preferredAreaForPreset } from "./local-print-area-selection";
@@ -56,6 +57,7 @@ type PlacementPresetOption = {
   localBaseProductId?: string | null;
   productTemplateId?: string | null;
   placement: string;
+  providerPlacement?: string | null;
   defaultWidthCm?: string | number | null;
   defaultHeightCm?: string | number | null;
   defaultWidthIn?: string | number | null;
@@ -113,6 +115,7 @@ type PrintAreaOption = {
 
 type PrintfulTemplateOption = {
   id: string;
+  printfulCatalogProductId?: string | null;
   displayName: string;
   previewImageUrl?: string | null;
   active?: boolean;
@@ -124,6 +127,7 @@ type PrintfulTemplateOption = {
   allowedColorVariantIds?: unknown;
   allowedSizeVariantIds?: unknown;
   printfulVariantIds?: unknown;
+  variantOptions?: PrintfulCatalogVariant[];
 };
 
 type PipelineMode = "uzbek" | "global";
@@ -338,7 +342,8 @@ export default function Page() {
   }
 
   function presetPlacement(presetId: string) {
-    return placementPresets.find((item) => item.id === presetId)?.placement ?? "FRONT";
+    const preset = placementPresets.find((item) => item.id === presetId);
+    return preset?.providerPlacement ?? preset?.placement ?? "front";
   }
 
   function toggleReason(reason: string) {
@@ -537,6 +542,26 @@ export default function Page() {
     }
   }
 
+  function applyPreparedPrintfulProduct(index: number, prepared: PreparedPrintfulProduct) {
+    const template = { ...prepared.template, variantOptions: prepared.product.variants } as PrintfulTemplateOption;
+    const presets = prepared.presets as PlacementPresetOption[];
+    const preset = presets.find((item) => item.providerPlacement === template.defaultPlacement)
+      ?? presets.find((item) => item.providerPlacement === "front")
+      ?? presets[0];
+    const variantIds = prepared.product.variants.filter((item) => item.inStock).map((item) => String(item.id));
+
+    setPrintfulTemplates((current) => [...current.filter((item) => item.id !== template.id), template]);
+    setPlacementPresets((current) => [...current.filter((item) => !presets.some((presetItem) => presetItem.id === item.id)), ...presets]);
+    invalidateGlobalPreview(index, {
+      ...globalDefaultsFromPreset(preset),
+      printfulProductTemplateId: template.id,
+      placementPresetId: preset?.id ?? "",
+      technique: defaultTechnique(template),
+      selectedVariantIds: variantIds,
+    });
+    toast({ tone: "success", title: "Printful product selected", description: "Printable areas and current in-stock variants are ready for placement." });
+  }
+
   async function pollPrintfulPreview(selectionId: string, taskKey: string, requestKey: string, signal: AbortSignal, attempt = 0) {
     if (attempt > 12) {
       setGlobalSelections((current) => current.map((selection) =>
@@ -712,6 +737,8 @@ export default function Page() {
   );
 
   const designResolutionOk = Boolean(latest?.widthPx && latest?.heightPx && latest.widthPx >= 800 && latest.heightPx >= 800);
+  const productRightsOk = Boolean(detail?.commercialRights?.allowProductSales);
+  const marketplaceRightsOk = Boolean(detail?.commercialRights?.allowMarketplacePublishing);
 
   useEffect(() => {
     const target = pendingScrollTargetRef.current;
@@ -818,6 +845,13 @@ export default function Page() {
                   </div>
                   <Button variant="secondary" size="sm" onClick={loadConfig} disabled={configLoading}>Refresh</Button>
                 </div>
+
+                {!productRightsOk || (pipelineMode === "global" && !marketplaceRightsOk) ? (
+                  <div role="alert" className="mb-5 rounded-2xl border border-status-warning/30 bg-status-warning/5 p-4 text-sm">
+                    <p className="font-semibold text-brand-ink">Designer rights are not ready</p>
+                    <p className="mt-1 text-brand-muted">The designer must allow product sales{pipelineMode === "global" ? " and marketplace publishing" : ""} before this design can be approved for this pipeline.</p>
+                  </div>
+                ) : null}
 
                 <div className="mb-5 grid gap-3 sm:grid-cols-2">
                   <button
@@ -983,7 +1017,7 @@ export default function Page() {
                       </Button>
                       <Button
                         onClick={() => submitApproval("APPROVE_LOCAL")}
-                        disabled={submitting || configLoading || !localSelections.length || !localReady}
+                        disabled={submitting || configLoading || !productRightsOk || !localSelections.length || !localReady}
                         loading={submitting && pendingDecision === "APPROVE_LOCAL"}
                       >
                         <MapPin size={18} /> Approve Local & Generate Mockups
@@ -996,19 +1030,17 @@ export default function Page() {
                       {globalSelections.map((selection, index) => (
                         <SelectionPanel key={selection.id} title={`Printful selection ${index + 1}`} onRemove={globalSelections.length > 1 ? () => removeGlobalSelection(index) : undefined}>
                           <div>
-                            <p className="mb-2 text-sm font-medium text-brand-ink">Printful template</p>
-                            <ProductPickerGrid
-                              items={activePrintfulTemplates.map((item) => ({
-                                id: item.id,
-                                name: item.displayName,
-                                imageUrl: item.previewImageUrl,
-                                subtitle: `${item.rashpodProductType ?? "Printful"} · ${stringArray(item.allowedPlacements).length} placements · ${item.defaultTechnique ?? "dtg"}`,
-                                badge: "Printful",
-                              }))}
-                              selectedId={selection.printfulProductTemplateId}
-                              onSelect={(value) => selectPrintfulTemplate(index, value)}
-                              emptyLabel="No active Printful templates configured."
+                            <PrintfulModerationCatalog
+                              selectedCatalogProductId={printfulTemplates.find((item) => item.id === selection.printfulProductTemplateId)?.printfulCatalogProductId}
+                              onPrepared={(prepared) => applyPreparedPrintfulProduct(index, prepared)}
                             />
+                            {selection.printfulProductTemplateId ? (
+                              <div className="mt-4 rounded-2xl border border-brand-blue/30 bg-brand-lightBlue/20 p-4">
+                                <p className="text-xs font-semibold uppercase tracking-wide text-brand-blue">Selected for moderation</p>
+                                <p className="mt-1 font-semibold text-brand-ink">{printfulTemplates.find((item) => item.id === selection.printfulProductTemplateId)?.displayName ?? "Printful product"}</p>
+                                <p className="mt-1 text-xs text-brand-muted">The product, variants, technique, and placement approved here will be locked for publishing.</p>
+                              </div>
+                            ) : null}
                           </div>
                           {selection.printfulProductTemplateId ? (
                             <>
@@ -1021,7 +1053,7 @@ export default function Page() {
                                 />
                               </div>
                               <div className="mt-4 grid gap-3 md:grid-cols-2 lg:grid-cols-3">
-                                <SelectField label="Placement preset" value={selection.placementPresetId} onChange={(value) => selectGlobalPreset(index, value)} options={globalPresetsFor(selection.printfulProductTemplateId).map((item) => ({ value: item.id, label: `${item.name} - ${item.placement}` }))} />
+                                <SelectField label="Printful placement" value={selection.placementPresetId} onChange={(value) => selectGlobalPreset(index, value)} options={globalPresetsFor(selection.printfulProductTemplateId).map((item) => ({ value: item.id, label: `${item.name} - ${item.providerPlacement ?? item.placement}` }))} />
                                 <SelectField label="Technique" value={selection.technique} onChange={(value) => invalidateGlobalPreview(index, { technique: value })} options={techniqueOptionsFor(selection.printfulProductTemplateId, printfulTemplates)} />
                               </div>
                               <div className="mt-4">
@@ -1030,7 +1062,7 @@ export default function Page() {
                                   {variantIdsFromTemplate(printfulTemplates.find((item) => item.id === selection.printfulProductTemplateId)).map((variantId) => (
                                     <label key={variantId} className="flex min-h-10 items-center gap-2 rounded-pill border border-surface-borderSoft px-3 text-xs text-brand-ink">
                                       <input type="checkbox" checked={selection.selectedVariantIds.includes(variantId)} onChange={() => toggleVariant(index, variantId)} />
-                                      <span>Variant {variantId}</span>
+                                      <span>{variantLabel(printfulTemplates.find((item) => item.id === selection.printfulProductTemplateId), variantId)}</span>
                                     </label>
                                   ))}
                                 </div>
@@ -1124,7 +1156,7 @@ export default function Page() {
                       </Button>
                       <Button
                         onClick={() => submitApproval("APPROVE_GLOBAL")}
-                        disabled={submitting || configLoading || !localSelections.length || !localReady || !globalSelections.length || !globalReady}
+                        disabled={submitting || configLoading || !productRightsOk || !marketplaceRightsOk || !localSelections.length || !localReady || !globalSelections.length || !globalReady}
                         loading={submitting && pendingDecision === "APPROVE_GLOBAL"}
                       >
                         <Globe2 size={18} /> Approve Global & Generate Mockups
@@ -1138,6 +1170,8 @@ export default function Page() {
                     items={[
                       { label: "Local product selections ready", ok: localReady },
                       { label: pipelineMode === "global" ? "Printful selections ready" : "Printful not required (Uzbek only)", ok: pipelineMode === "uzbek" || globalReady },
+                      { label: "Product sales rights granted", ok: productRightsOk },
+                      { label: pipelineMode === "global" ? "Marketplace publishing rights granted" : "Marketplace rights not required", ok: pipelineMode === "uzbek" || marketplaceRightsOk },
                       { label: "Design resolution adequate", ok: designResolutionOk, warn: !designResolutionOk },
                     ]}
                   />
@@ -1241,6 +1275,10 @@ export default function Page() {
                             ? {
                                 id: selection.id,
                                 pipeline: selection.pipeline,
+                                placement: selection.placement,
+                                providerPlacement: selection.providerPlacement,
+                                technique: selection.technique,
+                                placementConfigJson: selection.placementConfigJson,
                                 mockupAssets: selection.mockupAssets,
                                 localBaseProduct: selection.localBaseProduct as {
                                   name?: string;
@@ -1250,6 +1288,7 @@ export default function Page() {
                                   currency?: string;
                                 } | null,
                                 printfulProductTemplate: selection.printfulProductTemplate as {
+                                  printfulCatalogProductId?: string | null;
                                   displayName?: string;
                                   defaultRetailPrice?: string | number | null;
                                   currency?: string;
@@ -1435,6 +1474,7 @@ function createGlobalSelection(templates: PrintfulTemplateOption[], presets: Pla
 }
 
 function variantIdsFromTemplate(template?: PrintfulTemplateOption) {
+  if (template?.variantOptions?.length) return template.variantOptions.filter((item) => item.inStock).map((item) => String(item.id));
   const color = stringArray(template?.allowedColorVariantIds);
   const size = stringArray(template?.allowedSizeVariantIds);
   const all = stringArray(template?.printfulVariantIds);
@@ -1489,6 +1529,12 @@ function localDefaultsFromPreset(preset?: PlacementPresetOption, area?: PrintAre
     editorReady: false,
     preferContextInitialPlacement: true,
   };
+}
+
+function variantLabel(template: PrintfulTemplateOption | undefined, variantId: string) {
+  const variant = template?.variantOptions?.find((item) => String(item.id) === variantId);
+  if (!variant) return `Variant ${variantId}`;
+  return [variant.color, variant.size, variant.name].filter(Boolean).filter((value, index, values) => values.indexOf(value) === index).join(" · ");
 }
 
 function localPlacement(selection: LocalSelectionForm, areas: PrintAreaOption[], presets: PlacementPresetOption[]) {

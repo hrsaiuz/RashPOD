@@ -3,7 +3,7 @@ import { CurrentUser, RequestUser } from "../../common/auth/current-user.decorat
 import { JwtAuthGuard } from "../../common/auth/jwt-auth.guard";
 import { PermissionGuard } from "../../common/auth/permission.guard";
 import { RequirePermission } from "../../common/auth/permission.decorator";
-import { ListPrintfulCatalogProductsQueryDto, PublishPrintfulListingDto } from "./dto/printful-catalog.dto";
+import { ListPrintfulCatalogProductsQueryDto, PreparePrintfulCatalogProductDto, PublishPrintfulListingDto } from "./dto/printful-catalog.dto";
 import { PrintfulPublicationService } from "./printful-publication.service";
 
 @Controller("admin/printful")
@@ -33,6 +33,16 @@ export class PrintfulController {
   @RequirePermission("printful-catalog:read")
   getProduct(@Param("id", ParseIntPipe) id: number) {
     return this.publication.getProduct(id);
+  }
+
+  @Post("catalog-products/:id/prepare")
+  @RequirePermission("printful-catalog:read")
+  prepareProduct(
+    @CurrentUser() user: RequestUser,
+    @Param("id", ParseIntPipe) id: number,
+    @Body() dto: PreparePrintfulCatalogProductDto,
+  ) {
+    return this.publication.prepareCatalogProduct(user.sub, id, dto);
   }
 
   @Get("listings/:id/publications")

@@ -73,6 +73,7 @@ export class PipelineMockupJobHandler {
           designProductSelectionId: selection.id,
           pipeline: selection.pipeline,
           placement: selection.placement,
+          providerPlacement: selection.providerPlacement ?? null,
           width: selection.width,
           height: selection.height,
           x: selection.x,

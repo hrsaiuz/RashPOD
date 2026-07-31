@@ -1581,6 +1581,7 @@ model PlacementPreset {
   productTemplateId  String?
   localBaseProductId String?
   placement          PlacementKind
+  providerPlacement  String?
   defaultWidthCm     Float?
   defaultHeightCm    Float?
   defaultWidthIn     Float?
@@ -1825,6 +1826,7 @@ model DesignProductSelection {
   printfulProductTemplateId String?
   placementPresetId         String?
   placement                 PlacementKind
+  providerPlacement         String?
   technique                 String?
   width                     Float?
   height                    Float?

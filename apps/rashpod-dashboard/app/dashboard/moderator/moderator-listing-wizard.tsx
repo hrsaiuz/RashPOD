@@ -6,7 +6,7 @@ import { Globe2, Languages, Send, Sparkles } from "lucide-react";
 import { Button, Card, Input, StatusBadge, Textarea } from "@rashpod/ui";
 import { api, type Listing } from "../../../lib/api";
 import { ModeratorActionDialog } from "../../../components/moderator/ModeratorActionDialog";
-import { PrintfulPublishWizard } from "../../../components/moderator/PrintfulPublishWizard";
+import { PrintfulPublishWizard, type ApprovedPrintfulConfiguration } from "../../../components/moderator/PrintfulPublishWizard";
 import { useDashboardFeedback } from "../../../components/feedback/use-dashboard-feedback";
 
 type LocaleKey = "en" | "uz" | "ru";
@@ -29,6 +29,10 @@ type ListingDetail = Listing & {
   designProductSelection?: {
     id: string;
     pipeline?: string;
+    providerPlacement?: string | null;
+    placement?: string | null;
+    technique?: string | null;
+    placementConfigJson?: unknown;
     mockupAssets?: Array<{
       id: string;
       mockupType: string;
@@ -44,6 +48,7 @@ type ListingDetail = Listing & {
       currency?: string;
     } | null;
     printfulProductTemplate?: {
+      printfulCatalogProductId?: string | null;
       displayName?: string;
       defaultRetailPrice?: string | number | null;
       currency?: string;
@@ -77,6 +82,25 @@ function readVariants(metadata: unknown): VariantRow[] {
       price: item.price != null ? String(item.price) : "",
       enabled: item.enabled !== false,
     }));
+}
+
+function approvedPrintfulConfiguration(listing: ListingDetail): ApprovedPrintfulConfiguration | null {
+  const selection = listing.designProductSelection;
+  const catalogProductId = Number(selection?.printfulProductTemplate?.printfulCatalogProductId);
+  const config = selection?.placementConfigJson;
+  const selectedVariantIds = config && typeof config === "object" && !Array.isArray(config)
+    ? (config as Record<string, unknown>).selectedVariantIds
+    : null;
+  const variantIds = Array.isArray(selectedVariantIds)
+    ? selectedVariantIds.map(Number).filter((value) => Number.isInteger(value) && value > 0)
+    : [];
+  if (!Number.isInteger(catalogProductId) || catalogProductId <= 0 || !variantIds.length || !selection?.technique) return null;
+  return {
+    catalogProductId,
+    variantIds,
+    technique: selection.technique,
+    placement: selection.providerPlacement || selection.placement || "front",
+  };
 }
 
 function buildDefaultVariants(listing: ListingDetail): VariantRow[] {
@@ -148,6 +172,7 @@ export function ModeratorListingWizard({
   const [confirmPublish, setConfirmPublish] = useState(false);
 
   const mockups = listing.designProductSelection?.mockupAssets ?? [];
+  const approvedPrintful = useMemo(() => approvedPrintfulConfiguration(listing), [listing]);
   const activeCopy = translations[activeLocale];
 
   const tagsText = useMemo(() => activeCopy.tags.join(", "), [activeCopy.tags]);
@@ -453,21 +478,29 @@ export function ModeratorListingWizard({
         <Button onClick={saveListing} disabled={saving} loading={saving}>
           Save listing
         </Button>
-        <Button variant="primaryPeach" onClick={() => setConfirmPublish(true)} disabled={saving}>
-          <Send size={16} /> Publish
-        </Button>
+        {listing.designProductSelection?.pipeline !== "GLOBAL_PRINTFUL" ? (
+          <Button variant="primaryPeach" onClick={() => setConfirmPublish(true)} disabled={saving}>
+            <Send size={16} /> Publish
+          </Button>
+        ) : null}
         {listing.designProductSelection?.pipeline === "GLOBAL_PRINTFUL" ? (
           <span className="inline-flex items-center gap-1 text-xs text-brand-muted">
             <Globe2 size={14} /> Global pipeline will queue marketplace publications
           </span>
         ) : null}
       </div>
-      {listing.designProductSelection?.pipeline === "GLOBAL_PRINTFUL" ? (
+      {listing.designProductSelection?.pipeline === "GLOBAL_PRINTFUL" && approvedPrintful ? (
         <PrintfulPublishWizard
           listingId={listing.id}
           defaultPrice={price}
+          approvedConfiguration={approvedPrintful}
           onPublished={onSaved}
         />
+      ) : null}
+      {listing.designProductSelection?.pipeline === "GLOBAL_PRINTFUL" && !approvedPrintful ? (
+        <p role="alert" className="rounded-2xl border border-status-warning/30 bg-status-warning/5 p-4 text-sm text-brand-ink">
+          This legacy selection has no complete approved Printful configuration. Return to moderation and approve its product, variants, technique, and placement before publishing.
+        </p>
       ) : null}
       <ModeratorActionDialog
         open={confirmPublish}

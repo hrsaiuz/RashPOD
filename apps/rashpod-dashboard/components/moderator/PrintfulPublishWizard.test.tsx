@@ -152,4 +152,45 @@ describe("PrintfulPublishWizard", () => {
     ));
     expect(await screen.findByText("RashPOD API was queued for retry.")).toBeInTheDocument();
   });
+
+  it("locks publishing to the moderator-approved Printful configuration", async () => {
+    vi.mocked(api.get).mockImplementation(async (path: string) => {
+      if (path === "/admin/printful/stores") {
+        return [{ id: "11", name: "RashPOD API", type: "native", directPublishingSupported: true, publishingMode: "PRINTFUL_PRODUCTS_API" }] as never;
+      }
+      if (path === "/admin/printful/catalog-products/71") {
+        return {
+          id: 71,
+          title: "Approved premium tee",
+          variantCount: 2,
+          techniques: ["dtg", "embroidery"],
+          placements: ["front", "back"],
+          variants: [
+            { id: 401, name: "Black / M", color: "Black", size: "M", inStock: true },
+            { id: 402, name: "Black / L", color: "Black", size: "L", inStock: true },
+          ],
+        } as never;
+      }
+      throw new Error(`Unexpected request: ${path}`);
+    });
+
+    render(
+      <ToastProvider>
+        <PrintfulPublishWizard
+          listingId="listing-1"
+          defaultPrice="29.99"
+          approvedConfiguration={{ catalogProductId: 71, variantIds: [401], technique: "dtg", placement: "front" }}
+        />
+      </ToastProvider>,
+    );
+
+    await waitFor(() => expect(api.get).toHaveBeenCalledWith("/admin/printful/catalog-products/71"));
+    expect(screen.queryByLabelText("Category")).not.toBeInTheDocument();
+    expect(screen.getByText(/approved product, variants, technique, and placement are locked/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /continue/i }));
+    expect(await screen.findByText("Approved premium tee")).toBeInTheDocument();
+    expect(await screen.findByText("1 selected")).toBeInTheDocument();
+    expect(screen.getByText("DTG · front")).toBeInTheDocument();
+    expect(api.get).not.toHaveBeenCalledWith("/admin/printful/categories");
+  });
 });

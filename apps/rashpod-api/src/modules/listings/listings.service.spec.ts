@@ -1,4 +1,4 @@
-import { ListingStatus, ListingType, UserRole } from "@prisma/client";
+import { ListingStatus, ListingType, PipelineType, UserRole } from "@prisma/client";
 import { ListingsService } from "./listings.service";
 
 describe("ListingsService moderation audit", () => {
@@ -46,5 +46,36 @@ describe("ListingsService moderation audit", () => {
         notes: null,
       },
     }));
+  });
+
+  it("blocks direct publication of a global Printful listing", async () => {
+    const listing = {
+      id: "listing-printful",
+      designerId: "designer-1",
+      type: ListingType.PRODUCT,
+      pipeline: PipelineType.GLOBAL_PRINTFUL,
+      status: ListingStatus.DRAFT,
+      price: 30,
+      cost: 12,
+      publishedAt: null,
+      metadataJson: null,
+    };
+    const prisma = {
+      commerceListing: {
+        findUnique: jest.fn().mockResolvedValue(listing),
+        update: jest.fn(),
+      },
+    };
+    const audit = { log: jest.fn() };
+    const service = new ListingsService(prisma as never, audit as never);
+
+    await expect(service.adminSetStatus(
+      { sub: "moderator-1", role: UserRole.MODERATOR } as never,
+      listing.id,
+      ListingStatus.PUBLISHED,
+    )).rejects.toThrow("tracked Printful store publications");
+
+    expect(prisma.commerceListing.update).not.toHaveBeenCalled();
+    expect(audit.log).not.toHaveBeenCalled();
   });
 });

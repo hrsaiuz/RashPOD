@@ -1,5 +1,5 @@
 import { ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
-import { ListingStatus, ListingType, Prisma, UserRole } from "@prisma/client";
+import { ListingStatus, ListingType, PipelineType, Prisma, UserRole } from "@prisma/client";
 import { PrismaService } from "../../prisma/prisma.service";
 import { AuditService } from "../audit/audit.service";
 import { RequestUser } from "../../common/auth/current-user.decorator";
@@ -239,6 +239,9 @@ export class ListingsService {
     if (!listing) throw new NotFoundException("Listing not found");
     if (!this.isAdminRole(user.role)) throw new ForbiddenException("Not allowed");
     if (status === ListingStatus.PUBLISHED) {
+      if (listing.pipeline === PipelineType.GLOBAL_PRINTFUL) {
+        throw new ForbiddenException("Global Printful listings publish only after their tracked Printful store publications succeed");
+      }
       await this.assertListingPublishable(id, user.sub, "listing.admin-status.update");
     }
     const royalty = status === ListingStatus.PUBLISHED ? await this.calculateRoyalty(listing.price, listing.cost) : null;
@@ -566,7 +569,10 @@ export class ListingsService {
   private async assertListingPublishable(listingId: string, actorId: string, sourceAction: string) {
     const listing = await this.prisma.commerceListing.findUnique({
       where: { id: listingId },
-      include: { designProductSelection: { include: { mockupAssets: true } } },
+      include: {
+        designAsset: { include: { commercialRights: true } },
+        designProductSelection: { include: { mockupAssets: true } },
+      },
     });
     if (!listing) throw new NotFoundException("Listing not found");
 
@@ -582,6 +588,12 @@ export class ListingsService {
     const readyTypes = new Set(readyMockups.map((asset) => asset.mockupType));
 
     const reasons: string[] = [];
+    if (!listing.designAsset?.commercialRights?.allowProductSales) {
+      reasons.push("Designer product-sales rights are required");
+    }
+    if (listing.pipeline === PipelineType.GLOBAL_PRINTFUL && !listing.designAsset?.commercialRights?.allowMarketplacePublishing) {
+      reasons.push("Designer marketplace-publishing rights are required");
+    }
     if (imageUrls.length === 0 && readyMockups.length === 0) {
       reasons.push("Listing has no ready public images");
     }

@@ -79,3 +79,10 @@ export class PublishPrintfulListingDto {
   @IsNumberString()
   retailPrice!: string;
 }
+
+export class PreparePrintfulCatalogProductDto {
+  @IsString()
+  @IsOptional()
+  @MaxLength(80)
+  rashpodProductType?: string;
+}

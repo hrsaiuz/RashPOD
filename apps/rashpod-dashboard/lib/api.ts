@@ -210,6 +210,9 @@ export interface DesignProductSelection {
   designId: string;
   pipeline: "LOCAL" | "GLOBAL_PRINTFUL";
   placement: string;
+  providerPlacement?: string | null;
+  technique?: string | null;
+  placementConfigJson?: unknown;
   status: string;
   errorMessage?: string | null;
   localBaseProduct?: unknown;
@@ -231,6 +234,7 @@ export interface DesignWorkflowDetail extends Design {
   productSelections?: DesignProductSelection[];
   listings?: Listing[];
   story?: DesignStorySummary | null;
+  commercialRights?: CommercialRights | null;
 }
 
 export type StoryLocale = "uz" | "ru" | "en";

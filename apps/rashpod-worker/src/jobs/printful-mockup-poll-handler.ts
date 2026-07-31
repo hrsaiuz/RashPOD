@@ -117,7 +117,7 @@ export class PrintfulMockupStartHelper {
     const body = buildPrintfulMockupTaskBody({
       template: selection.printfulProductTemplate,
       fileId: file.printfulFileId,
-      placement: selection.placement?.toLowerCase(),
+      placement: selection.providerPlacement ?? selection.placement?.toLowerCase(),
       technique: selection.technique ?? undefined,
       variantIds: placementConfig?.selectedVariantIds,
       position: {

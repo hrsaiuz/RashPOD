@@ -118,6 +118,7 @@ export class DesignWorkflowService {
         include: {
           designer: { select: { id: true, email: true, displayName: true, handle: true } },
           versions: { orderBy: { createdAt: "desc" }, take: 5 },
+          commercialRights: true,
           moderationCases: { orderBy: { createdAt: "desc" }, take: 10 },
           moderationAudits: { orderBy: { createdAt: "desc" }, take: 10 },
           productSelections: { include: { mockupAssets: true, localBaseProduct: true, printfulProductTemplate: true, placementPreset: true } },
@@ -288,7 +289,7 @@ export class DesignWorkflowService {
     }
 
     const placementKey = query.placement.trim().toLowerCase().replace(/[\s-]+/g, "_");
-    if (preset.placement.toLowerCase() !== placementKey) {
+    if (this.providerPlacementForPreset(preset) !== placementKey) {
       throw new BadRequestException("INVALID_PLACEMENT: Printful preset placement does not match selection");
     }
     const areaInches = this.resolveTemplatePrintArea(template, placementKey);
@@ -500,7 +501,7 @@ export class DesignWorkflowService {
   }
 
   async submitModerationDecision(moderator: { sub: string; role: string; email?: string }, designId: string, dto: SubmitModerationDecisionDto) {
-    const design = await this.prisma.designAsset.findUnique({ where: { id: designId } });
+    const design = await this.prisma.designAsset.findUnique({ where: { id: designId }, include: { commercialRights: true } });
     if (!design) throw new NotFoundException("Design not found");
     this.assertModeratable(design.status, moderator.role);
     this.validateDecisionPayload(dto);
@@ -508,6 +509,13 @@ export class DesignWorkflowService {
     if (dto.decision === "REJECT") {
       const updated = await this.rejectDesign(moderator, design, dto);
       return this.moderationDetail(updated.id);
+    }
+
+    if (!design.commercialRights?.allowProductSales) {
+      throw new BadRequestException("PRODUCT_SALES_RIGHTS_REQUIRED: the designer must allow product sales before approval");
+    }
+    if (dto.decision === "APPROVE_GLOBAL" && !design.commercialRights.allowMarketplacePublishing) {
+      throw new BadRequestException("MARKETPLACE_RIGHTS_REQUIRED: the designer must allow marketplace publishing before global approval");
     }
 
     const allowGlobalWithoutLocal = await this.allowGlobalWithoutLocal();
@@ -591,6 +599,7 @@ export class DesignWorkflowService {
     if (selection.status !== DesignProductSelectionStatus.MOCKUP_FAILED) {
       throw new BadRequestException("MOCKUP_RETRY_NOT_ALLOWED: only failed mockups can be retried");
     }
+
     const claimed = await this.prisma.designProductSelection.updateMany({
       where: { id: selection.id, status: DesignProductSelectionStatus.MOCKUP_FAILED },
       data: { status: DesignProductSelectionStatus.MOCKUP_PENDING, errorMessage: null },
@@ -912,11 +921,12 @@ export class DesignWorkflowService {
     if (!preset || !preset.active || preset.pipeline !== PipelineType.GLOBAL_PRINTFUL) throw new BadRequestException("INVALID_PLACEMENT: placement preset is not active for Printful pipeline");
     if (preset.productTemplateId && preset.productTemplateId !== template.id) throw new BadRequestException("INVALID_PLACEMENT: preset does not belong to Printful template");
 
-    const placement = this.normalizePlacement(selection.placement);
-    if (preset.placement !== placement) {
+    const providerPlacement = this.normalizeProviderPlacement(selection.placement);
+    const placement = this.placementKindForProvider(providerPlacement);
+    if (this.providerPlacementForPreset(preset) !== providerPlacement) {
       throw new BadRequestException("INVALID_PLACEMENT: Printful preset placement does not match selection");
     }
-    const placementText = selection.placement.toLowerCase();
+    const placementText = providerPlacement;
     const allowedPlacements = this.jsonStringArray(template.allowedPlacements);
     if (!allowedPlacements.includes(placementText)) throw new BadRequestException("INVALID_PLACEMENT: Printful placement is not allowed for this template");
     const technique = selection.technique ?? template.defaultTechnique;
@@ -958,6 +968,7 @@ export class DesignWorkflowService {
       templateId: template.id,
       presetId: preset.id,
       placement,
+      providerPlacement,
       technique,
       position,
       marketplaces,
@@ -972,6 +983,7 @@ export class DesignWorkflowService {
         printfulProductTemplateId: template.id,
         placementPresetId: preset.id,
         placement,
+        providerPlacement,
         technique,
         width: position.width,
         height: position.height,
@@ -987,6 +999,7 @@ export class DesignWorkflowService {
       },
       update: {
         placementPresetId: preset.id,
+        providerPlacement,
         technique,
         width: position.width,
         height: position.height,
@@ -1060,6 +1073,30 @@ export class DesignWorkflowService {
     const normalized = value.trim().toUpperCase().replace(/[-\s]+/g, "_");
     if (normalized in PlacementKind) return normalized as PlacementKind;
     throw new BadRequestException("INVALID_PLACEMENT");
+  }
+
+  private normalizeProviderPlacement(value: string) {
+    const normalized = value.trim().toLowerCase().replace(/[-\s]+/g, "_");
+    if (!normalized) throw new BadRequestException("INVALID_PLACEMENT");
+    return normalized;
+  }
+
+  private providerPlacementForPreset(preset: { placement: PlacementKind; providerPlacement?: string | null }) {
+    return preset.providerPlacement
+      ? this.normalizeProviderPlacement(preset.providerPlacement)
+      : preset.placement.toLowerCase();
+  }
+
+  private placementKindForProvider(providerPlacement: string): PlacementKind {
+    const normalized = providerPlacement.toUpperCase();
+    if (normalized === "FRONT") return PlacementKind.FRONT;
+    if (normalized === "BACK") return PlacementKind.BACK;
+    if (normalized.includes("LEFT_CHEST")) return PlacementKind.LEFT_CHEST;
+    if (normalized.includes("RIGHT_CHEST")) return PlacementKind.RIGHT_CHEST;
+    if (normalized.includes("LEFT_SLEEVE")) return PlacementKind.LEFT_SLEEVE;
+    if (normalized.includes("RIGHT_SLEEVE")) return PlacementKind.RIGHT_SLEEVE;
+    if (normalized.includes("WRAP") || normalized.includes("ALL_OVER")) return PlacementKind.FULL_WRAP;
+    return PlacementKind.OTHER;
   }
 
   private normalizeMarketplaces(values: string[]) {

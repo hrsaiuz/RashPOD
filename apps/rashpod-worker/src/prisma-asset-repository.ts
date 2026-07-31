@@ -368,6 +368,7 @@ export class PrismaAssetRepository implements WorkerRepository {
       errorMessage: row.errorMessage ?? undefined,
       targetMarketplaces: row.targetMarketplaces,
       placement: row.placement,
+      providerPlacement: row.providerPlacement,
       technique: row.technique,
       width: row.width,
       height: row.height,

@@ -1,11 +1,14 @@
 import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
 import { randomUUID } from "node:crypto";
 import {
-  DesignProductSelectionStatus,
   ListingStatus,
   MarketplaceKind,
   MarketplacePublicationStatus,
+  MockupAssetType,
   PipelineType,
+  PlacementAlignment,
+  PlacementKind,
+  PlacementUnits,
   Prisma,
   ProviderType,
 } from "@prisma/client";
@@ -13,7 +16,7 @@ import { mapCatalogProductToTemplate } from "@rashpod/printful";
 import { PrismaService } from "../../prisma/prisma.service";
 import { AuditService } from "../audit/audit.service";
 import { JobDispatcherService } from "../worker-jobs/job-dispatcher.service";
-import { ListPrintfulCatalogProductsQueryDto, PublishPrintfulListingDto } from "./dto/printful-catalog.dto";
+import { ListPrintfulCatalogProductsQueryDto, PreparePrintfulCatalogProductDto, PublishPrintfulListingDto } from "./dto/printful-catalog.dto";
 import { PrintfulClient } from "./printful.client";
 
 type JsonRecord = Record<string, unknown>;
@@ -149,53 +152,40 @@ export class PrintfulPublicationService {
     };
   }
 
-  async publish(actorId: string, listingId: string, dto: PublishPrintfulListingDto) {
-    const publicationVersion = randomUUID();
-    const [listing, stores, productResponse, printfilesResponse] = await Promise.all([
-      this.prisma.commerceListing.findUnique({
-        where: { id: listingId },
-        include: { designProductSelection: true, designAsset: true },
-      }),
-      this.listStores(),
-      this.client.getCatalogProduct(dto.catalogProductId),
-      this.client.getPrintfiles(dto.catalogProductId, dto.technique),
+  async prepareCatalogProduct(actorId: string, productId: number, dto: PreparePrintfulCatalogProductDto) {
+    const [productResponse, printfilesResponse] = await Promise.all([
+      this.client.getCatalogProduct(productId),
+      this.client.getPrintfiles(productId),
     ]);
-    if (!listing) throw new NotFoundException("LISTING_NOT_FOUND");
-    if (!listing.designProductSelection) throw new BadRequestException("PRINTFUL_SELECTION_MISSING");
-    if (!listing.designAsset) throw new BadRequestException("PRINTFUL_DESIGN_MISSING");
+    const result = this.record(productResponse.result);
+    const product = this.record(result.product);
+    const variants = Array.isArray(result.variants) ? result.variants.map((variant) => this.record(variant)) : [];
+    if (!Object.keys(product).length) throw new NotFoundException("PRINTFUL_PRODUCT_NOT_FOUND");
 
-    const storeMap = new Map(stores.map((store) => [store.id, store]));
-    const storeIds = [...new Set(dto.storeIds.map(String))];
-    const missingStores = storeIds.filter((storeId) => !storeMap.has(storeId));
-    if (missingStores.length) throw new BadRequestException(`PRINTFUL_STORE_NOT_ACCESSIBLE:${missingStores.join(",")}`);
-    const unsupportedStores = storeIds
-      .map((storeId) => storeMap.get(storeId)!)
-      .filter((store) => !store.directPublishingSupported);
-    if (unsupportedStores.length) {
-      throw new BadRequestException(
-        `PRINTFUL_EXTERNAL_STORE_CONNECTOR_REQUIRED:${unsupportedStores.map((store) => `${store.id}:${store.type}`).join(",")}`,
-      );
-    }
+    const availableVariantIds = variants
+      .filter((variant) => variant.in_stock !== false && variant.id != null)
+      .map((variant) => Number(variant.id))
+      .filter(Number.isFinite);
+    if (!availableVariantIds.length) throw new BadRequestException("INVALID_PRINTFUL_VARIANT: no in-stock variants are available");
 
-    const productResult = this.record(productResponse.result);
-    const product = this.record(productResult.product);
-    const variants = Array.isArray(productResult.variants) ? productResult.variants.map((variant) => this.record(variant)) : [];
-    if (!Object.keys(product).length) throw new BadRequestException("PRINTFUL_PRODUCT_NOT_FOUND");
-    const availableVariantIds = new Set(variants.map((variant) => Number(variant.id)).filter(Number.isFinite));
-    const invalidVariants = dto.variantIds.filter((variantId) => !availableVariantIds.has(variantId));
-    if (invalidVariants.length) throw new BadRequestException(`INVALID_PRINTFUL_VARIANT:${invalidVariants.join(",")}`);
-
+    const printfiles = this.record(printfilesResponse.result);
+    const availableTechniques = Object.keys(this.record(printfiles.available_techniques));
+    const providerPlacements = this.providerPlacements(printfiles);
+    const defaultTechnique = availableTechniques.includes("dtg") ? "dtg" : availableTechniques[0] ?? "dtg";
+    const defaultPlacement = providerPlacements.includes("front") ? "front" : providerPlacements[0] ?? "front";
+    const rashpodProductType = dto.rashpodProductType?.trim()
+      || String(product.type_name ?? product.type ?? "Printful product");
     const mapped = mapCatalogProductToTemplate({
       allowlistItem: {
-        catalogProductId: dto.catalogProductId,
-        rashpodProductType: dto.rashpodProductType,
-        displayName: String(product.title ?? product.name ?? `Printful product ${dto.catalogProductId}`),
-        defaultVariantIds: dto.variantIds,
-        defaultTechnique: dto.technique,
-        defaultPlacement: dto.placement,
+        catalogProductId: productId,
+        rashpodProductType,
+        displayName: String(product.title ?? product.name ?? `Printful product ${productId}`),
+        defaultVariantIds: availableVariantIds,
+        defaultTechnique,
+        defaultPlacement,
       },
       product: { ...product, variants },
-      printfiles: this.record(printfilesResponse.result),
+      printfiles,
     });
 
     const template = await this.prisma.printfulProductTemplate.upsert({
@@ -219,15 +209,17 @@ export class PrintfulPublicationService {
         allowedTechniques: mapped.allowedTechniques,
         defaultTechnique: mapped.defaultTechnique,
         defaultPlacement: mapped.defaultPlacement,
-        defaultRetailPrice: new Prisma.Decimal(dto.retailPrice),
+        defaultRetailPrice: mapped.defaultRetailPrice == null ? null : new Prisma.Decimal(mapped.defaultRetailPrice),
         estimatedBaseCost: mapped.estimatedBaseCost == null ? null : new Prisma.Decimal(mapped.estimatedBaseCost),
         currency: mapped.currency,
         previewImageUrl: mapped.previewImageUrl,
         printAreasJson: mapped.printAreasJson as Prisma.InputJsonValue,
         metadataJson: mapped.metadataJson as Prisma.InputJsonValue,
+        active: true,
       },
       update: {
         rashpodProductType: mapped.rashpodProductType,
+        printfulProductName: mapped.printfulProductName,
         printfulVariantIds: mapped.printfulVariantIds,
         allowedColorVariantIds: mapped.allowedColorVariantIds ?? mapped.printfulVariantIds,
         allowedSizeVariantIds: mapped.allowedSizeVariantIds ?? mapped.printfulVariantIds,
@@ -235,35 +227,122 @@ export class PrintfulPublicationService {
         allowedTechniques: mapped.allowedTechniques,
         defaultTechnique: mapped.defaultTechnique,
         defaultPlacement: mapped.defaultPlacement,
-        defaultRetailPrice: new Prisma.Decimal(dto.retailPrice),
+        defaultRetailPrice: mapped.defaultRetailPrice == null ? undefined : new Prisma.Decimal(mapped.defaultRetailPrice),
+        estimatedBaseCost: mapped.estimatedBaseCost == null ? undefined : new Prisma.Decimal(mapped.estimatedBaseCost),
+        currency: mapped.currency,
         previewImageUrl: mapped.previewImageUrl,
         printAreasJson: mapped.printAreasJson as Prisma.InputJsonValue,
         metadataJson: mapped.metadataJson as Prisma.InputJsonValue,
         active: true,
       },
     });
+    const presets = await this.ensureProviderPlacementPresets(template.id, mapped.allowedPlacements, mapped.printAreasJson);
+    await this.audit.log({
+      actorId,
+      action: "printful.catalog-product.prepared-for-moderation",
+      entityType: "PrintfulProductTemplate",
+      entityId: template.id,
+      metadata: { catalogProductId: productId, providerPlacements: presets.map((preset) => preset.providerPlacement) },
+    });
+    return {
+      template,
+      presets,
+      product: {
+        ...this.normalizeProductSummary(product),
+        techniques: availableTechniques,
+        placements: providerPlacements,
+        variants: variants.map((variant) => ({
+          id: Number(variant.id),
+          name: String(variant.name ?? (`${variant.color ?? ""} ${variant.size ?? ""}`.trim() || `Variant ${variant.id}`)),
+          color: variant.color == null ? null : String(variant.color),
+          colorCode: variant.color_code == null ? null : String(variant.color_code),
+          size: variant.size == null ? null : String(variant.size),
+          imageUrl: variant.image == null ? null : String(variant.image),
+          price: variant.price == null ? null : String(variant.price),
+          inStock: variant.in_stock !== false,
+        })),
+      },
+    };
+  }
+
+  async publish(actorId: string, listingId: string, dto: PublishPrintfulListingDto) {
+    const publicationVersion = randomUUID();
+    const [listing, stores, productResponse] = await Promise.all([
+      this.prisma.commerceListing.findUnique({
+        where: { id: listingId },
+        include: {
+          designProductSelection: { include: { printfulProductTemplate: true, mockupAssets: true } },
+          designAsset: { include: { commercialRights: true } },
+        },
+      }),
+      this.listStores(),
+      this.client.getCatalogProduct(dto.catalogProductId),
+    ]);
+    if (!listing) throw new NotFoundException("LISTING_NOT_FOUND");
+    if (!listing.designProductSelection) throw new BadRequestException("PRINTFUL_SELECTION_MISSING");
+    if (!listing.designAsset) throw new BadRequestException("PRINTFUL_DESIGN_MISSING");
+    if (!listing.designAsset.commercialRights?.allowProductSales) throw new BadRequestException("PRODUCT_SALES_RIGHTS_REQUIRED");
+    if (!listing.designAsset.commercialRights.allowMarketplacePublishing) throw new BadRequestException("MARKETPLACE_RIGHTS_REQUIRED");
+    if (listing.pipeline !== PipelineType.GLOBAL_PRINTFUL || listing.designProductSelection.pipeline !== PipelineType.GLOBAL_PRINTFUL) {
+      throw new BadRequestException("PRINTFUL_SELECTION_MISMATCH: listing is not approved for the Printful pipeline");
+    }
+    const approvedTemplate = listing.designProductSelection.printfulProductTemplate;
+    if (!approvedTemplate) throw new BadRequestException("PRINTFUL_SELECTION_MISSING");
+    const requiredMockups = [MockupAssetType.MAIN, MockupAssetType.LIFESTYLE, MockupAssetType.DETAIL];
+    const readyMockupTypes = new Set(listing.designProductSelection.mockupAssets
+      .filter((asset) => asset.status === "READY")
+      .map((asset) => asset.mockupType));
+    const missingMockups = requiredMockups.filter((type) => !readyMockupTypes.has(type));
+    if (missingMockups.length) {
+      throw new BadRequestException(`PRINTFUL_MOCKUPS_NOT_READY:${missingMockups.join(",")}`);
+    }
+    const approvedPlacement = listing.designProductSelection.providerPlacement
+      ?? listing.designProductSelection.placement.toLowerCase();
+    const approvedConfig = this.record(listing.designProductSelection.placementConfigJson);
+    const approvedVariantIds = Array.isArray(approvedConfig.selectedVariantIds)
+      ? approvedConfig.selectedVariantIds.map(String).sort()
+      : [];
+    const requestedVariantIds = dto.variantIds.map(String).sort();
+    if (String(dto.catalogProductId) !== approvedTemplate.printfulCatalogProductId) {
+      throw new BadRequestException("PRINTFUL_CONFIGURATION_CHANGED: catalog product differs from the approved mockups");
+    }
+    if (dto.placement.trim().toLowerCase().replace(/[\s-]+/g, "_") !== approvedPlacement) {
+      throw new BadRequestException("PRINTFUL_CONFIGURATION_CHANGED: placement differs from the approved mockups");
+    }
+    if (dto.technique !== listing.designProductSelection.technique) {
+      throw new BadRequestException("PRINTFUL_CONFIGURATION_CHANGED: technique differs from the approved mockups");
+    }
+    if (approvedVariantIds.length !== requestedVariantIds.length || approvedVariantIds.some((id, index) => id !== requestedVariantIds[index])) {
+      throw new BadRequestException("PRINTFUL_CONFIGURATION_CHANGED: variants differ from the approved mockups");
+    }
+
+    const storeMap = new Map(stores.map((store) => [store.id, store]));
+    const storeIds = [...new Set(dto.storeIds.map(String))];
+    const missingStores = storeIds.filter((storeId) => !storeMap.has(storeId));
+    if (missingStores.length) throw new BadRequestException(`PRINTFUL_STORE_NOT_ACCESSIBLE:${missingStores.join(",")}`);
+    const unsupportedStores = storeIds
+      .map((storeId) => storeMap.get(storeId)!)
+      .filter((store) => !store.directPublishingSupported);
+    if (unsupportedStores.length) {
+      throw new BadRequestException(
+        `PRINTFUL_EXTERNAL_STORE_CONNECTOR_REQUIRED:${unsupportedStores.map((store) => `${store.id}:${store.type}`).join(",")}`,
+      );
+    }
+
+    const productResult = this.record(productResponse.result);
+    const product = this.record(productResult.product);
+    const variants = Array.isArray(productResult.variants) ? productResult.variants.map((variant) => this.record(variant)) : [];
+    if (!Object.keys(product).length) throw new BadRequestException("PRINTFUL_PRODUCT_NOT_FOUND");
+    const availableVariantIds = new Set(variants.map((variant) => Number(variant.id)).filter(Number.isFinite));
+    const invalidVariants = dto.variantIds.filter((variantId) => !availableVariantIds.has(variantId));
+    if (invalidVariants.length) throw new BadRequestException(`INVALID_PRINTFUL_VARIANT:${invalidVariants.join(",")}`);
 
     const publications = await this.prisma.$transaction(async (tx) => {
-      await tx.designProductSelection.update({
-        where: { id: listing.designProductSelection!.id },
-        data: {
-          pipeline: PipelineType.GLOBAL_PRINTFUL,
-          printfulProductTemplateId: template.id,
-          technique: dto.technique,
-          status: DesignProductSelectionStatus.LISTING_DRAFT,
-          placementConfigJson: {
-            ...this.record(listing.designProductSelection!.placementConfigJson),
-            selectedVariantIds: dto.variantIds.map(String),
-            printfulCatalogProductId: String(dto.catalogProductId),
-            selectedStoreIds: storeIds,
-          },
-        },
-      });
       await tx.commerceListing.update({
         where: { id: listing.id },
         data: {
           pipeline: PipelineType.GLOBAL_PRINTFUL,
-          printfulProductTemplateId: template.id,
+          printfulProductTemplateId: approvedTemplate.id,
           status: ListingStatus.READY_TO_PUBLISH,
         },
       });
@@ -320,7 +399,7 @@ export class PrintfulPublicationService {
         publicationIds: publications.map((publication) => publication.id),
       },
     });
-    return { listingId: listing.id, templateId: template.id, publications, jobs };
+    return { listingId: listing.id, templateId: approvedTemplate.id, publications, jobs };
   }
 
   async retry(actorId: string, publicationId: string) {
@@ -402,6 +481,60 @@ export class PrintfulPublicationService {
       imageUrl: product.image == null ? null : String(product.image),
       variantCount: Number(product.variant_count ?? 0),
     };
+  }
+
+  private providerPlacements(printfiles: JsonRecord) {
+    const variantPrintfiles = Array.isArray(printfiles.variant_printfiles) ? printfiles.variant_printfiles : [];
+    return [...new Set(variantPrintfiles.flatMap((entry) => {
+      const files = this.record(entry).printfiles;
+      if (!Array.isArray(files)) return [];
+      return files
+        .map((file) => String(this.record(file).placement ?? "").trim().toLowerCase().replace(/[\s-]+/g, "_"))
+        .filter(Boolean);
+    }))];
+  }
+
+  private async ensureProviderPlacementPresets(productTemplateId: string, placements: string[], printAreas: unknown) {
+    const areaMap = this.record(printAreas);
+    const rows = [];
+    for (const rawPlacement of placements) {
+      const providerPlacement = rawPlacement.trim().toLowerCase().replace(/[\s-]+/g, "_");
+      if (!providerPlacement) continue;
+      const area = this.record(areaMap[providerPlacement]);
+      const placement = this.placementKind(providerPlacement);
+      const existing = await this.prisma.placementPreset.findFirst({
+        where: { pipeline: PipelineType.GLOBAL_PRINTFUL, productTemplateId, providerPlacement },
+      });
+      const data = {
+        name: providerPlacement.split("_").map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join(" "),
+        placement,
+        providerPlacement,
+        defaultWidthIn: Number(area.printAreaWidthIn) || 4,
+        defaultHeightIn: Number(area.printAreaHeightIn) || 4,
+        defaultX: Number(area.areaLeftIn) || 0,
+        defaultY: Number(area.areaTopIn) || 0,
+        defaultScale: 1,
+        alignment: PlacementAlignment.CENTER,
+        units: PlacementUnits.INCH,
+        active: true,
+      };
+      rows.push(existing
+        ? await this.prisma.placementPreset.update({ where: { id: existing.id }, data })
+        : await this.prisma.placementPreset.create({ data: { ...data, pipeline: PipelineType.GLOBAL_PRINTFUL, productTemplateId } }));
+    }
+    return rows;
+  }
+
+  private placementKind(providerPlacement: string): PlacementKind {
+    const key = providerPlacement.toUpperCase();
+    if (key === "FRONT") return PlacementKind.FRONT;
+    if (key === "BACK") return PlacementKind.BACK;
+    if (key.includes("LEFT_CHEST")) return PlacementKind.LEFT_CHEST;
+    if (key.includes("RIGHT_CHEST")) return PlacementKind.RIGHT_CHEST;
+    if (key.includes("LEFT_SLEEVE")) return PlacementKind.LEFT_SLEEVE;
+    if (key.includes("RIGHT_SLEEVE")) return PlacementKind.RIGHT_SLEEVE;
+    if (key.includes("WRAP") || key.includes("ALL_OVER")) return PlacementKind.FULL_WRAP;
+    return PlacementKind.OTHER;
   }
 
   private supportsDirectPublishing(type: string) {

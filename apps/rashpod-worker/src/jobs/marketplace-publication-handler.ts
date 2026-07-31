@@ -126,7 +126,7 @@ export class MarketplacePublicationJobHandler {
         : publication.productListing.price != null
           ? String(publication.productListing.price)
           : "24.99";
-    const placement = String(publicationMetadata.placement ?? publication.selection?.placement ?? template.defaultPlacement ?? "front").toLowerCase();
+    const placement = String(publicationMetadata.placement ?? publication.selection?.providerPlacement ?? publication.selection?.placement ?? template.defaultPlacement ?? "front").toLowerCase();
     const externalProductId = this.printfulExternalId(publication.id);
 
     const payload = buildPrintfulSyncProductPayload({

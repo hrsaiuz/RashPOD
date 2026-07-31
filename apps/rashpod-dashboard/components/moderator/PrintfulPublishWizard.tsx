@@ -70,6 +70,13 @@ type PrintfulPublication = {
   lastSyncedAt?: string | null;
 };
 
+export type ApprovedPrintfulConfiguration = {
+  catalogProductId: number;
+  variantIds: number[];
+  technique: string;
+  placement: string;
+};
+
 const STEPS = [
   { id: 1, label: "Product", description: "Category and blank product" },
   { id: 2, label: "Variants", description: "Sizes, colors, and print setup" },
@@ -80,14 +87,16 @@ const STEPS = [
 export function PrintfulPublishWizard({
   listingId,
   defaultPrice,
+  approvedConfiguration,
   onPublished,
 }: {
   listingId: string;
   defaultPrice: string;
+  approvedConfiguration?: ApprovedPrintfulConfiguration | null;
   onPublished?: () => void;
 }) {
   const feedback = useDashboardFeedback();
-  const [step, setStep] = useState(1);
+  const [step, setStep] = useState(approvedConfiguration ? 3 : 1);
   const [stores, setStores] = useState<PrintfulStore[]>([]);
   const [categories, setCategories] = useState<PrintfulCategory[]>([]);
   const [products, setProducts] = useState<PrintfulProduct[]>([]);
@@ -121,7 +130,7 @@ export function PrintfulPublishWizard({
       try {
         const [nextStores, nextCategories] = await Promise.all([
           api.get<PrintfulStore[]>("/admin/printful/stores"),
-          api.get<PrintfulCategory[]>("/admin/printful/categories"),
+          approvedConfiguration ? Promise.resolve([]) : api.get<PrintfulCategory[]>("/admin/printful/categories"),
         ]);
         if (cancelled) return;
         setStores(nextStores);
@@ -138,7 +147,25 @@ export function PrintfulPublishWizard({
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [approvedConfiguration]);
+
+  useEffect(() => {
+    if (!approvedConfiguration) return;
+    let cancelled = false;
+    setLoadingProduct(true);
+    api.get<PrintfulProductDetail>(`/admin/printful/catalog-products/${approvedConfiguration.catalogProductId}`)
+      .then((detail) => {
+        if (cancelled) return;
+        setProduct(detail);
+        setSelectedVariants(approvedConfiguration.variantIds);
+        setTechnique(approvedConfiguration.technique);
+        setPlacement(approvedConfiguration.placement);
+        setStep((current) => Math.max(3, current));
+      })
+      .catch((cause) => { if (!cancelled) setError(cause instanceof Error ? cause.message : "The approved Printful configuration could not be loaded."); })
+      .finally(() => { if (!cancelled) setLoadingProduct(false); });
+    return () => { cancelled = true; };
+  }, [approvedConfiguration]);
 
   useEffect(() => {
     let cancelled = false;
@@ -163,6 +190,7 @@ export function PrintfulPublishWizard({
   }, [listingId, publicationRefresh]);
 
   useEffect(() => {
+    if (approvedConfiguration) return;
     if (!categoryId) {
       setProducts([]);
       return;
@@ -190,7 +218,7 @@ export function PrintfulPublishWizard({
       window.clearTimeout(timeout);
       controller.abort();
     };
-  }, [categoryId, search]);
+  }, [approvedConfiguration, categoryId, search]);
 
   const selectedCategory = categories.find((category) => String(category.id) === categoryId);
   const selectableVariants = product?.variants.filter((variant) => variant.inStock) ?? [];
@@ -322,9 +350,9 @@ export function PrintfulPublishWizard({
             <StoreIcon size={18} aria-hidden="true" />
             <p className="text-xs font-bold uppercase tracking-[0.14em]">Printful publishing</p>
           </div>
-          <h3 className="mt-2 text-xl font-semibold text-brand-ink">Choose a product and publish to connected stores</h3>
+          <h3 className="mt-2 text-xl font-semibold text-brand-ink">{approvedConfiguration ? "Publish the approved product to connected stores" : "Choose a product and publish to connected stores"}</h3>
           <p className="mt-1 max-w-3xl text-sm leading-6 text-brand-muted">
-            Browse the live Printful catalog, select sellable variants, then choose every store that should receive this product.
+            {approvedConfiguration ? "The moderator-approved product, variants, technique, and placement are locked. Choose the stores and confirm the retail price." : "Browse the live Printful catalog, select sellable variants, then choose every store that should receive this product."}
           </p>
         </div>
         {loadingSetup ? (
@@ -595,7 +623,7 @@ export function PrintfulPublishWizard({
 
       {product ? (
         <div className="flex flex-wrap items-center justify-between gap-3 border-t border-surface-borderSoft pt-5">
-          <Button variant="secondary" onClick={() => setStep((current) => Math.max(1, current - 1))} disabled={step === 1 || publishing}>
+          <Button variant="secondary" onClick={() => setStep((current) => Math.max(approvedConfiguration ? 3 : 1, current - 1))} disabled={step === (approvedConfiguration ? 3 : 1) || publishing}>
             <ArrowLeft size={16} aria-hidden="true" /> Back
           </Button>
           {step < 4 ? (
@@ -604,9 +632,11 @@ export function PrintfulPublishWizard({
             </Button>
           ) : (
             <div className="flex flex-wrap gap-2">
-              <Button variant="secondary" onClick={() => { setStep(1); setProduct(null); setMessage(""); }}>
-                <RefreshCw size={16} aria-hidden="true" /> Choose another product
-              </Button>
+              {!approvedConfiguration ? (
+                <Button variant="secondary" onClick={() => { setStep(1); setProduct(null); setMessage(""); }}>
+                  <RefreshCw size={16} aria-hidden="true" /> Choose another product
+                </Button>
+              ) : null}
               <Button variant="primaryPeach" onClick={() => setConfirmOpen(true)} disabled={!canContinue || publishing}>
                 <Send size={16} aria-hidden="true" /> Publish to {selectedStores.length} store{selectedStores.length === 1 ? "" : "s"}
               </Button>
