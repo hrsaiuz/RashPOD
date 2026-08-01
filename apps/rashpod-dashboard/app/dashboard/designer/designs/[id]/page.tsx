@@ -52,6 +52,7 @@ export default function DesignDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [action, setAction] = useState<"" | "submitting" | "version">("");
+  const [uploadPlacement, setUploadPlacement] = useState("FRONT");
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
@@ -99,6 +100,7 @@ export default function DesignDetailPage() {
   async function onPickVersion(e: ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0];
     if (!f) return;
+    const placement = uploadPlacement;
     if (f.size > MAX_BYTES) {
       setError("File too large (max 50 MB).");
       if (fileInputRef.current) fileInputRef.current.value = "";
@@ -108,6 +110,7 @@ export default function DesignDetailPage() {
     setAction("version");
     setError("");
     try {
+      const dimensions = await readImageDimensions(f);
       const upload = await api.post<UploadUrlResponse>("/files/upload-url", {
         purpose: "DESIGN_ORIGINAL",
         filename: f.name,
@@ -123,12 +126,12 @@ export default function DesignDetailPage() {
       });
       await api.post(`/designer/designs/${id}/versions`, {
         fileId: upload.fileId,
-        widthPx: 0,
-        heightPx: 0,
+        ...(dimensions ?? {}),
         dpi: 300,
+        placement,
       });
       await load();
-      toast({ tone: "success", title: "New design version uploaded" });
+      toast({ tone: "success", title: `${placementLabel(placement)} artwork uploaded` });
     } catch (err) {
       const nextError = err instanceof Error ? err.message : "Version upload failed";
       setError(nextError);
@@ -198,12 +201,24 @@ export default function DesignDetailPage() {
             </Card>
 
             <Card>
-              <h2 className="text-lg font-semibold text-brand-ink mb-4">Actions</h2>
+              <h2 className="text-lg font-semibold text-brand-ink mb-2">Placement artwork</h2>
+              <p className="mb-4 text-sm text-brand-muted">Upload a different file for each print location. The matching artwork is used for front, back, chest, and sleeve mockups.</p>
+              <label className="mb-4 block max-w-sm text-sm font-semibold text-brand-ink">
+                Upload for placement
+                <select
+                  className="mt-2 min-h-11 w-full rounded-xl border border-surface-borderSoft bg-white px-3 font-normal outline-none focus-visible:ring-4 focus-visible:ring-brand-blue/20 disabled:cursor-not-allowed disabled:opacity-50"
+                  value={uploadPlacement}
+                  onChange={(event) => setUploadPlacement(event.target.value)}
+                  disabled={Boolean(action)}
+                >
+                  {PLACEMENT_OPTIONS.map((placement) => <option key={placement} value={placement}>{placementLabel(placement)}</option>)}
+                </select>
+              </label>
               <div className="flex flex-wrap gap-3">
                 <Button
                   variant="primaryBlue"
                   loading={action === "submitting"}
-                  disabled={!canSubmit}
+                  disabled={!canSubmit || Boolean(action)}
                   onClick={submitForReview}
                 >
                   <Send size={16} />
@@ -212,10 +227,11 @@ export default function DesignDetailPage() {
                 <Button
                   variant="secondary"
                   loading={action === "version"}
+                  disabled={Boolean(action)}
                   onClick={() => fileInputRef.current?.click()}
                 >
                   <UploadIcon size={16} />
-                  Upload new version
+                  Upload {placementLabel(uploadPlacement)} artwork
                 </Button>
                 <input
                   ref={fileInputRef}
@@ -231,6 +247,21 @@ export default function DesignDetailPage() {
                   </Button>
                 </Link>
               </div>
+              {design.versions?.length ? (
+                <ul className="mt-5 grid gap-2 sm:grid-cols-2" aria-label="Uploaded placement artwork">
+                  {PLACEMENT_OPTIONS.map((placement) => {
+                    const version = design.versions?.find((item) => item.placement === placement);
+                    const defaultVersion = design.versions?.find((item) => !item.placement);
+                    const status = version ? "Uploaded" : defaultVersion ? "Uses default" : "Not uploaded";
+                    return (
+                      <li key={placement} className="flex min-h-11 items-center justify-between rounded-xl border border-surface-borderSoft px-3 text-sm">
+                        <span className="font-medium text-brand-ink">{placementLabel(placement)}</span>
+                        <span className={version ? "text-semantic-success" : "text-brand-muted"}>{status}</span>
+                      </li>
+                    );
+                  })}
+                </ul>
+              ) : null}
             </Card>
 
             <PipelineOverview design={design} />
@@ -255,6 +286,23 @@ export default function DesignDetailPage() {
       </div>
     </DashboardLayout>
   );
+}
+
+const PLACEMENT_OPTIONS = ["FRONT", "BACK", "LEFT_CHEST", "RIGHT_CHEST", "LEFT_SLEEVE", "RIGHT_SLEEVE", "FULL_WRAP"] as const;
+
+function placementLabel(value: string) {
+  return value.toLowerCase().replace(/_/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+async function readImageDimensions(file: File) {
+  try {
+    const bitmap = await createImageBitmap(file);
+    const dimensions = { widthPx: bitmap.width, heightPx: bitmap.height };
+    bitmap.close();
+    return dimensions;
+  } catch {
+    return null;
+  }
 }
 
 function RightsRow({ label, on }: { label: string; on: boolean }) {

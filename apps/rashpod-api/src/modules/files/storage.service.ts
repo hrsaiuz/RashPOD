@@ -21,6 +21,7 @@ export class StorageService {
   private readonly projectId?: string;
   private readonly bucketName: string;
   private readonly publicBucketName: string;
+  private readonly assetsBucketName: string;
   private readonly localAssetsDir: string;
 
   constructor() {
@@ -28,6 +29,7 @@ export class StorageService {
     const sharedBucket = firstPresent(process.env.GCS_BUCKET_ASSETS, process.env.GCS_BUCKET_NAME);
     this.bucketName = firstPresent(process.env.GCS_BUCKET_PRIVATE, sharedBucket, "rashpod-assets-private")!;
     this.publicBucketName = firstPresent(process.env.GCS_BUCKET_PUBLIC, sharedBucket, "rashpod-assets-public")!;
+    this.assetsBucketName = firstPresent(process.env.GCS_BUCKET_ASSETS, process.env.GCS_BUCKET_PUBLIC, process.env.GCS_BUCKET_NAME, "rashpod-assets-public")!;
     this.localAssetsDir = firstPresent(process.env.LOCAL_ASSETS_DIR) ?? path.resolve(process.cwd(), "local-assets");
   }
 
@@ -75,6 +77,10 @@ export class StorageService {
 
   buildPublicUrl(objectKey: string) {
     return `https://storage.googleapis.com/${this.publicBucketName}/${objectKey}`;
+  }
+
+  buildAssetUrl(objectKey: string) {
+    return `https://storage.googleapis.com/${this.assetsBucketName}/${objectKey}`;
   }
 
   async createPublicPresignedUploadUrl(input: PresignedUploadInput) {
@@ -285,6 +291,13 @@ export class StorageService {
       sizeBytes: input.buffer.byteLength,
       storageProvider: "GCS" as const,
     };
+  }
+
+  async readAssetObject(objectKey: string) {
+    const storage = this.getStorage();
+    if (!storage) return fs.readFile(this.localObjectPath(objectKey));
+    const [buffer] = await storage.bucket(this.assetsBucketName).file(objectKey).download();
+    return buffer;
   }
 
   getLocalUploadMaxBytes() {

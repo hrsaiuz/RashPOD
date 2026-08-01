@@ -1,8 +1,13 @@
-import { IsInt, IsOptional, IsString, Max, Min } from "class-validator";
+import { PlacementKind } from "@prisma/client";
+import { IsEnum, IsInt, IsOptional, IsString, Max, Min } from "class-validator";
 
 export class CreateDesignVersionDto {
   @IsString()
   fileId!: string;
+
+  @IsEnum(PlacementKind)
+  @IsOptional()
+  placement?: PlacementKind;
 
   @IsInt()
   @IsOptional()

@@ -22,7 +22,10 @@ export function resolveBucketNames() {
 }
 
 class LocalArtifactStore implements ArtifactStore {
-  constructor(private readonly baseDir: string) {}
+  constructor(
+    private readonly baseDir: string,
+    private readonly sourceDirs: string[] = [],
+  ) {}
 
   private resolvePath(objectKey: string) {
     const normalized = objectKey.replace(/\\/g, "/");
@@ -34,6 +37,10 @@ class LocalArtifactStore implements ArtifactStore {
       this.resolvePath(objectKey),
       this.resolvePath(path.join(bucket, objectKey)),
       this.resolvePath(path.join("fixtures", objectKey)),
+      ...this.sourceDirs.flatMap((dir) => [
+        path.join(dir, objectKey),
+        path.join(dir, bucket, objectKey),
+      ]),
     ];
     for (const candidate of candidates) {
       try {
@@ -89,7 +96,9 @@ class GcsArtifactStore implements ArtifactStore {
   }
 }
 
-export function createArtifactStore(baseDir = path.resolve(process.cwd(), "worker-artifacts")): ArtifactStore {
+export function createArtifactStore(
+  baseDir = path.resolve(process.env.LOCAL_ASSETS_DIR || path.resolve(process.cwd(), "../rashpod-api/local-assets")),
+): ArtifactStore {
   const projectId = firstPresent(
     process.env.GCP_PROJECT_ID,
     process.env.GCS_PROJECT_ID,
@@ -103,5 +112,15 @@ export function createArtifactStore(baseDir = path.resolve(process.cwd(), "worke
   if (process.env.NODE_ENV === "production") {
     throw new Error("Google Cloud Storage is not configured for worker artifacts");
   }
-  return new LocalArtifactStore(baseDir);
+  const localAssetsDir = firstPresent(process.env.LOCAL_ASSETS_DIR);
+  const localSourceDirs = [
+    ...(localAssetsDir ? [path.resolve(localAssetsDir)] : []),
+    path.resolve(process.cwd(), "local-assets"),
+    path.resolve(process.cwd(), "../rashpod-api/local-assets"),
+  ];
+  // Use the API's local asset directory as the shared source/output store when
+  // configured. This makes uploads and generated mockups visible to both
+  // processes during local development.
+  const outputDir = localAssetsDir ? path.resolve(localAssetsDir) : baseDir;
+  return new LocalArtifactStore(outputDir, localSourceDirs);
 }

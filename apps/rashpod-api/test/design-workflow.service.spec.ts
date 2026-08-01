@@ -123,3 +123,23 @@ describe("DesignWorkflowService.moderationDetail", () => {
     await expect(service.moderationDetail("missing-id")).rejects.toBeInstanceOf(NotFoundException);
   });
 });
+
+describe("DesignWorkflowService placement artwork selection", () => {
+  it("uses exact placement artwork before the legacy default", () => {
+    const { service } = createService();
+    const versions = [
+      { id: "back", placement: "BACK" },
+      { id: "default", placement: null },
+      { id: "front", placement: "FRONT" },
+    ];
+
+    expect((service as any).versionForPlacement(versions, "front")).toEqual(versions[2]);
+  });
+
+  it("does not use artwork from a different explicit placement", () => {
+    const { service } = createService();
+    const versions = [{ id: "back", placement: "BACK" }];
+
+    expect((service as any).versionForPlacement(versions, "front")).toBeUndefined();
+  });
+});

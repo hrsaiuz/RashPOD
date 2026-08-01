@@ -1,4 +1,5 @@
-import { Body, Controller, Get, Param, Post, Query, UseGuards } from "@nestjs/common";
+import { Body, Controller, Get, Param, Post, Query, Res, StreamableFile, UseGuards } from "@nestjs/common";
+import type { Response } from "express";
 import { CurrentUser, RequestUser } from "../../common/auth/current-user.decorator";
 import { JwtAuthGuard } from "../../common/auth/jwt-auth.guard";
 import { PermissionGuard } from "../../common/auth/permission.guard";
@@ -48,6 +49,15 @@ export class DesignWorkflowController {
   @RequirePermission("design:moderate")
   moderationDetail(@Param("id") id: string) {
     return this.workflow.moderationDetail(id);
+  }
+
+  @Get("mockup-assets/:assetId/content")
+  @RequirePermission("design:moderate")
+  async mockupAssetContent(@Param("assetId") assetId: string, @Res({ passthrough: true }) response: Response) {
+    const asset = await this.workflow.mockupAssetContent(assetId);
+    response.setHeader("Content-Type", asset.contentType);
+    response.setHeader("Cache-Control", "private, max-age=300");
+    return new StreamableFile(asset.buffer);
   }
 
   @Get(":id/mockup-status")

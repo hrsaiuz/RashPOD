@@ -188,6 +188,7 @@ export interface ModerationQueueDesign extends Design {
     heightPx?: number | null;
     dpi?: number | null;
     hasTransparency?: boolean | null;
+    placement?: string | null;
     createdAt: string;
   }>;
 }

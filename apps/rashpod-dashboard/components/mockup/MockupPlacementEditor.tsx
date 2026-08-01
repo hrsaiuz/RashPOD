@@ -96,8 +96,12 @@ export function MockupPlacementEditor(props: {
   const [imageRetryKey, setImageRetryKey] = useState(0);
   const templateImage = useImage(props.context.templateImageUrl, imageRetryKey);
   const designImage = useImage(props.context.designImageUrl, imageRetryKey);
-  const templateWidthPx = templateImage.image?.naturalWidth || props.context.templateWidthPx;
-  const templateHeightPx = templateImage.image?.naturalHeight || props.context.templateHeightPx;
+  // Print/safe-area coordinates are authored in the template coordinate space
+  // returned by the API. A Printful catalog thumbnail can have different raw
+  // pixel dimensions, so using naturalWidth/naturalHeight here offsets the
+  // overlays and can place them outside the product image.
+  const templateWidthPx = props.context.templateWidthPx || templateImage.image?.naturalWidth || 2000;
+  const templateHeightPx = props.context.templateHeightPx || templateImage.image?.naturalHeight || 2000;
   const initialPlacementSignature = [
     props.context.initialPlacement.x,
     props.context.initialPlacement.y,

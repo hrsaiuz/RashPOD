@@ -55,13 +55,9 @@ async function handleRequest(req: NextRequest, params: { path: string[] }, metho
     });
 
     const contentType = apiRes.headers.get("Content-Type") || "";
-    let responseBody;
-
-    if (contentType.includes("application/json")) {
-      responseBody = await apiRes.text();
-    } else {
-      responseBody = await apiRes.text();
-    }
+    const responseBody = contentType.includes("application/json") || contentType.startsWith("text/")
+      ? await apiRes.text()
+      : await apiRes.arrayBuffer();
 
     return new NextResponse(responseBody, {
       status: apiRes.status,

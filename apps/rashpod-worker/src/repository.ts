@@ -277,7 +277,11 @@ export interface WorkerRepository {
     metadataJson?: unknown;
   }): Promise<{ id: string; displayName: string }>;
   ensurePrintfulPlacementPreset?(productTemplateId: string, rashpodProductType: string): Promise<{ created: boolean }>;
-  ensurePrintfulFileForDesign?(designId: string, uploadFromUrl: (url: string) => Promise<{ fileId: string; printfulUrl?: string | null }>): Promise<{ printfulFileId: string }>;
+  ensurePrintfulFileForDesign?(
+    designId: string,
+    uploadFromUrl: (url: string) => Promise<{ fileId: string; printfulUrl?: string | null }>,
+    sourceVersion?: { id: string; fileKey: string } | null,
+  ): Promise<{ printfulFileId: string }>;
   enqueueWorkerJob?(input: { type: string; payload: Record<string, unknown>; nextRunAt?: Date; idempotencyKey?: string }): Promise<{ jobId: string }>;
   getMockupAsset?(id: string): Promise<MockupAssetRecord | null>;
   countProcessingMockupAssets?(selectionId: string): Promise<number>;

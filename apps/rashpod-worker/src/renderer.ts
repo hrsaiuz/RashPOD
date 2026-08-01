@@ -39,7 +39,7 @@ export class SharpRenderer {
   private readonly store: ArtifactStore;
 
   constructor(
-    baseDir = path.resolve(process.cwd(), "worker-artifacts"),
+    baseDir = path.resolve(process.env.LOCAL_ASSETS_DIR || path.resolve(process.cwd(), "../rashpod-api/local-assets")),
     store: ArtifactStore = createArtifactStore(baseDir),
   ) {
     this.store = store;

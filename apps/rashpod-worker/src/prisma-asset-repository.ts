@@ -357,9 +357,18 @@ export class PrismaAssetRepository implements WorkerRepository {
   async getPipelineSelection(id: string): Promise<PipelineSelectionRecord | null> {
     const row = await this.prisma.designProductSelection.findUnique({
       where: { id },
-      include: { design: { include: { versions: { orderBy: { createdAt: "desc" }, take: 1 } } }, localBaseProduct: true, printfulProductTemplate: true },
+      include: {
+        design: { include: { versions: { orderBy: { createdAt: "desc" }, take: 20 } } },
+        sourceDesignVersion: true,
+        localBaseProduct: true,
+        printfulProductTemplate: true,
+      },
     });
     if (!row) return null;
+    const sourceVersion = row.sourceDesignVersion
+      ?? row.design.versions.find((version) => version.placement === row.placement)
+      ?? row.design.versions.find((version) => !version.placement)
+      ?? (row.placement ? undefined : row.design.versions[0]);
     return {
       id: row.id,
       designId: row.designId,
@@ -381,14 +390,14 @@ export class PrismaAssetRepository implements WorkerRepository {
       units: row.units,
       placementConfigJson: row.placementConfigJson,
       design: { id: row.design.id, title: row.design.title, designerId: row.design.designerId },
-      latestDesignVersion: row.design.versions[0]
+      latestDesignVersion: sourceVersion
         ? {
-            id: row.design.versions[0].id,
-            fileKey: row.design.versions[0].fileKey,
-            widthPx: row.design.versions[0].widthPx,
-            heightPx: row.design.versions[0].heightPx,
-            dpi: row.design.versions[0].dpi,
-            hasTransparency: row.design.versions[0].hasTransparency,
+            id: sourceVersion.id,
+            fileKey: sourceVersion.fileKey,
+            widthPx: sourceVersion.widthPx,
+            heightPx: sourceVersion.heightPx,
+            dpi: sourceVersion.dpi,
+            hasTransparency: sourceVersion.hasTransparency,
           }
         : null,
       localBaseProduct: row.localBaseProduct
@@ -721,24 +730,32 @@ export class PrismaAssetRepository implements WorkerRepository {
     return { created: true };
   }
 
-  async ensurePrintfulFileForDesign(designId: string, uploadFromUrl: (url: string) => Promise<{ fileId: string; printfulUrl?: string | null }>) {
-    const existing = await this.prisma.printfulFileMapping.findFirst({
-      where: { designId, status: "READY", printfulFileId: { not: null } },
-      orderBy: { updatedAt: "desc" },
-    });
-    if (existing?.printfulFileId) return { printfulFileId: existing.printfulFileId };
+  async ensurePrintfulFileForDesign(
+    designId: string,
+    uploadFromUrl: (url: string) => Promise<{ fileId: string; printfulUrl?: string | null }>,
+    sourceVersion?: { id: string; fileKey: string } | null,
+  ) {
+    if (!sourceVersion) {
+      const existing = await this.prisma.printfulFileMapping.findFirst({
+        where: { designId, status: "READY", printfulFileId: { not: null } },
+        orderBy: { updatedAt: "desc" },
+      });
+      if (existing?.printfulFileId) return { printfulFileId: existing.printfulFileId };
+    }
 
     const design = await this.prisma.designAsset.findUnique({
       where: { id: designId },
       include: { versions: { orderBy: { createdAt: "desc" }, take: 1 } },
     });
-    if (!design?.versions[0]?.fileKey) throw new Error("DESIGN_FILE_MISSING");
+    if (!sourceVersion && !design?.versions[0]?.fileKey) throw new Error("DESIGN_FILE_MISSING");
 
     const mapping = await this.prisma.printfulFileMapping.create({
       data: { designId, status: "PENDING" },
     });
     try {
-      const signedUrl = await import("./gcs-signing").then((mod) => mod.createSignedReadUrl(design.versions[0]!.fileKey, 3600));
+      const sourceFileKey = sourceVersion?.fileKey ?? design?.versions[0]?.fileKey;
+      if (!sourceFileKey) throw new Error("DESIGN_FILE_MISSING");
+      const signedUrl = await import("./gcs-signing").then((mod) => mod.createSignedReadUrl(sourceFileKey, 3600));
       const uploaded = await uploadFromUrl(signedUrl);
       await this.prisma.printfulFileMapping.update({
         where: { id: mapping.id },

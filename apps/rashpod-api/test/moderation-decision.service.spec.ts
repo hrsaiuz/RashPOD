@@ -130,6 +130,9 @@ describe("DesignWorkflowService moderation validation", () => {
           placement: "FRONT",
         }),
       },
+      designVersion: {
+        findMany: jest.fn().mockResolvedValue([{ id: "version_front", placement: "FRONT" }]),
+      },
       designProductSelection: {
         upsert: jest.fn().mockResolvedValue({ id: "selection_1" }),
       },
@@ -226,6 +229,9 @@ describe("DesignWorkflowService moderation validation", () => {
         }),
       },
       placementPreset: { findUnique: jest.fn() },
+      designVersion: {
+        findMany: jest.fn().mockResolvedValue([{ id: "version_front", placement: "FRONT" }]),
+      },
       designProductSelection: {
         upsert: jest.fn().mockResolvedValue({ id: "selection_1" }),
       },
@@ -731,7 +737,11 @@ describe("DesignWorkflowService moderation validation", () => {
     const selectionUpdate = jest.fn().mockResolvedValue({ id: "selection_1" });
     const { service, designStories, audit, jobs } = createService({
       designAsset: {
-        findUnique: jest.fn().mockResolvedValue({ id: "design_1", status: DesignStatus.PENDING_MODERATION }),
+        findUnique: jest.fn().mockResolvedValue({
+          id: "design_1",
+          status: DesignStatus.PENDING_MODERATION,
+          commercialRights: { allowProductSales: true, allowMarketplacePublishing: false },
+        }),
       },
       designProductSelection: {
         findMany: jest.fn().mockResolvedValue([{ id: "selection_1", pipeline: "LOCAL" }]),
@@ -795,7 +805,11 @@ describe("DesignWorkflowService moderation validation", () => {
     };
     const { service, designStories } = createService({
       designAsset: {
-        findUnique: jest.fn().mockResolvedValue({ id: "design_1", status: DesignStatus.PENDING_MODERATION }),
+        findUnique: jest.fn().mockResolvedValue({
+          id: "design_1",
+          status: DesignStatus.PENDING_MODERATION,
+          commercialRights: { allowProductSales: true, allowMarketplacePublishing: false },
+        }),
       },
       $transaction: jest.fn(async (operation: (client: typeof tx) => unknown) => operation(tx)),
     });

@@ -65,6 +65,7 @@ export class DesignsService {
         heightPx: version.heightPx,
         dpi: version.dpi,
         hasTransparency: version.hasTransparency,
+        placement: version.placement,
         createdAt: version.createdAt,
       })),
       moderationAudits: design.moderationAudits.map((audit) => ({
@@ -135,6 +136,7 @@ export class DesignsService {
         heightPx: dto.heightPx,
         dpi: dto.dpi,
         hasTransparency: true,
+        placement: dto.placement,
       },
     });
 
@@ -143,7 +145,7 @@ export class DesignsService {
       action: "design.version.create",
       entityType: "DesignVersion",
       entityId: version.id,
-      metadata: { designId, previousVersionId: latestVersion?.id, fileId: dto.fileId },
+      metadata: { designId, previousVersionId: latestVersion?.id, fileId: dto.fileId, placement: dto.placement ?? "DEFAULT" },
     });
 
     return version;

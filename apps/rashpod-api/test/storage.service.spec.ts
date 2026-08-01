@@ -43,6 +43,16 @@ describe("StorageService", () => {
     expect(service.getPrivateBucketName()).toBe("rashpod-assets");
     expect(service.getPublicBucketName()).toBe("rashpod-assets");
     expect(service.buildPublicUrl("media/logo.png")).toBe("https://storage.googleapis.com/rashpod-assets/media/logo.png");
+    expect(service.buildAssetUrl("mockups/a.png")).toBe("https://storage.googleapis.com/rashpod-assets/mockups/a.png");
+  });
+
+  it("keeps generated assets on the assets bucket when the public bucket is separate", () => {
+    process.env.GCP_PROJECT_ID = "p1";
+    process.env.GCS_BUCKET_ASSETS = "generated-assets";
+    process.env.GCS_BUCKET_PUBLIC = "public-templates";
+    const service = new StorageService();
+    expect(service.buildPublicUrl("template.png")).toContain("public-templates/template.png");
+    expect(service.buildAssetUrl("mockup.png")).toContain("generated-assets/mockup.png");
   });
 
   it("uses configured storage client for metadata and read URL", async () => {

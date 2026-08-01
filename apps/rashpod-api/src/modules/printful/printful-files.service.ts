@@ -11,20 +11,26 @@ export class PrintfulFilesService {
     private readonly client: PrintfulClient,
   ) {}
 
-  async ensurePrintfulFileForDesign(designId: string) {
+  async ensurePrintfulFileForDesign(designId: string, placement?: string) {
     const design = await this.prisma.designAsset.findUnique({
       where: { id: designId },
-      include: { versions: { orderBy: { createdAt: "desc" }, take: 1 } },
+      include: { versions: { orderBy: { createdAt: "desc" }, take: 20 } },
     });
-    if (!design?.versions[0]?.fileKey) throw new Error("DESIGN_FILE_MISSING");
+    const normalizedPlacement = placement?.trim().toUpperCase().replace(/[\s-]+/g, "_");
+    const exactVersion = design?.versions.find((version) => normalizedPlacement && version.placement === normalizedPlacement);
+    const defaultVersion = design?.versions.find((version) => !version.placement);
+    const sourceVersion = exactVersion ?? defaultVersion ?? (normalizedPlacement ? undefined : design?.versions[0]);
+    if (!sourceVersion?.fileKey) throw new Error("DESIGN_FILE_MISSING");
 
-    const existing = await this.prisma.printfulFileMapping.findFirst({
-      where: { designId, status: "READY", printfulFileId: { not: null } },
-      orderBy: { updatedAt: "desc" },
-    });
-    if (existing?.printfulFileId) return existing;
+    if (!sourceVersion.placement) {
+      const existing = await this.prisma.printfulFileMapping.findFirst({
+        where: { designId, status: "READY", printfulFileId: { not: null } },
+        orderBy: { updatedAt: "desc" },
+      });
+      if (existing?.printfulFileId) return existing;
+    }
 
-    const fileKey = design.versions[0].fileKey;
+    const fileKey = sourceVersion.fileKey;
     const signedUrl = await this.storage.createSignedReadUrl({ objectKey: fileKey, expiresSeconds: 60 * 60 });
     const mapping = await this.prisma.printfulFileMapping.create({
       data: { designId, status: "PENDING", originalUrl: signedUrl },

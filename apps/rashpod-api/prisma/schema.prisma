@@ -1224,6 +1224,7 @@ model DesignVersion {
   heightPx        Int?
   dpi             Int?
   hasTransparency Boolean?
+  placement       PlacementKind?
   createdAt       DateTime @default(now())
 
   designAsset              DesignAsset               @relation(fields: [designAssetId], references: [id])
@@ -1231,6 +1232,9 @@ model DesignVersion {
   placements               MockupPlacement[]
   externalOrderIntakeItems ExternalOrderIntakeItem[]
   gangSheetItems           GangSheetItem[]
+  sourceProductSelections DesignProductSelection[] @relation("SelectionSourceDesignVersion")
+
+  @@index([designAssetId, placement, createdAt])
 }
 
 model DesignModerationCase {
@@ -1825,6 +1829,7 @@ model DesignProductSelection {
   localBaseProductId        String?
   printfulProductTemplateId String?
   placementPresetId         String?
+  sourceDesignVersionId      String?
   placement                 PlacementKind
   providerPlacement         String?
   technique                 String?
@@ -1850,11 +1855,13 @@ model DesignProductSelection {
   localBaseProduct        BaseProduct?             @relation(fields: [localBaseProductId], references: [id])
   printfulProductTemplate PrintfulProductTemplate? @relation(fields: [printfulProductTemplateId], references: [id])
   placementPreset         PlacementPreset?         @relation(fields: [placementPresetId], references: [id])
+  sourceDesignVersion     DesignVersion?            @relation("SelectionSourceDesignVersion", fields: [sourceDesignVersionId], references: [id], onDelete: Restrict)
   mockupAssets            MockupAsset[]
   productListing          CommerceListing?
 
   @@unique([designId, pipeline, positionHash])
   @@index([designId, pipeline])
+  @@index([sourceDesignVersionId])
   @@index([status])
 }
 

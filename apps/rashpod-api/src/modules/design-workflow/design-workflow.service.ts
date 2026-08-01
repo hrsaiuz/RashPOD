@@ -136,7 +136,45 @@ export class DesignWorkflowService {
     if (!design) throw new NotFoundException("Design not found");
     const latestVersion = design.versions[0];
     const previewImageUrl = await this.safeSignedUrl(latestVersion?.fileKey);
-    return { ...design, previewImageUrl, ai: { jobs: aiJobs, suggestions: aiJobs.flatMap((job) => job.suggestions) } };
+    const productSelections = design.productSelections?.map((selection) => ({
+      ...selection,
+      mockupAssets: (selection.mockupAssets ?? []).map((asset) => ({
+        ...asset,
+        imageUrl: this.mockupAssetUrl(asset),
+        thumbnailUrl: this.mockupAssetUrl(asset),
+      })),
+    }));
+    return {
+      ...design,
+      ...(productSelections ? { productSelections } : {}),
+      previewImageUrl,
+      ai: { jobs: aiJobs, suggestions: aiJobs.flatMap((job) => job.suggestions) },
+    };
+  }
+
+  async mockupAssetContent(assetId: string) {
+    const asset = await this.prisma.mockupAsset.findUnique({ where: { id: assetId } });
+    if (!asset?.objectKey) throw new NotFoundException("Mockup asset not found");
+    return {
+      buffer: await this.storage.readAssetObject(asset.objectKey),
+      contentType: asset.contentType ?? "image/png",
+    };
+  }
+
+  private mockupAssetUrl(asset: { id: string; imageUrl: string | null; thumbnailUrl: string | null; objectKey: string | null }) {
+    const current = asset.imageUrl ?? asset.thumbnailUrl;
+    if (current && /^https?:\/\//i.test(current)) return current;
+    if (asset.objectKey) return `/api/proxy/admin/designs/mockup-assets/${asset.id}/content`;
+    return current;
+  }
+
+  private versionForPlacement<T extends { placement?: unknown }>(versions: T[], placement?: string | null) {
+    const normalized = placement?.trim().toUpperCase().replace(/[\s-]+/g, "_");
+    const exact = versions.find((version) => normalized && version.placement === normalized);
+    const defaultVersion = versions.find((version) => !version.placement);
+    // Never borrow artwork from another explicit placement. Legacy/default
+    // versions remain a valid fallback for existing designs.
+    return exact ?? defaultVersion ?? (normalized ? undefined : versions[0]);
   }
 
   async mockupStatus(id: string) {
@@ -171,7 +209,7 @@ export class DesignWorkflowService {
     const [design, baseProduct, template, printArea, preset] = await Promise.all([
       this.prisma.designAsset.findUnique({
         where: { id: designId },
-        include: { versions: { orderBy: { createdAt: "desc" }, take: 1 } },
+        include: { versions: { orderBy: { createdAt: "desc" }, take: 20 } },
       }),
       this.prisma.baseProduct.findUnique({ where: { id: query.localBaseProductId } }),
       this.prisma.mockupTemplate.findUnique({ where: { id: query.mockupTemplateId } }),
@@ -182,7 +220,7 @@ export class DesignWorkflowService {
     ]);
 
     if (!design) throw new NotFoundException("Design not found");
-    const latestVersion = design.versions[0];
+    const latestVersion = this.versionForPlacement(design.versions, printArea?.placement);
     if (!latestVersion?.fileKey) throw new BadRequestException("DESIGN_FILE_MISSING");
 
     if (!baseProduct?.isActive) throw new BadRequestException("PRODUCT_SELECTION_REQUIRED: local base product is not active");
@@ -271,14 +309,14 @@ export class DesignWorkflowService {
     const [design, template, preset] = await Promise.all([
       this.prisma.designAsset.findUnique({
         where: { id: designId },
-        include: { versions: { orderBy: { createdAt: "desc" }, take: 1 } },
+        include: { versions: { orderBy: { createdAt: "desc" }, take: 20 } },
       }),
       this.prisma.printfulProductTemplate.findUnique({ where: { id: query.printfulProductTemplateId } }),
       this.prisma.placementPreset.findUnique({ where: { id: query.placementPresetId } }),
     ]);
 
     if (!design) throw new NotFoundException("Design not found");
-    const latestVersion = design.versions[0];
+    const latestVersion = this.versionForPlacement(design.versions, query.placement);
     if (!latestVersion?.fileKey) throw new BadRequestException("DESIGN_FILE_MISSING");
     if (!template?.active) throw new BadRequestException("PRODUCT_SELECTION_REQUIRED: Printful product template is not active");
     if (!preset?.active || preset.pipeline !== PipelineType.GLOBAL_PRINTFUL) {
@@ -450,7 +488,7 @@ export class DesignWorkflowService {
       "INCH",
     );
 
-    const fileMapping = await this.printfulFiles.ensurePrintfulFileForDesign(designId);
+    const fileMapping = await this.printfulFiles.ensurePrintfulFileForDesign(designId, dto.placement);
     if (!fileMapping.printfulFileId) throw new BadRequestException("PRINTFUL_FILE_UPLOAD_FAILED");
 
     const task = await this.printfulMockup.createMockupTask({
@@ -870,6 +908,11 @@ export class DesignWorkflowService {
       },
       unit === PlacementUnits.PX ? "PX" : "CM",
     );
+    const sourceVersion = this.versionForPlacement(
+      await tx.designVersion.findMany({ where: { designAssetId: designId }, orderBy: { createdAt: "desc" }, take: 20 }),
+      placement,
+    );
+    if (!sourceVersion) throw new BadRequestException("DESIGN_FILE_MISSING");
     const placementConfig = this.localPlacementConfig({ template: selectedTemplate, area, preset, unit, anchor, position });
     const positionHash = this.selectionHash({ pipeline: PipelineType.LOCAL, localBaseProductId: baseProduct.id, presetId: preset?.id ?? null, placement, placementConfig });
 
@@ -880,6 +923,7 @@ export class DesignWorkflowService {
         pipeline: PipelineType.LOCAL,
         localBaseProductId: baseProduct.id,
         placementPresetId: preset?.id ?? null,
+        sourceDesignVersionId: sourceVersion.id,
         placement,
         width: position.width,
         height: position.height,
@@ -895,6 +939,7 @@ export class DesignWorkflowService {
       },
       update: {
         placementPresetId: preset?.id ?? null,
+        sourceDesignVersionId: sourceVersion.id,
         width: position.width,
         height: position.height,
         x: position.x,
@@ -957,6 +1002,11 @@ export class DesignWorkflowService {
       },
       "INCH",
     );
+    const sourceVersion = this.versionForPlacement(
+      await tx.designVersion.findMany({ where: { designAssetId: designId }, orderBy: { createdAt: "desc" }, take: 20 }),
+      placement,
+    );
+    if (!sourceVersion) throw new BadRequestException("DESIGN_FILE_MISSING");
     const placementConfigJson = {
       version: 1,
       selectedVariantIds,
@@ -982,6 +1032,7 @@ export class DesignWorkflowService {
         pipeline: PipelineType.GLOBAL_PRINTFUL,
         printfulProductTemplateId: template.id,
         placementPresetId: preset.id,
+        sourceDesignVersionId: sourceVersion.id,
         placement,
         providerPlacement,
         technique,
@@ -999,6 +1050,7 @@ export class DesignWorkflowService {
       },
       update: {
         placementPresetId: preset.id,
+        sourceDesignVersionId: sourceVersion.id,
         providerPlacement,
         technique,
         width: position.width,

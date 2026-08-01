@@ -111,7 +111,7 @@ export class PrintfulMockupStartHelper {
       const fileId = response.result?.id;
       if (!fileId) throw new Error("PRINTFUL_FILE_UPLOAD_FAILED");
       return { fileId: String(fileId), printfulUrl: response.result?.url ?? null };
-    });
+    }, selection.latestDesignVersion ? { id: selection.latestDesignVersion.id, fileKey: selection.latestDesignVersion.fileKey } : null);
 
     const placementConfig = selection.placementConfigJson as { selectedVariantIds?: string[] } | null;
     const body = buildPrintfulMockupTaskBody({
