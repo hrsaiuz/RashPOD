@@ -14,5 +14,6 @@ dist/
 coverage/
 **/coverage/
 apps/rashpod-worker/worker-artifacts/
+apps/*/local-assets/
 *.log
 *.tsbuildinfo
