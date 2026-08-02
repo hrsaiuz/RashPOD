@@ -643,7 +643,7 @@ export default function BrandingPage() {
             ))}
           </div>
           <div className="mt-4 flex items-center gap-3">
-            <Button variant="primaryBlue" onClick={saveTheme} disabled={themeSaving}>{themeSaving ? "Savingâ€¦" : "Save category mosaic"}</Button>
+            <Button variant="primaryBlue" onClick={saveTheme} disabled={themeSaving}>{themeSaving ? "Saving…" : "Save category mosaic"}</Button>
             {themeSaved && <span className="text-sm text-semantic-successText">Saved.</span>}
           </div>
         </Card>

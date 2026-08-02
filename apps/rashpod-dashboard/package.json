@@ -5,6 +5,10 @@
   "scripts": {
     "dev": "next dev -p 3001",
     "build": "next build",
+    "i18n:check": "node ../../tools/i18n/dashboard-copy.mjs --check",
+    "i18n:prune": "node ../../tools/i18n/dashboard-copy.mjs --prune",
+    "i18n:generate": "node ../../tools/i18n/dashboard-copy.mjs --generate",
+    "i18n:generate:offline": "python ../../tools/i18n/generate-dashboard-catalogs.py",
     "start": "next start -p 3001"
   },
   "dependencies": {

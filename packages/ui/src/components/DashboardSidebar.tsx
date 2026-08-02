@@ -30,6 +30,7 @@ export interface DashboardSidebarProps {
   brandName?: string;
   compact?: boolean;
   onCompactChange?: (compact: boolean) => void;
+  ariaLabel?: string;
 }
 
 const ACCENT_BY_ROLE: Record<string, NonNullable<DashboardSidebarProps["accent"]>> = {
@@ -107,6 +108,7 @@ export const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
   brandName = "RashPOD",
   compact = false,
   onCompactChange,
+  ariaLabel,
 }) => {
   const resolvedAccent: NonNullable<DashboardSidebarProps["accent"]> =
     accent ?? ACCENT_BY_ROLE[role.toLowerCase()] ?? "blue";
@@ -211,7 +213,7 @@ export const DashboardSidebar: React.FC<DashboardSidebarProps> = ({
         compact ? "w-[72px] overflow-x-hidden overflow-y-auto" : "w-[248px] overflow-y-auto",
         className
       )}
-      aria-label={`${role} navigation`}
+      aria-label={ariaLabel ?? `${role} navigation`}
     >
       <div className={compact ? "px-2 py-4" : "p-5"}>
         <div className={cn("flex items-center", compact ? "mb-5 justify-center" : "mb-7 gap-3")}>

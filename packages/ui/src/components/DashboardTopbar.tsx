@@ -13,6 +13,8 @@ export interface DashboardTopbarProps {
   onSignOut: () => void;
   onMobileMenuToggle?: () => void;
   searchSlot?: React.ReactNode;
+  utilitySlot?: React.ReactNode;
+  avatarAlt?: string;
   className?: string;
 }
 
@@ -21,6 +23,8 @@ export const DashboardTopbar: React.FC<DashboardTopbarProps> = ({
   onSignOut,
   onMobileMenuToggle,
   searchSlot,
+  utilitySlot,
+  avatarAlt,
   className,
 }) => {
   const [userMenuOpen, setUserMenuOpen] = React.useState(false);
@@ -64,6 +68,7 @@ export const DashboardTopbar: React.FC<DashboardTopbarProps> = ({
         </div>
 
         <div className="flex items-center gap-3">
+          {utilitySlot}
           <button
             className="relative grid h-11 w-11 place-items-center rounded-xl hover:bg-backoffice-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-backoffice-focus"
             aria-label="Notifications"
@@ -80,7 +85,7 @@ export const DashboardTopbar: React.FC<DashboardTopbarProps> = ({
               aria-expanded={userMenuOpen}
             >
               {user.avatar ? (
-                <img src={user.avatar} alt={`${user.name} avatar`} className="w-8 h-8 rounded-full" />
+                <img src={user.avatar} alt={avatarAlt ?? `${user.name} avatar`} className="w-8 h-8 rounded-full" />
               ) : (
                 <div className="w-8 h-8 rounded-full bg-brand-blueLight flex items-center justify-center">
                   <User size={16} className="text-brand-blue" />

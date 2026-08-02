@@ -24,6 +24,9 @@ export interface DashboardShellProps {
   sidebarAccent?: "blue" | "peach" | "green" | "ink";
   sidebarLogoUrl?: string | null;
   brandName?: string;
+  topbarUtilitySlot?: React.ReactNode;
+  sidebarAriaLabel?: string;
+  topbarAvatarAlt?: string;
 }
 
 export const DashboardShell: React.FC<DashboardShellProps> = ({
@@ -38,6 +41,9 @@ export const DashboardShell: React.FC<DashboardShellProps> = ({
   sidebarAccent,
   sidebarLogoUrl,
   brandName,
+  topbarUtilitySlot,
+  sidebarAriaLabel,
+  topbarAvatarAlt,
 }) => {
   const [mobileSidebarOpen, setMobileSidebarOpen] = React.useState(false);
   const [sidebarCompact, setSidebarCompact] = React.useState(true);
@@ -65,6 +71,7 @@ export const DashboardShell: React.FC<DashboardShellProps> = ({
           brandName={brandName}
           compact={sidebarCompact}
           onCompactChange={updateSidebarCompact}
+          ariaLabel={sidebarAriaLabel}
         />
       </div>
 
@@ -85,6 +92,7 @@ export const DashboardShell: React.FC<DashboardShellProps> = ({
           onNavigate={() => setMobileSidebarOpen(false)}
           className="!w-full !border-r-0"
           compact={false}
+          ariaLabel={sidebarAriaLabel}
         />
       </Drawer>
 
@@ -93,6 +101,8 @@ export const DashboardShell: React.FC<DashboardShellProps> = ({
           user={user}
           onSignOut={onSignOut}
           onMobileMenuToggle={() => setMobileSidebarOpen((v) => !v)}
+          utilitySlot={topbarUtilitySlot}
+          avatarAlt={topbarAvatarAlt}
         />
 
         <main

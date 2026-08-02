@@ -4,6 +4,8 @@ import { ReactNode, useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "../auth/auth-provider";
 import { DashboardShell, DashboardLink, BreadcrumbItem } from "@rashpod/ui";
+import { DashboardLanguageSwitcher } from "../../components/i18n/dashboard-language-switcher";
+import { useDashboardI18n } from "../../components/i18n/dashboard-i18n-provider";
 import {
   LayoutDashboard,
   ShoppingBag,
@@ -174,6 +176,7 @@ export default function DashboardLayout({ children, role }: { children: ReactNod
   const pathname = usePathname();
   const router = useRouter();
   const { user, clearSession } = useAuth();
+  const { t } = useDashboardI18n();
   const [branding, setBranding] = useState<PublicBranding | null>(null);
 
   useEffect(() => {
@@ -203,19 +206,19 @@ export default function DashboardLayout({ children, role }: { children: ReactNod
     }
     return roleLinks.map((l) => ({
       href: l.href,
-      label: l.label,
+      label: t(l.label),
       icon: l.icon,
-      group: l.group,
+      group: l.group ? t(l.group) : undefined,
     }));
-  }, [navRole, user?.role]);
+  }, [navRole, user?.role, t]);
 
   const breadcrumbs: BreadcrumbItem[] = useMemo(() => {
     const segments = pathname.split("/").filter(Boolean);
-    const items: BreadcrumbItem[] = [{ label: "Dashboard", href: "/dashboard" }];
+    const items: BreadcrumbItem[] = [{ label: t("Dashboard"), href: "/dashboard" }];
 
     if (segments.length > 1) {
       items.push({
-        label: ROLE_LABELS[segments[1]] || segments[1],
+        label: t(ROLE_LABELS[segments[1]] || segments[1]),
         href: `/dashboard/${segments[1]}`,
       });
     }
@@ -224,14 +227,14 @@ export default function DashboardLayout({ children, role }: { children: ReactNod
       for (let i = 2; i < segments.length; i++) {
         const label = segments[i].replace(/-/g, " ");
         items.push({
-          label: label.charAt(0).toUpperCase() + label.slice(1),
+          label: t(label.charAt(0).toUpperCase() + label.slice(1)),
           href: `/dashboard/${segments.slice(1, i + 1).join("/")}`,
         });
       }
     }
 
     return items;
-  }, [pathname]);
+  }, [pathname, t]);
 
   const handleSignOut = async () => {
     await clearSession();
@@ -249,29 +252,34 @@ export default function DashboardLayout({ children, role }: { children: ReactNod
 
   return (
     <DashboardShell
-      role={ROLE_LABELS[navRole] || navRole}
+      role={t(ROLE_LABELS[navRole] || navRole)}
       links={links}
       activePath={pathname}
       user={{
-        name: user?.displayName || user?.email || "User",
+        name: user?.displayName || user?.email || t("User"),
         email: user?.email,
       }}
       onSignOut={handleSignOut}
       breadcrumbs={breadcrumbs}
       sidebarLogoUrl={branding?.dashboardLogoUrl ?? null}
       brandName={branding?.theme?.storeName || "RashPOD"}
+      topbarUtilitySlot={<DashboardLanguageSwitcher />}
+      sidebarAriaLabel={t("{role} navigation", { role: t(ROLE_LABELS[navRole] || navRole) })}
+      topbarAvatarAlt={t("{name} avatar", { name: user?.displayName || user?.email || t("User") })}
     >
       {impersonating && (
         <div className="mb-4 flex flex-col gap-3 rounded-2xl border border-semantic-warningBg bg-semantic-warningBg px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="text-sm text-semantic-warningText">
-            <span className="font-semibold">Admin view:</span> you're viewing the {ROLE_LABELS[role] || role} dashboard as
-            an admin. Actions you take are logged with your admin identity.
+            <span className="font-semibold">{t("Admin view:")}</span>{" "}
+            {t("You're viewing the {role} dashboard as an admin. Actions you take are logged with your admin identity.", {
+              role: t(ROLE_LABELS[role] || role),
+            })}
           </div>
           <button
             onClick={() => router.push("/dashboard/admin")}
             className="min-h-11 shrink-0 rounded-pill bg-brand-ink px-4 text-xs font-semibold text-white hover:opacity-90"
           >
-            Exit to admin
+            {t("Exit to admin")}
           </button>
         </div>
       )}
