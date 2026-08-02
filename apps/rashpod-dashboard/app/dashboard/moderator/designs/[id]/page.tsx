@@ -14,7 +14,7 @@ import { GlobalSelectionMockupEditor, LocalSelectionMockupEditor } from "../../.
 import { DesignPreviewCard } from "../../../../../components/design/DesignPreviewCard";
 import { ModeratorDesignStoryReview } from "../../../../../components/design-story/ModeratorDesignStoryReview";
 import { PrintfulModerationCatalog, type PreparedPrintfulProduct, type PrintfulCatalogVariant } from "../../../../../components/moderator/PrintfulModerationCatalog";
-import { MockupErrorHint, PlacementChips, ReadinessChecklist } from "../../moderator-pipeline-helpers";
+import { isMockupConfigurationFailure, isMockupRetryable, MockupErrorHint, PlacementChips, ReadinessChecklist } from "../../moderator-pipeline-helpers";
 import { buildModerationDecisionPayload } from "./moderation-decision-payload";
 import { moderatorPrintAreasForTemplate, preferredAreaForPreset } from "./local-print-area-selection";
 import { useToast } from "../../../../../components/feedback/toast-provider";
@@ -133,6 +133,7 @@ type PrintfulTemplateOption = {
 type PipelineMode = "uzbek" | "global";
 type LocalSelectionForm = {
   id: string;
+  compositionKey: string;
   localBaseProductId: string;
   mockupTemplateId: string;
   printAreaId: string;
@@ -155,6 +156,7 @@ type LocalSelectionForm = {
 
 type GlobalSelectionForm = {
   id: string;
+  compositionKey: string;
   printfulProductTemplateId: string;
   placementPresetId: string;
   widthIn: string;
@@ -357,11 +359,21 @@ export default function Page() {
   function selectLocalProduct(index: number, productId: string) {
     const presets = localPresetsFor(productId);
     const template = localTemplatesFor(productId)[0];
-    const area = template ? printAreasFor(template.id)[0] : undefined;
-    const preset = presets.find((item) => item.id === area?.defaultPresetId)
-      ?? presets.find((item) => item.name.toLowerCase().includes("center"))
-      ?? presets[0];
-    updateLocalSelection(index, { ...localDefaultsFromPreset(preset, area), localBaseProductId: productId, placementPresetId: preset?.id ?? "", mockupTemplateId: template?.id ?? "", printAreaId: area?.id ?? "" });
+    const areas = template ? printAreasFor(template.id) : [];
+    const compositionKey = localSelections[index]?.compositionKey;
+    setLocalSelections((current) => {
+      let placementIndex = 0;
+      return current.map((selection) => {
+        if (selection.compositionKey !== compositionKey) return selection;
+        const area = areas[placementIndex] ?? areas[0];
+        placementIndex += 1;
+        const preset = presets.find((item) => item.id === area?.defaultPresetId)
+          ?? presets.find((item) => item.placement === area?.placement)
+          ?? presets.find((item) => item.name.toLowerCase().includes("center"))
+          ?? presets[0];
+        return { ...selection, ...localDefaultsFromPreset(preset, area), localBaseProductId: productId, placementPresetId: preset?.id ?? "", mockupTemplateId: template?.id ?? "", printAreaId: area?.id ?? "" };
+      });
+    });
   }
 
   function selectLocalPlacementChip(index: number, presetId: string) {
@@ -379,12 +391,41 @@ export default function Page() {
   function selectLocalTemplate(index: number, templateId: string) {
     const current = localSelections[index];
     const candidates = printAreasFor(templateId);
-    const area = candidates.find((item) => item.defaultPresetId === current.placementPresetId)
-      ?? candidates.find((item) => item.placement === presetPlacement(current.placementPresetId))
-      ?? candidates[0];
-    const preset = placementPresets.find((item) => item.id === area?.defaultPresetId)
-      ?? placementPresets.find((item) => item.id === current.placementPresetId);
-    updateLocalSelection(index, { ...localDefaultsFromPreset(preset, area), mockupTemplateId: templateId, printAreaId: area?.id ?? "", placementPresetId: preset?.id ?? "" });
+    setLocalSelections((items) => {
+      let placementIndex = 0;
+      return items.map((item) => {
+        if (item.compositionKey !== current.compositionKey) return item;
+        const wantedPlacement = localPlacement(item, printAreas, placementPresets);
+        const area = candidates.find((candidate) => candidate.placement === wantedPlacement)
+          ?? candidates[placementIndex]
+          ?? candidates[0];
+        placementIndex += 1;
+        const preset = placementPresets.find((candidate) => candidate.id === area?.defaultPresetId)
+          ?? placementPresets.find((candidate) => candidate.placement === area?.placement)
+          ?? placementPresets.find((candidate) => candidate.id === item.placementPresetId);
+        return { ...item, ...localDefaultsFromPreset(preset, area), mockupTemplateId: templateId, printAreaId: area?.id ?? "", placementPresetId: preset?.id ?? "" };
+      });
+    });
+  }
+
+  function addLocalPlacement(index: number) {
+    const source = localSelections[index];
+    if (!source) return;
+    const used = new Set(localSelections.filter((item) => item.compositionKey === source.compositionKey).map((item) => localPlacement(item, printAreas, placementPresets)));
+    const area = printAreasFor(source.mockupTemplateId).find((item) => !used.has(item.placement ?? item.mockupView?.placementCode ?? "FRONT"));
+    if (!area) {
+      toast({ tone: "info", title: "All configured placements are already added" });
+      return;
+    }
+    const preset = placementPresets.find((item) => item.id === area.defaultPresetId)
+      ?? localPresetsFor(source.localBaseProductId).find((item) => item.placement === area.placement);
+    setLocalSelections((current) => [...current, {
+      ...source,
+      id: crypto.randomUUID(),
+      printAreaId: area.id,
+      placementPresetId: preset?.id ?? "",
+      ...localDefaultsFromPreset(preset, area),
+    }]);
   }
 
   function selectPrintArea(index: number, printAreaId: string) {
@@ -549,17 +590,53 @@ export default function Page() {
       ?? presets.find((item) => item.providerPlacement === "front")
       ?? presets[0];
     const variantIds = prepared.product.variants.filter((item) => item.inStock).map((item) => String(item.id));
+    const compositionKey = globalSelections[index]?.compositionKey;
+    const orderedPresets = preset ? [preset, ...presets.filter((item) => item.id !== preset.id)] : presets;
 
     setPrintfulTemplates((current) => [...current.filter((item) => item.id !== template.id), template]);
     setPlacementPresets((current) => [...current.filter((item) => !presets.some((presetItem) => presetItem.id === item.id)), ...presets]);
-    invalidateGlobalPreview(index, {
-      ...globalDefaultsFromPreset(preset),
-      printfulProductTemplateId: template.id,
-      placementPresetId: preset?.id ?? "",
-      technique: defaultTechnique(template),
-      selectedVariantIds: variantIds,
+    setGlobalSelections((current) => {
+      let placementIndex = 0;
+      return current.map((selection) => {
+        if (selection.compositionKey !== compositionKey) return selection;
+        const placementPreset = orderedPresets[placementIndex] ?? orderedPresets[0];
+        placementIndex += 1;
+        return {
+          ...selection,
+          ...globalDefaultsFromPreset(placementPreset),
+          printfulProductTemplateId: template.id,
+          placementPresetId: placementPreset?.id ?? "",
+          technique: defaultTechnique(template),
+          selectedVariantIds: variantIds,
+          previewTaskKey: undefined,
+          previewUrls: undefined,
+          previewLoading: false,
+          editorReady: false,
+          preferContextInitialPlacement: true,
+        };
+      });
     });
     toast({ tone: "success", title: "Printful product selected", description: "Printable areas and current in-stock variants are ready for placement." });
+  }
+
+  function addGlobalPlacement(index: number) {
+    const source = globalSelections[index];
+    if (!source) return;
+    const used = new Set(globalSelections.filter((item) => item.compositionKey === source.compositionKey).map((item) => item.placementPresetId));
+    const preset = globalPresetsFor(source.printfulProductTemplateId).find((item) => !used.has(item.id));
+    if (!preset) {
+      toast({ tone: "info", title: "All configured Printful placements are already added" });
+      return;
+    }
+    setGlobalSelections((current) => [...current, {
+      ...source,
+      id: crypto.randomUUID(),
+      placementPresetId: preset.id,
+      previewTaskKey: undefined,
+      previewUrls: undefined,
+      previewLoading: false,
+      ...globalDefaultsFromPreset(preset),
+    }]);
   }
 
   async function pollPrintfulPreview(selectionId: string, taskKey: string, requestKey: string, signal: AbortSignal, attempt = 0) {
@@ -606,6 +683,7 @@ export default function Page() {
 
   function toLocalPayload() {
     return localSelections.map((selection) => ({
+      compositionKey: selection.compositionKey,
       localBaseProductId: selection.localBaseProductId,
       mockupTemplateId: selection.mockupTemplateId,
       printAreaId: selection.printAreaId,
@@ -635,6 +713,7 @@ export default function Page() {
 
   function toGlobalPayload() {
     return globalSelections.map((selection) => ({
+      compositionKey: selection.compositionKey,
       printfulProductTemplateId: selection.printfulProductTemplateId,
       placementPresetId: selection.placementPresetId,
       placement: presetPlacement(selection.placementPresetId),
@@ -726,14 +805,22 @@ export default function Page() {
 
   const localReady = useMemo(
     () => localSelections.every((selection) =>
-      selection.localBaseProductId && selection.mockupTemplateId && selection.printAreaId && selection.editorReady),
-    [localSelections],
+      selection.localBaseProductId
+      && selection.mockupTemplateId
+      && selection.printAreaId
+      && selection.editorReady
+      && placementArtworkAvailable(detail?.versions, localPlacement(selection, printAreas, placementPresets))),
+    [detail?.versions, localSelections, placementPresets, printAreas],
   );
 
   const globalReady = useMemo(
     () => globalSelections.every((selection) =>
-      selection.printfulProductTemplateId && selection.placementPresetId && selection.selectedVariantIds.length && selection.editorReady),
-    [globalSelections],
+      selection.printfulProductTemplateId
+      && selection.placementPresetId
+      && selection.selectedVariantIds.length
+      && selection.editorReady
+      && placementArtworkAvailable(detail?.versions, placementPresets.find((item) => item.id === selection.placementPresetId)?.placement ?? "FRONT")),
+    [detail?.versions, globalSelections, placementPresets],
   );
 
   const designResolutionOk = Boolean(latest?.widthPx && latest?.heightPx && latest.widthPx >= 800 && latest.heightPx >= 800);
@@ -882,7 +969,7 @@ export default function Page() {
                   <DecisionSection icon={<MapPin size={20} />} title={pipelineMode === "global" ? "Uzbek Base Products" : "Select Base Products"}>
                     <div className="space-y-4">
                       {localSelections.map((selection, index) => (
-                        <SelectionPanel key={selection.id} title={`Local selection ${index + 1}`} onRemove={localSelections.length > 1 ? () => setLocalSelections((current) => current.filter((_, itemIndex) => itemIndex !== index)) : undefined}>
+                        <SelectionPanel key={selection.id} title={compositionPlacementTitle(localSelections, index, "Local product")} onRemove={localSelections.length > 1 ? () => setLocalSelections((current) => current.filter((_, itemIndex) => itemIndex !== index)) : undefined}>
                           <div>
                             <p className="mb-2 text-sm font-medium text-brand-ink">Base product</p>
                             <ProductPickerGrid
@@ -906,6 +993,10 @@ export default function Page() {
                               onSelect={(presetId) => selectLocalPlacementChip(index, presetId)}
                             />
                           </div>
+                          <PlacementArtworkNotice
+                            placement={localPlacement(selection, printAreas, placementPresets)}
+                            versions={detail.versions}
+                          />
                           <div className="mt-4 grid gap-3 md:grid-cols-2">
                             <SelectField label="Placement preset (optional)" value={selection.placementPresetId} onChange={(value) => selectLocalPreset(index, value)} options={localPresetsFor(selection.localBaseProductId).map((item) => ({ value: item.id, label: `${item.name} - ${item.placement}` }))} />
                             <SelectField label="Mockup template" value={selection.mockupTemplateId} onChange={(value) => selectLocalTemplate(index, value)} options={localTemplatesFor(selection.localBaseProductId).map((item) => ({ value: item.id, label: item.name }))} />
@@ -1010,6 +1101,11 @@ export default function Page() {
                             </>
                           ) : null}
                           {selection.printAreaId ? <p className="mt-3 text-xs text-brand-muted">{printAreaSummary(printAreas.find((item) => item.id === selection.printAreaId))}</p> : <p className="mt-3 text-xs text-status-danger">Select an active print area before approval.</p>}
+                          <div className="mt-4 border-t border-surface-borderSoft pt-4">
+                            <Button variant="secondary" size="sm" onClick={() => addLocalPlacement(index)}>
+                              <Plus size={16} /> Add placement to this product
+                            </Button>
+                          </div>
                         </SelectionPanel>
                       ))}
                       <Button variant="secondary" size="sm" onClick={() => setLocalSelections((current) => [...current, createLocalSelection(baseProducts, placementPresets, mockupTemplates, printAreas)])} disabled={configLoading}>
@@ -1028,7 +1124,7 @@ export default function Page() {
                   <DecisionSection icon={<Globe2 size={20} />} title="Printful Products">
                     <div className="space-y-4">
                       {globalSelections.map((selection, index) => (
-                        <SelectionPanel key={selection.id} title={`Printful selection ${index + 1}`} onRemove={globalSelections.length > 1 ? () => removeGlobalSelection(index) : undefined}>
+                        <SelectionPanel key={selection.id} title={compositionPlacementTitle(globalSelections, index, "Printful product")} onRemove={globalSelections.length > 1 ? () => removeGlobalSelection(index) : undefined}>
                           <div>
                             <PrintfulModerationCatalog
                               selectedCatalogProductId={printfulTemplates.find((item) => item.id === selection.printfulProductTemplateId)?.printfulCatalogProductId}
@@ -1052,6 +1148,10 @@ export default function Page() {
                                   onSelect={(presetId) => selectGlobalPreset(index, presetId)}
                                 />
                               </div>
+                              <PlacementArtworkNotice
+                                placement={placementPresets.find((item) => item.id === selection.placementPresetId)?.placement ?? "FRONT"}
+                                versions={detail.versions}
+                              />
                               <div className="mt-4 grid gap-3 md:grid-cols-2 lg:grid-cols-3">
                                 <SelectField label="Printful placement" value={selection.placementPresetId} onChange={(value) => selectGlobalPreset(index, value)} options={globalPresetsFor(selection.printfulProductTemplateId).map((item) => ({ value: item.id, label: `${item.name} - ${item.providerPlacement ?? item.placement}` }))} />
                                 <SelectField label="Technique" value={selection.technique} onChange={(value) => invalidateGlobalPreview(index, { technique: value })} options={techniqueOptionsFor(selection.printfulProductTemplateId, printfulTemplates)} />
@@ -1138,6 +1238,11 @@ export default function Page() {
                                   <NumberField label="Scale" value={selection.scale} onChange={(value) => invalidateGlobalPreview(index, { scale: value, editorReady: false, preferContextInitialPlacement: false })} />
                                 </div>
                               ) : null}
+                              <div className="mt-4 border-t border-surface-borderSoft pt-4">
+                                <Button variant="secondary" size="sm" onClick={() => addGlobalPlacement(index)}>
+                                  <Plus size={16} /> Add placement to this product
+                                </Button>
+                              </div>
                               {!selection.editorReady ? <p className="mt-2 text-xs text-status-warning">Use the visual placement controls once to validate numeric changes.</p> : null}
                             </>
                           ) : null}
@@ -1208,21 +1313,31 @@ export default function Page() {
                 ) : null}
                 {detail.productSelections?.length ? (
                   <div className="space-y-4">
-                    {detail.productSelections.map((selection) => (
+                    {detail.productSelections.map((selection) => {
+                      const failedAsset = selection.mockupAssets?.find((asset) => asset.status === "FAILED");
+                      const retryable = isMockupRetryable(selection.errorMessage, failedAsset?.metadataJson);
+                      const configurationFailure = isMockupConfigurationFailure(selection.errorMessage);
+                      const sourceVersion = detail.versions?.find((version) => version.id === selection.sourceDesignVersionId);
+                      const artworkLabel = sourceVersion?.placement
+                        ? `Dedicated ${formatPlacementLabel(sourceVersion.placement)} artwork`
+                        : "Default artwork fallback";
+                      return (
                       <div key={selection.id} className="rounded-xl border border-surface-borderSoft p-4">
                         <div className="flex flex-wrap items-center justify-between gap-3">
                           <div>
                             <p className="font-semibold text-brand-ink">{selection.pipeline} · {selection.placement}</p>
+                            <p className="mt-1 text-xs font-medium text-brand-muted">Artwork: {artworkLabel}</p>
                             {selection.errorMessage ? (
                               <>
-                                <p className="mt-1 text-sm text-status-danger">{selection.errorMessage}</p>
-                                <MockupErrorHint code={selection.errorMessage} />
+                                <p className="mt-2 text-xs font-semibold uppercase tracking-wide text-status-danger">{selection.errorMessage}</p>
+                                <MockupErrorHint code={selection.errorMessage} details={failedAsset?.metadataJson} />
                               </>
                             ) : null}
                           </div>
                           <div className="flex items-center gap-2">
                             <StatusBadge status={selection.status} />
-                            {selection.status === "MOCKUP_FAILED" ? <Button size="sm" variant="secondary" onClick={() => retryMockup(selection.id)} disabled={submitting}>Retry</Button> : null}
+                            {selection.status === "MOCKUP_FAILED" && retryable ? <Button size="sm" variant="secondary" onClick={() => retryMockup(selection.id)} disabled={submitting}>Retry</Button> : null}
+                            {selection.status === "MOCKUP_FAILED" && !retryable && configurationFailure && canModerate ? <Button size="sm" variant="secondary" onClick={() => openWorkflowSection(2, "pipeline-approval")}>Review setup</Button> : null}
                           </div>
                         </div>
                         {selection.mockupAssets?.length ? (
@@ -1246,7 +1361,8 @@ export default function Page() {
                           </div>
                         ) : <p className="mt-3 text-sm text-brand-muted">No mockup assets have been created for this selection yet.</p>}
                       </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 ) : (
                   <p className="text-brand-muted">No product selections have been approved yet.</p>
@@ -1455,7 +1571,7 @@ function createLocalSelection(products: BaseProductOption[], presets: PlacementP
   const area = areas.find((item) => item.isActive !== false && item.mockupView?.isActive !== false && item.mockupTemplateId === template?.id);
   const preset = presets.find((item) => item.id === area?.defaultPresetId && item.active !== false)
     ?? presets.find((item) => item.active !== false && item.pipeline === "LOCAL" && (!item.localBaseProductId || item.localBaseProductId === product?.id));
-  return { id: crypto.randomUUID(), localBaseProductId: product?.id ?? "", mockupTemplateId: template?.id ?? "", printAreaId: area?.id ?? "", placementPresetId: preset?.id ?? "", ...localDefaultsFromPreset(preset, area) };
+  return { id: crypto.randomUUID(), compositionKey: crypto.randomUUID(), localBaseProductId: product?.id ?? "", mockupTemplateId: template?.id ?? "", printAreaId: area?.id ?? "", placementPresetId: preset?.id ?? "", ...localDefaultsFromPreset(preset, area) };
 }
 
 function createGlobalSelection(templates: PrintfulTemplateOption[], presets: PlacementPresetOption[]): GlobalSelectionForm {
@@ -1464,6 +1580,7 @@ function createGlobalSelection(templates: PrintfulTemplateOption[], presets: Pla
   const variantIds = variantIdsFromTemplate(template);
   return {
     id: crypto.randomUUID(),
+    compositionKey: crypto.randomUUID(),
     printfulProductTemplateId: template?.id ?? "",
     placementPresetId: preset?.id ?? "",
     technique: defaultTechnique(template),
@@ -1493,7 +1610,7 @@ function techniqueOptionsFor(templateId: string, templates: PrintfulTemplateOpti
   return values.map((value) => ({ value, label: value }));
 }
 
-function localDefaultsFromPreset(preset?: PlacementPresetOption, area?: PrintAreaOption): Omit<LocalSelectionForm, "id" | "localBaseProductId" | "mockupTemplateId" | "printAreaId" | "placementPresetId"> {
+function localDefaultsFromPreset(preset?: PlacementPresetOption, area?: PrintAreaOption): Omit<LocalSelectionForm, "id" | "compositionKey" | "localBaseProductId" | "mockupTemplateId" | "printAreaId" | "placementPresetId"> {
   const configuredScale = optionalNumber(preset?.defaultScale) ?? 1;
   const scale = area
     ? Math.max(area.minScale, Math.min(area.maxScale, configuredScale))
@@ -1531,6 +1648,15 @@ function localDefaultsFromPreset(preset?: PlacementPresetOption, area?: PrintAre
   };
 }
 
+function compositionPlacementTitle<T extends { compositionKey: string }>(items: T[], index: number, prefix: string) {
+  const current = items[index];
+  if (!current) return prefix;
+  const keys = [...new Set(items.map((item) => item.compositionKey))];
+  const group = items.filter((item) => item.compositionKey === current.compositionKey);
+  const placementIndex = group.indexOf(current);
+  return `${prefix} ${keys.indexOf(current.compositionKey) + 1} · Placement ${placementIndex + 1}`;
+}
+
 function variantLabel(template: PrintfulTemplateOption | undefined, variantId: string) {
   const variant = template?.variantOptions?.find((item) => String(item.id) === variantId);
   if (!variant) return `Variant ${variantId}`;
@@ -1544,7 +1670,7 @@ function localPlacement(selection: LocalSelectionForm, areas: PrintAreaOption[],
   return area?.placement || area?.mockupView?.placementCode || "FRONT";
 }
 
-function globalDefaultsFromPreset(preset?: PlacementPresetOption): Omit<GlobalSelectionForm, "id" | "printfulProductTemplateId" | "placementPresetId" | "technique" | "targetMarketplaces" | "selectedVariantIds" | "previewTaskKey" | "previewUrls" | "previewLoading"> {
+function globalDefaultsFromPreset(preset?: PlacementPresetOption): Omit<GlobalSelectionForm, "id" | "compositionKey" | "printfulProductTemplateId" | "placementPresetId" | "technique" | "targetMarketplaces" | "selectedVariantIds" | "previewTaskKey" | "previewUrls" | "previewLoading"> {
   return {
     widthIn: stringValue(preset?.defaultWidthIn, "4"),
     heightIn: stringValue(preset?.defaultHeightIn, "4"),
@@ -1554,6 +1680,40 @@ function globalDefaultsFromPreset(preset?: PlacementPresetOption): Omit<GlobalSe
     editorReady: false,
     preferContextInitialPlacement: true,
   };
+}
+
+function formatPlacementLabel(value: string) {
+  return value.toLowerCase().replace(/_/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function PlacementArtworkNotice(props: {
+  placement: string;
+  versions?: Array<{ id: string; placement?: string | null }>;
+}) {
+  const normalized = props.placement.trim().toUpperCase().replace(/[\s-]+/g, "_");
+  const dedicated = props.versions?.find((version) => version.placement === normalized);
+  const fallback = props.versions?.find((version) => !version.placement);
+  const available = dedicated ?? fallback;
+  return (
+    <div className={`mt-3 rounded-xl border px-3 py-2 text-sm ${available ? "border-brand-blue/20 bg-brand-lightBlue/20 text-brand-ink" : "border-status-danger/25 bg-status-danger/5 text-status-danger"}`}>
+      <p className="font-medium">
+        {dedicated
+          ? `Using dedicated ${formatPlacementLabel(normalized)} artwork`
+          : fallback
+            ? `No dedicated ${formatPlacementLabel(normalized)} artwork; using legacy default artwork`
+            : `Missing ${formatPlacementLabel(normalized)} artwork`}
+      </p>
+      {!available ? <p className="mt-1 text-xs">Ask the designer to upload artwork for this placement before approval.</p> : null}
+    </div>
+  );
+}
+
+function placementArtworkAvailable(
+  versions: Array<{ placement?: string | null }> | undefined,
+  placement: string,
+) {
+  const normalized = placement.trim().toUpperCase().replace(/[\s-]+/g, "_");
+  return Boolean(versions?.some((version) => version.placement === normalized || !version.placement));
 }
 
 function defaultTechnique(template?: PrintfulTemplateOption) {

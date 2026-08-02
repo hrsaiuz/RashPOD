@@ -61,6 +61,10 @@ export class ModerationPositionDto {
 
 export class LocalSelectionDto {
   @IsString()
+  @IsOptional()
+  compositionKey?: string;
+
+  @IsString()
   localBaseProductId!: string;
 
   @IsString()
@@ -93,6 +97,10 @@ export class LocalSelectionDto {
 }
 
 export class GlobalPrintfulSelectionDto {
+  @IsString()
+  @IsOptional()
+  compositionKey?: string;
+
   @IsString()
   printfulProductTemplateId!: string;
 

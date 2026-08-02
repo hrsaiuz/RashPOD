@@ -109,6 +109,32 @@ describe("PipelineMockupJobHandler", () => {
     expect(repo.assets.every((asset) => asset.status === "FAILED")).toBe(true);
   });
 
+  it("persists actionable details for a non-retryable Printful validation failure", async () => {
+    const repo = createRepo();
+    repo.selection.pipeline = "GLOBAL_PRINTFUL";
+    repo.selection.printfulProductTemplate = { id: "pt_1", displayName: "Printful Tee" };
+    process.env.PRINTFUL_ENABLED = "true";
+    process.env.PRINTFUL_API_TOKEN = "test-token";
+    const printfulError = new Error("PRINTFUL_REQUEST_FAILED:400") as Error & { responseBody?: unknown; printfulOperation?: string };
+    printfulError.responseBody = { error: { message: "Variant 401 does not support placement sleeve_left" }, request_id: "req_400" };
+    printfulError.printfulOperation = "CREATE_MOCKUP_TASK";
+    const helper = { ensureFileAndCreateTask: jest.fn(async () => { throw printfulError; }) };
+    const handler = new PipelineMockupJobHandler(repo, renderer, helper);
+
+    const result = await handler.handlePrintfulMockups({ designProductSelectionId: "sel_1" });
+
+    expect(result).toEqual({ failed: true, errorCode: "PRINTFUL_REQUEST_FAILED:400", retryable: false });
+    expect(repo.selection.errorMessage).toBe("PRINTFUL_REQUEST_FAILED:400");
+    expect(repo.assets.every((asset) => asset.status === "FAILED" && asset.failureReason === "PRINTFUL_REQUEST_FAILED:400")).toBe(true);
+    expect(repo.assets[0].metadataJson).toEqual(expect.objectContaining({
+      retryable: false,
+      providerStatus: 400,
+      providerMessage: "Variant 401 does not support placement sleeve_left",
+      providerRequestId: "req_400",
+      operation: "CREATE_MOCKUP_TASK",
+    }));
+  });
+
   it("persists failure reasons when rendering fails", async () => {
     const repo = createRepo();
     const failingRenderer = {

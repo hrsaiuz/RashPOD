@@ -59,6 +59,14 @@ export class OrdersService {
           where: { provider: "PRINTFUL", status: "PUBLISHED" },
           orderBy: { updatedAt: "desc" },
         },
+        productComposition: {
+          include: {
+            selections: {
+              orderBy: { createdAt: "asc" },
+              include: { placementPreset: true, mockupAssets: { orderBy: { createdAt: "asc" } } },
+            },
+          },
+        },
       },
     });
   }
@@ -93,6 +101,14 @@ export class OrdersService {
             marketplacePublications: {
               where: { provider: "PRINTFUL", status: "PUBLISHED" },
               orderBy: { updatedAt: "desc" },
+            },
+            productComposition: {
+              include: {
+                selections: {
+                  orderBy: { createdAt: "asc" },
+                  include: { placementPreset: true, mockupAssets: { orderBy: { createdAt: "asc" } } },
+                },
+              },
             },
           },
         },
@@ -790,7 +806,7 @@ export class OrdersService {
         reasons.push("Listing is missing base product");
       }
       if (!listing.designAssetId || !listing.designAsset) reasons.push("Listing is missing design");
-      if (!listing.designProductSelectionId || !listing.designProductSelection) reasons.push("Listing is missing placement snapshot");
+      if ((!listing.designProductSelectionId || !listing.designProductSelection) && !listing.productComposition?.selections.length) reasons.push("Listing is missing placement snapshots");
       const readyMockups = this.readyMockups(listing);
       const readyTypes = new Set(readyMockups.map((asset) => asset.mockupType));
       if (!readyTypes.has("MAIN")) reasons.push("Listing requires a ready main image");
@@ -802,12 +818,15 @@ export class OrdersService {
   }
 
   private readyMockups(listing: CheckoutListing) {
-    return listing.designProductSelection?.mockupAssets.filter(
+    const assets = listing.productComposition?.selections.flatMap((selection) => selection.mockupAssets)
+      ?? listing.designProductSelection?.mockupAssets
+      ?? [];
+    return assets.filter(
       (asset) =>
         (asset.status === "READY" || asset.status === "GENERATED") &&
         !asset.archivedAt &&
         Boolean(asset.imageUrl || asset.objectKey),
-    ) ?? [];
+    );
   }
 
   private buildOrderItemSnapshot(item: CheckoutCartItem, deliveryFeeAllocation: number) {
@@ -822,6 +841,7 @@ export class OrdersService {
     const readyMockups = this.readyMockups(listing);
     const firstMockup = readyMockups[0];
     const selection = listing.designProductSelection;
+    const compositionSelections = listing.productComposition?.selections ?? (selection ? [selection] : []);
     const baseProduct = listing.localBaseProduct;
     const productType = baseProduct?.productType;
     const latestVersion = listing.designAsset.versions[0];
@@ -866,6 +886,23 @@ export class OrdersService {
         publishedAt: listing.publishedAt,
       },
       placementSnapshot: this.cleanJson({
+        productCompositionId: listing.productCompositionId,
+        placements: compositionSelections.map((item) => ({
+          selectionId: item.id,
+          placement: item.placement,
+          placementPresetId: item.placementPresetId,
+          x: item.x,
+          y: item.y,
+          top: item.top,
+          left: item.left,
+          width: item.width,
+          height: item.height,
+          scale: item.scale,
+          rotation: item.rotation,
+          units: item.units,
+          placementConfigJson: item.placementConfigJson,
+          sourceDesignVersionId: item.sourceDesignVersionId,
+        })),
         selectionId: selection?.id,
         placement: selection?.placement,
         placementPresetId: selection?.placementPresetId,

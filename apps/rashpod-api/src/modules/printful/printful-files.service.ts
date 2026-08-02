@@ -27,7 +27,7 @@ export class PrintfulFilesService {
         where: { designId, status: "READY", printfulFileId: { not: null } },
         orderBy: { updatedAt: "desc" },
       });
-      if (existing?.printfulFileId) return existing;
+      if (existing?.printfulFileId && existing.printfulUrl) return existing;
     }
 
     const fileKey = sourceVersion.fileKey;

@@ -25,6 +25,12 @@ export interface PrintfulMockupSelectionInput {
     top?: number | null;
     scale?: number | null;
   };
+  printArea: {
+    width: number;
+    height: number;
+    left?: number | null;
+    top?: number | null;
+  };
   variantIds?: string[] | null;
 }
 

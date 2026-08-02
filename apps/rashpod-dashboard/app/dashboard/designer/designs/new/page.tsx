@@ -191,6 +191,7 @@ export default function NewDesignPage() {
         widthPx: dims?.width ?? 0,
         heightPx: dims?.height ?? 0,
         dpi: 300,
+        placement: "FRONT",
       });
     } catch (err) {
       setError(uploadStepMessage("create-version", err));

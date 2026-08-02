@@ -29,6 +29,7 @@ export interface PipelineSelectionRecord {
   pipeline: "LOCAL" | "GLOBAL_PRINTFUL" | "GLOBAL_POD";
   status: PipelineSelectionStatus;
   errorMessage?: string;
+  productCompositionId?: string | null;
   design?: { id: string; title: string; designerId: string };
   latestDesignVersion?: { id: string; fileKey: string; widthPx?: number | null; heightPx?: number | null; dpi?: number | null; hasTransparency?: boolean | null } | null;
   placement?: string;
@@ -67,6 +68,8 @@ export interface MockupAssetRecord {
   status: "PENDING" | "PROCESSING" | "GENERATED" | "READY" | "FAILED" | "REPLACED" | "ARCHIVED";
   imageUrl?: string | null;
   objectKey?: string | null;
+  failureReason?: string | null;
+  metadataJson?: unknown;
 }
 
 export type MarketplacePublicationStatus = "NOT_SELECTED" | "DRAFT" | "QUEUED" | "PUBLISHING" | "PUBLISHED" | "FAILED" | "NEEDS_REVIEW";
@@ -90,12 +93,14 @@ export interface MarketplacePublicationRecord {
     pipeline?: "LOCAL" | "GLOBAL_PRINTFUL" | "GLOBAL_POD" | null;
     mockupAssetIds?: unknown;
     designProductSelectionId?: string | null;
+    productCompositionId?: string | null;
     printfulProductTemplateId?: string | null;
   };
 }
 
 export interface MarketplacePublicationPublishContext extends MarketplacePublicationRecord {
   selection?: PipelineSelectionRecord | null;
+  compositionSelections?: PipelineSelectionRecord[];
   printfulFileId?: string | null;
   mockupAssets?: Array<MockupAssetRecord & { mockupType: MockupAssetRecord["mockupType"] }>;
   printfulProductTemplate?: PipelineSelectionRecord["printfulProductTemplate"];
@@ -281,7 +286,7 @@ export interface WorkerRepository {
     designId: string,
     uploadFromUrl: (url: string) => Promise<{ fileId: string; printfulUrl?: string | null }>,
     sourceVersion?: { id: string; fileKey: string } | null,
-  ): Promise<{ printfulFileId: string }>;
+  ): Promise<{ printfulFileId: string; printfulUrl?: string | null }>;
   enqueueWorkerJob?(input: { type: string; payload: Record<string, unknown>; nextRunAt?: Date; idempotencyKey?: string }): Promise<{ jobId: string }>;
   getMockupAsset?(id: string): Promise<MockupAssetRecord | null>;
   countProcessingMockupAssets?(selectionId: string): Promise<number>;

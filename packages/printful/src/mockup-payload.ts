@@ -6,6 +6,13 @@ export type PrintfulPlacementInput = {
   scale?: number | null;
 };
 
+export type PrintfulPrintAreaInput = {
+  width: number;
+  height: number;
+  left?: number | null;
+  top?: number | null;
+};
+
 export type PrintfulTemplateLike = {
   printfulCatalogProductId: string;
   printfulVariantIds: unknown;
@@ -21,23 +28,36 @@ function stringArray(value: unknown) {
 
 export function buildPrintfulMockupTaskBody(input: {
   template: PrintfulTemplateLike;
-  fileId?: string | null;
   fileUrl?: string | null;
   placement?: string | null;
   technique?: string | null;
   position: PrintfulPlacementInput;
+  printArea: PrintfulPrintAreaInput;
   variantIds?: string[] | null;
 }) {
   const placement = input.placement || input.template.defaultPlacement;
   const technique = input.technique || input.template.defaultTechnique;
   const allowedPlacements = stringArray(input.template.allowedPlacements);
   const allowedTechniques = stringArray(input.template.allowedTechniques);
-  const variantIds = input.variantIds?.length ? input.variantIds : stringArray(input.template.printfulVariantIds);
+  const variantIds = (input.variantIds?.length ? input.variantIds : stringArray(input.template.printfulVariantIds))
+    .map((id) => Number(id))
+    .filter((id) => Number.isSafeInteger(id) && id > 0);
 
   if (!allowedPlacements.includes(placement)) throw new Error("INVALID_PLACEMENT");
   if (!allowedTechniques.includes(technique)) throw new Error("INVALID_PRINTFUL_TECHNIQUE");
   if (variantIds.length === 0) throw new Error("INVALID_PRINTFUL_VARIANT");
-  if (!input.fileId && !input.fileUrl) throw new Error("PRINTFUL_FILE_UPLOAD_FAILED");
+  if (!input.fileUrl) throw new Error("PRINTFUL_FILE_UPLOAD_FAILED");
+
+  const unitsPerInch = 100;
+  const scale = input.position.scale ?? 1;
+  const areaLeft = input.printArea.left ?? 0;
+  const areaTop = input.printArea.top ?? 0;
+  const areaWidth = positiveInt(input.printArea.width * unitsPerInch);
+  const areaHeight = positiveInt(input.printArea.height * unitsPerInch);
+  const width = positiveInt((input.position.width ?? input.printArea.width) * scale * unitsPerInch);
+  const height = positiveInt((input.position.height ?? input.printArea.height) * scale * unitsPerInch);
+  const left = Math.round(((input.position.left ?? areaLeft) - areaLeft) * unitsPerInch);
+  const top = Math.round(((input.position.top ?? areaTop) - areaTop) * unitsPerInch);
 
   return {
     catalog_product_id: input.template.printfulCatalogProductId,
@@ -46,15 +66,14 @@ export function buildPrintfulMockupTaskBody(input: {
     files: [
       {
         placement,
-        technique,
-        file_id: input.fileId ?? undefined,
-        image_url: input.fileUrl ?? undefined,
+        image_url: input.fileUrl,
         position: {
-          width: input.position.width,
-          height: input.position.height,
-          left: input.position.left,
-          top: input.position.top,
-          scale: input.position.scale ?? 1,
+          area_width: areaWidth,
+          area_height: areaHeight,
+          width,
+          height,
+          left,
+          top,
         },
       },
     ],
@@ -68,6 +87,7 @@ export function buildPrintfulSyncProductPayload(input: {
   retailPrice: string;
   fileId: string;
   placement: string;
+  files?: Array<{ fileId: string; placement: string }>;
   externalProductId?: string;
   externalVariantId?: (variantId: string) => string;
 }) {
@@ -81,7 +101,13 @@ export function buildPrintfulSyncProductPayload(input: {
       variant_id: Number(variantId),
       external_id: input.externalVariantId?.(variantId),
       retail_price: input.retailPrice,
-      files: [{ type: input.placement, id: input.fileId }],
+      files: (input.files?.length ? input.files : [{ fileId: input.fileId, placement: input.placement }])
+        .map((file) => ({ type: file.placement, id: file.fileId })),
     })),
   };
+}
+
+function positiveInt(value: number) {
+  if (!Number.isFinite(value) || value <= 0) throw new Error("INVALID_PLACEMENT");
+  return Math.max(1, Math.round(value));
 }

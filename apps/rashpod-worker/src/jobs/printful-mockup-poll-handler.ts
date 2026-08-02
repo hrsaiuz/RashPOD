@@ -1,4 +1,4 @@
-import { PrintfulApiClient, buildPrintfulMockupTaskBody, extractMockupUrls } from "@rashpod/printful";
+import { PrintfulApiClient, buildPrintfulMockupTaskBody, extractMockupUrls, withPrintfulOperation } from "@rashpod/printful";
 import { createArtifactStore } from "../artifact-store";
 import { createSignedReadUrl } from "../gcs-signing";
 import { WorkerRepository } from "../repository";
@@ -107,16 +107,27 @@ export class PrintfulMockupStartHelper {
     if (!selection?.printfulProductTemplate) throw new Error("INVALID_PRINTFUL_VARIANT");
 
     const file = await repo.ensurePrintfulFileForDesign!(selection.designId, async (url) => {
-      const response = await this.client.uploadFileFromUrl(url);
+      let response;
+      try {
+        response = await this.client.uploadFileFromUrl(url);
+      } catch (error) {
+        throw withPrintfulOperation(error, "UPLOAD_DESIGN_FILE");
+      }
       const fileId = response.result?.id;
       if (!fileId) throw new Error("PRINTFUL_FILE_UPLOAD_FAILED");
       return { fileId: String(fileId), printfulUrl: response.result?.url ?? null };
     }, selection.latestDesignVersion ? { id: selection.latestDesignVersion.id, fileKey: selection.latestDesignVersion.fileKey } : null);
 
-    const placementConfig = selection.placementConfigJson as { selectedVariantIds?: string[] } | null;
+    const placementConfig = selection.placementConfigJson as {
+      selectedVariantIds?: string[];
+      printAreaInches?: { printAreaWidthIn?: number; printAreaHeightIn?: number; areaLeftIn?: number; areaTopIn?: number };
+    } | null;
+    const printArea = placementConfig?.printAreaInches;
+    if (!printArea?.printAreaWidthIn || !printArea.printAreaHeightIn) throw new Error("PRINTFUL_PRINT_AREA_MISSING");
+    if (!file.printfulUrl) throw new Error("PRINTFUL_FILE_UPLOAD_FAILED");
     const body = buildPrintfulMockupTaskBody({
       template: selection.printfulProductTemplate,
-      fileId: file.printfulFileId,
+      fileUrl: file.printfulUrl,
       placement: selection.providerPlacement ?? selection.placement?.toLowerCase(),
       technique: selection.technique ?? undefined,
       variantIds: placementConfig?.selectedVariantIds,
@@ -127,9 +138,20 @@ export class PrintfulMockupStartHelper {
         top: selection.top,
         scale: selection.scale,
       },
+      printArea: {
+        width: printArea.printAreaWidthIn,
+        height: printArea.printAreaHeightIn,
+        left: printArea.areaLeftIn,
+        top: printArea.areaTopIn,
+      },
     });
     const { catalog_product_id, ...payload } = body;
-    const taskResponse = await this.client.createMockupTask(catalog_product_id, payload);
+    let taskResponse;
+    try {
+      taskResponse = await this.client.createMockupTask(catalog_product_id, payload);
+    } catch (error) {
+      throw withPrintfulOperation(error, "CREATE_MOCKUP_TASK");
+    }
     const taskKey = taskResponse.result?.task_key;
     if (!taskKey) throw new Error("PRINTFUL_MOCKUP_TASK_FAILED");
 

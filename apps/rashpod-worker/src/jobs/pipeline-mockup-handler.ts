@@ -1,6 +1,7 @@
 import { PipelineRenderContext, RenderedFile, SharpRenderer } from "../renderer";
 import { MockupAssetRecord, PipelineSelectionRecord, WorkerRepository } from "../repository";
 import { PrintfulMockupStartHelper } from "./printful-mockup-poll-handler";
+import { summarizePrintfulFailure, type PrintfulFailureSummary } from "@rashpod/printful";
 
 export interface PipelineMockupRendererPort {
   renderListingVariant(selectionId: string, variant: "main" | "lifestyle" | "closeup"): Promise<RenderedFile>;
@@ -9,13 +10,14 @@ export interface PipelineMockupRendererPort {
 }
 
 export class PipelineMockupJobHandler {
-  private readonly printfulHelper: PrintfulMockupStartHelper;
+  private readonly printfulHelper: Pick<PrintfulMockupStartHelper, "ensureFileAndCreateTask">;
 
   constructor(
     private readonly repo: WorkerRepository,
     private readonly renderer: PipelineMockupRendererPort = new SharpRenderer(),
+    printfulHelper?: Pick<PrintfulMockupStartHelper, "ensureFileAndCreateTask">,
   ) {
-    this.printfulHelper = new PrintfulMockupStartHelper(repo);
+    this.printfulHelper = printfulHelper ?? new PrintfulMockupStartHelper(repo);
   }
 
   async handleLocalMockups(input: { designProductSelectionId: string; workerJobId?: string }) {
@@ -45,9 +47,9 @@ export class PipelineMockupJobHandler {
       const started = await this.printfulHelper.ensureFileAndCreateTask(input.designProductSelectionId, input.workerJobId);
       return { processing: true, taskKey: started.taskKey, printfulFileId: started.printfulFileId };
     } catch (error) {
-      const message = error instanceof Error ? error.message : "PRINTFUL_MOCKUP_FAILED";
-      await this.failSelection(selection.id, message);
-      return { failed: true, errorCode: message };
+      const failure = summarizePrintfulFailure(error);
+      await this.failSelection(selection.id, failure.code, failure);
+      return { failed: true, errorCode: failure.code, retryable: failure.retryable };
     }
   }
 
@@ -135,12 +137,24 @@ export class PipelineMockupJobHandler {
     return this.renderer.renderPreview(selection.id);
   }
 
-  private async failSelection(selectionId: string, errorMessage: string) {
+  private async failSelection(selectionId: string, errorMessage: string, failure?: PrintfulFailureSummary) {
     const repo = this.pipelineRepo();
     await repo.updatePipelineSelection(selectionId, { status: "MOCKUP_FAILED", errorMessage });
     const assets = await repo.listMockupAssets(selectionId);
     for (const asset of assets) {
-      await repo.updateMockupAsset(asset.id, { status: "FAILED", metadataJson: { errorMessage } });
+      await repo.updateMockupAsset(asset.id, {
+        status: "FAILED",
+        failureReason: errorMessage,
+        metadataJson: {
+          errorMessage,
+          retryable: failure?.retryable ?? false,
+          providerStatus: failure?.status,
+          providerMessage: failure?.providerMessage,
+          providerCode: failure?.providerCode,
+          providerRequestId: failure?.requestId,
+          operation: failure?.operation,
+        },
+      });
     }
   }
 

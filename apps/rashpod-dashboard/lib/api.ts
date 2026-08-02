@@ -214,12 +214,14 @@ export interface DesignProductSelection {
   providerPlacement?: string | null;
   technique?: string | null;
   placementConfigJson?: unknown;
+  sourceDesignVersionId?: string | null;
+  productCompositionId?: string | null;
   status: string;
   errorMessage?: string | null;
   localBaseProduct?: unknown;
   printfulProductTemplate?: unknown;
   placementPreset?: unknown;
-  mockupAssets?: Array<{ id: string; mockupType: string; status: string; imageUrl?: string | null; thumbnailUrl?: string | null; metadataJson?: unknown }>;
+  mockupAssets?: Array<{ id: string; mockupType: string; status: string; imageUrl?: string | null; thumbnailUrl?: string | null; failureReason?: string | null; metadataJson?: unknown }>;
 }
 
 export interface DesignWorkflowDetail extends Design {

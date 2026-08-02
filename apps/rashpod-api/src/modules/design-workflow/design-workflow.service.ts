@@ -17,7 +17,7 @@ import {
 } from "@prisma/client";
 import { createHash } from "crypto";
 import { presetToInitialPlacement, presetToInitialPrintfulPlacement, printAreaInchesToPixelRect, PRINTFUL_EDITOR_CANVAS, type PrintAreaRect } from "@rashpod/mockup";
-import { resolvePrintfulPrintArea, type PrintfulPrintAreasMap } from "@rashpod/printful";
+import { isPrintfulFailureRetryable, resolvePrintfulPrintArea, type PrintfulPrintAreasMap } from "@rashpod/printful";
 import { PrismaService } from "../../prisma/prisma.service";
 import { AuditService } from "../audit/audit.service";
 import { DesignStoriesService, type DesignStoryModerationSyncResult } from "../design-stories/design-stories.service";
@@ -117,7 +117,9 @@ export class DesignWorkflowService {
         where: { id },
         include: {
           designer: { select: { id: true, email: true, displayName: true, handle: true } },
-          versions: { orderBy: { createdAt: "desc" }, take: 5 },
+          // A design can have dedicated artwork for every configured placement.
+          // Keep enough history to resolve all placement-specific source versions.
+          versions: { orderBy: { createdAt: "desc" }, take: 20 },
           commercialRights: true,
           moderationCases: { orderBy: { createdAt: "desc" }, take: 10 },
           moderationAudits: { orderBy: { createdAt: "desc" }, take: 10 },
@@ -489,11 +491,12 @@ export class DesignWorkflowService {
     );
 
     const fileMapping = await this.printfulFiles.ensurePrintfulFileForDesign(designId, dto.placement);
-    if (!fileMapping.printfulFileId) throw new BadRequestException("PRINTFUL_FILE_UPLOAD_FAILED");
+    const printfulMockupUrl = fileMapping.printfulUrl ?? fileMapping.originalUrl;
+    if (!printfulMockupUrl) throw new BadRequestException("PRINTFUL_FILE_UPLOAD_FAILED");
 
     const task = await this.printfulMockup.createMockupTask({
       template,
-      fileId: fileMapping.printfulFileId,
+      fileUrl: printfulMockupUrl,
       placement: dto.placement,
       technique: dto.technique ?? template.defaultTechnique,
       variantIds: dto.selectedVariantIds,
@@ -503,6 +506,12 @@ export class DesignWorkflowService {
         left: position.left,
         top: position.top,
         scale: position.scale,
+      },
+      printArea: {
+        width: areaInches.printAreaWidthIn,
+        height: areaInches.printAreaHeightIn,
+        left: areaInches.areaLeftIn,
+        top: areaInches.areaTopIn,
       },
     });
 
@@ -636,6 +645,9 @@ export class DesignWorkflowService {
     if (!selection) throw new NotFoundException("Design product selection not found");
     if (selection.status !== DesignProductSelectionStatus.MOCKUP_FAILED) {
       throw new BadRequestException("MOCKUP_RETRY_NOT_ALLOWED: only failed mockups can be retried");
+    }
+    if (selection.errorMessage?.startsWith("PRINTFUL_REQUEST_FAILED:") && !isPrintfulFailureRetryable(selection.errorMessage)) {
+      throw new BadRequestException("MOCKUP_CONFIGURATION_REQUIRED: fix the Printful product configuration before generating again");
     }
 
     const claimed = await this.prisma.designProductSelection.updateMany({
@@ -913,8 +925,25 @@ export class DesignWorkflowService {
       placement,
     );
     if (!sourceVersion) throw new BadRequestException("DESIGN_FILE_MISSING");
+    const compositionKey = selection.compositionKey?.trim()
+      || createHash("sha256").update(`${baseProduct.id}:${selectedTemplate.id}`).digest("hex");
+    const composition = await tx.productComposition.upsert({
+      where: { designId_pipeline_compositionKey: { designId, pipeline: PipelineType.LOCAL, compositionKey } },
+      create: {
+        designId,
+        pipeline: PipelineType.LOCAL,
+        compositionKey,
+        localBaseProductId: baseProduct.id,
+        mockupTemplateId: selectedTemplate.id,
+        selectedByModeratorId: moderatorId,
+      },
+      update: { selectedByModeratorId: moderatorId },
+    });
+    if (composition.localBaseProductId !== baseProduct.id || composition.mockupTemplateId !== selectedTemplate.id) {
+      throw new BadRequestException("INVALID_PRODUCT_COMPOSITION: all placements in a composition must use the same local product and mockup template");
+    }
     const placementConfig = this.localPlacementConfig({ template: selectedTemplate, area, preset, unit, anchor, position });
-    const positionHash = this.selectionHash({ pipeline: PipelineType.LOCAL, localBaseProductId: baseProduct.id, presetId: preset?.id ?? null, placement, placementConfig });
+    const positionHash = this.selectionHash({ pipeline: PipelineType.LOCAL, compositionKey, localBaseProductId: baseProduct.id, presetId: preset?.id ?? null, placement, placementConfig });
 
     const row = await tx.designProductSelection.upsert({
       where: { designId_pipeline_positionHash: { designId, pipeline: PipelineType.LOCAL, positionHash } },
@@ -924,6 +953,7 @@ export class DesignWorkflowService {
         localBaseProductId: baseProduct.id,
         placementPresetId: preset?.id ?? null,
         sourceDesignVersionId: sourceVersion.id,
+        productCompositionId: composition.id,
         placement,
         width: position.width,
         height: position.height,
@@ -940,6 +970,7 @@ export class DesignWorkflowService {
       update: {
         placementPresetId: preset?.id ?? null,
         sourceDesignVersionId: sourceVersion.id,
+        productCompositionId: composition.id,
         width: position.width,
         height: position.height,
         x: position.x,
@@ -1007,6 +1038,22 @@ export class DesignWorkflowService {
       placement,
     );
     if (!sourceVersion) throw new BadRequestException("DESIGN_FILE_MISSING");
+    const compositionKey = selection.compositionKey?.trim()
+      || createHash("sha256").update(`${template.id}:${selectedVariantIds.slice().sort().join(",")}`).digest("hex");
+    const composition = await tx.productComposition.upsert({
+      where: { designId_pipeline_compositionKey: { designId, pipeline: PipelineType.GLOBAL_PRINTFUL, compositionKey } },
+      create: {
+        designId,
+        pipeline: PipelineType.GLOBAL_PRINTFUL,
+        compositionKey,
+        printfulProductTemplateId: template.id,
+        selectedByModeratorId: moderatorId,
+      },
+      update: { selectedByModeratorId: moderatorId },
+    });
+    if (composition.printfulProductTemplateId !== template.id) {
+      throw new BadRequestException("INVALID_PRODUCT_COMPOSITION: all placements in a composition must use the same Printful product template");
+    }
     const placementConfigJson = {
       version: 1,
       selectedVariantIds,
@@ -1015,6 +1062,7 @@ export class DesignWorkflowService {
     const marketplaces = this.normalizeMarketplaces(selection.targetMarketplaces ?? []);
     const positionHash = this.selectionHash({
       pipeline: PipelineType.GLOBAL_PRINTFUL,
+      compositionKey,
       templateId: template.id,
       presetId: preset.id,
       placement,
@@ -1033,6 +1081,7 @@ export class DesignWorkflowService {
         printfulProductTemplateId: template.id,
         placementPresetId: preset.id,
         sourceDesignVersionId: sourceVersion.id,
+        productCompositionId: composition.id,
         placement,
         providerPlacement,
         technique,
@@ -1051,6 +1100,7 @@ export class DesignWorkflowService {
       update: {
         placementPresetId: preset.id,
         sourceDesignVersionId: sourceVersion.id,
+        productCompositionId: composition.id,
         providerPlacement,
         technique,
         width: position.width,
@@ -1143,10 +1193,10 @@ export class DesignWorkflowService {
     const normalized = providerPlacement.toUpperCase();
     if (normalized === "FRONT") return PlacementKind.FRONT;
     if (normalized === "BACK") return PlacementKind.BACK;
-    if (normalized.includes("LEFT_CHEST")) return PlacementKind.LEFT_CHEST;
-    if (normalized.includes("RIGHT_CHEST")) return PlacementKind.RIGHT_CHEST;
-    if (normalized.includes("LEFT_SLEEVE")) return PlacementKind.LEFT_SLEEVE;
-    if (normalized.includes("RIGHT_SLEEVE")) return PlacementKind.RIGHT_SLEEVE;
+    if (normalized.includes("LEFT_CHEST") || normalized.includes("CHEST_LEFT")) return PlacementKind.LEFT_CHEST;
+    if (normalized.includes("RIGHT_CHEST") || normalized.includes("CHEST_RIGHT")) return PlacementKind.RIGHT_CHEST;
+    if (normalized.includes("LEFT_SLEEVE") || normalized.includes("SLEEVE_LEFT")) return PlacementKind.LEFT_SLEEVE;
+    if (normalized.includes("RIGHT_SLEEVE") || normalized.includes("SLEEVE_RIGHT")) return PlacementKind.RIGHT_SLEEVE;
     if (normalized.includes("WRAP") || normalized.includes("ALL_OVER")) return PlacementKind.FULL_WRAP;
     return PlacementKind.OTHER;
   }

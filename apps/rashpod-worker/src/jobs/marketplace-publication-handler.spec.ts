@@ -193,11 +193,63 @@ describe("MarketplacePublicationJobHandler", () => {
       .handlePublish({ marketplacePublicationId: "pub_1" });
 
     expect(result).toMatchObject({ published: true });
-    expect(repo.ensurePrintfulFileForDesign).toHaveBeenCalledWith("design-1", expect.any(Function));
+    expect(repo.ensurePrintfulFileForDesign).toHaveBeenCalledWith("design-1", expect.any(Function), null);
     expect(client.uploadFileFromUrl).toHaveBeenCalledWith("https://signed.example.test/design.png");
     expect(client.createSyncProduct).toHaveBeenCalledWith(
       expect.objectContaining({
         sync_variants: [expect.objectContaining({ files: [expect.objectContaining({ id: "777" })] })],
+      }),
+      "store-22",
+    );
+  });
+
+  it("publishes all artwork placements from one product composition", async () => {
+    process.env.PRINTFUL_ENABLED = "true";
+    process.env.PRINTFUL_API_TOKEN = "test-token";
+    const repo = createRepo({ marketplace: "PRINTFUL", provider: "PRINTFUL", providerStoreId: "store-22" });
+    const template = {
+      id: "template-1",
+      displayName: "Premium tee",
+      printfulCatalogProductId: "71",
+      printfulVariantIds: ["401"],
+      allowedPlacements: ["front", "sleeve_left"],
+      allowedTechniques: ["dtg"],
+      defaultPlacement: "front",
+      defaultTechnique: "dtg",
+      defaultRetailPrice: "29.99",
+      estimatedBaseCost: null,
+      currency: "USD",
+    };
+    repo.getMarketplacePublicationPublishContext = async () => ({
+      ...repo.publication,
+      productListing: { ...repo.publication.productListing, productCompositionId: "composition-1" },
+      selection: { designId: "design-1", placement: "FRONT", providerPlacement: "front", printfulProductTemplate: template } as any,
+      compositionSelections: [
+        { designId: "design-1", placement: "FRONT", providerPlacement: "front", latestDesignVersion: { id: "front-version", fileKey: "front.png" }, printfulProductTemplate: template },
+        { designId: "design-1", placement: "LEFT_SLEEVE", providerPlacement: "sleeve_left", latestDesignVersion: { id: "sleeve-version", fileKey: "sleeve.png" }, printfulProductTemplate: template },
+      ] as any,
+      printfulProductTemplate: template,
+      mockupAssets: [{ id: "mockup_1", mockupType: "MAIN", status: "GENERATED", imageUrl: "https://example.test/mockup.jpg" }],
+    });
+    repo.ensurePrintfulFileForDesign = jest.fn(async (_designId, _upload, sourceVersion) => ({ printfulFileId: `file-${sourceVersion?.id}` }));
+    const client = {
+      getSyncProduct: jest.fn()
+        .mockRejectedValueOnce(new Error("PRINTFUL_REQUEST_FAILED:404"))
+        .mockResolvedValueOnce({ result: { sync_product: { id: 808 }, sync_variants: [{ id: 9001, variant_id: 401 }] } }),
+      createSyncProduct: jest.fn().mockResolvedValue({ result: { id: 808 } }),
+    };
+
+    const result = await new MarketplacePublicationJobHandler(repo, client as any).handlePublish({ marketplacePublicationId: "pub_1" });
+
+    expect(result).toMatchObject({ published: true });
+    expect(client.createSyncProduct).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sync_variants: [expect.objectContaining({
+          files: [
+            { type: "front", id: "file-front-version" },
+            { type: "sleeve_left", id: "file-sleeve-version" },
+          ],
+        })],
       }),
       "store-22",
     );

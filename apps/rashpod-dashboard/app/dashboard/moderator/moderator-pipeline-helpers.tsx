@@ -61,10 +61,59 @@ export function ReadinessChecklist(props: {
   );
 }
 
-export function MockupErrorHint({ code }: { code?: string | null }) {
+export function MockupErrorHint({ code, details }: { code?: string | null; details?: unknown }) {
   if (!code) return null;
-  const message = MOCKUP_ERROR_HINTS[code] ?? code.replace(/_/g, " ").toLowerCase();
-  return <p className="mt-1 text-xs text-status-danger">{message}</p>;
+  const detail = mockupFailureDetail(details);
+  const message = code.startsWith("PRINTFUL_REQUEST_FAILED:4")
+    ? "Printful rejected this product configuration. Review the product, variants, technique, placement, and artwork file before trying again."
+    : MOCKUP_ERROR_HINTS[code] ?? code.replace(/_/g, " ").toLowerCase();
+  return (
+    <div role="alert" className="mt-2 max-w-2xl rounded-xl border border-status-danger/20 bg-status-danger/5 p-3 text-sm text-status-danger">
+      <p className="font-medium">{message}</p>
+      {detail.providerMessage ? <p className="mt-1">Printful: {detail.providerMessage}</p> : null}
+      <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-brand-muted">
+        {detail.operation ? <span>Stage: {formatPlacementLabel(detail.operation)}</span> : null}
+        {detail.providerStatus ? <span>HTTP {detail.providerStatus}</span> : null}
+        {detail.providerRequestId ? <span>Request: {detail.providerRequestId}</span> : null}
+      </div>
+    </div>
+  );
+}
+
+export function isMockupRetryable(code?: string | null, details?: unknown) {
+  const detail = mockupFailureDetail(details);
+  if (typeof detail.retryable === "boolean") return detail.retryable;
+  if (!code) return false;
+  const match = /^PRINTFUL_REQUEST_FAILED:(\d{3})$/.exec(code);
+  if (match) {
+    const status = Number(match[1]);
+    return status === 408 || status === 409 || status === 425 || status === 429 || status >= 500;
+  }
+  return code === "PRINTFUL_MOCKUP_TIMEOUT" || code === "PRINTFUL_MOCKUP_EMPTY" || code.startsWith("PRINTFUL_MOCKUP_DOWNLOAD_FAILED:");
+}
+
+export function isMockupConfigurationFailure(code?: string | null) {
+  if (!code) return false;
+  return code.startsWith("PRINTFUL_REQUEST_FAILED:4")
+    || code === "INVALID_PLACEMENT"
+    || code === "INVALID_PRINTFUL_TECHNIQUE"
+    || code === "INVALID_PRINTFUL_VARIANT"
+    || code === "POSITION_OUTSIDE_PRINT_AREA"
+    || code === "PRINTFUL_PRINT_AREA_MISSING"
+    || code === "LOCAL_MOCKUP_GENERATION_FAILED";
+}
+
+type MockupFailureDetail = {
+  retryable?: boolean;
+  providerMessage?: string;
+  providerStatus?: number;
+  providerRequestId?: string;
+  operation?: string;
+};
+
+function mockupFailureDetail(value: unknown): MockupFailureDetail {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  return value as MockupFailureDetail;
 }
 
 const MOCKUP_ERROR_HINTS: Record<string, string> = {

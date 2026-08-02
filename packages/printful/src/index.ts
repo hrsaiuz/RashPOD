@@ -3,3 +3,4 @@ export * from "./client";
 export * from "./catalog-mapper";
 export * from "./print-area-parser";
 export * from "./mockup-payload";
+export * from "./errors";

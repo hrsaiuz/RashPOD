@@ -85,26 +85,33 @@ export class MarketplacePublicationJobHandler {
 
   private async publishPrintful(repo: ReturnType<MarketplacePublicationJobHandler["publicationRepo"]>, publication: MarketplacePublicationPublishContext) {
     const template = publication.printfulProductTemplate ?? publication.selection?.printfulProductTemplate;
-    let fileId = publication.printfulFileId;
     if (!template) return this.failPublication(publication, "PRINTFUL_PUBLISH_CONTEXT_MISSING", "The Printful product template is missing.");
-    if (!fileId && publication.selection?.designId && repo.ensurePrintfulFileForDesign) {
+    const selections = publication.compositionSelections?.length ? publication.compositionSelections : publication.selection ? [publication.selection] : [];
+    const files: Array<{ fileId: string; placement: string }> = [];
+    if (selections.length && repo.ensurePrintfulFileForDesign) {
       try {
-        const mapping = await repo.ensurePrintfulFileForDesign(
-          publication.selection.designId,
-          async (url) => {
-            const response = await this.client.uploadFileFromUrl(url);
-            const uploadedId = response.result?.id;
-            if (uploadedId == null) throw new Error("PRINTFUL_FILE_UPLOAD_FAILED");
-            return { fileId: String(uploadedId), printfulUrl: response.result?.url ?? null };
-          },
-        );
-        fileId = mapping.printfulFileId;
+        for (const selection of selections) {
+          const mapping = await repo.ensurePrintfulFileForDesign(
+            selection.designId,
+            async (url) => {
+              const response = await this.client.uploadFileFromUrl(url);
+              const uploadedId = response.result?.id;
+              if (uploadedId == null) throw new Error("PRINTFUL_FILE_UPLOAD_FAILED");
+              return { fileId: String(uploadedId), printfulUrl: response.result?.url ?? null };
+            },
+            selection.latestDesignVersion ? { id: selection.latestDesignVersion.id, fileKey: selection.latestDesignVersion.fileKey } : null,
+          );
+          files.push({ fileId: mapping.printfulFileId, placement: String(selection.providerPlacement ?? selection.placement ?? "front").toLowerCase() });
+        }
       } catch (error) {
         const message = error instanceof Error ? error.message : "PRINTFUL_FILE_UPLOAD_FAILED";
         return this.failPublication(publication, "PRINTFUL_FILE_UPLOAD_FAILED", message);
       }
     }
-    if (!fileId) return this.failPublication(publication, "PRINTFUL_FILE_MISSING", "The approved design file could not be uploaded to Printful.");
+    if (!files.length && publication.printfulFileId) {
+      files.push({ fileId: publication.printfulFileId, placement: String(publication.selection?.providerPlacement ?? publication.selection?.placement ?? template.defaultPlacement ?? "front").toLowerCase() });
+    }
+    if (!files.length) return this.failPublication(publication, "PRINTFUL_FILE_MISSING", "The approved design files could not be uploaded to Printful.");
 
     const publicationMetadata = this.record(publication.metadataJson);
     const configuredVariantIds = Array.isArray(publicationMetadata.variantIds)
@@ -134,8 +141,9 @@ export class MarketplacePublicationJobHandler {
       thumbnailUrl,
       variantIds,
       retailPrice,
-      fileId,
+      fileId: files[0]!.fileId,
       placement,
+      files,
       externalProductId,
       externalVariantId: (variantId) => this.printfulExternalId(`${publication.id}:${variantId}`),
     });

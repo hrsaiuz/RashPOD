@@ -1155,6 +1155,7 @@ model DesignAsset {
   moderationAudits         ModerationAudit[]
   placements               MockupPlacement[]
   productSelections        DesignProductSelection[]
+  productCompositions      ProductComposition[]
   mockupAssets             MockupAsset[]
   printfulFileMappings     PrintfulFileMapping[]
   listings                 CommerceListing[]
@@ -1217,7 +1218,7 @@ model StoryEngagement {
 }
 
 model DesignVersion {
-  id              String   @id @default(uuid())
+  id              String         @id @default(uuid())
   designAssetId   String
   fileKey         String
   widthPx         Int?
@@ -1225,14 +1226,14 @@ model DesignVersion {
   dpi             Int?
   hasTransparency Boolean?
   placement       PlacementKind?
-  createdAt       DateTime @default(now())
+  createdAt       DateTime       @default(now())
 
   designAsset              DesignAsset               @relation(fields: [designAssetId], references: [id])
   moderationCases          DesignModerationCase[]
   placements               MockupPlacement[]
   externalOrderIntakeItems ExternalOrderIntakeItem[]
   gangSheetItems           GangSheetItem[]
-  sourceProductSelections DesignProductSelection[] @relation("SelectionSourceDesignVersion")
+  sourceProductSelections  DesignProductSelection[]  @relation("SelectionSourceDesignVersion")
 
   @@index([designAssetId, placement, createdAt])
 }
@@ -1434,6 +1435,7 @@ model BaseProduct {
   mockupTemplates             MockupTemplate[]
   placementPresets            PlacementPreset[]
   productSelections           DesignProductSelection[]
+  productCompositions         ProductComposition[]
   listings                    CommerceListing[]
   marketplaceCategoryMappings MarketplaceCategoryMapping[]
   podProductMappings          PodProductMapping[]
@@ -1457,12 +1459,13 @@ model MockupTemplate {
   createdAt            DateTime              @default(now())
   updatedAt            DateTime              @updatedAt
 
-  baseProduct   BaseProduct          @relation(fields: [baseProductId], references: [id])
-  tenant        Tenant?              @relation(fields: [tenantId], references: [id], onDelete: SetNull)
-  printAreas    PrintArea[]
-  placements    MockupPlacement[]
-  views         MockupView[]
-  galleryAssets MockupGalleryAsset[]
+  baseProduct         BaseProduct          @relation(fields: [baseProductId], references: [id])
+  tenant              Tenant?              @relation(fields: [tenantId], references: [id], onDelete: SetNull)
+  printAreas          PrintArea[]
+  placements          MockupPlacement[]
+  views               MockupView[]
+  galleryAssets       MockupGalleryAsset[]
+  productCompositions ProductComposition[]
 }
 
 model MockupView {
@@ -1571,9 +1574,10 @@ model PrintfulProductTemplate {
   createdAt                DateTime     @default(now())
   updatedAt                DateTime     @updatedAt
 
-  placementPresets  PlacementPreset[]
-  productSelections DesignProductSelection[]
-  listings          CommerceListing[]
+  placementPresets    PlacementPreset[]
+  productSelections   DesignProductSelection[]
+  productCompositions ProductComposition[]
+  listings            CommerceListing[]
 
   @@unique([provider, printfulCatalogProductId, displayName])
 }
@@ -1822,6 +1826,32 @@ model GeneratedAsset {
   sourcePlacement MockupPlacement @relation(fields: [sourcePlacementId], references: [id])
 }
 
+model ProductComposition {
+  id                        String       @id @default(uuid())
+  designId                  String
+  pipeline                  PipelineType
+  compositionKey            String
+  localBaseProductId        String?
+  mockupTemplateId          String?
+  printfulProductTemplateId String?
+  selectedByModeratorId     String
+  createdAt                 DateTime     @default(now())
+  updatedAt                 DateTime     @updatedAt
+
+  design                  DesignAsset              @relation(fields: [designId], references: [id], onDelete: Cascade)
+  localBaseProduct        BaseProduct?             @relation(fields: [localBaseProductId], references: [id], onDelete: Restrict)
+  mockupTemplate          MockupTemplate?          @relation(fields: [mockupTemplateId], references: [id], onDelete: Restrict)
+  printfulProductTemplate PrintfulProductTemplate? @relation(fields: [printfulProductTemplateId], references: [id], onDelete: Restrict)
+  selections              DesignProductSelection[]
+  productListing          CommerceListing?
+
+  @@unique([designId, pipeline, compositionKey])
+  @@index([designId, pipeline])
+  @@index([localBaseProductId])
+  @@index([mockupTemplateId])
+  @@index([printfulProductTemplateId])
+}
+
 model DesignProductSelection {
   id                        String                       @id @default(uuid())
   designId                  String
@@ -1829,7 +1859,8 @@ model DesignProductSelection {
   localBaseProductId        String?
   printfulProductTemplateId String?
   placementPresetId         String?
-  sourceDesignVersionId      String?
+  sourceDesignVersionId     String?
+  productCompositionId      String?
   placement                 PlacementKind
   providerPlacement         String?
   technique                 String?
@@ -1855,13 +1886,15 @@ model DesignProductSelection {
   localBaseProduct        BaseProduct?             @relation(fields: [localBaseProductId], references: [id])
   printfulProductTemplate PrintfulProductTemplate? @relation(fields: [printfulProductTemplateId], references: [id])
   placementPreset         PlacementPreset?         @relation(fields: [placementPresetId], references: [id])
-  sourceDesignVersion     DesignVersion?            @relation("SelectionSourceDesignVersion", fields: [sourceDesignVersionId], references: [id], onDelete: Restrict)
+  sourceDesignVersion     DesignVersion?           @relation("SelectionSourceDesignVersion", fields: [sourceDesignVersionId], references: [id], onDelete: Restrict)
+  productComposition      ProductComposition?      @relation(fields: [productCompositionId], references: [id], onDelete: Cascade)
   mockupAssets            MockupAsset[]
   productListing          CommerceListing?
 
   @@unique([designId, pipeline, positionHash])
   @@index([designId, pipeline])
   @@index([sourceDesignVersionId])
+  @@index([productCompositionId])
   @@index([status])
 }
 
@@ -1916,6 +1949,7 @@ model CommerceListing {
   localBaseProductId        String?
   printfulProductTemplateId String?
   designProductSelectionId  String?       @unique
+  productCompositionId      String?       @unique
   mockupAssetIds            Json?
   slug                      String        @unique
   price                     Decimal       @db.Decimal(10, 2)
@@ -1938,6 +1972,7 @@ model CommerceListing {
   localBaseProduct         BaseProduct?              @relation(fields: [localBaseProductId], references: [id])
   printfulProductTemplate  PrintfulProductTemplate?  @relation(fields: [printfulProductTemplateId], references: [id])
   designProductSelection   DesignProductSelection?   @relation(fields: [designProductSelectionId], references: [id])
+  productComposition       ProductComposition?       @relation(fields: [productCompositionId], references: [id])
   marketplacePublications  MarketplacePublication[]
   marketplaceExportItems   MarketplaceExportItem[]
   exportedListings         ExportedListing[]
@@ -3410,7 +3445,7 @@ model CommercialOffer {
   offerNumber        String                @unique
   status             CommercialOfferStatus @default(DRAFT)
   subtotal           Decimal               @db.Decimal(10, 2)
-  discount           Decimal               @db.Decimal(10, 2) @default(0)
+  discount           Decimal               @default(0) @db.Decimal(10, 2)
   total              Decimal               @db.Decimal(10, 2)
   terms              String?
   sentAt             DateTime?
@@ -3734,8 +3769,8 @@ model DailyMetric {
 
   tenant Tenant? @relation(fields: [tenantId], references: [id], onDelete: SetNull)
 
-  @@index([tenantId, metricKey, date])
   @@unique([date, metricKey, dimensionType, dimensionId, channel, currency])
+  @@index([tenantId, metricKey, date])
   @@index([metricKey, date])
   @@index([dimensionType, dimensionId, date])
 }

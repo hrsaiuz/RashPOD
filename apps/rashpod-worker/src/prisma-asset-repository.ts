@@ -375,6 +375,7 @@ export class PrismaAssetRepository implements WorkerRepository {
       pipeline: row.pipeline,
       status: row.status,
       errorMessage: row.errorMessage ?? undefined,
+      productCompositionId: row.productCompositionId,
       targetMarketplaces: row.targetMarketplaces,
       placement: row.placement,
       providerPlacement: row.providerPlacement,
@@ -443,7 +444,15 @@ export class PrismaAssetRepository implements WorkerRepository {
       where: { designProductSelectionId: selectionId },
       orderBy: { createdAt: "asc" },
     });
-    return rows.map((row) => ({ id: row.id, mockupType: row.mockupType, status: row.status, imageUrl: row.imageUrl, objectKey: row.objectKey }));
+    return rows.map((row) => ({
+      id: row.id,
+      mockupType: row.mockupType,
+      status: row.status,
+      imageUrl: row.imageUrl,
+      objectKey: row.objectKey,
+      failureReason: row.failureReason,
+      metadataJson: row.metadataJson,
+    }));
   }
 
   async updateMockupAsset(
@@ -493,6 +502,7 @@ export class PrismaAssetRepository implements WorkerRepository {
       include: { design: true, localBaseProduct: true, printfulProductTemplate: true, mockupAssets: true },
     });
     if (!selection || selection.status !== DesignProductSelectionStatus.MOCKUP_READY) return null;
+    if (selection.productCompositionId) return this.createListingDraftForComposition(selection.productCompositionId);
     const existing = await this.prisma.commerceListing.findUnique({ where: { designProductSelectionId: selection.id } });
     if (existing) return { id: existing.id, status: existing.status };
 
@@ -563,6 +573,97 @@ export class PrismaAssetRepository implements WorkerRepository {
     return { id: listing.id, status: listing.status };
   }
 
+  private async createListingDraftForComposition(compositionId: string) {
+    const composition = await this.prisma.productComposition.findUnique({
+      where: { id: compositionId },
+      include: {
+        design: true,
+        localBaseProduct: true,
+        printfulProductTemplate: true,
+        selections: { include: { mockupAssets: true }, orderBy: { createdAt: "asc" } },
+      },
+    });
+    if (!composition) return null;
+    if (!compositionReadyForListing(composition.selections)) return null;
+
+    const primary = composition.selections.find((item) => item.placement === PlacementKind.FRONT) ?? composition.selections[0]!;
+    const generatedAssets = composition.selections.flatMap((item) => item.mockupAssets.map((asset) => ({ ...asset, selection: item })))
+      .filter((asset) => asset.status === "GENERATED" || asset.status === "READY");
+    const publicAssets = selectCompositionGallery(generatedAssets, primary.id);
+    if (publicAssets.length < 3) return null;
+
+    const isLocal = composition.pipeline === PipelineType.LOCAL;
+    const title = isLocal
+      ? `${composition.design.title} ${composition.localBaseProduct?.name ?? "Local product"}`
+      : `${composition.design.title} ${composition.printfulProductTemplate?.displayName ?? "Global product"}`;
+    const slug = `${composition.design.title}-${composition.id}`.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+    const price = isLocal ? (composition.localBaseProduct?.defaultPrice ?? new Prisma.Decimal(0)) : (composition.printfulProductTemplate?.defaultRetailPrice ?? new Prisma.Decimal(0));
+    const cost = isLocal ? composition.localBaseProduct?.baseCost : composition.printfulProductTemplate?.estimatedBaseCost;
+    const royalty = await this.calculateRoyalty(price, cost ?? null);
+
+    const listing = await this.prisma.commerceListing.upsert({
+      where: { productCompositionId: composition.id },
+      create: {
+        type: ListingType.PRODUCT,
+        status: ListingStatus.DRAFT,
+        designerId: composition.design.designerId,
+        designAssetId: composition.designId,
+        pipeline: composition.pipeline,
+        title,
+        slug,
+        price,
+        currency: isLocal ? composition.localBaseProduct?.currency ?? "UZS" : composition.printfulProductTemplate?.currency ?? "USD",
+        cost,
+        designerRoyalty: royalty.amount,
+        localBaseProductId: composition.localBaseProductId,
+        printfulProductTemplateId: composition.printfulProductTemplateId,
+        designProductSelectionId: primary.id,
+        productCompositionId: composition.id,
+        mockupAssetIds: generatedAssets.map((asset) => asset.id),
+        imagesJson: publicAssets.map((asset) => asset.imageUrl).filter(Boolean),
+        metadataJson: {
+          ...(royalty.rule ? { royaltyRuleId: royalty.rule.id, royaltyBasis: royalty.rule.basis, royaltyValue: royalty.rule.value.toString() } : {}),
+          productCompositionId: composition.id,
+          placements: composition.selections.map((item) => ({
+            selectionId: item.id,
+            placement: item.placement,
+            providerPlacement: item.providerPlacement,
+            sourceDesignVersionId: item.sourceDesignVersionId,
+            placementConfigJson: item.placementConfigJson,
+          })),
+          renderAssets: generatedAssets.map((asset) => ({ id: asset.id, selectionId: asset.selection.id, placement: asset.selection.placement, objectKey: asset.objectKey, contentType: asset.contentType, widthPx: asset.widthPx, heightPx: asset.heightPx, mockupType: asset.mockupType })),
+        },
+      },
+      update: {},
+    });
+
+    const targets = [...new Set(composition.selections.flatMap((item) => this.marketplacesForSelection(item.pipeline, item.targetMarketplaces)))];
+    for (const marketplace of targets) {
+      await this.prisma.marketplacePublication.upsert({
+        where: {
+          productListingId_marketplace_publicationKey: {
+            productListingId: listing.id,
+            marketplace,
+            publicationKey: "default",
+          },
+        },
+        create: {
+          productListingId: listing.id,
+          marketplace,
+          publicationKey: "default",
+          provider: marketplace === MarketplaceKind.RASHPOD_LOCAL || marketplace === MarketplaceKind.LOCAL_MARKETPLACE ? ProviderType.RASHPOD : ProviderType.PRINTFUL,
+          status: marketplace === MarketplaceKind.AMAZON ? MarketplacePublicationStatus.NEEDS_REVIEW : MarketplacePublicationStatus.DRAFT,
+        },
+        update: {},
+      });
+    }
+    await this.prisma.designProductSelection.updateMany({
+      where: { productCompositionId: composition.id },
+      data: { status: DesignProductSelectionStatus.LISTING_DRAFT },
+    });
+    return { id: listing.id, status: listing.status };
+  }
+
   async getMarketplacePublication(id: string): Promise<MarketplacePublicationRecord | null> {
     const row = await this.prisma.marketplacePublication.findUnique({
       where: { id },
@@ -588,6 +689,7 @@ export class PrismaAssetRepository implements WorkerRepository {
         pipeline: row.productListing.pipeline,
         mockupAssetIds: row.productListing.mockupAssetIds,
         designProductSelectionId: row.productListing.designProductSelectionId,
+        productCompositionId: row.productListing.productCompositionId,
         printfulProductTemplateId: row.productListing.printfulProductTemplateId,
       },
     };
@@ -597,6 +699,11 @@ export class PrismaAssetRepository implements WorkerRepository {
     const publication = await this.getMarketplacePublication(id);
     if (!publication?.productListing.designProductSelectionId) return publication;
     const selection = await this.getPipelineSelection(publication.productListing.designProductSelectionId);
+    const compositionRows = publication.productListing.productCompositionId
+      ? await this.prisma.designProductSelection.findMany({ where: { productCompositionId: publication.productListing.productCompositionId }, orderBy: { createdAt: "asc" } })
+      : [];
+    const compositionSelections = (await Promise.all(compositionRows.map((item) => this.getPipelineSelection(item.id))))
+      .filter((item): item is PipelineSelectionRecord => Boolean(item));
     const mockupIds = Array.isArray(publication.productListing.mockupAssetIds) ? publication.productListing.mockupAssetIds.filter((item): item is string => typeof item === "string") : [];
     const mockupAssets = mockupIds.length
       ? await this.prisma.mockupAsset.findMany({ where: { id: { in: mockupIds } } })
@@ -609,6 +716,7 @@ export class PrismaAssetRepository implements WorkerRepository {
     return {
       ...publication,
       selection,
+      compositionSelections,
       printfulFileId: mapping?.printfulFileId ?? null,
       mockupAssets: mockupAssets.map((asset) => ({ id: asset.id, mockupType: asset.mockupType, status: asset.status, imageUrl: asset.imageUrl, objectKey: asset.objectKey })),
       printfulProductTemplate: selection?.printfulProductTemplate ?? null,
@@ -740,7 +848,7 @@ export class PrismaAssetRepository implements WorkerRepository {
         where: { designId, status: "READY", printfulFileId: { not: null } },
         orderBy: { updatedAt: "desc" },
       });
-      if (existing?.printfulFileId) return { printfulFileId: existing.printfulFileId };
+      if (existing?.printfulFileId && existing.printfulUrl) return { printfulFileId: existing.printfulFileId, printfulUrl: existing.printfulUrl };
     }
 
     const design = await this.prisma.designAsset.findUnique({
@@ -761,7 +869,7 @@ export class PrismaAssetRepository implements WorkerRepository {
         where: { id: mapping.id },
         data: { status: "READY", printfulFileId: uploaded.fileId, originalUrl: signedUrl, printfulUrl: uploaded.printfulUrl ?? null },
       });
-      return { printfulFileId: uploaded.fileId };
+      return { printfulFileId: uploaded.fileId, printfulUrl: uploaded.printfulUrl ?? signedUrl };
     } catch (error) {
       await this.prisma.printfulFileMapping.update({ where: { id: mapping.id }, data: { status: "FAILED" } });
       throw error;
@@ -874,4 +982,18 @@ export class PrismaAssetRepository implements WorkerRepository {
     const amount = rule.basis === "FIXED_AMOUNT" ? rate : basisAmount.mul(rate).div(100);
     return { amount: amount.toDecimalPlaces(2), rule };
   }
+}
+
+export function compositionReadyForListing(selections: Array<{ status: string }>) {
+  return selections.length > 0 && selections.every((item) => item.status === DesignProductSelectionStatus.MOCKUP_READY);
+}
+
+export function selectCompositionGallery<T extends { selection: { id: string }; mockupType: string }>(assets: T[], primarySelectionId: string): T[] {
+  const primaryAssets = assets.filter((asset) => asset.selection.id === primarySelectionId);
+  const complementaryMain = assets.find((asset) => asset.selection.id !== primarySelectionId && asset.mockupType === "MAIN");
+  return [
+    primaryAssets.find((asset) => asset.mockupType === "MAIN"),
+    complementaryMain ?? primaryAssets.find((asset) => asset.mockupType === "LIFESTYLE" || asset.mockupType === "SECONDARY"),
+    primaryAssets.find((asset) => asset.mockupType === "DETAIL"),
+  ].filter((asset, index, all): asset is T => Boolean(asset) && all.indexOf(asset) === index);
 }
