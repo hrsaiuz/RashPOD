@@ -34,7 +34,7 @@ describe("PlacementCalculationService", () => {
   it("enforces print area transform constraints", () => {
     expect(() =>
       service.validatePrintAreaConstraints(
-        { width: 10, height: 10, x: 0, y: 0, scale: 1, rotation: 15 },
+        { width: 5, height: 5, x: 2.5, y: 2.5, scale: 1, rotation: 15 },
         { widthCm: 10, heightCm: 10, minScale: 0.5, maxScale: 2, allowRotate: false },
         "CM",
       ),

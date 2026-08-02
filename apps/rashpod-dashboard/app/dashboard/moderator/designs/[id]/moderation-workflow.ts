@@ -14,6 +14,10 @@ export function placementArtworkAvailable(
   versions: Array<{ placement?: string | null }> | undefined,
   placement: string,
 ) {
-  const normalized = placement.trim().toUpperCase().replace(/[\s-]+/g, "_");
-  return Boolean(versions?.some((version) => version.placement === normalized || version.placement == null));
+  const normalized = normalizePlacement(placement);
+  return Boolean(versions?.some((version) => version.placement == null || normalizePlacement(version.placement) === normalized));
+}
+
+export function normalizePlacement(placement: string) {
+  return placement.trim().toUpperCase().replace(/[\s-]+/g, "_");
 }

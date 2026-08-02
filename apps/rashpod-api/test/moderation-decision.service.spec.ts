@@ -7,6 +7,7 @@ import { PlacementCalculationService } from "../src/modules/design-workflow/plac
 function createService(prismaOverrides: any = {}) {
   const prisma: any = {
     designAsset: { findUnique: jest.fn().mockResolvedValue({ id: "design_1", status: DesignStatus.SUBMITTED }) },
+    mediaAsset: { findFirst: jest.fn().mockResolvedValue(null) },
     platformSetting: { findUnique: jest.fn().mockResolvedValue(null) },
     ...prismaOverrides,
   };
@@ -133,6 +134,13 @@ describe("DesignWorkflowService moderation validation", () => {
       designVersion: {
         findMany: jest.fn().mockResolvedValue([{ id: "version_front", placement: "FRONT" }]),
       },
+      productComposition: {
+        upsert: jest.fn().mockResolvedValue({
+          id: "composition_1",
+          localBaseProductId: "product_1",
+          mockupTemplateId: "template_1",
+        }),
+      },
       designProductSelection: {
         upsert: jest.fn().mockResolvedValue({ id: "selection_1" }),
       },
@@ -231,6 +239,13 @@ describe("DesignWorkflowService moderation validation", () => {
       placementPreset: { findUnique: jest.fn() },
       designVersion: {
         findMany: jest.fn().mockResolvedValue([{ id: "version_front", placement: "FRONT" }]),
+      },
+      productComposition: {
+        upsert: jest.fn().mockResolvedValue({
+          id: "composition_1",
+          localBaseProductId: "product_1",
+          mockupTemplateId: "template_1",
+        }),
       },
       designProductSelection: {
         upsert: jest.fn().mockResolvedValue({ id: "selection_1" }),

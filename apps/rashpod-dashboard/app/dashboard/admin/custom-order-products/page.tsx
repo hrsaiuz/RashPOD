@@ -30,7 +30,11 @@ export default function CustomOrderProductsPage() {
   async function save() {
     setSaving(true); setMessage("");
     const response = await fetch("/api/proxy/admin/branding/custom-order-products", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ items: products.map(({ key, mediaAssetId, altText }) => ({ key, mediaAssetId, altText })) }) });
-    if (response.ok) { setProducts(await response.json()); setMessage("Custom Order images saved."); await revalidateStorefrontBranding(); }
+    if (response.ok) {
+      setProducts(await response.json());
+      const revalidated = await revalidateStorefrontBranding();
+      setMessage(revalidated ? "Custom Order images saved." : "Images saved. The storefront will refresh within one minute.");
+    }
     else setMessage("Images could not be saved. Check the selected media assets.");
     setSaving(false);
   }

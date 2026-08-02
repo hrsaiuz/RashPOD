@@ -1,7 +1,9 @@
 import {
   computeCompositeBox,
   editorStateFromLocalPosition,
+  mapPlacementToVariantRegion,
   parsePlacementConfig,
+  parseVariantRenderRegion,
   resolveTemplateImageKey,
   type EditorPlacementState,
   type MockupVariant,
@@ -86,14 +88,15 @@ export function resolvePipelinePlacement(
     rotation?: number | null;
     units?: "CM" | "INCH" | "PX" | null;
   },
+  variant: MockupVariant = "main",
 ): EditorPlacementState {
   const config = parsePlacementConfig(placementConfigJson);
   const printArea = config?.printArea as PrintAreaRect | undefined;
+  let placement: EditorPlacementState;
   if (config?.position && printArea) {
-    return editorStateFromLocalPosition(config.position, printArea, config.unit === "CM" ? "CM" : "PX");
-  }
-  if (printArea) {
-    return editorStateFromLocalPosition(
+    placement = editorStateFromLocalPosition(config.position, printArea, config.unit === "CM" ? "CM" : "PX");
+  } else if (printArea) {
+    placement = editorStateFromLocalPosition(
       {
         x: context.x ?? undefined,
         y: context.y ?? undefined,
@@ -105,15 +108,30 @@ export function resolvePipelinePlacement(
       printArea,
       context.units === "CM" ? "CM" : "PX",
     );
+  } else {
+    placement = {
+      x: context.x ?? 0,
+      y: context.y ?? 0,
+      width: context.width ?? 400,
+      height: context.height ?? 400,
+      scale: context.scale ?? 1,
+      rotation: context.rotation ?? 0,
+    };
   }
-  return {
-    x: context.x ?? 0,
-    y: context.y ?? 0,
-    width: context.width ?? 400,
-    height: context.height ?? 400,
-    scale: context.scale ?? 1,
-    rotation: context.rotation ?? 0,
-  };
+
+  if (!config || !printArea || variant === "main" || variant === "preview") return placement;
+  const role = variant === "lifestyle" ? "LIFESTYLE" : "DETAIL";
+  const galleryAsset = config.galleryAssets?.find((asset) => asset.role === role);
+  const distinctLegacyImage = variant === "lifestyle"
+    ? config.mockupTemplate.lifestyleImageKey
+    : config.mockupTemplate.closeupImageKey;
+  if (!galleryAsset && !distinctLegacyImage) return placement;
+
+  const renderRegion = parseVariantRenderRegion(galleryAsset?.metadataJson);
+  if (!renderRegion) {
+    throw new Error(`${role}_RENDER_REGION_MISSING`);
+  }
+  return mapPlacementToVariantRegion(placement, printArea, renderRegion);
 }
 
 export { parsePlacementConfig, resolveTemplateImageKey };

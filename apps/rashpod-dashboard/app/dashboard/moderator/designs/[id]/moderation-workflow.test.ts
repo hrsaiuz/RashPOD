@@ -31,6 +31,22 @@ describe("moderator workflow re-entry", () => {
 });
 
 describe("placement artwork readiness", () => {
+  it("accepts a package containing only one explicit placement", () => {
+    const versions = [{ placement: "LEFT_SLEEVE" }];
+
+    expect(placementArtworkAvailable(versions, "left-sleeve")).toBe(true);
+    expect(placementArtworkAvailable(versions, "FRONT")).toBe(false);
+  });
+
+  it("accepts each placement in a multi-placement package independently", () => {
+    const versions = [{ placement: "FRONT" }, { placement: "BACK" }, { placement: "RIGHT_SLEEVE" }];
+
+    expect(placementArtworkAvailable(versions, "front")).toBe(true);
+    expect(placementArtworkAvailable(versions, "BACK")).toBe(true);
+    expect(placementArtworkAvailable(versions, "right sleeve")).toBe(true);
+    expect(placementArtworkAvailable(versions, "LEFT_CHEST")).toBe(false);
+  });
+
   it("does not reuse explicit front artwork for a sleeve", () => {
     expect(placementArtworkAvailable([{ placement: "FRONT" }], "left_sleeve")).toBe(false);
   });

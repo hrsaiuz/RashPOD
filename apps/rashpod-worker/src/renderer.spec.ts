@@ -1,5 +1,5 @@
 import type { ArtifactStore } from "./artifact-store";
-import { compositeMockupImage } from "./mockup-compositor";
+import { compositeMockupImage, resolvePipelinePlacement } from "./mockup-compositor";
 import { SharpRenderer } from "./renderer";
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
@@ -110,5 +110,31 @@ describe("SharpRenderer pipeline compositing", () => {
     await expect(
       renderer.renderPipelineMockup({ id: "sel_x", pipeline: "LOCAL", placementConfigJson: { version: 1, mockupTemplate: {}, position: {} } }, "main"),
     ).rejects.toThrow("MOCKUP_TEMPLATE_IMAGE_MISSING");
+  });
+
+  it("maps moderator placement into the calibrated lifestyle region", () => {
+    const placement = resolvePipelinePlacement({
+      version: 1,
+      mockupTemplate: { id: "t1", name: "Front", baseImageKey: "main.png", lifestyleImageKey: "lifestyle.png" },
+      printArea: { x: 100, y: 100, width: 500, height: 800, safeX: 120, safeY: 120, safeWidth: 460, safeHeight: 760 },
+      position: { x: 200, y: 300, width: 100, height: 150, scale: 1, rotation: 0 },
+      galleryAssets: [{
+        id: "life-1",
+        role: "LIFESTYLE",
+        imageKey: "lifestyle.png",
+        metadataJson: { renderRegion: { canvasWidth: 1600, canvasHeight: 2000, x: 700, y: 400, width: 300, height: 600 } },
+      }],
+    }, {}, "lifestyle");
+
+    expect(placement).toEqual({ x: 760, y: 550, width: 60, height: 113, scale: 1, rotation: 0 });
+  });
+
+  it("refuses a distinct lifestyle image without calibration", () => {
+    expect(() => resolvePipelinePlacement({
+      version: 1,
+      mockupTemplate: { id: "t1", name: "Front", baseImageKey: "main.png", lifestyleImageKey: "lifestyle.png" },
+      printArea: { x: 0, y: 0, width: 500, height: 800, safeX: 0, safeY: 0, safeWidth: 500, safeHeight: 800 },
+      position: { x: 50, y: 50, width: 100, height: 100, scale: 1, rotation: 0 },
+    }, {}, "lifestyle")).toThrow("LIFESTYLE_RENDER_REGION_MISSING");
   });
 });

@@ -209,8 +209,17 @@ export class MediaService {
   }
 
   async customOrderProducts() {
-    const setting = await this.prisma.platformSetting.findUnique({ where: { key: CUSTOM_ORDER_SETTING_KEY } });
+    const [setting, brandingSetting] = await Promise.all([
+      this.prisma.platformSetting.findUnique({ where: { key: CUSTOM_ORDER_SETTING_KEY } }),
+      this.prisma.platformSetting.findUnique({ where: { key: "branding" } }),
+    ]);
     const configured = Array.isArray(setting?.value) ? (setting.value as Array<Record<string, unknown>>) : [];
+    const brandingTheme = brandingSetting?.value && typeof brandingSetting.value === "object" && !Array.isArray(brandingSetting.value)
+      ? (brandingSetting.value as Record<string, unknown>)
+      : {};
+    const homepageTiles = Array.isArray(brandingTheme.homeCategoryTiles)
+      ? (brandingTheme.homeCategoryTiles as Array<Record<string, unknown>>)
+      : [];
     const ids = configured.map((item) => typeof item.mediaAssetId === "string" ? item.mediaAssetId : "").filter(Boolean);
     const assets = ids.length ? await this.prisma.mediaAsset.findMany({ where: { id: { in: ids }, isActive: true } }) : [];
     const byId = new Map(assets.map((asset) => [asset.id, asset]));
@@ -218,14 +227,23 @@ export class MediaService {
       const row = configured.find((item) => item.key === product.key);
       const mediaAssetId = typeof row?.mediaAssetId === "string" ? row.mediaAssetId : null;
       const asset = mediaAssetId ? byId.get(mediaAssetId) : null;
+      const homepageTile = homepageTiles.find((item) => item.key === product.key);
+      const homepageImageUrl = typeof homepageTile?.imageUrl === "string" && homepageTile.imageUrl.trim()
+        ? homepageTile.imageUrl.trim()
+        : null;
+      const homepageAltText = typeof homepageTile?.altText === "string" && homepageTile.altText.trim()
+        ? homepageTile.altText.trim()
+        : null;
       return {
         ...product,
         mediaAssetId: asset?.id ?? null,
-        imageUrl: asset?.publicUrl ?? null,
+        imageUrl: asset?.publicUrl ?? homepageImageUrl,
         mimeType: asset?.mimeType ?? null,
         width: asset?.width ?? null,
         height: asset?.height ?? null,
-        altText: typeof row?.altText === "string" && row.altText.trim() ? row.altText.trim() : `RashPOD ${product.title}`,
+        altText: typeof row?.altText === "string" && row.altText.trim()
+          ? row.altText.trim()
+          : homepageAltText ?? `RashPOD ${product.title}`,
       };
     });
   }

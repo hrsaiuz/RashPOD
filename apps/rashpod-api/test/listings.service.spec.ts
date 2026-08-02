@@ -118,6 +118,7 @@ describe("ListingsService lifecycle", () => {
       imagesJson: ["https://cdn.example/listing.png"],
       designProductSelectionId: null,
       designProductSelection: null,
+      designAsset: { commercialRights: { allowProductSales: true, allowMarketplacePublishing: false } },
     };
     const prisma: any = {
       commerceListing: {
@@ -227,6 +228,7 @@ describe("ListingsService lifecycle", () => {
       imagesJson: ["mockups/main.png", "mockups/lifestyle.png", "mockups/detail.png"],
       designProductSelectionId: "sel-1",
       designProductSelection: { mockupAssets: [readyMockup("main", "MAIN"), readyMockup("lifestyle", "LIFESTYLE"), readyMockup("detail", "DETAIL")] },
+      designAsset: { commercialRights: { allowProductSales: true, allowMarketplacePublishing: false } },
     };
     const prisma: any = {
       commerceListing: {
@@ -313,8 +315,12 @@ describe("ListingsService lifecycle", () => {
 
     const result = await service.shopBySlug("listing-public");
 
-    expect(result?.imageUrl).toBe("mockups/main.png");
-    expect(result?.images).toEqual(["mockups/main.png", "mockups/lifestyle.png", "mockups/detail.png"]);
+    expect(result?.imageUrl).toMatch(/^https:\/\/storage\.googleapis\.com\/[^/]+\/mockups\/main\.png$/);
+    expect(result?.images).toEqual([
+      expect.stringMatching(/\/mockups\/main\.png$/),
+      expect.stringMatching(/\/mockups\/lifestyle\.png$/),
+      expect.stringMatching(/\/mockups\/detail\.png$/),
+    ]);
   });
 
   it("applies storefront filters, sort, and pagination at the database layer", async () => {

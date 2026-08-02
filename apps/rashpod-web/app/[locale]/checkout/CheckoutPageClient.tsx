@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useTranslations } from "next-intl";
 import Image from "next/image";
 import Link from "next/link";
 import { ChevronRight, Plus } from "lucide-react";
@@ -56,13 +57,10 @@ type PrintfulShippingResponse = {
   } | null;
 };
 
-const STEP_LABELS: Array<{ key: CheckoutStep; label: string }> = [
-  { key: "address", label: "Address" },
-  { key: "shipping", label: "Shipping" },
-  { key: "payment", label: "Payment" },
-];
+const STEP_KEYS: CheckoutStep[] = ["address", "shipping", "payment"];
 
 export default function CheckoutPageClient({ shopSettings }: { shopSettings: ShopSettings }) {
+  const t = useTranslations("checkout");
   const freeDeliveryThreshold = resolveFreeDeliveryThreshold(shopSettings);
   const { items, subtotal, clearCart } = useCart();
   const [step, setStep] = useState<CheckoutStep>("address");
@@ -316,7 +314,7 @@ export default function CheckoutPageClient({ shopSettings }: { shopSettings: Sho
         setAuthState("guest");
         return;
       }
-      setError(err instanceof Error ? err.message : "Could not place order");
+      setError(err instanceof Error ? err.message : t("placeOrderError"));
     } finally {
       setPlacingOrder(false);
     }
@@ -336,15 +334,15 @@ export default function CheckoutPageClient({ shopSettings }: { shopSettings: Sho
           <section>
             <StepNav active={step} setStep={setStep} />
             {authState === "checking" || loadingCheckout ? (
-              <p className="mt-12 text-brand-muted">Checking your session...</p>
+              <p className="mt-12 text-brand-muted">{t("checkingSession")}</p>
             ) : null}
             {authState === "guest" ? <AuthGatePanel /> : null}
             {authState === "authed" && items.length === 0 && serverCartCount === 0 ? (
               <div className="mt-12 max-w-form rounded-md bg-brand-bg p-8">
-                <h1 className="text-h3 font-bold text-brand-ink">Your cart is empty</h1>
-                <p className="mt-3 text-brand-muted">Add a product before starting checkout.</p>
+                <h1 className="text-h3 font-bold text-brand-ink">{t("emptyCartTitle")}</h1>
+                <p className="mt-3 text-brand-muted">{t("emptyCartDescription")}</p>
                 <Link href="/shop" className="mt-6 inline-flex h-12 items-center rounded-pill bg-brand-peach px-6 text-sm font-semibold text-white hover:opacity-90">
-                  Browse shop
+                  {t("browseShop")}
                 </Link>
               </div>
             ) : null}
@@ -407,11 +405,11 @@ export default function CheckoutPageClient({ shopSettings }: { shopSettings: Sho
           <div className="mt-8 flex justify-end">
             {step !== "payment" ? (
               <Button disabled={!canContinue} onClick={goNext} variant="primaryPeach" size="lg">
-                Continue
+                {t("continue")}
               </Button>
             ) : (
               <Button disabled={!canContinue || placingOrder} onClick={placeOrder} variant="primaryPeach" size="lg" loading={placingOrder}>
-                {placingOrder ? "Preparing Click payment..." : "Place Your Order and Pay"}
+                {placingOrder ? t("preparingPayment") : t("placeOrder")}
               </Button>
             )}
           </div>
@@ -422,16 +420,17 @@ export default function CheckoutPageClient({ shopSettings }: { shopSettings: Sho
 }
 
 function AuthGatePanel() {
+  const t = useTranslations("checkout");
   return (
     <div className="mt-12 max-w-form rounded-[24px] bg-brand-bg p-8">
-      <h1 className="text-h3 font-bold text-brand-ink">Sign in to complete your order</h1>
-      <p className="mt-3 text-brand-muted">Your cart stays saved while you sign in or create an account.</p>
+      <h1 className="text-h3 font-bold text-brand-ink">{t("signInTitle")}</h1>
+      <p className="mt-3 text-brand-muted">{t("signInDescription")}</p>
       <div className="mt-6 flex flex-col gap-3 sm:flex-row">
         <Link href="/auth/login?next=%2Fcheckout" className="inline-flex h-12 items-center justify-center rounded-pill bg-brand-peach px-6 text-sm font-semibold text-white hover:opacity-90">
-          Sign in
+          {t("signIn")}
         </Link>
         <Link href="/auth/register?next=%2Fcheckout" className="inline-flex h-12 items-center justify-center rounded-pill border border-brand-blue px-6 text-sm font-semibold text-brand-blue hover:bg-brand-blueLight">
-          Create account
+          {t("createAccount")}
         </Link>
       </div>
     </div>
@@ -455,33 +454,35 @@ async function syncLocalCartToServer(items: CartItem[]) {
 }
 
 function BreadcrumbTrail() {
+  const t = useTranslations("checkout");
   return (
-    <nav aria-label="Breadcrumb" className="inline-flex min-h-10 items-center gap-3 overflow-x-auto rounded-xs bg-brand-bg px-4 text-sm text-brand-text sm:gap-5 sm:text-base">
-      <Link href="/" className="hover:text-brand-blue">Home</Link>
+    <nav aria-label={t("breadcrumb")} className="inline-flex min-h-10 items-center gap-3 overflow-x-auto rounded-xs bg-brand-bg px-4 text-sm text-brand-text sm:gap-5 sm:text-base">
+      <Link href="/" className="hover:text-brand-blue">{t("home")}</Link>
       <ChevronRight size={18} className="text-brand-subtle" />
-      <Link href="/shop" className="hover:text-brand-blue">Shop</Link>
+      <Link href="/shop" className="hover:text-brand-blue">{t("shop")}</Link>
       <ChevronRight size={18} className="text-brand-subtle" />
-      <span className="shrink-0 font-bold text-brand-ink">Checkout</span>
+      <span className="shrink-0 font-bold text-brand-ink">{t("checkout")}</span>
     </nav>
   );
 }
 
 function StepNav({ active, setStep }: { active: CheckoutStep; setStep: (step: CheckoutStep) => void }) {
+  const t = useTranslations("checkout");
   return (
-    <div role="tablist" aria-label="Checkout steps" className="-mx-1 flex items-center gap-3 overflow-x-auto pb-2 text-base sm:gap-6 sm:text-h3">
-      {STEP_LABELS.map((step, index) => (
-        <span key={step.key} className="flex shrink-0 items-center gap-3 sm:gap-6">
+    <div role="tablist" aria-label={t("steps")} className="-mx-1 flex items-center gap-3 overflow-x-auto pb-2 text-base sm:gap-6 sm:text-h3">
+      {STEP_KEYS.map((step, index) => (
+        <span key={step} className="flex shrink-0 items-center gap-3 sm:gap-6">
           <button
             type="button"
             role="tab"
-            aria-selected={active === step.key}
-            aria-current={active === step.key ? "step" : undefined}
-            onClick={() => setStep(step.key)}
-            className={`rounded-pill px-3 py-1.5 sm:px-4 ${active === step.key ? "bg-brand-blueLight font-bold text-brand-ink" : "text-brand-muted"}`}
+            aria-selected={active === step}
+            aria-current={active === step ? "step" : undefined}
+            onClick={() => setStep(step)}
+            className={`rounded-pill px-3 py-1.5 sm:px-4 ${active === step ? "bg-brand-blueLight font-bold text-brand-ink" : "text-brand-muted"}`}
           >
-            {step.label}
+            {t(step)}
           </button>
-          {index < STEP_LABELS.length - 1 ? <ChevronRight size={18} className="text-brand-subtle" /> : null}
+          {index < STEP_KEYS.length - 1 ? <ChevronRight size={18} className="text-brand-subtle" /> : null}
         </span>
       ))}
     </div>
@@ -517,10 +518,11 @@ function AddressStep(props: {
   setPostalCode: (value: string) => void;
   setAddressLabel: (value: string) => void;
 }) {
+  const t = useTranslations("checkout");
   const showForm = props.selectedAddressId === "new" || props.addresses.length === 0;
   return (
     <div className="mt-8 max-w-form lg:mt-12">
-      <h1 className="text-section font-semibold text-brand-ink">Choose your address</h1>
+      <h1 className="text-section font-semibold text-brand-ink">{t("chooseAddress")}</h1>
       <div className="mt-6 grid gap-4">
         {props.addresses.map((address) => (
           <AddressRow
@@ -538,27 +540,27 @@ function AddressStep(props: {
             checked={props.selectedAddressId === "pickup"}
             onClick={props.onSelectPickup}
             name={props.pickup.displayName}
-            type="Pickup"
+            type={t("pickup")}
             address={props.pickup.address ?? props.pickup.zone}
             phone={props.pickup.hours ?? undefined}
           />
         ) : null}
       </div>
       <button type="button" onClick={props.onSelectNew} className="mt-6 inline-flex min-h-11 items-center gap-3 text-base text-brand-blue">
-        <Plus size={18} /> Add a new address
+        <Plus size={18} /> {t("addAddress")}
       </button>
       {showForm ? (
         <div className="mt-6 grid gap-4 sm:grid-cols-2">
-          <CheckoutInput label="Label" value={props.addressLabel} onChange={props.setAddressLabel} error={props.fieldErrors.addressLabel} />
-          <CheckoutInput label="Full name" value={props.customerName} onChange={props.setCustomerName} error={props.fieldErrors.customerName} />
-          <CheckoutInput label="Phone" value={props.customerPhone} onChange={props.setCustomerPhone} error={props.fieldErrors.customerPhone} />
-          <CheckoutInput label="Email" value={props.customerEmail} onChange={props.setCustomerEmail} type="email" />
-          <CheckoutInput label="Address line 1" value={props.deliveryAddress} onChange={props.setDeliveryAddress} error={props.fieldErrors.deliveryAddress} className="sm:col-span-2" />
-          <CheckoutInput label="Address line 2 (optional)" value={props.deliveryAddress2} onChange={props.setDeliveryAddress2} className="sm:col-span-2" />
-          <CheckoutInput label="City" value={props.addressCity} onChange={props.setAddressCity} error={props.fieldErrors.addressCity} />
-          <CheckoutInput label="State / region (optional)" value={props.addressState} onChange={props.setAddressState} />
-          <CheckoutInput label="Country code" value={props.countryCode} onChange={props.setCountryCode} error={props.fieldErrors.countryCode} />
-          <CheckoutInput label="Postal code" value={props.postalCode} onChange={props.setPostalCode} error={props.fieldErrors.postalCode} />
+          <CheckoutInput label={t("label")} value={props.addressLabel} onChange={props.setAddressLabel} error={props.fieldErrors.addressLabel} />
+          <CheckoutInput label={t("fullName")} value={props.customerName} onChange={props.setCustomerName} error={props.fieldErrors.customerName} />
+          <CheckoutInput label={t("phone")} value={props.customerPhone} onChange={props.setCustomerPhone} error={props.fieldErrors.customerPhone} />
+          <CheckoutInput label={t("email")} value={props.customerEmail} onChange={props.setCustomerEmail} type="email" />
+          <CheckoutInput label={t("addressLine1")} value={props.deliveryAddress} onChange={props.setDeliveryAddress} error={props.fieldErrors.deliveryAddress} className="sm:col-span-2" />
+          <CheckoutInput label={t("addressLine2")} value={props.deliveryAddress2} onChange={props.setDeliveryAddress2} className="sm:col-span-2" />
+          <CheckoutInput label={t("city")} value={props.addressCity} onChange={props.setAddressCity} error={props.fieldErrors.addressCity} />
+          <CheckoutInput label={t("state")} value={props.addressState} onChange={props.setAddressState} />
+          <CheckoutInput label={t("countryCode")} value={props.countryCode} onChange={props.setCountryCode} error={props.fieldErrors.countryCode} />
+          <CheckoutInput label={t("postalCode")} value={props.postalCode} onChange={props.setPostalCode} error={props.fieldErrors.postalCode} />
         </div>
       ) : null}
     </div>
@@ -621,13 +623,14 @@ function ShippingStep({
   freeDeliveryThreshold: number;
   error?: string;
 }) {
+  const t = useTranslations("checkout");
   return (
     <div className="mt-8 max-w-form lg:mt-12">
-      <h1 className="text-section font-semibold text-brand-ink">Shipment method</h1>
-      <p className="mt-2 text-sm text-brand-muted">Free delivery applies from {formatPrice(freeDeliveryThreshold)} on eligible methods.</p>
+      <h1 className="text-section font-semibold text-brand-ink">{t("shipmentMethod")}</h1>
+      <p className="mt-2 text-sm text-brand-muted">{t("freeDeliveryThreshold", { amount: formatPrice(freeDeliveryThreshold) })}</p>
       <div className="mt-6 overflow-hidden rounded-md bg-brand-surface shadow-soft">
         {quotes.length === 0 ? (
-          <p className="px-5 py-6 text-brand-muted">Loading delivery options...</p>
+          <p className="px-5 py-6 text-brand-muted">{t("loadingDelivery")}</p>
         ) : (
           quotes.map((quote) => (
             <button
@@ -643,7 +646,7 @@ function ShippingStep({
                 <span className="font-medium text-brand-ink">{quote.providerName}</span>
                 <span>{quote.etaText ?? quote.zone}</span>
               </span>
-              <span className="font-bold text-brand-ink sm:pl-8">{quote.deliveryPrice <= 0 ? "Free" : formatPrice(quote.deliveryPrice)}</span>
+              <span className="font-bold text-brand-ink sm:pl-8">{quote.deliveryPrice <= 0 ? t("free") : formatPrice(quote.deliveryPrice)}</span>
             </button>
           ))
         )}
@@ -654,20 +657,21 @@ function ShippingStep({
 }
 
 function PaymentStep() {
+  const t = useTranslations("checkout");
   return (
     <div className="mt-8 max-w-form lg:mt-12">
-      <h1 className="text-section font-semibold text-brand-ink">Payment method</h1>
+      <h1 className="text-section font-semibold text-brand-ink">{t("paymentMethod")}</h1>
       <div className="mt-6 divide-y divide-brand-line">
         <div className="flex flex-wrap items-center gap-4 py-4">
           <span className="grid h-[18px] w-[18px] place-items-center rounded-full border-2 border-brand-blue">
             <span className="h-2 w-2 rounded-full bg-brand-blue" />
           </span>
           <span className="grid h-5 min-w-9 place-items-center rounded-xs bg-brand-peach px-2 text-caption font-black text-white">Click</span>
-          <span className="text-base text-brand-ink">Click Uz payment</span>
+          <span className="text-base text-brand-ink">{t("clickPayment")}</span>
         </div>
       </div>
       <p className="mt-6 max-w-form text-body leading-relaxed text-brand-muted">
-        You will be routed through the Click payment flow after the order is created. RashPOD does not collect or store card numbers.
+        {t("paymentDisclaimer")}
       </p>
     </div>
   );
@@ -682,23 +686,24 @@ function OrderSummaryPanel({
   freeDeliveryThreshold: number;
   deliveryFee: number;
 }) {
+  const t = useTranslations("checkout");
   const { items, subtotal, updateQuantity, removeItem } = useCart();
   const remaining = Math.max(0, freeDeliveryThreshold - subtotal);
   const progress = Math.min(100, (subtotal / freeDeliveryThreshold) * 100);
   const total = subtotal + deliveryFee;
   return (
     <aside className="rounded-md bg-brand-bg p-6 shadow-soft sm:p-8">
-      <h2 className="mb-6 text-section font-bold uppercase text-brand-ink">Order Summary</h2>
+      <h2 className="mb-6 text-section font-bold uppercase text-brand-ink">{t("orderSummary")}</h2>
       <FreeDeliveryBar subtotal={subtotal} remaining={remaining} progress={progress} threshold={freeDeliveryThreshold} compact />
       <div className="mb-4 grid grid-cols-[1fr_100px_72px] rounded-xs bg-brand-peach px-4 py-2 text-caption font-bold text-white sm:grid-cols-[1fr_140px_80px]">
-        <span>Product</span>
-        <span className="text-center">Qty</span>
-        <span className="text-right">Total</span>
+        <span>{t("product")}</span>
+        <span className="text-center">{t("quantityShort")}</span>
+        <span className="text-right">{t("total")}</span>
       </div>
       <div className="max-h-[430px] space-y-3 overflow-y-auto pr-1">
         {items.length === 0 ? (
           <div className="rounded-md bg-brand-surface p-8 text-center text-brand-muted">
-            {serverCartCount > 0 ? `${serverCartCount} server cart item${serverCartCount === 1 ? "" : "s"} ready for checkout.` : "Your cart is empty."}
+            {serverCartCount > 0 ? t("serverCartItems", { count: serverCartCount }) : t("emptyCartTitle")}
           </div>
         ) : null}
         {items.map((item) => (
@@ -714,20 +719,20 @@ function OrderSummaryPanel({
             </div>
             <div className="col-start-2 sm:col-start-auto">
               <div className="inline-flex h-7 min-w-[72px] items-center justify-between rounded-pill bg-brand-bg px-3 text-xs font-bold text-brand-ink">
-                <button type="button" aria-label="Decrease quantity" onClick={() => updateQuantity(item.key, Math.max(1, item.quantity - 1))}>-</button>
+                <button type="button" aria-label={t("decreaseQuantity")} onClick={() => updateQuantity(item.key, Math.max(1, item.quantity - 1))}>-</button>
                 <span>{item.quantity}</span>
-                <button type="button" aria-label="Increase quantity" onClick={() => updateQuantity(item.key, item.quantity + 1)}>+</button>
+                <button type="button" aria-label={t("increaseQuantity")} onClick={() => updateQuantity(item.key, item.quantity + 1)}>+</button>
               </div>
-              <button type="button" onClick={() => removeItem(item.key)} className="mt-2 text-caption font-medium text-brand-peach">Remove</button>
+              <button type="button" onClick={() => removeItem(item.key)} className="mt-2 text-caption font-medium text-brand-peach">{t("remove")}</button>
             </div>
             <p className="text-right text-sm font-bold tabular-nums text-brand-ink sm:text-base">{formatPrice(item.price * item.quantity)}</p>
           </div>
         ))}
       </div>
       <div className="mt-6 space-y-2 border-t border-brand-line pt-4 text-sm text-brand-muted">
-        <div className="flex justify-between"><span>Subtotal</span><span>{formatPrice(subtotal)}</span></div>
-        <div className="flex justify-between"><span>Delivery</span><span>{deliveryFee <= 0 ? "Free" : formatPrice(deliveryFee)}</span></div>
-        <div className="flex justify-between text-base font-bold text-brand-ink"><span>Total</span><span>{formatPrice(total)}</span></div>
+        <div className="flex justify-between"><span>{t("subtotal")}</span><span>{formatPrice(subtotal)}</span></div>
+        <div className="flex justify-between"><span>{t("delivery")}</span><span>{deliveryFee <= 0 ? t("free") : formatPrice(deliveryFee)}</span></div>
+        <div className="flex justify-between text-base font-bold text-brand-ink"><span>{t("total")}</span><span>{formatPrice(total)}</span></div>
       </div>
     </aside>
   );

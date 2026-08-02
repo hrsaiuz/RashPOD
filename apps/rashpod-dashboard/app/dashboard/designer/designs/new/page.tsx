@@ -20,7 +20,7 @@ import { api, resolveUploadMimeType, uploadToSignedUrlWithProgress, type Design,
 
 const ACCEPTED = ["image/png", "image/jpeg", "image/svg+xml"];
 const MAX_BYTES = 50 * 1024 * 1024;
-const COMPLEMENTARY_PLACEMENTS = ["BACK", "LEFT_CHEST", "RIGHT_CHEST", "LEFT_SLEEVE", "RIGHT_SLEEVE"] as const;
+const PLACEMENTS = ["FRONT", "BACK", "LEFT_CHEST", "RIGHT_CHEST", "LEFT_SLEEVE", "RIGHT_SLEEVE"] as const;
 
 type Step = "form" | "pending_upload" | "uploading" | "verifying" | "ready" | "failed" | "success";
 
@@ -47,6 +47,7 @@ export default function NewDesignPage() {
   const { toast } = useToast();
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
+  const [primaryPlacement, setPrimaryPlacement] = useState<(typeof PLACEMENTS)[number]>("FRONT");
   const [file, setFile] = useState<File | null>(null);
   const [step, setStep] = useState<Step>("form");
   const [progress, setProgress] = useState("");
@@ -264,7 +265,7 @@ export default function NewDesignPage() {
         widthPx: dims?.width ?? 0,
         heightPx: dims?.height ?? 0,
         dpi: 300,
-        placement: "FRONT",
+        placement: primaryPlacement,
       });
     } catch (err) {
       setError(uploadStepMessage("create-version", err));
@@ -314,12 +315,12 @@ export default function NewDesignPage() {
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-[0.18em] text-brand-blue">Optional placement files</p>
                   <h2 className="mt-1 text-lg font-semibold text-brand-ink">Add complementary artwork</h2>
-                  <p className="mt-1 max-w-xl text-sm text-brand-muted">Upload artwork that should differ from the main front design, such as a sleeve mark or back graphic. Each file stays linked to this design package.</p>
+                  <p className="mt-1 max-w-xl text-sm text-brand-muted">Your main placement is enough to submit. Optionally upload a sleeve mark, back graphic, or other artwork; each added file stays linked to this design package.</p>
                 </div>
                 <span className="rounded-pill bg-brand-blueLight px-3 py-1 text-xs font-semibold text-brand-ink">Before moderation</span>
               </div>
               <div className="mt-5 grid gap-3 sm:grid-cols-2">
-                {COMPLEMENTARY_PLACEMENTS.map((placement) => {
+                {PLACEMENTS.filter((placement) => placement !== primaryPlacement).map((placement) => {
                   const uploaded = designDetail?.versions?.some((version) => version.placement === placement);
                   const loading = placementUploading === placement;
                   return (
@@ -409,7 +410,14 @@ export default function NewDesignPage() {
                 />
               </FormField>
 
-              <FormField label="Main front design" helperText="This is the primary artwork. You can add back, chest, and sleeve files immediately after it uploads." required>
+              <FormField label="First artwork placement" helperText="Choose the location this file belongs to. One uploaded placement is enough to submit." required>
+                <select
+                  className="mb-4 min-h-11 w-full rounded-xl border border-surface-borderSoft bg-white px-3 text-sm outline-none focus-visible:ring-4 focus-visible:ring-brand-blue/20"
+                  value={primaryPlacement}
+                  onChange={(event) => setPrimaryPlacement(event.target.value as (typeof PLACEMENTS)[number])}
+                >
+                  {PLACEMENTS.map((placement) => <option key={placement} value={placement}>{placementLabel(placement)}</option>)}
+                </select>
                 {localPreviewUrl ? (
                   <div className="mb-4">
                     <DesignPreviewCard title="Selected file" src={localPreviewUrl} alt={file?.name ?? "Selected design"} compact />

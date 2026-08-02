@@ -15,6 +15,7 @@ import type { DesignerSummary, ProductListing } from "../../lib/catalog";
 import type { HomeCategoryTile } from "../../lib/branding";
 import { normalizeDesigners, normalizeProducts } from "../../lib/catalog";
 import { Link } from "../../i18n/navigation";
+import { useLocale, useTranslations } from "next-intl";
 
 export interface HomeBrandingMedia {
   homeHeroImageUrl?: string;
@@ -54,6 +55,8 @@ export default function HomePageClient({
   initialDesigners,
 }: HomePageClientProps) {
   const apiBase = getApiBase();
+  const locale = useLocale();
+  const t = useTranslations("home");
 
   const [products, setProducts] = useState<ProductListing[]>(initialProducts ?? []);
   const [designers, setDesigners] = useState<DesignerSummary[]>(initialDesigners ?? []);
@@ -64,7 +67,7 @@ export default function HomePageClient({
     const controller = new AbortController();
     const opts = { signal: controller.signal };
 
-    fetch(`${apiBase}/shop/listings?limit=8`, opts)
+    fetch(`${apiBase}/shop/listings?limit=8&locale=${encodeURIComponent(locale)}`, opts)
       .then((res) => {
         if (!res.ok) throw new Error("Failed to load products");
         return res.json();
@@ -97,7 +100,7 @@ export default function HomePageClient({
       });
 
     return controller;
-  }, [apiBase]);
+  }, [apiBase, locale]);
 
   useEffect(() => {
     const controller = loadCatalog();
@@ -121,9 +124,9 @@ export default function HomePageClient({
       <ServiceStrip />
       <CategoryMosaic tiles={homeMedia.homeCategoryTiles ?? []} />
       <HomepageProductCarousel
-        title="Bestselling Designs"
+        title={t("bestsellingDesigns")}
         products={products.slice(0, 4)}
-        badge="Best Seller"
+        badge={t("bestSeller")}
         error={productsError}
         empty={!productsError && products.length === 0}
         onRetry={retryCatalog}
@@ -143,40 +146,41 @@ export default function HomePageClient({
 }
 
 function FigmaHero({ media }: { media: HomeBrandingMedia }) {
+  const t = useTranslations("home");
   return (
     <section className="relative overflow-hidden bg-white">
       <div className={`mx-auto grid ${media.homeHeroImageUrl ? "min-h-[765px] lg:grid-cols-[0.48fr_0.52fr]" : "min-h-[620px] lg:grid-cols-1"} ${HOME_MAX} grid-cols-1 items-center gap-7 ${HOME_GUTTER} pb-7 pt-14 lg:pt-7`}>
         <motion.div {...fadeUp} className={`relative z-10 ${media.homeHeroImageUrl ? "max-w-[520px]" : "mx-auto w-full max-w-[720px]"}`}>
           <h1 className="leading-none tracking-[0] text-brand-ink">
-            <span className="block text-[clamp(28px,2.55vw,36px)] font-normal">Shop original</span>
+            <span className="block text-[clamp(28px,2.55vw,36px)] font-normal">{t("hero.shopOriginal")}</span>
             <span className="relative mt-1 flex items-baseline text-[clamp(74px,6.3vw,112px)] font-normal leading-[0.86] text-semantic-filmText">
-              designs
+              {t("hero.designs")}
             </span>
             <span className="block text-center text-[clamp(43px,3.55vw,61px)] font-normal leading-[0.82] text-brand-blue">
-              Sell your own
+              {t("hero.sellYourOwn")}
             </span>
             <span className="block text-center text-[clamp(29px,2.64vw,41px)] font-normal leading-[1.12]">
-              Printed on demand
+              {t("hero.printedOnDemand")}
             </span>
           </h1>
           <p className="mt-10 max-w-[520px] text-[18px] leading-[1.52] text-brand-ink">
-            Discover unique products by independent designers - or upload your own artwork and earn royalties with RashPOD's local print-on-demand system.
+            {t("hero.storefrontSubtitle")}
           </p>
           <div className="mt-12 flex flex-wrap gap-5">
             <Link
               href="/designer-application"
               className="inline-flex h-[75px] min-w-[189px] items-center justify-center rounded-md bg-brand-blue px-9 text-[16px] font-extrabold tracking-[0.12em] text-brand-ink shadow-none transition-transform hover:scale-[1.02]"
             >
-              Start Selling
+              {t("hero.cta")}
             </Link>
             <Link
               href="/shop"
               className="inline-flex h-[75px] min-w-[189px] items-center justify-center rounded-md bg-brand-peach px-9 text-[16px] font-extrabold tracking-[0.12em] text-brand-ink shadow-none transition-transform hover:scale-[1.02]"
             >
-              RashPOD Shop
+              {t("hero.shopCta")}
             </Link>
           </div>
-          <p className="mt-5 text-[15px] text-brand-ink">Local production - Transparent royalties - Made in Uzbekistan</p>
+          <p className="mt-5 text-[15px] text-brand-ink">{t("hero.proof")}</p>
         </motion.div>
 
         {media.homeHeroImageUrl ? (
@@ -186,7 +190,7 @@ function FigmaHero({ media }: { media: HomeBrandingMedia }) {
           >
             <Image
               src={media.homeHeroImageUrl}
-              alt={media.homeHeroImageAlt ?? "RashPOD designers and product artwork"}
+              alt={media.homeHeroImageAlt ?? t("hero.imageAlt")}
               fill
               priority
               sizes="(min-width: 1024px) 646px, 100vw"
@@ -200,11 +204,12 @@ function FigmaHero({ media }: { media: HomeBrandingMedia }) {
 }
 
 function ServiceStrip() {
+  const t = useTranslations("home");
   const services = [
-    { label: "Designed\nby creators", icon: Gift, shape: "flower" },
-    { label: "Produced\nlocally", icon: PackageCheck, shape: "arch" },
-    { label: "Sold\non demand", icon: Tags, shape: "flower" },
-    { label: "Royalties\ntracked", icon: BadgeDollarSign, shape: "pin" },
+    { label: t("services.designed"), icon: Gift, shape: "flower" },
+    { label: t("services.produced"), icon: PackageCheck, shape: "arch" },
+    { label: t("services.sold"), icon: Tags, shape: "flower" },
+    { label: t("services.royalties"), icon: BadgeDollarSign, shape: "pin" },
   ];
 
   return (
@@ -257,21 +262,22 @@ function HomepageProductCarousel({
   empty?: boolean;
   onRetry?: () => void;
 }) {
+  const t = useTranslations("home");
   return (
     <section className="bg-white py-9">
       <SectionHeader title={title} href="/shop" />
       {error ? (
         <CatalogFeedback
           kind="error"
-          title="Failed to load products"
-          description="We couldn't load featured products. Please try again."
+          title={t("productLoadError")}
+          description={t("productLoadErrorDescription")}
           onRetry={onRetry}
         />
       ) : empty ? (
         <CatalogFeedback
           kind="empty"
-          title="No products yet"
-          description="Check back soon for new designs from RashPOD creators."
+          title={t("noProducts")}
+          description={t("noProductsDescription")}
         />
       ) : (
         <div className={`mx-auto flex ${HOME_MAX} snap-x gap-5 overflow-x-auto ${HOME_GUTTER} pb-7 pt-2 xl:grid xl:grid-cols-4 xl:overflow-visible`}>
@@ -286,7 +292,7 @@ function HomepageProductCarousel({
               designer={{ displayName: product.designer }}
               badge={badge}
               secondaryBadge={index === 1 ? "new" : undefined}
-              description="high quality, 100% cotton, perfect for vibrant"
+              description={t("productCardDescription")}
               className="min-w-[255px] snap-start xl:min-w-0"
             />
           ))}
@@ -334,6 +340,7 @@ const DEFAULT_CATEGORY_TILES: HomeCategoryTile[] = [
 ];
 
 function CategoryMosaic({ tiles }: { tiles: HomeCategoryTile[] }) {
+  const t = useTranslations("home");
   const configured = DEFAULT_CATEGORY_TILES.map((fallback) => ({
     ...fallback,
     ...(tiles.find((tile) => tile.key === fallback.key) ?? {}),
@@ -344,10 +351,10 @@ function CategoryMosaic({ tiles }: { tiles: HomeCategoryTile[] }) {
       <div className={`mx-auto ${HOME_MAX} ${HOME_GUTTER}`}>
         <div className="mb-7 flex items-end justify-between gap-4">
           <div>
-            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-brand-peach">Made your way</p>
-            <h2 id="home-categories-title" className="mt-2 text-[clamp(31px,3vw,44px)] font-normal text-black">Browse by category</h2>
+            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-brand-peach">{t("madeYourWay")}</p>
+            <h2 id="home-categories-title" className="mt-2 text-[clamp(31px,3vw,44px)] font-normal text-black">{t("browseByCategory")}</h2>
           </div>
-          <Link href="/shop" className="hidden text-sm font-semibold text-brand-blue hover:underline sm:inline">View all products</Link>
+          <Link href="/shop" className="hidden text-sm font-semibold text-brand-blue hover:underline sm:inline">{t("viewAllProducts")}</Link>
         </div>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {configured.map((tile, index) => (
@@ -355,7 +362,7 @@ function CategoryMosaic({ tiles }: { tiles: HomeCategoryTile[] }) {
               key={tile.key}
               href={tile.href}
               className={tile.size === "wide" ? "sm:col-span-2" : ""}
-              aria-label={`Shop ${tile.productName}`}
+              aria-label={t("shopCategory", { category: tile.productName })}
             >
               <ProductCategoryBentoCard
                 category={tile.category}
@@ -385,21 +392,22 @@ function CollectionCarousel({
   empty?: boolean;
   onRetry?: () => void;
 }) {
+  const t = useTranslations("home");
   return (
     <section className="bg-white py-10">
-      <SectionHeader title="New Collections" href="/shop?sort=newest" />
+      <SectionHeader title={t("newCollections")} href="/shop?sort=newest" />
       {error ? (
         <CatalogFeedback
           kind="error"
-          title="Failed to load collections"
-          description="We couldn't load the latest collections. Please try again."
+          title={t("collectionLoadError")}
+          description={t("collectionLoadErrorDescription")}
           onRetry={onRetry}
         />
       ) : empty ? (
         <CatalogFeedback
           kind="empty"
-          title="No collections yet"
-          description="New product collections will appear here when designers publish listings."
+          title={t("noCollections")}
+          description={t("noCollectionsDescription")}
         />
       ) : (
         <div className={`mx-auto flex ${HOME_MAX} snap-x gap-5 overflow-x-auto ${HOME_GUTTER} pb-7 pt-2 xl:grid xl:grid-cols-4 xl:overflow-visible`}>
@@ -412,7 +420,7 @@ function CollectionCarousel({
               price={product.price}
               imageUrl={product.imageUrl}
               designer={{ displayName: product.designer }}
-              badge="New"
+              badge={t("newBadge")}
               secondaryBadge="new"
               className="min-w-[255px] snap-start xl:min-w-0"
             />
@@ -424,6 +432,7 @@ function CollectionCarousel({
 }
 
 function ClubCta() {
+  const t = useTranslations("home");
   return (
     <section className="relative my-10 overflow-hidden bg-white md:my-14">
       <div className="relative bg-brand-bg px-5 py-10 md:h-[272px] md:pt-[54px]">
@@ -450,19 +459,19 @@ function ClubCta() {
         </div>
         <div className="relative mx-auto grid max-w-[1105px] grid-cols-1 items-center gap-6 text-center md:grid-cols-3 md:items-start md:gap-7">
           <p className="text-[16px] tracking-[0.12em] text-black md:pt-[104px] md:text-[18px] md:tracking-[0.17em]">
-            Be the first to get the next drop
+            {t("club.firstDrop")}
           </p>
           <div className="flex flex-col items-center">
-            <h2 className="mb-6 text-[24px] font-extrabold text-black md:mb-[58px] md:text-[26px]">Join the RASH POD Club</h2>
+            <h2 className="mb-6 text-[24px] font-extrabold text-black md:mb-[58px] md:text-[26px]">{t("club.title")}</h2>
             <Link
               href="/auth/register"
               className="relative inline-flex h-[56px] min-w-[176px] items-center justify-center rounded-pill bg-brand-blue px-9 text-[18px] font-extrabold tracking-[0.08em] text-brand-ink md:h-[67px] md:text-[20px]"
             >
-              Join now
+              {t("club.join")}
               <span className="absolute -right-4 -top-4 text-[40px] leading-none text-brand-peach md:text-[48px]">*</span>
             </Link>
           </div>
-          <p className="text-[16px] text-black md:pt-[104px] md:text-[18px]">Receive a mystery design every month</p>
+          <p className="text-[16px] text-black md:pt-[104px] md:text-[18px]">{t("club.reward")}</p>
         </div>
       </div>
       <div className="h-[40px] bg-white md:h-[68px]" />
@@ -481,23 +490,24 @@ function DesignerCarousel({
   empty?: boolean;
   onRetry?: () => void;
 }) {
+  const t = useTranslations("home");
   const shown = designers.slice(0, 5);
 
   return (
     <section className="bg-white py-10">
-      <SectionHeader title="Meet Our Wonderful Designers" href="/designers" />
+      <SectionHeader title={t("meetDesigners")} href="/designers" />
       {error ? (
         <CatalogFeedback
           kind="error"
-          title="Failed to load designers"
-          description="We couldn't load featured designers. Please try again."
+          title={t("designerLoadError")}
+          description={t("designerLoadErrorDescription")}
           onRetry={onRetry}
         />
       ) : empty ? (
         <CatalogFeedback
           kind="empty"
-          title="No designers yet"
-          description="Featured designers will appear here once creators join RashPOD."
+          title={t("noDesigners")}
+          description={t("noDesignersDescription")}
         />
       ) : (
         <div className={`mx-auto flex ${HOME_MAX} snap-x gap-5 overflow-x-auto ${HOME_GUTTER} pb-7 pt-2 xl:overflow-visible`}>
@@ -521,6 +531,7 @@ function CatalogFeedback({
   description: string;
   onRetry?: () => void;
 }) {
+  const t = useTranslations("home");
   return (
     <div className={`mx-auto ${HOME_MAX} ${HOME_GUTTER}`}>
       {kind === "error" ? (
@@ -530,7 +541,7 @@ function CatalogFeedback({
           retry={
             onRetry ? (
               <Button variant="primaryBlue" size="md" onClick={() => onRetry()}>
-                Retry
+                {t("retry")}
               </Button>
             ) : undefined
           }
@@ -543,6 +554,7 @@ function CatalogFeedback({
 }
 
 function DesignerCard({ designer }: { designer: DesignerSummary }) {
+  const t = useTranslations("home");
   const imageUrl = designer.avatarUrl ?? designer.profileImageUrl;
 
   return (
@@ -559,12 +571,12 @@ function DesignerCard({ designer }: { designer: DesignerSummary }) {
           </div>
         )}
         <div className="absolute inset-x-0 bottom-0 z-20 flex h-[148px] translate-y-0 items-center justify-center bg-white/58 opacity-100 backdrop-blur-md transition-all duration-300 sm:translate-y-full sm:opacity-0 sm:group-hover:translate-y-0 sm:group-hover:opacity-100 motion-reduce:transition-none">
-          <span className="rounded-xs bg-brand-peach px-7 py-3 text-[14px] font-bold text-brand-ink">{designer.displayName}'s Designs</span>
+          <span className="rounded-xs bg-brand-peach px-7 py-3 text-[14px] font-bold text-brand-ink">{t("designerDesigns", { name: designer.displayName })}</span>
         </div>
         <div className="absolute left-6 top-6 z-20 translate-y-0 opacity-100 transition-all duration-300 sm:translate-y-3 sm:opacity-0 sm:group-hover:translate-y-0 sm:group-hover:opacity-100 motion-reduce:transition-none">
           <h3 className="text-[36px] font-black uppercase leading-none text-black">{designer.displayName}</h3>
-          <p className="mt-2 text-[15px] text-black">from</p>
-          <p className="ml-6 text-[18px] text-black">{designer.location ?? "Samarkand"}</p>
+          <p className="mt-2 text-[15px] text-black">{t("from")}</p>
+          <p className="ml-6 text-[18px] text-black">{designer.location ?? t("defaultLocation")}</p>
         </div>
       </div>
     </Link>
@@ -572,40 +584,41 @@ function DesignerCard({ designer }: { designer: DesignerSummary }) {
 }
 
 function ActionCards() {
+  const t = useTranslations("home");
   const cards = [
     {
-      titleTop: "DESIG",
-      titleBottom: "NERS",
-      body: "Upload artwork, publish products, and earn royalties without handling inventory",
+      titleTop: t("actions.designersTop"),
+      titleBottom: t("actions.designersBottom"),
+      body: t("actions.designersBody"),
       href: "/designer-application",
-      cta: "Start selling",
+      cta: t("actions.designersCta"),
       className: "bg-brand-peach text-black",
       button: "bg-brand-bg text-brand-ink",
     },
     {
-      titleTop: "custom",
-      titleBottom: "ORDERS",
-      body: "Create branded products for teams, events, campaigns, and corporate gifts",
+      titleTop: t("actions.customTop"),
+      titleBottom: t("actions.customBottom"),
+      body: t("actions.customBody"),
       href: "/custom-order",
-      cta: "Request a quote",
+      cta: t("actions.customCta"),
       className: "bg-brand-ink text-white",
       button: "bg-brand-blue text-brand-ink",
     },
     {
-      titleTop: "your",
-      titleBottom: "BUSINESS",
-      body: "Order ready-to-press films for apparel, stickers, packaging, and production runs",
+      titleTop: t("actions.businessTop"),
+      titleBottom: t("actions.businessBottom"),
+      body: t("actions.businessBody"),
       href: "/film",
-      cta: "Explore films",
+      cta: t("actions.businessCta"),
       className: "bg-brand-bg text-brand-ink",
       button: "bg-brand-ink text-white",
     },
     {
-      titleTop: "SHOP",
-      titleBottom: "now",
-      body: "Buy apparel, original products by independent designers",
+      titleTop: t("actions.shopTop"),
+      titleBottom: t("actions.shopBottom"),
+      body: t("actions.shopBody"),
       href: "/shop",
-      cta: "RASHPOD SHOP",
+      cta: t("actions.shopCta"),
       className: "bg-brand-blue text-brand-ink",
       button: "bg-brand-peach text-brand-ink",
     },
@@ -614,7 +627,7 @@ function ActionCards() {
   return (
     <section className="bg-white pb-[68px] pt-9">
       <div className={`mx-auto ${HOME_MAX} ${HOME_GUTTER}`}>
-        <h2 className="mb-9 text-[clamp(29px,2.72vw,39px)] font-normal text-black">Shop, design, order, or produce with RashPOD</h2>
+        <h2 className="mb-9 text-[clamp(29px,2.72vw,39px)] font-normal text-black">{t("actions.title")}</h2>
         <div className={`mx-auto flex ${HOME_MAX} snap-x gap-5 overflow-x-auto ${HOME_GUTTER} pb-7 pt-2 xl:grid xl:grid-cols-4 xl:overflow-visible`}>
           {cards.map((card) => (
             <Link
@@ -639,10 +652,11 @@ function ActionCards() {
 }
 
 function SectionHeader({ title, href }: { title: string; href: string }) {
+  const t = useTranslations("home");
   return (
     <div className={`mx-auto mb-6 flex ${HOME_MAX} items-center justify-between ${HOME_GUTTER}`}>
       <h2 className="text-[clamp(31px,2.55vw,36px)] font-normal leading-tight text-black">{title}</h2>
-      <Link href={href} className="grid h-[53px] w-[53px] place-items-center rounded-full border border-semantic-filmText text-semantic-filmText transition-colors hover:bg-brand-peach hover:text-brand-ink" aria-label={`View ${title}`}>
+      <Link href={href} className="grid h-[53px] w-[53px] place-items-center rounded-full border border-semantic-filmText text-semantic-filmText transition-colors hover:bg-brand-peach hover:text-brand-ink" aria-label={t("viewSection", { title })}>
         <ArrowRight size={32} strokeWidth={1.4} />
       </Link>
     </div>

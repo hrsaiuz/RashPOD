@@ -261,6 +261,7 @@ export class PrismaAssetRepository implements WorkerRepository {
             role: asset.role,
             imageKey: asset.imageKey,
             sortOrder: asset.sortOrder,
+            metadataJson: asset.metadataJson as Record<string, unknown> | null,
           })),
         printArea: {
           id: placement.printArea.id,

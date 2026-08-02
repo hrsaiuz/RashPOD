@@ -221,8 +221,9 @@ export async function fetchDesignerByHandle(handle: string) {
   return { designer: { ...normalized, bio: getOptionalString(designer.bio) ?? getOptionalString(designer.about) }, listings };
 }
 
-export async function fetchProductDetail(slug: string) {
-  const res = await fetchCatalogResource(`/shop/listings/${encodeURIComponent(slug)}`);
+export async function fetchProductDetail(slug: string, locale?: string) {
+  const query = locale ? `?locale=${encodeURIComponent(locale)}` : "";
+  const res = await fetchCatalogResource(`/shop/listings/${encodeURIComponent(slug)}${query}`);
   if (!res?.ok) return null;
   return res.json();
 }

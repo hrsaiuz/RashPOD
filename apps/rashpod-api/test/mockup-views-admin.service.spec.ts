@@ -279,6 +279,23 @@ describe("AdminConfigService multi-view mockup administration", () => {
     expect(create).toHaveBeenCalledTimes(2);
   });
 
+  it("rejects a gallery artwork region that extends outside its image", async () => {
+    const prisma: any = {
+      mockupTemplate: { findUnique: jest.fn().mockResolvedValue({ id: "template_1" }) },
+      $transaction: jest.fn(),
+    };
+    const service = new AdminConfigService(prisma, { log: jest.fn() } as any);
+
+    await expect(service.createMockupGalleryAsset("admin_1", "template_1", {
+      role: MockupGalleryAssetRole.LIFESTYLE,
+      imageKey: "mockup-templates/shirt/lifestyle.jpg",
+      metadataJson: {
+        renderRegion: { canvasWidth: 1000, canvasHeight: 1000, x: 900, y: 100, width: 200, height: 300 },
+      },
+    })).rejects.toThrow("Gallery artwork region must be inside the uploaded image canvas");
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
   it("synchronizes the legacy lifestyle key from the primary view's first active asset", async () => {
     const created = {
       id: "asset_primary",

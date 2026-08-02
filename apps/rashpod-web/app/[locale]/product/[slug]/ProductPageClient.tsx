@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useTranslations } from "next-intl";
 import Image from "next/image";
 import Link from "next/link";
 import {
@@ -56,10 +57,6 @@ type ListingCard = {
   designer?: { displayName?: string };
 };
 
-const FALLBACK_IMAGE_KEYS = ["mockup-main", "mockup-side", "mockup-flat", "mockup-pack"];
-
-const DEFAULT_SIZES = ["Small", "Medium", "Large", "XL", "XXL"];
-
 export default function ProductPageClient({
   slug,
   initialProduct = null,
@@ -70,22 +67,23 @@ export default function ProductPageClient({
   initialRelated?: ListingCard[];
 }) {
   const apiBase = getApiBase();
+  const t = useTranslations("product");
   const { addItem } = useCart();
   const [product, setProduct] = useState<ProductDetail | null>(initialProduct);
   const [related, setRelated] = useState<ListingCard[]>(initialRelated);
   const [loading, setLoading] = useState(!initialProduct);
   const [error, setError] = useState(false);
   const [selectedImage, setSelectedImage] = useState(0);
-  const [selectedColor, setSelectedColor] = useState<string>(COLOR_SWATCHES[0].label);
-  const [selectedSize, setSelectedSize] = useState(DEFAULT_SIZES[0]);
+  const [selectedColor, setSelectedColor] = useState("");
+  const [selectedSize, setSelectedSize] = useState("");
   const [quantity, setQuantity] = useState(1);
   const [wishlisted, setWishlisted] = useState(false);
   const [wishlistBusy, setWishlistBusy] = useState(false);
 
   useEffect(() => {
     if (initialProduct) {
-      setSelectedSize(initialProduct.variants?.sizes?.[0] || DEFAULT_SIZES[0]);
-      setSelectedColor(initialProduct.variants?.colors?.[0] || COLOR_SWATCHES[0].label);
+      setSelectedSize(initialProduct.variants?.sizes?.[0] || "");
+      setSelectedColor(initialProduct.variants?.colors?.[0] || "");
       return;
     }
 
@@ -99,8 +97,8 @@ export default function ProductPageClient({
         const data = (await res.json()) as ProductDetail;
         if (cancelled) return;
         setProduct(data);
-        setSelectedSize(data.variants?.sizes?.[0] || DEFAULT_SIZES[0]);
-        setSelectedColor(data.variants?.colors?.[0] || COLOR_SWATCHES[0].label);
+        setSelectedSize(data.variants?.sizes?.[0] || "");
+        setSelectedColor(data.variants?.colors?.[0] || "");
 
         const relatedRes = await fetch(`${apiBase}/shop/listings?limit=4`);
         if (relatedRes.ok) {
@@ -166,15 +164,25 @@ export default function ProductPageClient({
   if (error || !product) {
     return (
       <div className="mx-auto max-w-storefront px-5 py-20">
-        <ErrorState title="Product not found" description="We could not find this product." />
+        <ErrorState title={t("notFoundTitle")} description={t("notFoundDescription")} />
       </div>
     );
   }
 
   const price = toMoney(product.price, product.currency);
   const relatedCards = related;
-  const sizes = product.variants?.sizes?.length ? product.variants.sizes : DEFAULT_SIZES;
-  const colors = product.variants?.colors?.length ? product.variants.colors : COLOR_SWATCHES.map((swatch) => swatch.label);
+  const sizes = product.variants?.sizes ?? [];
+  const colors = product.variants?.colors ?? [];
+  const inStockCombinations = product.variants?.combinations?.filter((variant) => variant.inStock !== false) ?? [];
+  const sizesForColor = (color: string) => {
+    if (!color || !inStockCombinations.length) return sizes;
+    const configured = new Set(inStockCombinations
+      .filter((variant) => !variant.color || variant.color === color)
+      .map((variant) => variant.size)
+      .filter((size): size is string => Boolean(size)));
+    return configured.size ? sizes.filter((size) => configured.has(size)) : sizes;
+  };
+  const visibleSizes = sizesForColor(selectedColor);
 
   async function toggleWishlist() {
     if (!product || wishlistBusy) return;
@@ -214,7 +222,7 @@ export default function ProductPageClient({
     <>
     <div className="bg-white pb-24 lg:pb-12">
       <div className="mx-auto max-w-storefront px-4 pb-12 pt-4 sm:px-5">
-        <BreadcrumbTrail current="Products" />
+        <BreadcrumbTrail />
 
         <section className="mt-7 grid gap-8 lg:grid-cols-[520px_1fr] lg:gap-24">
           <div>
@@ -226,11 +234,11 @@ export default function ProductPageClient({
               )}
             </div>
             <div className="mt-7 flex items-center gap-4">
-              <button className="text-brand-peach" aria-label="Previous image" onClick={() => setSelectedImage((selectedImage - 1 + images.length) % images.length)}>
+              {images.length > 1 ? <button className="text-brand-peach" aria-label={t("previousImage")} onClick={() => setSelectedImage((selectedImage - 1 + images.length) % images.length)}>
                 <ChevronLeft size={34} strokeWidth={1.6} />
-              </button>
-              <div className="flex gap-4 overflow-x-auto">
-                {(images.length ? images.slice(0, 4) : FALLBACK_IMAGE_KEYS).map((image, index) => (
+              </button> : null}
+              {images.length ? <div className="flex gap-4 overflow-x-auto">
+                {images.slice(0, 4).map((image, index) => (
                   <button
                     key={image}
                     onClick={() => setSelectedImage(index)}
@@ -238,16 +246,16 @@ export default function ProductPageClient({
                     className={`relative h-[83px] w-[92px] shrink-0 overflow-hidden rounded-[10px] border-2 ${selectedImage === index ? "border-brand-blue" : "border-transparent"}`}
                   >
                     {images[index] ? (
-                      <Image src={images[index]} alt={`${product.title} preview ${index + 1}`} fill sizes="92px" className="object-cover" />
+                      <Image src={images[index]} alt={t("previewAlt", { title: product.title, index: index + 1 })} fill sizes="92px" className="object-cover" />
                     ) : (
                       <ProductImagePlaceholder compact />
                     )}
                   </button>
                 ))}
-              </div>
-              <button className="text-brand-peach" aria-label="Next image" onClick={() => setSelectedImage((selectedImage + 1) % images.length)}>
+              </div> : null}
+              {images.length > 1 ? <button className="text-brand-peach" aria-label={t("nextImage")} onClick={() => setSelectedImage((selectedImage + 1) % images.length)}>
                 <ChevronRight size={34} strokeWidth={1.6} />
-              </button>
+              </button> : null}
             </div>
           </div>
 
@@ -255,13 +263,13 @@ export default function ProductPageClient({
             <div className="flex items-start justify-between gap-5">
               <div>
                 <h1 className="text-h2 font-black lowercase leading-none text-brand-ink">{product.title}</h1>
-                <p className="mt-4 max-w-[160px] text-body leading-tight text-brand-muted">designed by {product.designer.displayName}</p>
+                <p className="mt-4 max-w-[240px] text-body leading-tight text-brand-muted">{t("designedBy", { designer: product.designer.displayName })}</p>
               </div>
               <div className="flex gap-3">
                 <button
                   type="button"
                   className="grid h-[38px] min-w-[38px] place-items-center rounded-[10px] bg-brand-bg text-black"
-                  aria-label={wishlisted ? "Remove from wishlist" : "Add to wishlist"}
+                  aria-label={wishlisted ? t("removeFromWishlist") : t("addToWishlist")}
                   aria-pressed={wishlisted}
                   disabled={wishlistBusy}
                   onClick={() => void toggleWishlist()}
@@ -281,26 +289,30 @@ export default function ProductPageClient({
                 ) : null}
                 {product.reviews?.count ? (
                   <span className="inline-flex h-[28px] items-center gap-2 rounded-full bg-brand-bg px-4 text-[13px] font-bold text-brand-blue">
-                    <MessageSquare size={15} /> {product.reviews.count} Reviews
+                    <MessageSquare size={15} /> {t("reviewsCount", { count: product.reviews.count })}
                   </span>
                 ) : null}
               </div>
             </div>
 
-            <div className="border-t border-brand-line py-5">
-              <h2 className="mb-4 text-body font-medium text-brand-ink">Choose a Color</h2>
+            {colors.length ? <div className="border-t border-brand-line py-5">
+              <h2 className="mb-4 text-body font-medium text-brand-ink">{t("chooseColor")}</h2>
               <div className="flex flex-wrap gap-5">
                 {colors.map((color) => {
                   const fallback = COLOR_SWATCHES.find((swatch) => swatch.label.toLocaleLowerCase() === color.toLocaleLowerCase());
                   const providerColor = product.variants?.combinations?.find((variant) => variant.color === color)?.colorCode;
-                  const swatchValue = providerColor || fallback?.value || COLOR_SWATCHES[0].value;
+                  const swatchValue = providerColor || fallback?.value || color;
                   return (
                   <button
                     key={color}
                     aria-label={color}
                     aria-pressed={selectedColor === color}
                     title={color}
-                    onClick={() => setSelectedColor(color)}
+                    onClick={() => {
+                      setSelectedColor(color);
+                      const validSizes = sizesForColor(color);
+                      if (validSizes.length && !validSizes.includes(selectedSize)) setSelectedSize(validSizes[0]);
+                    }}
                     className={`grid h-[52px] w-[52px] place-items-center rounded-full border border-brand-line ${selectedColor === color ? "ring-2 ring-brand-peachLight ring-offset-4" : ""}`}
                     style={swatchStyle(swatchValue)}
                   >
@@ -309,13 +321,13 @@ export default function ProductPageClient({
                   );
                 })}
               </div>
-              <p className="mt-4 text-caption text-brand-ink">The colors may differ by up to 15% from what you see in the image.</p>
-            </div>
+              <p className="mt-4 text-caption text-brand-ink">{t("colorDisclaimer")}</p>
+            </div> : null}
 
-            <div className="border-t border-brand-line py-5">
-              <h2 className="mb-5 text-body font-medium text-brand-ink">Choose a Size</h2>
+            {sizes.length ? <div className="border-t border-brand-line py-5">
+              <h2 className="mb-5 text-body font-medium text-brand-ink">{t("chooseSize")}</h2>
               <div className="flex flex-wrap gap-3">
-                {sizes.map((size) => (
+                {visibleSizes.map((size) => (
                   <button
                     key={size}
                     type="button"
@@ -327,25 +339,25 @@ export default function ProductPageClient({
                   </button>
                 ))}
               </div>
-            </div>
+            </div> : null}
 
             <div className="hidden border-t border-brand-line py-5 lg:block">
               <div className="flex flex-wrap gap-4">
                 <div className="inline-flex h-[53px] min-w-[140px] items-center justify-between rounded-md bg-brand-bg px-6 text-lg font-bold text-brand-ink">
-                  <button type="button" onClick={() => setQuantity(Math.max(1, quantity - 1))} aria-label="Decrease quantity">-</button>
+                  <button type="button" onClick={() => setQuantity(Math.max(1, quantity - 1))} aria-label={t("decreaseQuantity")}>-</button>
                   <span>{quantity}</span>
-                  <button type="button" onClick={() => setQuantity(quantity + 1)} aria-label="Increase quantity">+</button>
+                  <button type="button" onClick={() => setQuantity(quantity + 1)} aria-label={t("increaseQuantity")}>+</button>
                 </div>
                 <button type="button" onClick={handleAddToCart} className="h-[53px] min-w-[250px] rounded-md bg-brand-peach px-8 text-base font-bold text-white">
-                  Add To Cart
+                  {t("addToCart")}
                 </button>
               </div>
             </div>
 
             <div className="rounded-md bg-brand-bg p-4">
-              <DeliveryRow icon={<Truck size={19} />} title="Free Delivery" detail="Enter your Postal code for Delivery Availability" />
+              <DeliveryRow icon={<Truck size={19} />} title={t("freeDelivery")} detail={t("deliveryAvailability")} />
               <div className="my-4 h-px bg-brand-line" />
-              <DeliveryRow icon={<ShoppingBag size={18} />} title="Return Delivery" detail="Free 30 days Delivery Return. Details" />
+              <DeliveryRow icon={<ShoppingBag size={18} />} title={t("returnDelivery")} detail={t("returnDetails")} />
             </div>
           </div>
         </section>
@@ -354,7 +366,7 @@ export default function ProductPageClient({
 
         {relatedCards.length > 0 ? (
         <section className="mt-8">
-          <h2 className="mb-6 text-[28px] font-black text-black">You Might Like</h2>
+          <h2 className="mb-6 text-[28px] font-black text-black">{t("youMightLike")}</h2>
           <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
             {relatedCards.map((item) => <RelatedCard key={item.id} item={item} />)}
           </div>
@@ -367,14 +379,14 @@ export default function ProductPageClient({
       <div className="mx-auto flex max-w-storefront items-center gap-3 px-1">
         <div className="min-w-0">
           <p className="truncate text-lg font-bold text-brand-ink">{price}</p>
-          <p className="truncate text-xs text-brand-muted">{selectedSize} · {selectedColor}</p>
+          {selectedSize || selectedColor ? <p className="truncate text-xs text-brand-muted">{[selectedSize, selectedColor].filter(Boolean).join(" · ")}</p> : null}
         </div>
         <button
           type="button"
           onClick={handleAddToCart}
           className="ml-auto inline-flex h-12 min-w-[148px] shrink-0 items-center justify-center rounded-md bg-brand-peach px-5 text-sm font-bold text-white"
         >
-          Add to cart
+          {t("addToCart")}
         </button>
       </div>
     </div>
@@ -382,16 +394,22 @@ export default function ProductPageClient({
   );
 }
 
-function BreadcrumbTrail({ current }: { current: string }) {
+function BreadcrumbTrail() {
+  const t = useTranslations("product");
+  const items = [
+    { label: t("home"), href: "/" },
+    { label: t("category"), href: "/shop" },
+    { label: t("tshirts"), href: "/shop" },
+  ];
   return (
     <nav className="inline-flex min-h-10 max-w-full items-center gap-3 overflow-x-auto rounded-xs bg-brand-bg px-4 text-sm text-brand-text sm:gap-5 sm:text-base">
-      {["Home", "Category", "Tshirts"].map((item) => (
-        <span key={item} className="flex shrink-0 items-center gap-3 sm:gap-5">
-          <Link href={item === "Home" ? "/" : "/shop"} className="hover:text-brand-blue">{item}</Link>
+      {items.map((item) => (
+        <span key={item.label} className="flex shrink-0 items-center gap-3 sm:gap-5">
+          <Link href={item.href} className="hover:text-brand-blue">{item.label}</Link>
           <ChevronRight size={18} className="text-brand-subtle" />
         </span>
       ))}
-      <span className="shrink-0 font-bold text-brand-ink">{current}</span>
+      <span className="shrink-0 font-bold text-brand-ink">{t("products")}</span>
     </nav>
   );
 }
@@ -409,16 +427,17 @@ function DeliveryRow({ icon, title, detail }: { icon: ReactNode; title: string; 
 }
 
 function ProductCopy({ description, title }: { description?: string | null; title: string }) {
+  const t = useTranslations("product");
   const paragraphs = description
     ? description.split(/\n{2,}/).filter(Boolean)
     : [
-        `${title} is printed on demand by RashPOD using high-quality materials and local production.`,
-        "Each order supports independent designers with transparent royalty tracking.",
+        t("fallbackDescriptionPrimary", { title }),
+        t("fallbackDescriptionSecondary"),
       ];
 
   return (
     <section className="mt-16 max-w-[1040px] lg:mt-28">
-      <h2 className="text-section font-bold text-brand-ink">Product Description</h2>
+      <h2 className="text-section font-bold text-brand-ink">{t("productDescription")}</h2>
       <div className="mt-6 max-w-[1060px] space-y-4 text-body leading-relaxed text-brand-muted">
         {paragraphs.map((paragraph) => (
           <p key={paragraph.slice(0, 48)}>{paragraph}</p>
@@ -429,13 +448,14 @@ function ProductCopy({ description, title }: { description?: string | null; titl
 }
 
 function RelatedCard({ item }: { item: ListingCard }) {
+  const t = useTranslations("product");
   return (
     <Link href={`/product/${item.slug}`} className="block rounded-md bg-white p-4 shadow-soft sm:p-6">
       <div className="relative aspect-[0.95] overflow-hidden rounded-[22px] bg-brand-bg">
         {item.imageUrl ? <Image src={item.imageUrl} alt={item.title} fill sizes="280px" className="object-cover" /> : <Package className="m-auto h-full w-20 text-brand-blue" />}
       </div>
       <h3 className="mt-5 text-body font-bold text-brand-ink">{item.title}</h3>
-      <p className="mt-4 text-caption text-brand-muted">Designed by {item.designer?.displayName ?? "Designer"}</p>
+      <p className="mt-4 text-caption text-brand-muted">{t("designedBy", { designer: item.designer?.displayName ?? t("designerFallback") })}</p>
     </Link>
   );
 }

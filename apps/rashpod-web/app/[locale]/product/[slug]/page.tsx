@@ -5,10 +5,10 @@ import ProductPageClient from "./ProductPageClient";
 export async function generateMetadata({
   params,
 }: {
-  params: Promise<{ slug: string }>;
+  params: Promise<{ locale: string; slug: string }>;
 }): Promise<Metadata> {
-  const { slug } = await params;
-  const product = (await fetchProductDetail(slug)) as { title?: string; description?: string; imageUrl?: string } | null;
+  const { locale, slug } = await params;
+  const product = (await fetchProductDetail(slug, locale)) as { title?: string; description?: string; imageUrl?: string } | null;
 
   return {
     title: product?.title ?? "Product",
@@ -17,11 +17,11 @@ export async function generateMetadata({
   };
 }
 
-export default async function ProductPage({ params }: { params: Promise<{ slug: string }> }) {
-  const { slug } = await params;
+export default async function ProductPage({ params }: { params: Promise<{ locale: string; slug: string }> }) {
+  const { locale, slug } = await params;
   const [product, relatedResult] = await Promise.all([
-    fetchProductDetail(slug),
-    fetchListings({ limit: "5" }),
+    fetchProductDetail(slug, locale),
+    fetchListings({ limit: "5", locale }),
   ]);
 
   const related = relatedResult

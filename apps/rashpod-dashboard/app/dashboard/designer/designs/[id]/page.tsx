@@ -204,7 +204,7 @@ export default function DesignDetailPage() {
 
             <Card>
               <h2 className="text-lg font-semibold text-brand-ink mb-2">Placement artwork</h2>
-              <p className="mb-4 text-sm text-brand-muted">Upload a different file for each print location. The matching artwork is used for front, back, chest, and sleeve mockups.</p>
+              <p className="mb-4 text-sm text-brand-muted">One placement is enough to submit. Add other placement files only when this design package also includes artwork for the back, chest, or sleeves.</p>
               <label className="mb-4 block max-w-sm text-sm font-semibold text-brand-ink">
                 Upload for placement
                 <select
@@ -254,7 +254,7 @@ export default function DesignDetailPage() {
                   {PLACEMENT_OPTIONS.map((placement) => {
                     const version = design.versions?.find((item) => item.placement === placement);
                     const defaultVersion = design.versions?.find((item) => !item.placement);
-                    const status = version ? "Uploaded" : defaultVersion ? "Uses default" : "Not uploaded";
+                    const status = version ? "Uploaded" : defaultVersion ? "Uses default" : "Optional";
                     return (
                       <li key={placement} className="flex min-h-11 items-center justify-between rounded-xl border border-surface-borderSoft px-3 text-sm">
                         <span className="font-medium text-brand-ink">{placementLabel(placement)}</span>

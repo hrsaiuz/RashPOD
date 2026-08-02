@@ -6,3 +6,4 @@ export * from "./placement-converters";
 export * from "./placement-validation";
 export * from "./print-area-rect";
 export * from "./resolve-template-key";
+export * from "./variant-render-region";

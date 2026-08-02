@@ -26,12 +26,15 @@ function buildListingParams(searchParams: Record<string, string | string[] | und
 }
 
 export default async function ShopPage({
+  params: routeParams,
   searchParams,
 }: {
+  params: Promise<{ locale: string }>;
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const params = await searchParams;
-  const listingParams = buildListingParams(params);
+  const { locale } = await routeParams;
+  const searchValues = await searchParams;
+  const listingParams = { ...buildListingParams(searchValues), locale };
 
   const [{ items, meta }, designers, categories] = await Promise.all([
     fetchShopListings(listingParams),

@@ -9,7 +9,7 @@ import { ModeratorActionDialog } from "../../../components/moderator/ModeratorAc
 import { PrintfulPublishWizard, type ApprovedPrintfulConfiguration } from "../../../components/moderator/PrintfulPublishWizard";
 import { useDashboardFeedback } from "../../../components/feedback/use-dashboard-feedback";
 
-type LocaleKey = "en" | "uz" | "ru";
+type LocaleKey = "en" | "uz" | "ru" | "fr";
 
 type LocaleCopy = {
   title: string;
@@ -161,6 +161,11 @@ export function ModeratorListingWizard({
       title: initialTranslations.ru?.title ?? "",
       description: initialTranslations.ru?.description ?? "",
       tags: initialTranslations.ru?.tags ?? [],
+    },
+    fr: {
+      title: initialTranslations.fr?.title ?? "",
+      description: initialTranslations.fr?.description ?? "",
+      tags: initialTranslations.fr?.tags ?? [],
     },
   });
   const [price, setPrice] = useState(String(listing.price ?? ""));
@@ -332,7 +337,7 @@ export function ModeratorListingWizard({
       ) : null}
 
       <div role="tablist" aria-label="Listing language" className="flex flex-wrap gap-2">
-        {(["en", "uz", "ru"] as LocaleKey[]).map((locale) => (
+        {(["en", "uz", "ru", "fr"] as LocaleKey[]).map((locale) => (
           <button
             key={locale}
             type="button"

@@ -1,5 +1,5 @@
 import { ListingStatus, ListingType, PipelineType, UserRole } from "@prisma/client";
-import { ListingsService } from "./listings.service";
+import { ListingsService, toPublicListingImageUrl } from "./listings.service";
 
 describe("ListingsService moderation audit", () => {
   it("records the moderator rejection reason with the status transition", async () => {
@@ -77,5 +77,65 @@ describe("ListingsService moderation audit", () => {
 
     expect(prisma.commerceListing.update).not.toHaveBeenCalled();
     expect(audit.log).not.toHaveBeenCalled();
+  });
+});
+
+describe("ListingsService storefront payload", () => {
+  it("turns generated mockup keys into public URLs", () => {
+    expect(toPublicListingImageUrl("pipeline-mockups/selection/main image.png", "rashpod-assets")).toBe(
+      "https://storage.googleapis.com/rashpod-assets/pipeline-mockups/selection/main%20image.png",
+    );
+    expect(toPublicListingImageUrl("https://cdn.example/main.png", "rashpod-assets")).toBe("https://cdn.example/main.png");
+  });
+
+  it("exposes moderator-configured local colors and sizes", async () => {
+    const row = {
+      id: "listing-local",
+      slug: "local-shirt",
+      title: "Local shirt",
+      description: null,
+      price: 100_000,
+      currency: "UZS",
+      type: ListingType.PRODUCT,
+      publishedAt: new Date(),
+      imagesJson: ["pipeline-mockups/selection/main.png"],
+      metadataJson: {
+        translations: {
+          fr: { title: "T-shirt local", description: "Description française", tags: ["local"] },
+        },
+        variants: [
+          { id: "black-m", color: "Black", size: "M", price: "100000", enabled: true },
+          { id: "white-l", color: "White", size: "L", price: "100000", enabled: true },
+          { id: "disabled", color: "Red", size: "XL", price: "100000", enabled: false },
+        ],
+      },
+      designerId: "designer-1",
+      designer: { id: "designer-1", displayName: "Designer", handle: "designer" },
+      localBaseProduct: null,
+      marketplacePublications: [],
+    };
+    const prisma = { commerceListing: { findUnique: jest.fn().mockResolvedValue(row) } };
+    const service = new ListingsService(prisma as never, { log: jest.fn() } as never);
+
+    const result = await service.shopBySlug(row.slug);
+
+    expect(result).toEqual(expect.objectContaining({
+      imageUrl: expect.stringContaining("/pipeline-mockups/selection/main.png"),
+      images: [expect.stringContaining("/pipeline-mockups/selection/main.png")],
+      variants: {
+        colors: ["Black", "White"],
+        sizes: ["M", "L"],
+        combinations: [
+          expect.objectContaining({ id: "black-m", color: "Black", size: "M", inStock: true }),
+          expect.objectContaining({ id: "white-l", color: "White", size: "L", inStock: true }),
+        ],
+      },
+    }));
+
+    const frenchResult = await service.shopBySlug(row.slug, "fr");
+    expect(frenchResult).toEqual(expect.objectContaining({
+      title: "T-shirt local",
+      description: "Description française",
+    }));
   });
 });

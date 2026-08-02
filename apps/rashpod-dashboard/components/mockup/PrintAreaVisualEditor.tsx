@@ -125,6 +125,7 @@ export function PrintAreaVisualEditor(props: {
   activeLayer?: LayerId;
   onActiveLayerChange?: (layer: LayerId) => void;
   onImageDimensions?: (width: number, height: number) => void;
+  mode?: "print-area" | "render-region";
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [viewport, setViewport] = useState({ width: 720, height: 480 });
@@ -132,6 +133,7 @@ export function PrintAreaVisualEditor(props: {
   const [stagePosition, setStagePosition] = useState({ x: 24, y: 24 });
   const [internalLayer, setInternalLayer] = useState<LayerId>("print");
   const templateImage = useImage(props.imageUrl);
+  const renderRegionMode = props.mode === "render-region";
 
   const activeLayer = props.activeLayer ?? internalLayer;
   const setActiveLayer = props.onActiveLayerChange ?? setInternalLayer;
@@ -186,7 +188,7 @@ export function PrintAreaVisualEditor(props: {
   if (!props.imageUrl) {
     return (
       <div className="rounded-2xl border border-dashed border-surface-borderSoft bg-brand-bg/40 p-6 text-sm text-brand-muted">
-        Upload a base image on the mockup template before defining print coordinates.
+        {renderRegionMode ? "Upload the gallery image before defining its artwork region." : "Upload a base image on the mockup template before defining print coordinates."}
       </div>
     );
   }
@@ -194,7 +196,7 @@ export function PrintAreaVisualEditor(props: {
   if (templateImage.error) {
     return (
       <div className="rounded-2xl border border-dashed border-surface-borderSoft bg-brand-bg/40 p-6 text-sm text-brand-muted">
-        Could not load the mockup base image. Check that the template image is uploaded and publicly accessible.
+        Could not load the mockup image. Check that it is uploaded and publicly accessible.
       </div>
     );
   }
@@ -210,7 +212,7 @@ export function PrintAreaVisualEditor(props: {
     <div className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="inline-flex rounded-full bg-surface-app p-1">
-          {(["print", "safe"] as const).map((layer) => (
+          {(renderRegionMode ? (["print"] as const) : (["print", "safe"] as const)).map((layer) => (
             <button
               key={layer}
               type="button"
@@ -220,7 +222,7 @@ export function PrintAreaVisualEditor(props: {
               )}
               onClick={() => setActiveLayer(layer)}
             >
-              {layer === "print" ? "Print area" : "Safe zone"}
+              {layer === "print" ? (renderRegionMode ? "Artwork region" : "Print area") : "Safe zone"}
             </button>
           ))}
         </div>
@@ -254,20 +256,22 @@ export function PrintAreaVisualEditor(props: {
               active={activeLayer === "print"}
               stroke={rashpodTokens.colors.brand.blue}
               fill={activeLayer === "print" ? "rgba(120, 138, 224, 0.12)" : "rgba(120, 138, 224, 0.04)"}
-              onChange={(nextPrint) => emitChange(nextPrint, safeRect)}
+              onChange={(nextPrint) => emitChange(nextPrint, renderRegionMode ? nextPrint : safeRect)}
             />
-            <RectEditorNode
-              rect={safeRect}
-              active={activeLayer === "safe"}
-              stroke={rashpodTokens.colors.brand.peach}
-              fill={activeLayer === "safe" ? "rgba(243, 158, 124, 0.12)" : "rgba(243, 158, 124, 0.04)"}
-              onChange={(nextSafe) => emitChange(printRect, nextSafe)}
-            />
+            {!renderRegionMode ? (
+              <RectEditorNode
+                rect={safeRect}
+                active={activeLayer === "safe"}
+                stroke={rashpodTokens.colors.brand.peach}
+                fill={activeLayer === "safe" ? "rgba(243, 158, 124, 0.12)" : "rgba(243, 158, 124, 0.04)"}
+                onChange={(nextSafe) => emitChange(printRect, nextSafe)}
+              />
+            ) : null}
           </Layer>
         </Stage>
       </div>
       <p className="text-xs text-brand-muted">
-        Select a layer, then drag or resize its rectangle on the mockup. Coordinates sync to the fields below in template pixel space (
+        {renderRegionMode ? "Drag and resize the artwork region over the exact printable surface in this gallery image." : "Select a layer, then drag or resize its rectangle on the mockup."} Coordinates use the image pixel space (
         {templateWidthPx}×{templateHeightPx}px).
       </p>
     </div>

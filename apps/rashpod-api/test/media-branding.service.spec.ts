@@ -26,6 +26,34 @@ describe("MediaService storefront media", () => {
     expect(products.find((product) => product.key === "hoodie")?.imageUrl).toBeNull();
   });
 
+  it("reuses matching homepage category images when Custom Order cards have no dedicated asset", async () => {
+    const prisma: any = {
+      platformSetting: {
+        findUnique: jest.fn()
+          .mockResolvedValueOnce(null)
+          .mockResolvedValueOnce({
+            value: {
+              homeCategoryTiles: [
+                { key: "mug", imageUrl: "https://cdn.example/mug.png", altText: "Orange RashPOD mug" },
+                { key: "hat", imageUrl: "https://cdn.example/hat.png", altText: "White RashPOD hat" },
+              ],
+            },
+          }),
+      },
+      mediaAsset: { findMany: jest.fn().mockResolvedValue([]) },
+    };
+    const service = new MediaService(prisma, { log: jest.fn() } as any, {} as any);
+
+    const products = await service.customOrderProducts();
+
+    expect(products.find((product) => product.key === "mug")).toEqual(expect.objectContaining({
+      imageUrl: "https://cdn.example/mug.png",
+      altText: "Orange RashPOD mug",
+    }));
+    expect(products.find((product) => product.key === "hat")?.imageUrl).toBe("https://cdn.example/hat.png");
+    expect(products.find((product) => product.key === "hoodie")?.imageUrl).toBeNull();
+  });
+
   it("exposes the configured homepage category tiles through public branding", async () => {
     const tiles = [{ key: "mug", category: "ceramics", productName: "mug", imageUrl: "/mug.png" }];
     const prisma: any = {

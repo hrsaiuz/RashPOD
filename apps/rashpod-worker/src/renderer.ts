@@ -72,7 +72,7 @@ export class SharpRenderer {
     if (!templateKey) throw new Error("MOCKUP_TEMPLATE_IMAGE_MISSING");
     if (!designKey) throw new Error("DESIGN_SOURCE_FILE_MISSING");
 
-    const placement = resolvePipelinePlacement(context.placementConfigJson, context);
+    const placement = resolvePipelinePlacement(context.placementConfigJson, context, variant === "preview" ? "main" : variant);
     const buffer = await compositeMockupImage(this.store, {
       templateKey,
       designKey,

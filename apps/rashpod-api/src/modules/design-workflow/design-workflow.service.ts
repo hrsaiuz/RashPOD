@@ -1232,6 +1232,7 @@ export class DesignWorkflowService {
         role: "LIFESTYLE" | "DETAIL";
         imageKey: string;
         sortOrder: number;
+        metadataJson: Prisma.JsonValue | null;
       }>;
     };
     area: {
@@ -1303,6 +1304,7 @@ export class DesignWorkflowService {
           role: asset.role,
           imageKey: asset.imageKey,
           sortOrder: asset.sortOrder,
+          metadataJson: asset.metadataJson,
         })),
       printArea: {
         id: input.area.id,

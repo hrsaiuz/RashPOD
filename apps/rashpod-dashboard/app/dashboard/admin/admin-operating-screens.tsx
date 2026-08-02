@@ -3,7 +3,7 @@
 import { FormEvent, ReactNode, useCallback, useEffect, useMemo, useState } from "react";
 import { Button, Card, EmptyState, ErrorState, Input, Select, Skeleton, StatusBadge, Textarea } from "@rashpod/ui";
 import { Activity, BadgePercent, CreditCard, Eye, FileText, Images, Layers, ListChecks, Pencil, Plus, ShieldCheck, SlidersHorizontal, Star, Trash2, Upload, X } from "lucide-react";
-import { suggestDefaultPrintAreaRects, type PrintAreaRect } from "@rashpod/mockup";
+import { parseVariantRenderRegion, suggestDefaultPrintAreaRects, type PrintAreaRect, type VariantRenderRegion } from "@rashpod/mockup";
 import DashboardLayout from "../dashboard-layout";
 import { api } from "../../../lib/api";
 import { PrintAreaVisualEditor } from "../../../components/mockup/PrintAreaVisualEditorDynamic";
@@ -47,6 +47,7 @@ type MockupGalleryAsset = IdRow & {
   altText?: string | null;
   sortOrder: number;
   isActive: boolean;
+  metadataJson?: Record<string, unknown> | null;
 };
 type MockupTemplate = IdRow & {
   baseProductId: string;
@@ -406,7 +407,36 @@ type MockupGalleryEditingState = {
   sortOrder: string;
   isActive: boolean;
   previewUrl?: string;
+  metadataJson: Record<string, unknown>;
+  renderRegion?: VariantRenderRegion;
 };
+
+function renderRegionEditorRect(region: VariantRenderRegion): PrintAreaRect {
+  return {
+    x: region.x,
+    y: region.y,
+    width: region.width,
+    height: region.height,
+    safeX: region.x,
+    safeY: region.y,
+    safeWidth: region.width,
+    safeHeight: region.height,
+  };
+}
+
+function defaultRenderRegion(canvasWidth: number, canvasHeight: number): VariantRenderRegion {
+  const width = Math.max(20, Math.round(canvasWidth * 0.36));
+  const height = Math.max(20, Math.round(canvasHeight * 0.46));
+  return {
+    canvasWidth,
+    canvasHeight,
+    x: Math.round((canvasWidth - width) / 2),
+    y: Math.round((canvasHeight - height) / 2),
+    width,
+    height,
+    rotation: 0,
+  };
+}
 
 async function uploadMockupTemplateImage(file: File, title: string) {
   const signRes = await fetch("/api/proxy/admin/media/upload-url", {
@@ -647,6 +677,8 @@ export function MockupTemplatesScreen() {
             sortOrder: String(asset.sortOrder),
             isActive: asset.isActive,
             previewUrl: mediaByObjectKey.get(asset.imageKey),
+            metadataJson: asset.metadataJson ?? {},
+            renderRegion: parseVariantRenderRegion(asset.metadataJson) ?? undefined,
           }
         : {
             mockupViewId: managing?.views?.find((view) => view.isPrimary)?.id ?? "",
@@ -655,6 +687,7 @@ export function MockupTemplatesScreen() {
             altText: "",
             sortOrder: String(managing?.galleryAssets?.length ?? 0),
             isActive: true,
+            metadataJson: {},
           },
     );
   }
@@ -671,7 +704,7 @@ export function MockupTemplatesScreen() {
       if (target === "view") {
         setViewEditing((current) => current ? { ...current, blankImageKey: uploaded.objectKey, previewUrl: uploaded.publicUrl } : current);
       } else {
-        setGalleryEditing((current) => current ? { ...current, imageKey: uploaded.objectKey, previewUrl: uploaded.publicUrl } : current);
+        setGalleryEditing((current) => current ? { ...current, imageKey: uploaded.objectKey, previewUrl: uploaded.publicUrl, renderRegion: undefined } : current);
       }
     } catch (err) {
       setError(errorMessage(err));
@@ -734,6 +767,10 @@ export function MockupTemplatesScreen() {
         altText: galleryEditing.altText || undefined,
         sortOrder: Number(galleryEditing.sortOrder),
         isActive: galleryEditing.isActive,
+        metadataJson: {
+          ...galleryEditing.metadataJson,
+          renderRegion: galleryEditing.renderRegion,
+        },
       };
       if (galleryEditing.id) await api.patch(`/admin/mockup-gallery-assets/${galleryEditing.id}`, payload);
       else await api.post(`/admin/mockup-templates/${managing.id}/gallery-assets`, payload);
@@ -1200,11 +1237,70 @@ export function MockupTemplatesScreen() {
                     previewUrl={galleryEditing.previewUrl || mediaByObjectKey.get(galleryEditing.imageKey)}
                     uploading={uploadingField === `gallery-${galleryEditing.id ?? "new"}`}
                     onUpload={(file) => void handleManagerImageUpload("gallery", file)}
-                    onClear={() => setGalleryEditing((current) => current ? { ...current, imageKey: "", previewUrl: undefined } : current)}
+                    onClear={() => setGalleryEditing((current) => current ? { ...current, imageKey: "", previewUrl: undefined, renderRegion: undefined } : current)}
                   />
+                  {galleryEditing.previewUrl || mediaByObjectKey.get(galleryEditing.imageKey) ? (
+                    <div className="space-y-4 rounded-2xl border border-surface-borderSoft bg-white p-4">
+                      <div>
+                        <h4 className="font-semibold text-brand-ink">Artwork calibration</h4>
+                        <p className="mt-1 text-sm text-brand-muted">
+                          Draw the product surface that corresponds to the selected view&apos;s print area. Moderator placement will be mapped into this region automatically.
+                        </p>
+                      </div>
+                      <>
+                          <PrintAreaVisualEditor
+                            mode="render-region"
+                            imageUrl={galleryEditing.previewUrl || mediaByObjectKey.get(galleryEditing.imageKey) || null}
+                            value={renderRegionEditorRect(galleryEditing.renderRegion ?? defaultRenderRegion(1000, 1000))}
+                            onImageDimensions={(canvasWidth, canvasHeight) => setGalleryEditing((current) => {
+                              if (!current) return current;
+                              if (current.renderRegion?.canvasWidth === canvasWidth && current.renderRegion.canvasHeight === canvasHeight) return current;
+                              return { ...current, renderRegion: defaultRenderRegion(canvasWidth, canvasHeight) };
+                            })}
+                            onChange={(rect) => setGalleryEditing((current) => current?.renderRegion ? {
+                              ...current,
+                              renderRegion: {
+                                ...current.renderRegion,
+                                x: rect.x,
+                                y: rect.y,
+                                width: rect.width,
+                                height: rect.height,
+                              },
+                            } : current)}
+                          />
+                          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+                            {(["x", "y", "width", "height"] as const).map((key) => (
+                              <Field key={key} label={key === "x" ? "X" : key === "y" ? "Y" : key === "width" ? "Width" : "Height"}>
+                                <Input
+                                  type="number"
+                                  min={key === "width" || key === "height" ? 1 : 0}
+                                  value={galleryEditing.renderRegion?.[key] ?? 0}
+                                  onChange={(event) => setGalleryEditing((current) => current?.renderRegion ? {
+                                    ...current,
+                                    renderRegion: { ...current.renderRegion, [key]: Number(event.target.value) },
+                                  } : current)}
+                                />
+                              </Field>
+                            ))}
+                            <Field label="Rotation (degrees)">
+                              <Input
+                                type="number"
+                                min={-180}
+                                max={180}
+                                value={galleryEditing.renderRegion?.rotation ?? 0}
+                                onChange={(event) => setGalleryEditing((current) => current?.renderRegion ? {
+                                  ...current,
+                                  renderRegion: { ...current.renderRegion, rotation: Number(event.target.value) },
+                                } : current)}
+                              />
+                            </Field>
+                          </div>
+                      </>
+                    </div>
+                  ) : null}
                   <ToggleField label="Active" checked={galleryEditing.isActive} onChange={(value) => setGalleryEditing((current) => current ? { ...current, isActive: value } : current)} />
                   <div className="flex justify-end">
-                    <Button type="submit" loading={managerBusy === "gallery-save"} disabled={!galleryEditing.imageKey}>Save gallery image</Button>
+                    <Button type="submit" loading={managerBusy === "gallery-save"} disabled={!galleryEditing.imageKey || !galleryEditing.renderRegion}>Save gallery image</Button>
                   </div>
                 </form>
               ) : null}

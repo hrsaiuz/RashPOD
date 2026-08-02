@@ -65,6 +65,7 @@ export interface PlacementConfigV1 {
     role: "LIFESTYLE" | "DETAIL";
     imageKey: string;
     sortOrder?: number;
+    metadataJson?: Record<string, unknown> | null;
   }>;
   printArea: PrintAreaRect & {
     id?: string;

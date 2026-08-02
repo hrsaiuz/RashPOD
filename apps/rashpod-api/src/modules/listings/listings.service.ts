@@ -6,6 +6,19 @@ import { RequestUser } from "../../common/auth/current-user.decorator";
 import { CreateListingDto } from "./dto/create-listing.dto";
 import { UpdateListingDto } from "./dto/update-listing.dto";
 
+export function toPublicListingImageUrl(
+  value: string,
+  bucketName = process.env.GCS_BUCKET_ASSETS || process.env.GCS_BUCKET_PUBLIC || process.env.GCS_BUCKET_NAME || "rashpod-assets-public",
+) {
+  const trimmed = value.trim();
+  if (!trimmed || /^(https?:|data:)/i.test(trimmed) || trimmed.startsWith("/")) return trimmed;
+  const gsMatch = trimmed.match(/^gs:\/\/([^/]+)\/(.+)$/i);
+  const bucket = gsMatch?.[1] ?? bucketName;
+  const objectKey = gsMatch?.[2] ?? trimmed;
+  const encodedKey = objectKey.split("/").map(encodeURIComponent).join("/");
+  return `https://storage.googleapis.com/${bucket}/${encodedKey}`;
+}
+
 @Injectable()
 export class ListingsService {
   constructor(
@@ -279,6 +292,7 @@ export class ListingsService {
     sort?: string;
     page?: number;
     limit?: number;
+    locale?: string;
   }) {
     const take = Math.min(Math.max(Math.trunc(filters.limit ?? 24), 1), 100);
     const page = Math.max(Math.trunc(filters.page ?? 1), 1);
@@ -345,7 +359,7 @@ export class ListingsService {
       this.prisma.commerceListing.count({ where }),
     ]);
     return {
-      items: rows.map((row) => this.toShopListingDto(row)),
+      items: rows.map((row) => this.toShopListingDto(row, filters.locale)),
       meta: { total, page, perPage: take, totalPages: Math.max(1, Math.ceil(total / take)) },
     };
   }
@@ -404,7 +418,7 @@ export class ListingsService {
       .sort((a, b) => b.listingsCount - a.listingsCount);
   }
 
-  async shopBySlug(slug: string) {
+  async shopBySlug(slug: string, locale?: string) {
     const row = await this.prisma.commerceListing.findUnique({
       where: { slug },
       include: {
@@ -416,7 +430,7 @@ export class ListingsService {
         },
       },
     });
-    return row ? this.toShopListingDto(row) : null;
+    return row ? this.toShopListingDto(row, locale) : null;
   }
 
   private toShopListingDto(row: {
@@ -434,23 +448,47 @@ export class ListingsService {
     productType?: string | null;
     localBaseProduct?: { productType?: { name: string; slug: string; category: string } | null } | null;
     marketplacePublications?: Array<{ metadataJson: any }>;
-  }) {
+    metadataJson?: any;
+  }, locale?: string) {
     const images = Array.isArray(row.imagesJson)
-      ? (row.imagesJson as unknown[]).filter((v): v is string => typeof v === "string")
+      ? (row.imagesJson as unknown[])
+          .filter((v): v is string => typeof v === "string" && v.trim().length > 0)
+          .map((value) => toPublicListingImageUrl(value))
       : [];
     const printfulMetadata = this.objectJson(row.marketplacePublications?.[0]?.metadataJson);
-    const variantSelections = Array.isArray(printfulMetadata.variantSelections)
+    const printfulVariants = Array.isArray(printfulMetadata.variantSelections)
       ? printfulMetadata.variantSelections
           .map((item) => this.objectJson(item))
           .filter((item) => typeof item.id === "string")
       : [];
+    const listingMetadata = this.objectJson(row.metadataJson);
+    const translations = this.objectJson(listingMetadata.translations);
+    const requestedLocale = typeof locale === "string" ? locale.trim().toLowerCase() : "";
+    const localizedCopy = this.objectJson(translations[requestedLocale]);
+    const localizedTitle = typeof localizedCopy.title === "string" && localizedCopy.title.trim() ? localizedCopy.title.trim() : row.title;
+    const localizedDescription = typeof localizedCopy.description === "string" && localizedCopy.description.trim()
+      ? localizedCopy.description.trim()
+      : row.description;
+    const localVariants: Array<Record<string, unknown>> = Array.isArray(listingMetadata.variants)
+      ? listingMetadata.variants
+          .map((item, index): Record<string, unknown> => {
+            const variant = this.objectJson(item);
+            return {
+              ...variant,
+              id: typeof variant.id === "string" ? variant.id : `variant-${index}`,
+              inStock: true,
+            };
+          })
+          .filter((item) => item.enabled !== false)
+      : [];
+    const variantSelections = printfulVariants.length ? printfulVariants : localVariants;
     const sizes = [...new Set(variantSelections.map((item) => item.size).filter((value): value is string => typeof value === "string" && value.length > 0))];
     const colors = [...new Set(variantSelections.map((item) => item.color).filter((value): value is string => typeof value === "string" && value.length > 0))];
     return {
       id: row.id,
       slug: row.slug,
-      title: row.title,
-      description: row.description,
+      title: localizedTitle,
+      description: localizedDescription,
       price: Number(row.price),
       currency: row.currency,
       type: row.type,

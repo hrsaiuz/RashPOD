@@ -1,4 +1,6 @@
-export const BRANDING_REVALIDATE_SECONDS = 60 * 60 * 24 * 7; // 604800 — 1 week
+// Admin saves invalidate this tag immediately. The short TTL is a safety net if
+// cross-service revalidation is temporarily unavailable.
+export const BRANDING_REVALIDATE_SECONDS = 60;
 
 export const BRANDING_CACHE_TAG = "branding";
 

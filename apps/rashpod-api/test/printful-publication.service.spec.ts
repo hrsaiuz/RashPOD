@@ -23,19 +23,27 @@ describe("PrintfulPublicationService", () => {
       commerceListing: {
         findUnique: jest.fn().mockResolvedValue({
           id: "listing-1",
-          designAsset: { id: "design-1" },
+          pipeline: "GLOBAL_PRINTFUL",
+          designAsset: {
+            id: "design-1",
+            commercialRights: { allowProductSales: true, allowMarketplacePublishing: true },
+          },
           designProductSelection: {
             id: "selection-1",
-            placementConfigJson: {},
+            pipeline: "GLOBAL_PRINTFUL",
+            placement: "FRONT",
+            providerPlacement: "front",
+            technique: "dtg",
+            placementConfigJson: { selectedVariantIds: [401, 402] },
+            printfulProductTemplate: { id: "template-1", printfulCatalogProductId: "71" },
+            mockupAssets: [
+              { mockupType: "MAIN", status: "READY" },
+              { mockupType: "LIFESTYLE", status: "READY" },
+              { mockupType: "DETAIL", status: "READY" },
+            ],
           },
         }),
         update: jest.fn().mockResolvedValue({ id: "listing-1" }),
-      },
-      designProductSelection: {
-        update: jest.fn().mockResolvedValue({ id: "selection-1" }),
-      },
-      printfulProductTemplate: {
-        upsert: jest.fn().mockResolvedValue({ id: "template-1" }),
       },
       marketplacePublication: {
         upsert: jest.fn().mockImplementation(({ where }: any) => {
@@ -85,8 +93,8 @@ describe("PrintfulPublicationService", () => {
     expect(result.publications).toHaveLength(2);
     expect(prisma.marketplacePublication.upsert).toHaveBeenCalledTimes(2);
     expect(jobs.enqueue).toHaveBeenCalledTimes(2);
-    expect(prisma.designProductSelection.update).toHaveBeenCalledWith(expect.objectContaining({
-      where: { id: "selection-1" },
+    expect(prisma.commerceListing.update).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: "listing-1" },
       data: expect.objectContaining({ printfulProductTemplateId: "template-1" }),
     }));
     expect(audit.log).toHaveBeenCalledWith(expect.objectContaining({

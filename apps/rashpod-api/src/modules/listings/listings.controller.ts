@@ -130,6 +130,7 @@ export class ListingsController {
     @Query("sort") sort?: string,
     @Query("page") page?: string,
     @Query("limit") limit?: string,
+    @Query("locale") locale?: string,
   ) {
     return this.listings.shopList({
       type,
@@ -142,6 +143,7 @@ export class ListingsController {
       sort,
       page: finiteNumber(page),
       limit: finiteNumber(limit),
+      locale,
     });
   }
 
@@ -157,8 +159,8 @@ export class ListingsController {
   }
 
   @Get("shop/listings/:slug")
-  bySlug(@Param("slug") slug: string) {
-    return this.listings.shopBySlug(slug);
+  bySlug(@Param("slug") slug: string, @Query("locale") locale?: string) {
+    return this.listings.shopBySlug(slug, locale);
   }
 
   @Get("shop/designers/:handle")

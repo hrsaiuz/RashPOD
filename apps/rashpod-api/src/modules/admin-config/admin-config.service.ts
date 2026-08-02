@@ -25,6 +25,7 @@ import { CreatePrintfulProductTemplateDto } from "./dto/create-printful-product-
 import { UpdatePrintfulProductTemplateDto } from "./dto/update-printful-product-template.dto";
 import { UpdatePrintfulSettingsDto } from "./dto/update-printful-settings.dto";
 import { JobDispatcherService } from "../worker-jobs/job-dispatcher.service";
+import { parseVariantRenderRegion } from "@rashpod/mockup";
 
 @Injectable()
 export class AdminConfigService {
@@ -705,9 +706,17 @@ export class AdminConfigService {
     });
   }
 
+  private validateGalleryRenderRegion(metadata: Record<string, unknown> | undefined) {
+    if (!metadata || !("renderRegion" in metadata)) return;
+    if (!parseVariantRenderRegion(metadata)) {
+      throw new BadRequestException("Gallery artwork region must be inside the uploaded image canvas");
+    }
+  }
+
   async createMockupGalleryAsset(actorId: string, mockupTemplateId: string, dto: CreateMockupGalleryAssetDto) {
     await this.assertMockupTemplateExists(mockupTemplateId);
     if (dto.mockupViewId) await this.assertMockupViewForTemplate(dto.mockupViewId, mockupTemplateId);
+    this.validateGalleryRenderRegion(dto.metadataJson);
     const item = await this.prisma.$transaction(async (tx) => {
       const created = await tx.mockupGalleryAsset.create({
         data: {
@@ -738,6 +747,7 @@ export class AdminConfigService {
     const existing = await this.prisma.mockupGalleryAsset.findUnique({ where: { id } });
     if (!existing) throw new NotFoundException("Mockup gallery asset not found");
     if (dto.mockupViewId) await this.assertMockupViewForTemplate(dto.mockupViewId, existing.mockupTemplateId);
+    this.validateGalleryRenderRegion(dto.metadataJson);
     const item = await this.prisma.$transaction(async (tx) => {
       const updated = await tx.mockupGalleryAsset.update({
         where: { id },

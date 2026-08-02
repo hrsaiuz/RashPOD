@@ -5,16 +5,7 @@ import { Button, Card, rashpodTokens, Skeleton } from "@rashpod/ui";
 import { Upload, Image as ImageIcon } from "lucide-react";
 import DashboardLayout from "../../dashboard-layout";
 import { LOGIN_DECORATION_SLOTS, type LoginDecorThemeUrlKey } from "../../../auth/auth-login-slots";
-
-async function revalidateStorefrontBranding() {
-  const webUrl = process.env.NEXT_PUBLIC_WEB_URL;
-  const secret = process.env.REVALIDATE_SECRET;
-  if (!webUrl || !secret) return;
-  await fetch(`${webUrl}/api/revalidate/branding`, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${secret}` },
-  }).catch(() => undefined);
-}
+import { revalidateStorefrontBranding } from "../../../../lib/revalidate-storefront";
 
 type SlotKey = "storefrontLogoUrl" | "dashboardLogoUrl" | "loginLogoUrl" | "footerLogoUrl" | "faviconUrl";
 type ThemeImageUrlKey = "homeHeroImageUrl" | "homeDesignerSectionImageUrl";
@@ -265,7 +256,10 @@ export default function BrandingPage() {
       if (res.ok) {
         setThemeSaved(true);
         await load();
-        await revalidateStorefrontBranding();
+        const revalidated = await revalidateStorefrontBranding();
+        if (!revalidated) {
+          setError("Branding was saved, but the storefront refresh could not run. The public site will retry within one minute.");
+        }
       }
     } finally {
       setThemeSaving(false);

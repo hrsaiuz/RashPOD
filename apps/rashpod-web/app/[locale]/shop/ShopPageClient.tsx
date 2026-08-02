@@ -1,7 +1,7 @@
 "use client";
 
 import { Fragment, Suspense, useEffect, useRef, useState } from "react";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { Button, Card, Drawer, EmptyState, ErrorState, Skeleton, getApiBase } from "@rashpod/ui";
 import { ChevronLeft, ChevronRight, Filter } from "lucide-react";
 import { ProductCard } from "../../../components/ProductCard";
@@ -27,6 +27,7 @@ function ShopContent({ initialListings = [], initialMeta = null, initialDesigner
   initialCategories?: CatalogCategory[];
 }) {
   const t = useTranslations("shop");
+  const locale = useLocale();
   const apiBase = getApiBase();
   const filters = useCatalogFilters();
   const firstRender = useRef(true);
@@ -52,6 +53,7 @@ function ShopContent({ initialListings = [], initialMeta = null, initialDesigner
     setError(false);
     const params = new URLSearchParams(filters.queryString);
     params.set("limit", "24");
+    params.set("locale", locale);
     fetch(`${apiBase}/shop/listings?${params}`, { signal: controller.signal })
       .then(async (response) => {
         if (!response.ok) throw new Error("catalog");
@@ -73,7 +75,7 @@ function ShopContent({ initialListings = [], initialMeta = null, initialDesigner
       window.clearTimeout(timeout);
       controller.abort();
     };
-  }, [apiBase, filters.queryString, initialListings.length, initialMeta]);
+  }, [apiBase, filters.queryString, initialListings.length, initialMeta, locale]);
 
   const panel = (
     <CatalogFilterPanel

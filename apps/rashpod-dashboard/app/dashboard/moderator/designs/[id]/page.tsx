@@ -318,8 +318,8 @@ export default function Page() {
       setMockupTemplates(templates);
       setPrintAreas(areas);
       setPrintfulTemplates(printful);
-      setLocalSelections((current) => current.length ? current : [createLocalSelection(products, presets, templates, areas)]);
-      setGlobalSelections((current) => current.length ? current : [createGlobalSelection(printful, presets)]);
+      setLocalSelections((current) => current.length ? current : [createLocalSelection(products, presets, templates, areas, detail?.versions)]);
+      setGlobalSelections((current) => current.length ? current : [createGlobalSelection(printful, presets, detail?.versions)]);
     } catch (e) {
       setConfigError(e instanceof Error ? e.message : "Failed to load pipeline configuration");
     } finally {
@@ -328,7 +328,10 @@ export default function Page() {
   }
 
   function localPresetsFor(productId: string) {
-    return placementPresets.filter((item) => item.active !== false && item.pipeline === "LOCAL" && (!item.localBaseProductId || item.localBaseProductId === productId));
+    return placementPresets.filter((item) => item.active !== false
+      && item.pipeline === "LOCAL"
+      && (!item.localBaseProductId || item.localBaseProductId === productId)
+      && placementArtworkAvailable(detail?.versions, item.placement));
   }
 
   function localTemplatesFor(productId: string) {
@@ -339,8 +342,18 @@ export default function Page() {
     return moderatorPrintAreasForTemplate(printAreas, templateId);
   }
 
+  function artworkPrintAreasFor(templateId: string) {
+    return printAreasFor(templateId).filter((item) => placementArtworkAvailable(
+      detail?.versions,
+      item.placement ?? item.mockupView?.placementCode ?? "FRONT",
+    ));
+  }
+
   function globalPresetsFor(templateId: string) {
-    return placementPresets.filter((item) => item.active !== false && item.pipeline === "GLOBAL_PRINTFUL" && (!item.productTemplateId || item.productTemplateId === templateId));
+    return placementPresets.filter((item) => item.active !== false
+      && item.pipeline === "GLOBAL_PRINTFUL"
+      && (!item.productTemplateId || item.productTemplateId === templateId)
+      && placementArtworkAvailable(detail?.versions, item.providerPlacement ?? item.placement));
   }
 
   function presetPlacement(presetId: string) {
@@ -359,7 +372,7 @@ export default function Page() {
   function selectLocalProduct(index: number, productId: string) {
     const presets = localPresetsFor(productId);
     const template = localTemplatesFor(productId)[0];
-    const areas = template ? printAreasFor(template.id) : [];
+    const areas = template ? artworkPrintAreasFor(template.id) : [];
     const compositionKey = localSelections[index]?.compositionKey;
     setLocalSelections((current) => {
       let placementIndex = 0;
@@ -390,7 +403,7 @@ export default function Page() {
 
   function selectLocalTemplate(index: number, templateId: string) {
     const current = localSelections[index];
-    const candidates = printAreasFor(templateId);
+    const candidates = artworkPrintAreasFor(templateId);
     setLocalSelections((items) => {
       let placementIndex = 0;
       return items.map((item) => {
@@ -412,9 +425,9 @@ export default function Page() {
     const source = localSelections[index];
     if (!source) return;
     const used = new Set(localSelections.filter((item) => item.compositionKey === source.compositionKey).map((item) => localPlacement(item, printAreas, placementPresets)));
-    const area = printAreasFor(source.mockupTemplateId).find((item) => !used.has(item.placement ?? item.mockupView?.placementCode ?? "FRONT"));
+    const area = artworkPrintAreasFor(source.mockupTemplateId).find((item) => !used.has(item.placement ?? item.mockupView?.placementCode ?? "FRONT"));
     if (!area) {
-      toast({ tone: "info", title: "All configured placements are already added" });
+      toast({ tone: "info", title: "All uploaded placements are already added" });
       return;
     }
     const preset = placementPresets.find((item) => item.id === area.defaultPresetId)
@@ -625,7 +638,7 @@ export default function Page() {
     const used = new Set(globalSelections.filter((item) => item.compositionKey === source.compositionKey).map((item) => item.placementPresetId));
     const preset = globalPresetsFor(source.printfulProductTemplateId).find((item) => !used.has(item.id));
     if (!preset) {
-      toast({ tone: "info", title: "All configured Printful placements are already added" });
+      toast({ tone: "info", title: "All uploaded Printful placements are already added" });
       return;
     }
     setGlobalSelections((current) => [...current, {
@@ -1003,7 +1016,7 @@ export default function Page() {
                               label="Product view / print area"
                               value={selection.printAreaId}
                               onChange={(value) => selectPrintArea(index, value)}
-                              options={printAreasFor(selection.mockupTemplateId).map((item) => ({
+                              options={artworkPrintAreasFor(selection.mockupTemplateId).map((item) => ({
                                 value: item.id,
                                 label: `${item.mockupView?.name ?? "Legacy primary view"} · ${item.name} · safe ${item.safeWidth}x${item.safeHeight}px`,
                               }))}
@@ -1106,7 +1119,7 @@ export default function Page() {
                           </div>
                         </SelectionPanel>
                       ))}
-                      <Button variant="secondary" size="sm" onClick={() => setLocalSelections((current) => [...current, createLocalSelection(baseProducts, placementPresets, mockupTemplates, printAreas)])} disabled={configLoading}>
+                      <Button variant="secondary" size="sm" onClick={() => setLocalSelections((current) => [...current, createLocalSelection(baseProducts, placementPresets, mockupTemplates, printAreas, detail?.versions)])} disabled={configLoading}>
                         <Plus size={16} /> Add Local Product
                       </Button>
                       <Button
@@ -1254,7 +1267,7 @@ export default function Page() {
                           </div>
                         </SelectionPanel>
                       ))}
-                      <Button variant="secondary" size="sm" onClick={() => setGlobalSelections((current) => [...current, createGlobalSelection(printfulTemplates, placementPresets)])} disabled={configLoading}>
+                      <Button variant="secondary" size="sm" onClick={() => setGlobalSelections((current) => [...current, createGlobalSelection(printfulTemplates, placementPresets, detail?.versions)])} disabled={configLoading}>
                         <Plus size={16} /> Add Printful Product
                       </Button>
                       <Button
@@ -1562,18 +1575,36 @@ function ModerationWorkflowStepper({
   );
 }
 
-function createLocalSelection(products: BaseProductOption[], presets: PlacementPresetOption[], templates: MockupTemplateOption[], areas: PrintAreaOption[]): LocalSelectionForm {
-  const product = products.find((item) => item.isActive !== false);
-  const template = templates.find((item) => item.isActive !== false && item.baseProductId === product?.id);
-  const area = areas.find((item) => item.isActive !== false && item.mockupView?.isActive !== false && item.mockupTemplateId === template?.id);
+function createLocalSelection(products: BaseProductOption[], presets: PlacementPresetOption[], templates: MockupTemplateOption[], areas: PrintAreaOption[], versions?: Array<{ placement?: string | null }>): LocalSelectionForm {
+  const activeProducts = products.filter((item) => item.isActive !== false);
+  const activeTemplates = templates.filter((item) => item.isActive !== false);
+  const matchingArea = areas.find((item) => item.isActive !== false
+    && item.mockupView?.isActive !== false
+    && placementArtworkAvailable(versions, item.placement ?? item.mockupView?.placementCode ?? "FRONT")
+    && activeTemplates.some((template) => template.id === item.mockupTemplateId && activeProducts.some((product) => product.id === template.baseProductId)));
+  const template = activeTemplates.find((item) => item.id === matchingArea?.mockupTemplateId)
+    ?? activeTemplates.find((item) => activeProducts.some((product) => product.id === item.baseProductId));
+  const product = activeProducts.find((item) => item.id === template?.baseProductId) ?? activeProducts[0];
+  const configuredAreas = areas.filter((item) => item.isActive !== false && item.mockupView?.isActive !== false && item.mockupTemplateId === template?.id);
+  const area = configuredAreas.find((item) => item.id === matchingArea?.id)
+    ?? configuredAreas.find((item) => placementArtworkAvailable(versions, item.placement ?? item.mockupView?.placementCode ?? "FRONT"))
+    ?? configuredAreas[0];
   const preset = presets.find((item) => item.id === area?.defaultPresetId && item.active !== false)
     ?? presets.find((item) => item.active !== false && item.pipeline === "LOCAL" && (!item.localBaseProductId || item.localBaseProductId === product?.id));
   return { id: crypto.randomUUID(), compositionKey: crypto.randomUUID(), localBaseProductId: product?.id ?? "", mockupTemplateId: template?.id ?? "", printAreaId: area?.id ?? "", placementPresetId: preset?.id ?? "", ...localDefaultsFromPreset(preset, area) };
 }
 
-function createGlobalSelection(templates: PrintfulTemplateOption[], presets: PlacementPresetOption[]): GlobalSelectionForm {
-  const template = templates.find((item) => item.active !== false);
-  const preset = presets.find((item) => item.active !== false && item.pipeline === "GLOBAL_PRINTFUL" && (!item.productTemplateId || item.productTemplateId === template?.id));
+function createGlobalSelection(templates: PrintfulTemplateOption[], presets: PlacementPresetOption[], versions?: Array<{ placement?: string | null }>): GlobalSelectionForm {
+  const activeTemplates = templates.filter((item) => item.active !== false);
+  const matchingPreset = presets.find((item) => item.active !== false
+    && item.pipeline === "GLOBAL_PRINTFUL"
+    && placementArtworkAvailable(versions, item.providerPlacement ?? item.placement)
+    && (!item.productTemplateId || activeTemplates.some((template) => template.id === item.productTemplateId)));
+  const template = activeTemplates.find((item) => item.id === matchingPreset?.productTemplateId) ?? activeTemplates[0];
+  const availablePresets = presets.filter((item) => item.active !== false && item.pipeline === "GLOBAL_PRINTFUL" && (!item.productTemplateId || item.productTemplateId === template?.id));
+  const preset = availablePresets.find((item) => item.id === matchingPreset?.id)
+    ?? availablePresets.find((item) => placementArtworkAvailable(versions, item.providerPlacement ?? item.placement))
+    ?? availablePresets[0];
   const variantIds = variantIdsFromTemplate(template);
   return {
     id: crypto.randomUUID(),

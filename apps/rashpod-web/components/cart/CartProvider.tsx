@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useTranslations } from "next-intl";
 import Image from "next/image";
 import { Package, Tag, X } from "lucide-react";
 import { formatPrice } from "@rashpod/ui";
@@ -133,6 +134,7 @@ export function useCart() {
 }
 
 function MiniCartDrawer({ freeDeliveryThreshold }: { freeDeliveryThreshold: number }) {
+  const t = useTranslations("cart");
   const { items, isOpen, subtotal, closeCart, updateQuantity, removeItem } = useCart();
   const drawerRef = useRef<HTMLElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
@@ -178,13 +180,13 @@ function MiniCartDrawer({ freeDeliveryThreshold }: { freeDeliveryThreshold: numb
         role="dialog"
         aria-modal={isOpen}
         aria-hidden={!isOpen}
-        aria-label="Shopping cart"
+        aria-label={t("ariaLabel")}
         className={`fixed right-0 top-0 z-modal h-dvh w-full max-w-[620px] overflow-hidden rounded-l-md bg-brand-bg shadow-lg transition-transform duration-300 ease-out ${isOpen ? "translate-x-0" : "translate-x-full pointer-events-none"}`}
       >
         <div className="flex h-full flex-col px-4 py-5 pb-[max(1rem,env(safe-area-inset-bottom))] sm:px-10 sm:py-8">
           <div className="mb-6 flex items-center justify-between sm:mb-8">
-            <h2 className="text-section font-bold uppercase tracking-wide text-brand-ink">Order Summary</h2>
-            <button type="button" ref={closeButtonRef} onClick={closeCart} aria-label="Close cart" className="grid h-11 w-11 place-items-center rounded-full text-brand-ink transition-colors hover:bg-white">
+            <h2 className="text-section font-bold uppercase tracking-wide text-brand-ink">{t("orderSummary")}</h2>
+            <button type="button" ref={closeButtonRef} onClick={closeCart} aria-label={t("close")} className="grid h-11 w-11 place-items-center rounded-full text-brand-ink transition-colors hover:bg-white">
               <X size={25} strokeWidth={1.8} />
             </button>
           </div>
@@ -192,14 +194,14 @@ function MiniCartDrawer({ freeDeliveryThreshold }: { freeDeliveryThreshold: numb
           <FreeDeliveryBar subtotal={subtotal} remaining={remaining} progress={progress} threshold={freeDeliveryThreshold} />
 
           <div className="mb-4 grid grid-cols-[1fr_100px_82px] rounded-xs bg-brand-peach px-5 py-2 text-[11px] font-bold text-brand-ink sm:grid-cols-[1fr_140px_90px]">
-            <span>product</span>
-            <span className="text-center">Quantity</span>
-            <span className="text-right">Total</span>
+            <span>{t("product")}</span>
+            <span className="text-center">{t("quantity")}</span>
+            <span className="text-right">{t("total")}</span>
           </div>
 
           <div className="min-h-0 flex-1 space-y-4 overflow-y-auto pr-1">
             {items.length === 0 ? (
-              <div className="rounded-md bg-white p-10 text-center text-brand-muted">Your cart is empty.</div>
+              <div className="rounded-md bg-white p-10 text-center text-brand-muted">{t("empty")}</div>
             ) : items.map((item) => (
               <div key={item.key} className="grid grid-cols-[74px_1fr] items-center gap-4 rounded-[9px] bg-white p-4 sm:grid-cols-[96px_1fr_110px_88px]">
                 <div className="relative h-[92px] overflow-hidden rounded-[7px] bg-brand-bg">
@@ -229,7 +231,7 @@ function MiniCartDrawer({ freeDeliveryThreshold }: { freeDeliveryThreshold: numb
                     onClick={() => removeItem(item.key)}
                     className="mt-2 inline-flex min-h-11 items-center text-xs font-semibold text-semantic-filmText"
                   >
-                    Remove
+                    {t("remove")}
                   </button>
                 </div>
                 <p className="text-right text-lg font-bold tabular-nums text-brand-ink">{formatPrice(item.price * item.quantity)}</p>
@@ -239,7 +241,7 @@ function MiniCartDrawer({ freeDeliveryThreshold }: { freeDeliveryThreshold: numb
 
           <div className="mt-6 flex flex-col gap-3 border-t border-brand-line pt-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="hidden min-h-11 items-center gap-2 rounded-pill border-2 border-brand-blue bg-white px-4 text-sm text-brand-subtle sm:inline-flex">
-              <span>Coupon Code</span>
+              <span>{t("couponCode")}</span>
               <Tag size={17} className="ml-auto text-brand-peach" />
             </div>
             <Link
@@ -247,7 +249,7 @@ function MiniCartDrawer({ freeDeliveryThreshold }: { freeDeliveryThreshold: numb
               onClick={closeCart}
               className="inline-flex h-12 w-full items-center justify-center rounded-pill bg-brand-peach px-7 text-base font-bold lowercase text-brand-ink transition-transform hover:-translate-y-0.5 sm:ml-auto sm:w-auto sm:min-w-[128px] sm:text-xl"
             >
-              continue
+              {t("continue")}
             </Link>
           </div>
         </div>
@@ -269,14 +271,15 @@ export function FreeDeliveryBar({
   threshold?: number;
   compact?: boolean;
 }) {
+  const t = useTranslations("cart");
   return (
     <div className={compact ? "mb-4" : "mb-5"}>
       <div className="mb-1 flex items-center justify-between text-caption font-bold text-brand-ink">
         <span>0 UZS</span>
         <span className="text-center text-xs sm:text-caption">
           {remaining > 0
-            ? `${formatPrice(remaining)} away from free shipping`
-            : "You unlocked free shipping"}
+            ? t("freeShippingAway", { amount: formatPrice(remaining) })
+            : t("freeShippingUnlocked")}
         </span>
         <span className="relative grid h-9 w-9 place-items-center text-caption font-bold">
           <span className="cart-flower absolute inset-0 bg-brand-peach" />
@@ -291,11 +294,12 @@ export function FreeDeliveryBar({
 }
 
 function QuantityPill({ quantity, onChange }: { quantity: number; onChange: (quantity: number) => void }) {
+  const t = useTranslations("cart");
   return (
     <div className="inline-flex h-11 min-w-[132px] items-center justify-between overflow-hidden rounded-pill bg-brand-bg text-[13px] font-black text-brand-ink">
-      <button type="button" aria-label="Decrease quantity" className="grid h-11 w-11 place-items-center hover:bg-brand-blue/10" onClick={() => onChange(Math.max(1, quantity - 1))}>-</button>
+      <button type="button" aria-label={t("decreaseQuantity")} className="grid h-11 w-11 place-items-center hover:bg-brand-blue/10" onClick={() => onChange(Math.max(1, quantity - 1))}>-</button>
       <span aria-live="polite">{quantity}</span>
-      <button type="button" aria-label="Increase quantity" className="grid h-11 w-11 place-items-center hover:bg-brand-blue/10" onClick={() => onChange(quantity + 1)}>+</button>
+      <button type="button" aria-label={t("increaseQuantity")} className="grid h-11 w-11 place-items-center hover:bg-brand-blue/10" onClick={() => onChange(quantity + 1)}>+</button>
     </div>
   );
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useLocale } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { ChevronDown, Check, Languages } from "lucide-react";
 import { usePathname, useRouter } from "../i18n/navigation";
 import { routing, type AppLocale } from "../i18n/routing";
@@ -10,10 +10,12 @@ const LOCALES: Record<AppLocale, { label: string; nativeName: string }> = {
   uz: { label: "Uzbek", nativeName: "O'zbek" },
   ru: { label: "Russian", nativeName: "Русский" },
   en: { label: "English", nativeName: "English" },
+  fr: { label: "French", nativeName: "Français" },
 };
 
 export function LanguageSwitcher() {
   const locale = useLocale() as AppLocale;
+  const t = useTranslations("nav");
   const pathname = usePathname();
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -43,7 +45,7 @@ export function LanguageSwitcher() {
         type="button"
         aria-haspopup="menu"
         aria-expanded={open}
-        aria-label="Select language"
+        aria-label={t("selectLanguage")}
         className="inline-flex h-11 min-w-[148px] items-center justify-between gap-3 rounded-md border border-surface-borderSoft bg-white px-3 text-sm font-medium text-brand-ink shadow-xs transition-colors hover:bg-brand-bg focus:outline-none focus:ring-4 focus:ring-brand-blue/20"
         onClick={() => setOpen((value) => !value)}
       >
