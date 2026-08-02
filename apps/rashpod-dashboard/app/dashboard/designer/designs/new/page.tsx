@@ -1,6 +1,6 @@
 "use client";
 
-import { ChangeEvent, FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { ChangeEvent, FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
   Button,
@@ -20,6 +20,7 @@ import { api, resolveUploadMimeType, uploadToSignedUrlWithProgress, type Design,
 
 const ACCEPTED = ["image/png", "image/jpeg", "image/svg+xml"];
 const MAX_BYTES = 50 * 1024 * 1024;
+const COMPLEMENTARY_PLACEMENTS = ["BACK", "LEFT_CHEST", "RIGHT_CHEST", "LEFT_SLEEVE", "RIGHT_SLEEVE"] as const;
 
 type Step = "form" | "pending_upload" | "uploading" | "verifying" | "ready" | "failed" | "success";
 
@@ -56,6 +57,11 @@ export default function NewDesignPage() {
   const [submittedForReview, setSubmittedForReview] = useState(false);
   const [storySubmittedForReview, setStorySubmittedForReview] = useState(false);
   const [uploadedPreviewUrl, setUploadedPreviewUrl] = useState<string | null>(null);
+  const [designDetail, setDesignDetail] = useState<DesignWorkflowDetail | null>(null);
+  const [placementUploading, setPlacementUploading] = useState<string | null>(null);
+  const [placementError, setPlacementError] = useState("");
+  const placementInputRef = useRef<HTMLInputElement | null>(null);
+  const placementTargetRef = useRef<string | null>(null);
 
   const localPreviewUrl = useMemo(() => (file ? URL.createObjectURL(file) : null), [file]);
   const handleStoryStatusChange = useCallback((status: string | null) => {
@@ -71,7 +77,10 @@ export default function NewDesignPage() {
   useEffect(() => {
     if (!createdId || step !== "success") return;
     void api.get<DesignWorkflowDetail>(`/designer/designs/${createdId}`)
-      .then((detail) => setUploadedPreviewUrl(detail.previewImageUrl ?? null))
+      .then((detail) => {
+        setDesignDetail(detail);
+        setUploadedPreviewUrl(detail.previewImageUrl ?? null);
+      })
       .catch(() => undefined);
   }, [createdId, step]);
 
@@ -96,10 +105,74 @@ export default function NewDesignPage() {
     if (!f.type.startsWith("image/") && !f.name.match(/\.(png|jpe?g|webp)$/i)) return null;
     return new Promise((resolve) => {
       const img = new Image();
-      img.onload = () => resolve({ width: img.naturalWidth, height: img.naturalHeight });
-      img.onerror = () => resolve(null);
-      img.src = URL.createObjectURL(f);
+      const url = URL.createObjectURL(f);
+      img.onload = () => {
+        URL.revokeObjectURL(url);
+        resolve({ width: img.naturalWidth, height: img.naturalHeight });
+      };
+      img.onerror = () => {
+        URL.revokeObjectURL(url);
+        resolve(null);
+      };
+      img.src = url;
     });
+  }
+
+  function choosePlacementArtwork(placement: string) {
+    placementTargetRef.current = placement;
+    placementInputRef.current?.click();
+  }
+
+  async function uploadPlacementArtwork(event: ChangeEvent<HTMLInputElement>) {
+    const placement = placementTargetRef.current;
+    const nextFile = event.target.files?.[0];
+    event.target.value = "";
+    if (!createdId || !placement || !nextFile) return;
+    if (!ACCEPTED.includes(nextFile.type) && !nextFile.name.match(/\.(png|jpe?g|svg)$/i)) {
+      setPlacementError("Unsupported file type. Use PNG, JPEG, or SVG.");
+      return;
+    }
+    if (nextFile.size > MAX_BYTES) {
+      setPlacementError("File too large (max 50 MB).");
+      return;
+    }
+
+    setPlacementUploading(placement);
+    setPlacementError("");
+    try {
+      const mimeType = resolveUploadMimeType(nextFile);
+      const upload = await api.post<UploadUrlResponse>("/files/upload-url", {
+        purpose: "DESIGN_ORIGINAL",
+        filename: nextFile.name,
+        mimeType,
+        sizeBytes: nextFile.size,
+        designId: createdId,
+      });
+      await uploadToSignedUrlWithProgress(upload.url, nextFile, mimeType, upload.headers, () => undefined);
+      await api.post("/files/complete-upload", {
+        fileId: upload.fileId,
+        uploadedSizeBytes: nextFile.size,
+        uploadedMimeType: mimeType,
+      });
+      const dimensions = await readImageDimensions(nextFile);
+      await api.post(`/designs/${createdId}/versions`, {
+        fileId: upload.fileId,
+        widthPx: dimensions?.width ?? 0,
+        heightPx: dimensions?.height ?? 0,
+        dpi: 300,
+        placement,
+      });
+      const detail = await api.get<DesignWorkflowDetail>(`/designer/designs/${createdId}`);
+      setDesignDetail(detail);
+      toast({ tone: "success", title: `${placementLabel(placement)} artwork added` });
+    } catch (err) {
+      const nextError = err instanceof Error ? err.message : "Placement artwork upload failed";
+      setPlacementError(nextError);
+      toast({ tone: "error", title: "Could not upload placement artwork", description: nextError });
+    } finally {
+      setPlacementUploading(null);
+      placementTargetRef.current = null;
+    }
   }
 
   async function submitForModeration() {
@@ -236,6 +309,36 @@ export default function NewDesignPage() {
               src={uploadedPreviewUrl ?? localPreviewUrl}
               alt={title || "Uploaded design"}
             />
+            <Card>
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-brand-blue">Optional placement files</p>
+                  <h2 className="mt-1 text-lg font-semibold text-brand-ink">Add complementary artwork</h2>
+                  <p className="mt-1 max-w-xl text-sm text-brand-muted">Upload artwork that should differ from the main front design, such as a sleeve mark or back graphic. Each file stays linked to this design package.</p>
+                </div>
+                <span className="rounded-pill bg-brand-blueLight px-3 py-1 text-xs font-semibold text-brand-ink">Before moderation</span>
+              </div>
+              <div className="mt-5 grid gap-3 sm:grid-cols-2">
+                {COMPLEMENTARY_PLACEMENTS.map((placement) => {
+                  const uploaded = designDetail?.versions?.some((version) => version.placement === placement);
+                  const loading = placementUploading === placement;
+                  return (
+                    <div key={placement} className="flex min-h-16 items-center justify-between gap-3 rounded-2xl border border-brand-line bg-surface-card px-4 py-3">
+                      <div>
+                        <p className="font-semibold text-brand-ink">{placementLabel(placement)}</p>
+                        <p className={`text-xs ${uploaded ? "text-semantic-successText" : "text-brand-muted"}`}>{uploaded ? "Artwork uploaded" : "Uses no artwork until added"}</p>
+                      </div>
+                      <Button variant="secondary" size="sm" loading={loading} disabled={Boolean(placementUploading) || submittedForReview} onClick={() => choosePlacementArtwork(placement)}>
+                        <UploadIcon size={16} /> {uploaded ? "Replace" : "Upload"}
+                      </Button>
+                    </div>
+                  );
+                })}
+              </div>
+              <input ref={placementInputRef} type="file" className="hidden" accept=".png,.jpg,.jpeg,.svg,image/png,image/jpeg,image/svg+xml" onChange={(event) => void uploadPlacementArtwork(event)} />
+              {placementError ? <div className="mt-4"><ErrorState title="Placement upload failed" description={placementError} /></div> : null}
+              {submittedForReview ? <p className="mt-4 text-sm text-brand-muted">This package has already been sent for moderation.</p> : null}
+            </Card>
             <DesignerDesignStoryPanel
               designId={createdId}
               designTitle={title}
@@ -245,6 +348,8 @@ export default function NewDesignPage() {
                 setSubmittedForReview(true);
               }}
               reviewScope="design-and-story"
+              submissionBlocked={Boolean(placementUploading)}
+              submissionBlockReason="Wait for the complementary artwork upload to finish before sending this package for moderation."
             />
             <Card>
             <div className="flex flex-col items-center text-center py-6">
@@ -304,7 +409,7 @@ export default function NewDesignPage() {
                 />
               </FormField>
 
-              <FormField label="Design file" required>
+              <FormField label="Main front design" helperText="This is the primary artwork. You can add back, chest, and sleeve files immediately after it uploads." required>
                 {localPreviewUrl ? (
                   <div className="mb-4">
                     <DesignPreviewCard title="Selected file" src={localPreviewUrl} alt={file?.name ?? "Selected design"} compact />
@@ -382,4 +487,8 @@ function uploadLabel(step: Step) {
   if (step === "ready") return "Ready";
   if (step === "failed") return "Failed";
   return "Upload";
+}
+
+function placementLabel(value: string) {
+  return value.toLowerCase().replace(/_/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
 }

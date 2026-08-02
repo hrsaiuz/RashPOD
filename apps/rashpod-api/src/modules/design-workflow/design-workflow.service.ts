@@ -32,6 +32,7 @@ import { PlacementCalculationService } from "./placement-calculation.service";
 import { GlobalPrintfulSelectionDto, LocalSelectionDto, SubmitModerationDecisionDto } from "./dto/moderation-decision.dto";
 import { PrintfulMockupPreviewDto } from "./dto/printful-mockup-preview.dto";
 import { SuggestPrintfulPlacementDto } from "./dto/suggest-printful-placement.dto";
+import { selectPrimaryDesignVersion } from "../designs/design-version-selection";
 
 const REJECTION_REASONS = new Set([
   "COPYRIGHT_RISK",
@@ -136,8 +137,8 @@ export class DesignWorkflowService {
       }),
     ]);
     if (!design) throw new NotFoundException("Design not found");
-    const latestVersion = design.versions[0];
-    const previewImageUrl = await this.safeSignedUrl(latestVersion?.fileKey);
+    const primaryVersion = selectPrimaryDesignVersion(design.versions);
+    const previewImageUrl = await this.safeSignedUrl(primaryVersion?.fileKey);
     const productSelections = design.productSelections?.map((selection) => ({
       ...selection,
       mockupAssets: (selection.mockupAssets ?? []).map((asset) => ({

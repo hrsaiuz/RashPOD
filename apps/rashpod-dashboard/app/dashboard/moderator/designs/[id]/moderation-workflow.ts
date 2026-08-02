@@ -9,3 +9,11 @@ export function inferWorkflowStep(detail: WorkflowState): WorkflowStep {
   if (detail.listings?.length) return 4;
   return detail.productSelections?.length ? 3 : 1;
 }
+
+export function placementArtworkAvailable(
+  versions: Array<{ placement?: string | null }> | undefined,
+  placement: string,
+) {
+  const normalized = placement.trim().toUpperCase().replace(/[\s-]+/g, "_");
+  return Boolean(versions?.some((version) => version.placement === normalized || version.placement == null));
+}

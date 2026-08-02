@@ -69,7 +69,7 @@ export function LocalSelectionMockupEditor(props: {
         if (!cancelled) setContext(response);
       })
       .catch((e) => {
-        if (!cancelled) setError(e instanceof Error ? e.message : "Failed to load mockup editor");
+        if (!cancelled) setError(placementEditorError(e, "Failed to load mockup editor"));
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -174,4 +174,11 @@ export function LocalSelectionMockupEditor(props: {
   ].join(":");
 
   return <MockupPlacementEditor key={editorKey} context={editorContext} onChange={handleChange} reducedMotion={reducedMotion} />;
+}
+
+function placementEditorError(error: unknown, fallback: string) {
+  const message = error instanceof Error ? error.message : fallback;
+  return message.includes("DESIGN_FILE_MISSING")
+    ? "Artwork for this print placement has not been uploaded. Ask the designer to add the matching placement file, then try again."
+    : message;
 }

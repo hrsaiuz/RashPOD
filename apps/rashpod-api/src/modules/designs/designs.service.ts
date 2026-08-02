@@ -5,6 +5,7 @@ import { AuditService } from "../audit/audit.service";
 import { StorageService } from "../files/storage.service";
 import { CreateDesignDto } from "./dto/create-design.dto";
 import { CreateDesignVersionDto } from "./dto/create-design-version.dto";
+import { selectPrimaryDesignVersion } from "./design-version-selection";
 
 @Injectable()
 export class DesignsService {
@@ -45,7 +46,7 @@ export class DesignsService {
     const design = await this.prisma.designAsset.findUnique({
       where: { id: designId },
       include: {
-        versions: { orderBy: { createdAt: "desc" }, take: 5 },
+        versions: { orderBy: { createdAt: "desc" }, take: 20 },
         moderationAudits: { orderBy: { createdAt: "desc" }, take: 10 },
         productSelections: { include: { mockupAssets: true, localBaseProduct: true, printfulProductTemplate: true, placementPreset: true } },
         listings: { include: { marketplacePublications: true } },
@@ -53,8 +54,8 @@ export class DesignsService {
     });
     if (!design) throw new NotFoundException("Design not found");
     if (design.designerId !== designerId) throw new ForbiddenException("Not your design");
-    const latestVersion = design.versions[0];
-    const previewImageUrl = await this.resolvePreviewUrl(latestVersion?.fileKey);
+    const primaryVersion = selectPrimaryDesignVersion(design.versions);
+    const previewImageUrl = await this.resolvePreviewUrl(primaryVersion?.fileKey);
     return {
       ...design,
       previewImageUrl,

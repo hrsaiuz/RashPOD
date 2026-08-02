@@ -49,6 +49,8 @@ type Props = {
   onStatusChange?: (status: string | null) => void;
   onReviewRequested?: () => void;
   reviewScope?: "story" | "design-and-story";
+  submissionBlocked?: boolean;
+  submissionBlockReason?: string;
 };
 
 type WizardStep = 1 | 2 | 3 | 4;
@@ -74,6 +76,8 @@ export function DesignerDesignStoryPanel({
   onStatusChange,
   onReviewRequested,
   reviewScope = "story",
+  submissionBlocked = false,
+  submissionBlockReason,
 }: Props) {
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
@@ -112,7 +116,7 @@ export function DesignerDesignStoryPanel({
   const translationsComplete = hasCompleteStoryTranslations(translations);
   const readyForReview = translationsComplete && !translationsStale;
   const selectedPublicUrl = buildStoryUrl(slug, "uz");
-  const publishDisabled = !readyForReview || !story || saving || requesting;
+  const publishDisabled = !readyForReview || !story || saving || requesting || submissionBlocked;
 
   useEffect(() => {
     void load();
@@ -736,6 +740,7 @@ export function DesignerDesignStoryPanel({
                     : "Request human approval"}
                 </Button>
               </div>
+              {submissionBlocked ? <p className="text-sm text-status-warning" role="status">{submissionBlockReason ?? "Finish the artwork upload before requesting moderation."}</p> : null}
             </section>
           ) : null}
 

@@ -18,7 +18,7 @@ import { isMockupConfigurationFailure, isMockupRetryable, MockupErrorHint, Place
 import { buildModerationDecisionPayload } from "./moderation-decision-payload";
 import { moderatorPrintAreasForTemplate, preferredAreaForPreset } from "./local-print-area-selection";
 import { useToast } from "../../../../../components/feedback/toast-provider";
-import { inferWorkflowStep, type WorkflowStep } from "./moderation-workflow";
+import { inferWorkflowStep, placementArtworkAvailable, type WorkflowStep } from "./moderation-workflow";
 
 const REJECTION_REASONS = [
   ["COPYRIGHT_RISK", "Copyright or trademark risk"],
@@ -1025,7 +1025,7 @@ export default function Page() {
                           {selection.localBaseProductId && selection.mockupTemplateId && selection.printAreaId && params.id ? (
                             <div className="mt-4">
                               <p className="mb-2 text-sm font-medium text-brand-ink">Visual placement</p>
-                              <LocalSelectionMockupEditor
+                              {placementArtworkAvailable(detail.versions, localPlacement(selection, printAreas, placementPresets)) ? <LocalSelectionMockupEditor
                                 designId={String(params.id)}
                                 selection={{
                                   localBaseProductId: selection.localBaseProductId,
@@ -1061,7 +1061,7 @@ export default function Page() {
                                     preferContextInitialPlacement: false,
                                   })
                                 }
-                              />
+                              /> : <MissingPlacementArtworkState placement={localPlacement(selection, printAreas, placementPresets)} />}
                             </div>
                           ) : null}
                           <button
@@ -1179,7 +1179,7 @@ export default function Page() {
                               {selection.printfulProductTemplateId && selection.placementPresetId && params.id ? (
                                 <div className="mt-4">
                                   <p className="mb-2 text-sm font-medium text-brand-ink">Visual placement</p>
-                                  <GlobalSelectionMockupEditor
+                                  {placementArtworkAvailable(detail.versions, placementPresets.find((item) => item.id === selection.placementPresetId)?.placement ?? "FRONT") ? <GlobalSelectionMockupEditor
                                     designId={String(params.id)}
                                     selection={{
                                       printfulProductTemplateId: selection.printfulProductTemplateId,
@@ -1203,7 +1203,7 @@ export default function Page() {
                                         preferContextInitialPlacement: false,
                                       })
                                     }
-                                  />
+                                  /> : <MissingPlacementArtworkState placement={placementPresets.find((item) => item.id === selection.placementPresetId)?.placement ?? "FRONT"} />}
                                 </div>
                               ) : null}
                               <div className="mt-4 flex flex-wrap gap-2">
@@ -1708,12 +1708,14 @@ function PlacementArtworkNotice(props: {
   );
 }
 
-function placementArtworkAvailable(
-  versions: Array<{ placement?: string | null }> | undefined,
-  placement: string,
-) {
-  const normalized = placement.trim().toUpperCase().replace(/[\s-]+/g, "_");
-  return Boolean(versions?.some((version) => version.placement === normalized || !version.placement));
+function MissingPlacementArtworkState({ placement }: { placement: string }) {
+  return (
+    <div className="rounded-2xl border border-status-warning/30 bg-status-warning/5 p-4" role="status">
+      <p className="font-semibold text-brand-ink">{formatPlacementLabel(placement)} artwork is required</p>
+      <p className="mt-1 text-sm text-brand-muted">The visual editor cannot place a different print location without its matching artwork file. Ask the designer to upload this placement, then refresh the moderation page.</p>
+      <p className="mt-3 text-xs font-medium text-brand-muted">The main front artwork is not reused automatically, preventing an unintended sleeve or back print.</p>
+    </div>
+  );
 }
 
 function defaultTechnique(template?: PrintfulTemplateOption) {
