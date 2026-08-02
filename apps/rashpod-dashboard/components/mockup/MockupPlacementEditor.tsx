@@ -8,6 +8,7 @@ import { EditorToolbar } from "./EditorToolbar";
 import { useMockupEditorState } from "./useMockupEditorState";
 import type { MockupEditorContextResponse } from "./types";
 import { useImage } from "./useImage";
+import { resolveTemplateCanvasSize } from "./template-canvas-size";
 import { rashpodTokens } from "../../../../rashpod-ui-tokens";
 
 function DesignNode(props: {
@@ -90,18 +91,26 @@ export function MockupPlacementEditor(props: {
   context: MockupEditorContextResponse;
   onChange: (placement: EditorPlacementState) => void;
   reducedMotion?: boolean;
+  useNaturalTemplateSize?: boolean;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [viewport, setViewport] = useState({ width: 720, height: 480 });
   const [imageRetryKey, setImageRetryKey] = useState(0);
   const templateImage = useImage(props.context.templateImageUrl, imageRetryKey);
   const designImage = useImage(props.context.designImageUrl, imageRetryKey);
-  // Print/safe-area coordinates are authored in the template coordinate space
-  // returned by the API. A Printful catalog thumbnail can have different raw
-  // pixel dimensions, so using naturalWidth/naturalHeight here offsets the
-  // overlays and can place them outside the product image.
-  const templateWidthPx = props.context.templateWidthPx || templateImage.image?.naturalWidth || 2000;
-  const templateHeightPx = props.context.templateHeightPx || templateImage.image?.naturalHeight || 2000;
+  // Local print/safe-area coordinates are authored directly on the uploaded
+  // product-view image, so its natural dimensions are authoritative. Printful
+  // uses a provider canvas whose coordinate space can differ from the catalog
+  // thumbnail and therefore keeps the API dimensions.
+  const templateCanvasSize = resolveTemplateCanvasSize({
+    contextWidthPx: props.context.templateWidthPx,
+    contextHeightPx: props.context.templateHeightPx,
+    naturalWidthPx: templateImage.image?.naturalWidth,
+    naturalHeightPx: templateImage.image?.naturalHeight,
+    useNaturalTemplateSize: props.useNaturalTemplateSize === true,
+  });
+  const templateWidthPx = templateCanvasSize.width;
+  const templateHeightPx = templateCanvasSize.height;
   const initialPlacementSignature = [
     props.context.initialPlacement.x,
     props.context.initialPlacement.y,

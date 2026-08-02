@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { AlertTriangle, ArrowLeft, CheckCircle2, ChevronDown, ChevronUp, ClipboardCheck, FileText, Globe2, Image as ImageIcon, Loader2, MapPin, Plus, Trash2, XCircle } from "lucide-react";
 import { Button, Card, EmptyState, ErrorState, Input, ProductPickerGrid, Skeleton, StatusBadge } from "@rashpod/ui";
-import { assessPrintReadiness, clampPlacementToPrintArea, presetToInitialPlacement, toLocalSelectionPosition } from "@rashpod/mockup";
+import { clampPlacementToPrintArea, presetToInitialPlacement, toLocalSelectionPosition } from "@rashpod/mockup";
 import DashboardLayout from "../../../dashboard-layout";
 import { api, ApiError, type DesignWorkflowDetail } from "../../../../../lib/api";
 import { useAuth } from "../../../../auth/auth-provider";
@@ -97,7 +97,6 @@ type PrintAreaOption = {
   placement?: string | null;
   widthCm?: number | null;
   heightCm?: number | null;
-  minimumDpi?: number | null;
   x: number;
   y: number;
   width: number;
@@ -804,38 +803,6 @@ export default function Page() {
 
   const latest = detail?.versions?.[0];
 
-  const localQuality = useMemo(() => localSelections.map((selection) => {
-    const area = printAreas.find((item) => item.id === selection.printAreaId);
-    const placement = localPlacement(selection, printAreas, placementPresets);
-    const version = versionForPlacement(detail?.versions, placement);
-    const scale = numberValue(selection.scale) || 1;
-    const placedWidthIn = selection.unit === "CM"
-      ? numberValue(selection.widthCm) * scale / 2.54
-      : area?.widthCm && area.width ? numberValue(selection.widthPx) / area.width * area.widthCm * scale / 2.54 : null;
-    const placedHeightIn = selection.unit === "CM"
-      ? numberValue(selection.heightCm) * scale / 2.54
-      : area?.heightCm && area.height ? numberValue(selection.heightPx) / area.height * area.heightCm * scale / 2.54 : null;
-    return assessPrintReadiness({
-      sourceWidthPx: version?.widthPx,
-      sourceHeightPx: version?.heightPx,
-      placedWidthIn,
-      placedHeightIn,
-      minimumDpi: area?.minimumDpi,
-    });
-  }), [detail?.versions, localSelections, placementPresets, printAreas]);
-
-  const globalQuality = useMemo(() => globalSelections.map((selection) => {
-    const placement = placementPresets.find((item) => item.id === selection.placementPresetId)?.placement ?? "FRONT";
-    const version = versionForPlacement(detail?.versions, placement);
-    const scale = numberValue(selection.scale) || 1;
-    return assessPrintReadiness({
-      sourceWidthPx: version?.widthPx,
-      sourceHeightPx: version?.heightPx,
-      placedWidthIn: numberValue(selection.widthIn) * scale,
-      placedHeightIn: numberValue(selection.heightIn) * scale,
-    });
-  }), [detail?.versions, globalSelections, placementPresets]);
-
   const localReady = useMemo(
     () => localSelections.every((selection) =>
       selection.localBaseProductId
@@ -856,8 +823,6 @@ export default function Page() {
     [detail?.versions, globalSelections, placementPresets],
   );
 
-  const relevantQuality = pipelineMode === "global" ? globalQuality : localQuality;
-  const designResolutionOk = relevantQuality.length > 0 && relevantQuality.every((quality) => quality.ready);
   const productRightsOk = Boolean(detail?.commercialRights?.allowProductSales);
   const marketplaceRightsOk = Boolean(detail?.commercialRights?.allowMarketplacePublishing);
 
@@ -1052,7 +1017,6 @@ export default function Page() {
                                 { label: "Print area configured", ok: Boolean(selection.printAreaId) },
                                 { label: selection.placementPresetId ? "Placement preset applied" : "Using print-area default placement", ok: true },
                                 { label: "Visual placement validated", ok: selection.editorReady },
-                                { label: localQuality[index]?.label ?? "Print quality cannot be verified", ok: localQuality[index]?.ready ?? false, warn: !(localQuality[index]?.ready ?? false) },
                               ]}
                             />
                           </div>
@@ -1240,11 +1204,6 @@ export default function Page() {
                                   /> : <MissingPlacementArtworkState placement={placementPresets.find((item) => item.id === selection.placementPresetId)?.placement ?? "FRONT"} />}
                                 </div>
                               ) : null}
-                              <div className="mt-4">
-                                <ReadinessChecklist items={[
-                                  { label: globalQuality[index]?.label ?? "Print quality cannot be verified", ok: globalQuality[index]?.ready ?? false, warn: !(globalQuality[index]?.ready ?? false) },
-                                ]} />
-                              </div>
                               <div className="mt-4 flex flex-wrap gap-2">
                                 <Button size="sm" variant="secondary" onClick={() => previewPrintfulMockup(index)} disabled={selection.previewLoading || submitting || !selection.editorReady} loading={selection.previewLoading}>
                                   Preview Printful mockup
@@ -1316,7 +1275,6 @@ export default function Page() {
                       { label: pipelineMode === "global" ? "Printful selections ready" : "Printful not required (Uzbek only)", ok: pipelineMode === "uzbek" || globalReady },
                       { label: "Product sales rights granted", ok: productRightsOk },
                       { label: pipelineMode === "global" ? "Marketplace publishing rights granted" : "Marketplace rights not required", ok: pipelineMode === "uzbek" || marketplaceRightsOk },
-                      { label: designResolutionOk ? "All placements meet their minimum DPI" : "One or more placements are below or missing DPI verification", ok: designResolutionOk, warn: !designResolutionOk },
                     ]}
                   />
                 </div>
@@ -1707,17 +1665,6 @@ function localPlacement(selection: LocalSelectionForm, areas: PrintAreaOption[],
   if (preset?.placement) return preset.placement;
   const area = areas.find((item) => item.id === selection.printAreaId);
   return area?.placement || area?.mockupView?.placementCode || "FRONT";
-}
-
-function versionForPlacement(
-  versions: DesignWorkflowDetail["versions"],
-  placement: string,
-) {
-  if (!versions?.length) return undefined;
-  const normalized = placement.trim().toUpperCase().replace(/[-\s]+/g, "_");
-  return versions.find((version) => version.placement?.trim().toUpperCase().replace(/[-\s]+/g, "_") === normalized)
-    ?? (normalized === "FRONT" ? versions.find((version) => !version.placement || version.placement === "FRONT") : undefined)
-    ?? versions[0];
 }
 
 function globalDefaultsFromPreset(preset?: PlacementPresetOption): Omit<GlobalSelectionForm, "id" | "compositionKey" | "printfulProductTemplateId" | "placementPresetId" | "technique" | "targetMarketplaces" | "selectedVariantIds" | "previewTaskKey" | "previewUrls" | "previewLoading"> {

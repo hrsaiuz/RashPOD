@@ -173,7 +173,7 @@ export function LocalSelectionMockupEditor(props: {
     props.selection.placementPresetId || "print-area-default",
   ].join(":");
 
-  return <MockupPlacementEditor key={editorKey} context={editorContext} onChange={handleChange} reducedMotion={reducedMotion} />;
+  return <MockupPlacementEditor key={editorKey} context={editorContext} onChange={handleChange} reducedMotion={reducedMotion} useNaturalTemplateSize />;
 }
 
 function placementEditorError(error: unknown, fallback: string) {
