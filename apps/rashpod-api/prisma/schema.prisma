@@ -1520,6 +1520,7 @@ model PrintArea {
   placement        PlacementKind?
   widthCm          Float?
   heightCm         Float?
+  minimumDpi       Int            @default(150)
   x                Int
   y                Int
   width            Int

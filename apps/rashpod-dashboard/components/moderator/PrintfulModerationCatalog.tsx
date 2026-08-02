@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Loader2, Package, Search } from "lucide-react";
 import { Button, Input, Select } from "@rashpod/ui";
 import { api } from "../../lib/api";
+import { useToast } from "../feedback/toast-provider";
 
 export type PrintfulCatalogVariant = {
   id: number;
@@ -50,6 +51,7 @@ export function PrintfulModerationCatalog({
   selectedCatalogProductId?: string | null;
   onPrepared: (prepared: PreparedPrintfulProduct) => void;
 }) {
+  const { toast } = useToast();
   const [categories, setCategories] = useState<Category[]>([]);
   const [categoryId, setCategoryId] = useState("");
   const [search, setSearch] = useState("");
@@ -103,6 +105,7 @@ export function PrintfulModerationCatalog({
         rashpodProductType: product.typeName || product.type || "Printful product",
       });
       onPrepared(prepared);
+      toast({ title: "Printful product prepared", description: product.title, tone: "success" });
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "This Printful product could not be prepared for moderation.");
     } finally {

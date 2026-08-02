@@ -17,6 +17,7 @@ import { Film, ShieldCheck } from "lucide-react";
 import { useAuth } from "../../../auth/auth-provider";
 import DashboardLayout from "../../dashboard-layout";
 import { api, type CommercialRights, type Design } from "../../../../lib/api";
+import { useToast } from "../../../../components/feedback/toast-provider";
 
 type Row = {
   design: Design;
@@ -26,6 +27,7 @@ type Row = {
 export default function FilmRightsPage() {
   const router = useRouter();
   const { user, isLoading: authLoading } = useAuth();
+  const { toast } = useToast();
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -69,6 +71,11 @@ export default function FilmRightsPage() {
         await api.post(`/designs/${row.design.id}/enable-film-sales`);
       }
       await load();
+      toast({
+        title: row.rights?.allowFilmSales ? "Film sales disabled" : "Film sales enabled",
+        description: row.design.title,
+        tone: "success",
+      });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Update failed");
     } finally {

@@ -584,8 +584,8 @@ async function seedPipelineTemplates() {
     templateName: "Front and back",
     templateSlug: "classic-crew-tee",
     areas: [
-      { name: "T-shirt front", placement: PlacementKind.FRONT, x: 300, y: 260, width: 520, height: 620, widthCm: 30, heightCm: 36 },
-      { name: "T-shirt back", placement: PlacementKind.BACK, x: 300, y: 250, width: 540, height: 650, widthCm: 32, heightCm: 38 },
+      { name: "T-shirt front", placement: PlacementKind.FRONT, x: 340, y: 260, width: 520, height: 620, widthCm: 30, heightCm: 36 },
+      { name: "T-shirt back", placement: PlacementKind.BACK, x: 330, y: 250, width: 540, height: 650, widthCm: 32, heightCm: 38 },
     ],
   });
 
@@ -605,8 +605,8 @@ async function seedPipelineTemplates() {
     templateName: "Front and back",
     templateSlug: "long-sleeve-crew-tee",
     areas: [
-      { name: "Long sleeve front", placement: PlacementKind.FRONT, x: 300, y: 270, width: 520, height: 620, widthCm: 30, heightCm: 36 },
-      { name: "Long sleeve back", placement: PlacementKind.BACK, x: 300, y: 260, width: 540, height: 650, widthCm: 32, heightCm: 38 },
+      { name: "Long sleeve front", placement: PlacementKind.FRONT, x: 340, y: 270, width: 520, height: 620, widthCm: 30, heightCm: 36 },
+      { name: "Long sleeve back", placement: PlacementKind.BACK, x: 330, y: 260, width: 540, height: 650, widthCm: 32, heightCm: 38 },
     ],
   });
 
@@ -626,8 +626,8 @@ async function seedPipelineTemplates() {
     templateName: "Front and back",
     templateSlug: "classic-hoodie",
     areas: [
-      { name: "Hoodie front", placement: PlacementKind.FRONT, x: 280, y: 280, width: 500, height: 580, widthCm: 28, heightCm: 32 },
-      { name: "Hoodie back", placement: PlacementKind.BACK, x: 280, y: 270, width: 520, height: 620, widthCm: 30, heightCm: 34 },
+      { name: "Hoodie front", placement: PlacementKind.FRONT, x: 350, y: 280, width: 500, height: 580, widthCm: 28, heightCm: 32 },
+      { name: "Hoodie back", placement: PlacementKind.BACK, x: 340, y: 270, width: 520, height: 620, widthCm: 30, heightCm: 34 },
     ],
   });
 

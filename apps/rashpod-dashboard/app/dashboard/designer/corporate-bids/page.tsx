@@ -20,6 +20,7 @@ import { Briefcase, Send } from "lucide-react";
 import { useAuth } from "../../../auth/auth-provider";
 import DashboardLayout from "../../dashboard-layout";
 import { api, type CorporateRequest } from "../../../../lib/api";
+import { useToast } from "../../../../components/feedback/toast-provider";
 
 type Tab = "open" | "mine" | "closed";
 
@@ -37,6 +38,7 @@ type DesignerBidRow = {
 export default function CorporateBidsPage() {
   const router = useRouter();
   const { user, isLoading: authLoading } = useAuth();
+  const { toast } = useToast();
   const [requests, setRequests] = useState<CorporateRequest[]>([]);
   const [myBids, setMyBids] = useState<DesignerBidRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -107,6 +109,7 @@ export default function CorporateBidsPage() {
       setProposal("");
       setDesignFee("");
       setTimelineDays("");
+      toast({ title: "Bid submitted", description: "Your proposal was sent for corporate review.", tone: "success" });
       await load();
     } catch (e) {
       setSubmitError(e instanceof Error ? e.message : "Submit failed");

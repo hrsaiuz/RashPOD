@@ -263,6 +263,11 @@ export class DesignWorkflowService {
     };
 
     const templateImageKey = printArea.mockupView?.blankImageKey ?? template.baseImageKey;
+    const templateMedia = await this.prisma.mediaAsset.findFirst({
+      where: { OR: [{ objectKey: templateImageKey }, { key: templateImageKey }] },
+      select: { width: true, height: true },
+      orderBy: { updatedAt: "desc" },
+    });
     const templateImageUrl = this.storage.isCloudStorageConfigured()
       ? this.storage.buildPublicUrl(templateImageKey)
       : await this.storage.createPublicSignedReadUrl({ objectKey: templateImageKey, expiresSeconds: 60 * 60 });
@@ -288,8 +293,8 @@ export class DesignWorkflowService {
     );
 
     return {
-      templateWidthPx: 2000,
-      templateHeightPx: 2000,
+      templateWidthPx: templateMedia?.width ?? 2000,
+      templateHeightPx: templateMedia?.height ?? 2000,
       templateImageUrl,
       designImageUrl,
       printArea: printAreaRect,

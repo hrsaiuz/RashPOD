@@ -71,6 +71,9 @@ type PrintArea = IdRow & {
   y: number;
   width: number;
   height: number;
+  widthCm?: number | null;
+  heightCm?: number | null;
+  minimumDpi: number;
   safeX: number;
   safeY: number;
   safeWidth: number;
@@ -1259,7 +1262,7 @@ function placementKindForViewCode(value: string | undefined, fallback: PrintArea
     : fallback;
 }
 
-const PRINT_AREA_EMPTY = { mockupTemplateId: "", mockupViewId: "", name: "Front print area", placement: "FRONT" as PrintAreaPlacement, x: "300", y: "260", width: "800", height: "900", safeX: "340", safeY: "300", safeWidth: "720", safeHeight: "820", allowMove: true, allowResize: true, allowRotate: false, minScale: "0.1", maxScale: "2", isActive: true };
+const PRINT_AREA_EMPTY = { mockupTemplateId: "", mockupViewId: "", name: "Front print area", placement: "FRONT" as PrintAreaPlacement, x: "200", y: "200", width: "1600", height: "1600", safeX: "300", safeY: "300", safeWidth: "1400", safeHeight: "1400", widthCm: "30", heightCm: "30", minimumDpi: "150", allowMove: true, allowResize: true, allowRotate: false, minScale: "0.1", maxScale: "2", isActive: true };
 
 type PrintAreaEditingState = typeof PRINT_AREA_EMPTY & { id?: string };
 
@@ -1298,6 +1301,7 @@ function shouldSuggestPrintAreaDefaults(editing: PrintAreaEditingState) {
 }
 
 export function PrintAreasScreen() {
+  const feedback = useDashboardFeedback();
   const [items, setItems] = useState<PrintArea[]>([]);
   const [templates, setTemplates] = useState<MockupTemplate[]>([]);
   const [mediaByObjectKey, setMediaByObjectKey] = useState<Map<string, string>>(new Map());
@@ -1385,6 +1389,9 @@ export function PrintAreasScreen() {
             safeY: String(item.safeY),
             safeWidth: String(item.safeWidth),
             safeHeight: String(item.safeHeight),
+            widthCm: item.widthCm == null ? "" : String(item.widthCm),
+            heightCm: item.heightCm == null ? "" : String(item.heightCm),
+            minimumDpi: String(item.minimumDpi ?? 150),
             allowMove: item.allowMove,
             allowResize: item.allowResize,
             allowRotate: item.allowRotate,
@@ -1482,11 +1489,18 @@ export function PrintAreasScreen() {
         safeY: Number(editing.safeY),
         safeWidth: Number(editing.safeWidth),
         safeHeight: Number(editing.safeHeight),
+        widthCm: Number(editing.widthCm),
+        heightCm: Number(editing.heightCm),
+        minimumDpi: Number(editing.minimumDpi),
         minScale: Number(editing.minScale),
         maxScale: Number(editing.maxScale),
       };
       if (id) await api.patch(`/admin/print-areas/${id}`, payload);
       else await api.post("/admin/print-areas", payload);
+      feedback.success({
+        title: id ? "Print area updated" : "Print area created",
+        description: `${editing.name} is ready for moderator placement.`,
+      });
       setEditing(null);
       await load();
     } catch (err) {
@@ -1656,6 +1670,18 @@ export function PrintAreasScreen() {
               <p className="font-semibold">Automatic placement preset</p>
               <p className="mt-1 text-brand-muted">Saving this area creates or updates a centered local preset. Its initial artwork position is calculated from the safe zone, so moderators always start inside the allowed bounds.</p>
             </div>
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+              <Field label="Physical width (cm)">
+                <Input required type="number" min="0.01" step="0.01" value={editing.widthCm} onChange={(e) => setEditing({ ...editing, widthCm: e.target.value })} />
+              </Field>
+              <Field label="Physical height (cm)">
+                <Input required type="number" min="0.01" step="0.01" value={editing.heightCm} onChange={(e) => setEditing({ ...editing, heightCm: e.target.value })} />
+              </Field>
+              <Field label="Minimum print DPI">
+                <Input required type="number" min="72" step="1" value={editing.minimumDpi} onChange={(e) => setEditing({ ...editing, minimumDpi: e.target.value })} />
+              </Field>
+            </div>
+            <p className="text-xs text-brand-muted">These physical dimensions determine whether each placed design has enough source resolution for production.</p>
             <ToggleField label="Active" helper="Inactive print areas are hidden from new moderator selections." checked={editing.isActive} onChange={(value) => setEditing({ ...editing, isActive: value })} />
             <details className="rounded-2xl border border-surface-borderSoft bg-surface-app/40 p-4">
               <summary className="cursor-pointer text-sm font-semibold text-brand-ink">Advanced coordinates</summary>

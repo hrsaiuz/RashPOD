@@ -58,6 +58,21 @@ export class UpdatePrintAreaDto {
   @Min(1)
   safeHeight?: number;
 
+  @IsNumber()
+  @IsOptional()
+  @Min(0.01)
+  widthCm?: number;
+
+  @IsNumber()
+  @IsOptional()
+  @Min(0.01)
+  heightCm?: number;
+
+  @IsInt()
+  @IsOptional()
+  @Min(72)
+  minimumDpi?: number;
+
   @IsBoolean()
   @IsOptional()
   allowMove?: boolean;
