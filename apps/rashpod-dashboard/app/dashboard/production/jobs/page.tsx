@@ -8,6 +8,7 @@ import { Button, Card, DataTable, EmptyState, KpiTile, PageHeader, StatusBadge }
 import { useAuth } from "../../../auth/auth-provider";
 import DashboardLayout from "../../dashboard-layout";
 import { useDashboardFeedback } from "../../../../components/feedback/use-dashboard-feedback";
+import { downloadFileInBackground } from "../../../../lib/background-transfer";
 
 type ProductionJob = {
   id: string;
@@ -103,13 +104,12 @@ export default function ProductionJobsPage() {
       if (!res.ok) throw new Error(await res.text());
       if (path === "download-file") {
         const data = await res.json();
-        window.open(data.url, "_blank", "noopener,noreferrer");
+        await downloadFileInBackground(data.url, { filename: `production-${id}`, label: "Production file" });
       }
       await load();
-      feedback.success({
-        title: path === "download-file" ? "Production file opened" : "Production action completed",
-        description: productionActionDescription(path),
-      });
+      if (path !== "download-file") {
+        feedback.success({ title: "Production action completed", description: productionActionDescription(path) });
+      }
     } catch (e) {
       setError(feedback.error(e, { title: "Production action failed", fallback: "Action failed." }));
     } finally {
@@ -287,7 +287,7 @@ export default function ProductionJobsPage() {
 function productionActionDescription(path: string) {
   if (path === "assign") return "The production job assignment was updated.";
   if (path === "request-file" || path === "retry-file") return "The production file job was queued.";
-  if (path === "download-file") return "The secure download opened in a new tab.";
+  if (path === "download-file") return "The production file was saved to this device.";
   return "The production queue has been refreshed.";
 }
 

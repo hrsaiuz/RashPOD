@@ -7,6 +7,7 @@ import { Button } from "@rashpod/ui";
 import { useAuth } from "../../../auth/auth-provider";
 import DashboardLayout from "../../dashboard-layout";
 import { useDashboardFeedback } from "../../../../components/feedback/use-dashboard-feedback";
+import { saveBlobInBackground } from "../../../../lib/background-transfer";
 import {
   FinanceAlert,
   FinanceCell,
@@ -119,13 +120,11 @@ export default function PayoutsPage() {
       const res = await fetch(`/api/proxy/finance/payouts/${id}/export`);
       if (!res.ok) throw new Error(await res.text());
       const data = await res.json();
-      const url = URL.createObjectURL(new Blob([data.csv], { type: data.contentType || "text/csv" }));
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = data.filename || `payout-${id}.csv`;
-      link.click();
-      URL.revokeObjectURL(url);
-      feedback.success({ title: "Payout export downloaded" });
+      saveBlobInBackground(
+        new Blob([data.csv], { type: data.contentType || "text/csv" }),
+        data.filename || `payout-${id}.csv`,
+        "Payout CSV",
+      );
     } catch (cause) {
       setError(feedback.error(cause, { title: "Could not export payout", fallback: "Payout export failed." }));
     }

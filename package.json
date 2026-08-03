@@ -15,6 +15,7 @@
     "ci:migrations": "node tools/ci/migration-safety.mjs",
     "typecheck": "npx tsc --noEmit -p apps/rashpod-api/tsconfig.json && npx tsc --noEmit -p apps/rashpod-worker/tsconfig.json && npx tsc --noEmit -p apps/rashpod-dashboard/tsconfig.json && npx tsc --noEmit -p apps/rashpod-web/tsconfig.json",
     "check:ui-tokens": "node scripts/check-ui-tokens.mjs",
+    "check:dashboard-feedback": "node tools/ci/dashboard-feedback.mjs",
     "dev:api": "npm run start:dev -w @rashpod/api",
     "dev:web": "npm run dev -w @rashpod/web",
     "dev:dashboard": "npm run dev -w @rashpod/dashboard",

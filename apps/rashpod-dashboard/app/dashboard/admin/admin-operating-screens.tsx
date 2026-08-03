@@ -5,7 +5,7 @@ import { Button, Card, EmptyState, ErrorState, Input, Select, Skeleton, StatusBa
 import { Activity, BadgePercent, CreditCard, Eye, FileText, Images, Layers, ListChecks, Pencil, Plus, ShieldCheck, SlidersHorizontal, Star, Trash2, Upload, X } from "lucide-react";
 import { parseVariantRenderRegion, suggestDefaultPrintAreaRects, type PrintAreaRect, type VariantRenderRegion } from "@rashpod/mockup";
 import DashboardLayout from "../dashboard-layout";
-import { api } from "../../../lib/api";
+import { api, resolveUploadMimeType, uploadToSignedUrl } from "../../../lib/api";
 import { PrintAreaVisualEditor } from "../../../components/mockup/PrintAreaVisualEditorDynamic";
 import { useDashboardFeedback } from "../../../components/feedback/use-dashboard-feedback";
 
@@ -451,12 +451,7 @@ async function uploadMockupTemplateImage(file: File, title: string) {
   });
   if (!signRes.ok) throw new Error(`Upload init failed (${signRes.status})`);
   const signed = (await signRes.json()) as { objectKey: string; uploadUrl: string; method?: string; headers?: Record<string, string> };
-  const putRes = await fetch(signed.uploadUrl, {
-    method: signed.method || "PUT",
-    headers: signed.headers || {},
-    body: file,
-  });
-  if (!putRes.ok) throw new Error(`Upload failed (${putRes.status})`);
+  await uploadToSignedUrl(signed.uploadUrl, file, resolveUploadMimeType(file), signed.headers);
   const completeRes = await fetch("/api/proxy/admin/media/complete", {
     method: "POST",
     headers: { "Content-Type": "application/json" },

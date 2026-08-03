@@ -9,6 +9,13 @@
  * The proxy route already attaches the JWT cookie, so callers never deal with auth headers.
  */
 
+import {
+  beginDashboardTransfer,
+  completeDashboardTransfer,
+  failDashboardTransfer,
+  updateDashboardTransfer,
+} from "./background-transfer";
+
 export class ApiError extends Error {
   status: number;
   body: unknown;
@@ -108,17 +115,7 @@ function formatDirectUploadError(status: number) {
 
 /** Upload a file directly to GCS using a signed PUT URL returned by /files/upload-url. */
 export async function uploadToSignedUrl(url: string, file: File, mimeType: string, headers?: Record<string, string>) {
-  const contentType = resolveSignedUploadContentType(mimeType, headers);
-  const res = await fetch(url, {
-    method: "PUT",
-    body: file,
-    headers: {
-      "Content-Type": contentType,
-    },
-  });
-  if (!res.ok) {
-    throw new ApiError(formatDirectUploadError(res.status), res.status);
-  }
+  return uploadToSignedUrlWithProgress(url, file, mimeType, headers);
 }
 
 /** Upload a file directly to GCS with progress callbacks. */
@@ -130,18 +127,33 @@ export async function uploadToSignedUrlWithProgress(
   onProgress?: (percent: number) => void,
 ) {
   const contentType = resolveSignedUploadContentType(mimeType, headers);
+  const transferId = beginDashboardTransfer("upload", file.name || "Upload");
   return new Promise<void>((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     xhr.open("PUT", url);
+    for (const [name, value] of Object.entries(headers ?? {})) {
+      if (name.toLowerCase() !== "content-type") xhr.setRequestHeader(name, value);
+    }
     xhr.setRequestHeader("Content-Type", contentType);
     xhr.upload.onprogress = (event) => {
+      updateDashboardTransfer(transferId, "upload", file.name || "Upload", event.loaded, event.lengthComputable ? event.total : file.size);
       if (event.lengthComputable && onProgress) onProgress(Math.round((event.loaded / event.total) * 100));
     };
     xhr.onload = () => {
-      if (xhr.status >= 200 && xhr.status < 300) resolve();
-      else reject(new ApiError(formatDirectUploadError(xhr.status), xhr.status));
+      if (xhr.status >= 200 && xhr.status < 300) {
+        completeDashboardTransfer(transferId, "upload", file.name || "Upload");
+        resolve();
+      } else {
+        const error = new ApiError(formatDirectUploadError(xhr.status), xhr.status);
+        failDashboardTransfer(transferId, "upload", file.name || "Upload", error);
+        reject(error);
+      }
     };
-    xhr.onerror = () => reject(new ApiError(formatDirectUploadError(0), xhr.status || 0));
+    xhr.onerror = () => {
+      const error = new ApiError(formatDirectUploadError(0), xhr.status || 0);
+      failDashboardTransfer(transferId, "upload", file.name || "Upload", error);
+      reject(error);
+    };
     xhr.send(file);
   });
 }

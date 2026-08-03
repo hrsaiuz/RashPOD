@@ -5,6 +5,12 @@ import { AlertTriangle, CheckCircle2, ClipboardList, FileSpreadsheet, PackageChe
 import { Button, Card, DataTable, DataTableColumn, EmptyState, ErrorState, FormField, Input, KpiTile, Select, Skeleton, StatusBadge, Textarea } from "@rashpod/ui";
 import DashboardLayout from "../../dashboard-layout";
 import { api } from "../../../../lib/api";
+import {
+  beginDashboardTransfer,
+  completeDashboardTransfer,
+  failDashboardTransfer,
+  updateDashboardTransfer,
+} from "../../../../lib/background-transfer";
 
 type SourceType = "MARKETPLACE_MANUAL" | "MARKETPLACE_CSV_IMPORT" | "TELEGRAM_MANUAL" | "INSTAGRAM_MANUAL" | "PHONE_ORDER" | "SHOWROOM_OR_OFFLINE" | "GLOBAL_POD_PROVIDER_MANUAL" | "OTHER";
 type PaymentStatus = "PAID_EXTERNALLY" | "CASH_ON_DELIVERY" | "PAYMENT_PENDING_MANUAL" | "UNPAID" | "REFUNDED_EXTERNALLY" | "CANCELED_EXTERNALLY" | "MANUAL_REVIEW";
@@ -220,12 +226,21 @@ export default function ExternalSalesPage() {
       return;
     }
     await run("import", async () => {
-      const created = await api.post<ImportRecord>("/admin/external-sales/imports/upload", { sourceType: "MARKETPLACE_CSV_IMPORT", originalFilename: importFile.name, mimeType: importFile.type });
-      const contentBase64 = await fileToBase64(importFile);
-      const parsed = await api.post<{ import: ImportRecord; rows: Record<string, unknown>[]; expectedFields: string[] }>(`/admin/external-sales/imports/${created.id}/parse`, { filename: importFile.name, mimeType: importFile.type, contentBase64 });
-      setImportRecord(parsed.import);
-      setImportRows(parsed.rows.map((raw, index) => ({ index, raw, input: {}, item: {}, errors: [], warnings: [] })));
-      setNotice(`Parsed ${parsed.rows.length} rows`);
+      const transferId = beginDashboardTransfer("upload", importFile.name);
+      try {
+        const created = await api.post<ImportRecord>("/admin/external-sales/imports/upload", { sourceType: "MARKETPLACE_CSV_IMPORT", originalFilename: importFile.name, mimeType: importFile.type });
+        updateDashboardTransfer(transferId, "upload", importFile.name, Math.round(importFile.size * 0.1), importFile.size);
+        const contentBase64 = await fileToBase64(importFile);
+        updateDashboardTransfer(transferId, "upload", importFile.name, Math.round(importFile.size * 0.55), importFile.size);
+        const parsed = await api.post<{ import: ImportRecord; rows: Record<string, unknown>[]; expectedFields: string[] }>(`/admin/external-sales/imports/${created.id}/parse`, { filename: importFile.name, mimeType: importFile.type, contentBase64 });
+        setImportRecord(parsed.import);
+        setImportRows(parsed.rows.map((raw, index) => ({ index, raw, input: {}, item: {}, errors: [], warnings: [] })));
+        setNotice(`Parsed ${parsed.rows.length} rows`);
+        completeDashboardTransfer(transferId, "upload", importFile.name);
+      } catch (error) {
+        failDashboardTransfer(transferId, "upload", importFile.name, error);
+        throw error;
+      }
     });
   }
 

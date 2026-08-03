@@ -4,7 +4,7 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 import { Button, Card, EmptyState, ErrorState, Skeleton, StatusBadge } from "@rashpod/ui";
 import { Boxes, Pencil, Plus, Trash2, Upload, X } from "lucide-react";
 import DashboardLayout from "../../dashboard-layout";
-import { api } from "../../../../lib/api";
+import { api, resolveUploadMimeType, uploadToSignedUrl } from "../../../../lib/api";
 import { useDashboardFeedback } from "../../../../components/feedback/use-dashboard-feedback";
 
 interface ProductType {
@@ -156,12 +156,7 @@ export default function AdminBaseProductsPage() {
       });
       if (!signRes.ok) throw new Error(`Upload init failed (${signRes.status})`);
       const signed = await signRes.json();
-      const putRes = await fetch(signed.uploadUrl, {
-        method: signed.method || "PUT",
-        headers: signed.headers || {},
-        body: file,
-      });
-      if (!putRes.ok) throw new Error(`Upload failed (${putRes.status})`);
+      await uploadToSignedUrl(signed.uploadUrl, file, resolveUploadMimeType(file), signed.headers);
       const completeRes = await fetch("/api/proxy/admin/media/complete", {
         method: "POST",
         headers: { "Content-Type": "application/json" },

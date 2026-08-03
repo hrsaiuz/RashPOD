@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Button, Card, EmptyState, Input, Skeleton, StatusBadge, Textarea } from "@rashpod/ui";
+import { downloadFileInBackground } from "../../../lib/background-transfer";
 
 export type IntakeKind = "designer-applications" | "contact-messages" | "custom-order-requests";
 
@@ -116,7 +117,10 @@ export function IntakeAdminTable({ kind, title, description, emptyTitle }: Intak
       setError(body.message || "Could not open the review file.");
       return;
     }
-    window.open(body.url, "_blank", "noopener,noreferrer");
+    await downloadFileInBackground(body.url, {
+      filename: `designer-review-${fileId}`,
+      label: "Designer review file",
+    });
   }
 
   function evidence(row: Record<string, any>) {

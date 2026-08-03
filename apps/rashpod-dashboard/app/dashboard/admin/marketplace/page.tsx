@@ -5,6 +5,7 @@ import { Archive, Boxes, CheckCircle2, Download, ExternalLink, FileSpreadsheet, 
 import { Button, Card, DataTable, DataTableColumn, EmptyState, ErrorState, FormField, Input, KpiTile, Select, Skeleton, StatusBadge } from "@rashpod/ui";
 import DashboardLayout from "../../dashboard-layout";
 import { api } from "../../../../lib/api";
+import { downloadFileInBackground, saveBlobInBackground } from "../../../../lib/background-transfer";
 
 type MarketplaceConfig = {
   id: string;
@@ -245,8 +246,11 @@ export default function AdminMarketplacePage() {
   async function downloadBatch(batchId: string) {
     await run(`download-${batchId}`, async () => {
       const result = await api.get<{ url: string }>(`/admin/marketplace/export-batches/${batchId}/download`);
-      window.open(result.url, "_blank", "noopener,noreferrer");
-      setNotice("Download link opened");
+      await downloadFileInBackground(result.url, {
+        filename: `marketplace-batch-${batchId}.csv`,
+        label: `Marketplace batch ${compactId(batchId)}`,
+      });
+      setNotice("Download complete");
     });
   }
 
@@ -293,6 +297,11 @@ export default function AdminMarketplacePage() {
       if (legacyType) params.set("type", legacyType);
       const data = await api.get<any>(`/admin/marketplace/export?${params.toString()}`);
       setLegacyData(data);
+      saveBlobInBackground(
+        new Blob([JSON.stringify(data, null, 2)], { type: "application/json" }),
+        `rashpod-marketplace-${legacyType ? legacyType.toLowerCase() : Date.now()}.json`,
+        "Marketplace JSON export",
+      );
     });
   }
 

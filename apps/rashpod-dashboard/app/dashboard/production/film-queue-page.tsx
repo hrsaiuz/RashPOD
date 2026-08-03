@@ -9,6 +9,7 @@ import { useAuth } from "../../auth/auth-provider";
 import DashboardLayout from "../dashboard-layout";
 import { api } from "../../../lib/api";
 import { useDashboardFeedback } from "../../../components/feedback/use-dashboard-feedback";
+import { downloadFileInBackground } from "../../../lib/background-transfer";
 
 type FilmJob = {
   id: string;
@@ -58,8 +59,10 @@ export function FilmQueuePage({ queueType, title }: { queueType: "DTF" | "UV_DTF
     setWorking(job.id); setError("");
     try {
       const data = await api.get<{ url: string }>(`/production/items/${job.id}/download-file`);
-      window.open(data.url, "_blank", "noopener,noreferrer");
-      feedback.success({ title: "Film file opened", description: "The secure download opened in a new tab." });
+      await downloadFileInBackground(data.url, {
+        filename: `film-${job.id}`,
+        label: job.orderItem?.listingTitle || job.productSnapshotJson?.listingTitle || "Film production file",
+      });
     } catch (err) { setError(feedback.error(err, { title: "Could not download film file", fallback: "Download failed." })); }
     finally { setWorking(null); }
   }

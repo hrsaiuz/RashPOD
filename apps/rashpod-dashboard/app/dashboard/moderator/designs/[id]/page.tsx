@@ -19,6 +19,7 @@ import { buildModerationDecisionPayload } from "./moderation-decision-payload";
 import { moderatorPrintAreasForTemplate, preferredAreaForPreset } from "./local-print-area-selection";
 import { useToast } from "../../../../../components/feedback/toast-provider";
 import { inferWorkflowStep, placementArtworkAvailable, type WorkflowStep } from "./moderation-workflow";
+import { downloadFileInBackground } from "../../../../../lib/background-transfer";
 
 const REJECTION_REASONS = [
   ["COPYRIGHT_RISK", "Copyright or trademark risk"],
@@ -863,7 +864,18 @@ export default function Page() {
             <Button variant="ghost"><ArrowLeft size={18} /> Back to queue</Button>
           </Link>
           <div className="flex flex-wrap items-center justify-end gap-2">
-            {detail?.previewImageUrl ? <a href={detail.previewImageUrl} target="_blank" rel="noopener noreferrer"><Button variant="secondary" size="sm">Download file</Button></a> : null}
+            {detail?.previewImageUrl ? (
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => void downloadFileInBackground(detail.previewImageUrl!, {
+                  filename: `design-${detail.id}`,
+                  label: detail.title || "Design file",
+                }).catch(() => undefined)}
+              >
+                Download file
+              </Button>
+            ) : null}
             {detail && canModerate ? <Button variant="secondary" size="sm" onClick={() => openWorkflowSection(1, "moderation-rejection")}>Internal notes</Button> : null}
             {detail && canModerate ? <Button variant="danger" size="sm" onClick={() => openWorkflowSection(1, "moderation-rejection")}>Reject design</Button> : null}
             {detail && canModerate ? <Button variant="primaryPeach" size="sm" onClick={() => openWorkflowSection(2, "pipeline-approval")}>Approve</Button> : null}

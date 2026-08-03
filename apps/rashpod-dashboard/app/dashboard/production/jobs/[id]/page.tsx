@@ -9,6 +9,7 @@ import { Button, Card, FormField, Input, PageHeader, StatusBadge } from "@rashpo
 import { useAuth } from "../../../../auth/auth-provider";
 import DashboardLayout from "../../../dashboard-layout";
 import { useDashboardFeedback } from "../../../../../components/feedback/use-dashboard-feedback";
+import { downloadFileInBackground } from "../../../../../lib/background-transfer";
 
 type ProductionJobDetail = {
   id: string;
@@ -101,13 +102,12 @@ export default function ProductionJobDetailPage({ params }: { params: Promise<{ 
       if (!res.ok) throw new Error(await res.text());
       if (path === "download-file") {
         const data = await res.json();
-        window.open(data.url, "_blank", "noopener,noreferrer");
+        await downloadFileInBackground(data.url, { filename: `production-${id}`, label: "Production file" });
       }
       await load();
-      feedback.success({
-        title: path === "download-file" ? "Production file opened" : "Production job updated",
-        description: path === "download-file" ? "The secure download opened in a new tab." : "The latest job status is now visible.",
-      });
+      if (path !== "download-file") {
+        feedback.success({ title: "Production job updated", description: "The latest job status is now visible." });
+      }
     } catch (e) {
       setError(feedback.error(e, { title: "Could not update production job", fallback: "Action failed." }));
     } finally {

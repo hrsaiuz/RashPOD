@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import { Button, Card, FormField, Input, StatusBadge } from "@rashpod/ui";
 import { api, resolveUploadMimeType, uploadToSignedUrl } from "../../../lib/api";
+import { downloadFileInBackground } from "../../../lib/background-transfer";
 import { useAuth } from "../../auth/auth-provider";
 import DashboardLayout from "../dashboard-layout";
 
@@ -233,7 +234,7 @@ export function WorkshopItemPage({ id }: { id: string }) {
     try {
       if (method === "GET") {
         const result = await api.get<{ url?: string }>(path);
-        if (result.url) window.open(result.url, "_blank", "noopener,noreferrer");
+        if (result.url) await downloadFileInBackground(result.url, { filename: `production-${item?.id || Date.now()}`, label: "Production file" });
       } else {
         await api.post<unknown>(path, { idempotencyKey: crypto.randomUUID(), ...body });
       }

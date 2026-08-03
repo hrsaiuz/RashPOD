@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { AlertTriangle, BarChart3, Download, Filter, RefreshCw } from "lucide-react";
 import DashboardLayout from "../../dashboard-layout";
 import { api } from "../../../../lib/api";
+import { saveBlobInBackground } from "../../../../lib/background-transfer";
 import { Button, Card, ChartWrapper, DataTable, DataTableColumn, EmptyState, ErrorState, FormField, Input, KpiTile, Select, Skeleton, StatusBadge } from "@rashpod/ui";
 
 type AnalyticsClientProps = {
@@ -70,12 +71,11 @@ export function AnalyticsClient({ role = "admin", title, description, endpoint, 
     try {
       const created = await api.post<{ id: string }>("/admin/analytics/exports", { reportType, format: "CSV", ...filters });
       const file = await api.get<{ filename: string; contentType: string; csv: string }>(`/admin/analytics/exports/${created.id}/download`);
-      const url = URL.createObjectURL(new Blob([file.csv], { type: file.contentType || "text/csv" }));
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = file.filename || `${reportType}.csv`;
-      link.click();
-      URL.revokeObjectURL(url);
+      saveBlobInBackground(
+        new Blob([file.csv], { type: file.contentType || "text/csv" }),
+        file.filename || `${reportType}.csv`,
+        `${title} CSV`,
+      );
     } catch (err) {
       setError(err instanceof Error ? err.message : "Export failed");
     } finally {

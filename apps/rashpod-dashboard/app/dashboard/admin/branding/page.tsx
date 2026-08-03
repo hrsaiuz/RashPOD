@@ -6,6 +6,7 @@ import { Upload, Image as ImageIcon } from "lucide-react";
 import DashboardLayout from "../../dashboard-layout";
 import { LOGIN_DECORATION_SLOTS, type LoginDecorThemeUrlKey } from "../../../auth/auth-login-slots";
 import { revalidateStorefrontBranding } from "../../../../lib/revalidate-storefront";
+import { resolveUploadMimeType, uploadToSignedUrl } from "../../../../lib/api";
 
 type SlotKey = "storefrontLogoUrl" | "dashboardLogoUrl" | "loginLogoUrl" | "footerLogoUrl" | "faviconUrl";
 type ThemeImageUrlKey = "homeHeroImageUrl" | "homeDesignerSectionImageUrl";
@@ -208,12 +209,7 @@ export default function BrandingPage() {
       if (!signRes.ok) throw new Error(`Upload init failed (${signRes.status})`);
       const signed = await signRes.json();
 
-      const putRes = await fetch(signed.uploadUrl, {
-        method: signed.method || "PUT",
-        headers: signed.headers || {},
-        body: file,
-      });
-      if (!putRes.ok) throw new Error(`Upload failed (${putRes.status})`);
+      await uploadToSignedUrl(signed.uploadUrl, file, resolveUploadMimeType(file), signed.headers);
 
       const completeRes = await fetch("/api/proxy/admin/media/complete", {
         method: "POST",
@@ -287,12 +283,7 @@ export default function BrandingPage() {
       if (!signRes.ok) throw new Error(`Upload init failed (${signRes.status})`);
       const signed = await signRes.json();
 
-      const putRes = await fetch(signed.uploadUrl, {
-        method: signed.method || "PUT",
-        headers: signed.headers || {},
-        body: file,
-      });
-      if (!putRes.ok) throw new Error(`Upload failed (${putRes.status})`);
+      await uploadToSignedUrl(signed.uploadUrl, file, resolveUploadMimeType(file), signed.headers);
 
       const completeRes = await fetch("/api/proxy/admin/media/complete", {
         method: "POST",
@@ -347,8 +338,7 @@ export default function BrandingPage() {
       });
       if (!signRes.ok) throw new Error(`Upload init failed (${signRes.status})`);
       const signed = await signRes.json();
-      const putRes = await fetch(signed.uploadUrl, { method: signed.method || "PUT", headers: signed.headers || {}, body: file });
-      if (!putRes.ok) throw new Error(`Upload failed (${putRes.status})`);
+      await uploadToSignedUrl(signed.uploadUrl, file, resolveUploadMimeType(file), signed.headers);
       const completeRes = await fetch("/api/proxy/admin/media/complete", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -392,12 +382,7 @@ export default function BrandingPage() {
       if (!signRes.ok) throw new Error(`Upload init failed (${signRes.status})`);
       const signed = await signRes.json();
 
-      const putRes = await fetch(signed.uploadUrl, {
-        method: signed.method || "PUT",
-        headers: signed.headers || {},
-        body: file,
-      });
-      if (!putRes.ok) throw new Error(`Upload failed (${putRes.status})`);
+      await uploadToSignedUrl(signed.uploadUrl, file, resolveUploadMimeType(file), signed.headers);
 
       const completeRes = await fetch("/api/proxy/admin/media/complete", {
         method: "POST",
