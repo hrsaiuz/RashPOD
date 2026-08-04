@@ -21,7 +21,7 @@ export default async function ProductPage({ params }: { params: Promise<{ locale
   const { locale, slug } = await params;
   const [product, relatedResult] = await Promise.all([
     fetchProductDetail(slug, locale),
-    fetchListings({ limit: "5", locale }),
+    fetchListings({ limit: "5", locale, type: "PRODUCT" }),
   ]);
 
   const related = relatedResult
@@ -32,6 +32,7 @@ export default async function ProductPage({ params }: { params: Promise<{ locale
       slug: item.slug,
       title: item.title,
       price: item.price,
+      currency: item.currency,
       imageUrl: item.imageUrl,
       designer: { displayName: item.designer },
     }));

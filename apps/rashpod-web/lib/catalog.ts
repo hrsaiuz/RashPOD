@@ -10,6 +10,8 @@ export interface ProductListing {
   designer: string;
   designerHandle?: string;
   price: number;
+  currency: string;
+  type: "PRODUCT" | "FILM";
   imageUrl?: string;
   category?: string;
   description?: string;
@@ -114,6 +116,8 @@ export function normalizeProducts(data: unknown): ProductListing[] {
       designer: String(item.designer?.displayName ?? item.designerName ?? "Designer"),
       designerHandle: getOptionalString(item.designer?.handle),
       price: Number(item.price ?? 0),
+      currency: String(item.currency ?? "UZS"),
+      type: (item.type === "FILM" ? "FILM" : "PRODUCT") as ProductListing["type"],
       imageUrl:
         getOptionalString(item.imageUrl) ??
         (Array.isArray(item.images) ? getOptionalString(item.images[0]) : undefined),

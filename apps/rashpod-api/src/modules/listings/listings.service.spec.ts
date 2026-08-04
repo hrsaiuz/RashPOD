@@ -97,6 +97,7 @@ describe("ListingsService storefront payload", () => {
       price: 100_000,
       currency: "UZS",
       type: ListingType.PRODUCT,
+      status: ListingStatus.PUBLISHED,
       publishedAt: new Date(),
       imagesJson: ["pipeline-mockups/selection/main.png"],
       metadataJson: {
@@ -137,5 +138,16 @@ describe("ListingsService storefront payload", () => {
       title: "T-shirt local",
       description: "Description française",
     }));
+  });
+
+  it("does not expose an unpublished listing by slug", async () => {
+    const prisma = {
+      commerceListing: {
+        findUnique: jest.fn().mockResolvedValue({ status: ListingStatus.DRAFT }),
+      },
+    };
+    const service = new ListingsService(prisma as never, { log: jest.fn() } as never);
+
+    await expect(service.shopBySlug("draft-listing")).resolves.toBeNull();
   });
 });

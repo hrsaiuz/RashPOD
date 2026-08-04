@@ -13,6 +13,8 @@ interface Listing {
   slug: string;
   title: string;
   price: number;
+  currency: string;
+  type: "PRODUCT" | "FILM";
   imageUrl?: string;
   designer: { displayName: string; handle: string };
   category?: string;
@@ -127,7 +129,13 @@ function ShopContent({ initialListings = [], initialMeta = null, initialDesigner
           {!loading && !error && !listings.length ? <EmptyState title={t("emptyTitle")} description={t("emptyDescription")} action={filters.activeCount ? <Button onClick={filters.reset}>{t("clearFilters")}</Button> : undefined} /> : null}
           {!loading && !error && listings.length ? (
             <>
-              <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">{listings.map((listing) => <ProductCard key={listing.id} {...listing} />)}</div>
+              <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">{listings.map((listing) => (
+                <ProductCard
+                  key={listing.id}
+                  {...listing}
+                  href={`/${locale}/${listing.type === "FILM" ? "film" : "product"}/${listing.slug}`}
+                />
+              ))}</div>
               {meta && meta.totalPages > 1 ? <Pagination page={meta.page} totalPages={meta.totalPages} onPage={(page) => filters.setParams({ page: page === 1 ? null : String(page) }, { keepPage: true })} /> : null}
             </>
           ) : null}

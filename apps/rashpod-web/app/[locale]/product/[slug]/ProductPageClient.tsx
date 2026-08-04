@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import Image from "next/image";
 import Link from "next/link";
 import {
@@ -100,7 +100,7 @@ export default function ProductPageClient({
         setSelectedSize(data.variants?.sizes?.[0] || "");
         setSelectedColor(data.variants?.colors?.[0] || "");
 
-        const relatedRes = await fetch(`${apiBase}/shop/listings?limit=4`);
+        const relatedRes = await fetch(`${apiBase}/shop/listings?limit=4&type=PRODUCT`);
         if (relatedRes.ok) {
           const rows = (await relatedRes.json()) as ListingCard[] | { items?: ListingCard[] };
           const items = Array.isArray(rows) ? rows : rows.items || [];
@@ -449,8 +449,9 @@ function ProductCopy({ description, title }: { description?: string | null; titl
 
 function RelatedCard({ item }: { item: ListingCard }) {
   const t = useTranslations("product");
+  const locale = useLocale();
   return (
-    <Link href={`/product/${item.slug}`} className="block rounded-md bg-white p-4 shadow-soft sm:p-6">
+    <Link href={`/${locale}/product/${item.slug}`} className="block rounded-md bg-white p-4 shadow-soft sm:p-6">
       <div className="relative aspect-[0.95] overflow-hidden rounded-[22px] bg-brand-bg">
         {item.imageUrl ? <Image src={item.imageUrl} alt={item.title} fill sizes="280px" className="object-cover" /> : <Package className="m-auto h-full w-20 text-brand-blue" />}
       </div>

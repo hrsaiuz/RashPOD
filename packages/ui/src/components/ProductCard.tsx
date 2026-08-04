@@ -41,6 +41,7 @@ export interface ProductCardProps {
   slug?: string;
   description?: string;
   price?: number | string;
+  currency?: string;
   imageUrl?: string;
   designer?: {
     displayName: string;
@@ -60,6 +61,7 @@ function ProductCardInner({
   title,
   description,
   price,
+  currency = "UZS",
   imageUrl,
   designer,
   badge,
@@ -68,7 +70,7 @@ function ProductCardInner({
   className,
 }: Omit<ProductCardProps, "slug" | "href" | "onClick" | "legacyPrice">) {
   const priceLabel =
-    typeof price === "number" ? formatPrice(price) : price ?? undefined;
+    typeof price === "number" ? formatPrice(price, currency) : price ?? undefined;
 
   if (variant === "featured") {
     return (

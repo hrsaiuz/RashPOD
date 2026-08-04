@@ -13,7 +13,7 @@ export default async function HomePage({ params }: Props) {
 
   const [branding, products, designers] = await Promise.all([
     getStorefrontBranding(),
-    fetchListings({ limit: "8", locale }),
+    fetchListings({ limit: "8", locale, type: "PRODUCT" }),
     fetchDesigners(6),
   ]);
 

@@ -67,7 +67,7 @@ export default function HomePageClient({
     const controller = new AbortController();
     const opts = { signal: controller.signal };
 
-    fetch(`${apiBase}/shop/listings?limit=8&locale=${encodeURIComponent(locale)}`, opts)
+    fetch(`${apiBase}/shop/listings?limit=8&type=PRODUCT&locale=${encodeURIComponent(locale)}`, opts)
       .then((res) => {
         if (!res.ok) throw new Error("Failed to load products");
         return res.json();
@@ -263,6 +263,7 @@ function HomepageProductCarousel({
   onRetry?: () => void;
 }) {
   const t = useTranslations("home");
+  const locale = useLocale();
   return (
     <section className="bg-white py-9">
       <SectionHeader title={title} href="/shop" />
@@ -285,9 +286,10 @@ function HomepageProductCarousel({
             <ProductCard
               key={`${product.id}-${index}`}
               variant="featured"
-              slug={product.slug}
+              href={`/${locale}/product/${product.slug}`}
               title={product.title}
               price={product.price}
+              currency={product.currency}
               imageUrl={product.imageUrl}
               designer={{ displayName: product.designer }}
               badge={badge}
@@ -393,6 +395,7 @@ function CollectionCarousel({
   onRetry?: () => void;
 }) {
   const t = useTranslations("home");
+  const locale = useLocale();
   return (
     <section className="bg-white py-10">
       <SectionHeader title={t("newCollections")} href="/shop?sort=newest" />
@@ -415,9 +418,10 @@ function CollectionCarousel({
             <ProductCard
               key={`${product.id}-collection-${index}`}
               variant="featured"
-              slug={product.slug}
+              href={`/${locale}/product/${product.slug}`}
               title={product.category ?? product.title}
               price={product.price}
+              currency={product.currency}
               imageUrl={product.imageUrl}
               designer={{ displayName: product.designer }}
               badge={t("newBadge")}

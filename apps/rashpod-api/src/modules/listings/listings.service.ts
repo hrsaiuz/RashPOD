@@ -430,7 +430,7 @@ export class ListingsService {
         },
       },
     });
-    return row ? this.toShopListingDto(row, locale) : null;
+    return row?.status === ListingStatus.PUBLISHED ? this.toShopListingDto(row, locale) : null;
   }
 
   private toShopListingDto(row: {

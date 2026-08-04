@@ -47,6 +47,8 @@ export default async function ShopPage({
     slug: item.slug,
     title: item.title,
     price: item.price,
+    currency: item.currency,
+    type: item.type,
     imageUrl: item.imageUrl,
     designer: {
       displayName: item.designer,

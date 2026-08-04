@@ -304,6 +304,7 @@ describe("ListingsService lifecycle", () => {
           price: 100000,
           currency: "UZS",
           type: ListingType.PRODUCT,
+          status: ListingStatus.PUBLISHED,
           publishedAt,
           imagesJson: ["mockups/main.png", "mockups/lifestyle.png", "mockups/detail.png"],
           designerId: "designer-1",
