@@ -251,9 +251,12 @@ export function ModeratorListingWizard({
         description: translations.en.description || null,
         price: Number(price),
         tags: translations.en.tags,
+        variants: variants.filter((row) => row.enabled).map((row) => ({
+          ...row,
+          price: Number(row.price),
+        })),
         metadataJson: {
           translations,
-          variants: variants.filter((row) => row.enabled),
         },
       });
       setMessage("Listing saved.");
@@ -276,9 +279,12 @@ export function ModeratorListingWizard({
         description: translations.en.description || null,
         price: Number(price),
         tags: translations.en.tags,
+        variants: variants.filter((row) => row.enabled).map((row) => ({
+          ...row,
+          price: Number(row.price),
+        })),
         metadataJson: {
           translations,
-          variants: variants.filter((row) => row.enabled),
         },
       });
       await api.post(`/admin/listings/${listing.id}/status`, { status: "PUBLISHED" });

@@ -12,9 +12,9 @@ export class CommercialRightsController {
   constructor(private readonly service: CommercialRightsService) {}
 
   @Get("commercial-rights")
-  @RequirePermission("rights:update-own")
-  get(@Param("id") id: string) {
-    return this.service.getByDesign(id);
+  @RequirePermission("rights:read-own")
+  get(@Param("id") id: string, @CurrentUser() user: RequestUser) {
+    return this.service.getByDesign(id, user);
   }
 
   @Patch("commercial-rights")

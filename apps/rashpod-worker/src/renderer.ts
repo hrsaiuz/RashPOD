@@ -1,5 +1,6 @@
 import * as path from "path";
-import { resolveTemplateImageKey } from "@rashpod/mockup";
+import { createHash } from "crypto";
+import { parsePlacementConfig, parseVariantRenderRegion, resolveTemplateImageKey } from "@rashpod/mockup";
 import { ArtifactStore, createArtifactStore } from "./artifact-store";
 import { compositeMockupImage, resolvePipelinePlacement } from "./mockup-compositor";
 
@@ -13,7 +14,11 @@ export interface RenderedFile {
   format: string;
   widthPx: number;
   heightPx: number;
+  renderVersion?: string;
+  renderFingerprint?: string;
 }
+
+export const LOCAL_MOCKUP_RENDER_VERSION = "sharp-compositor-v2";
 
 export interface PipelineRenderContext {
   id: string;
@@ -36,6 +41,7 @@ export interface PipelineRenderContext {
 }
 
 export class SharpRenderer {
+  readonly renderVersion = LOCAL_MOCKUP_RENDER_VERSION;
   private readonly store: ArtifactStore;
 
   constructor(
@@ -73,6 +79,8 @@ export class SharpRenderer {
     if (!designKey) throw new Error("DESIGN_SOURCE_FILE_MISSING");
 
     const placement = resolvePipelinePlacement(context.placementConfigJson, context, variant === "preview" ? "main" : variant);
+    const expectedTemplateCanvas = this.expectedTemplateCanvas(context.placementConfigJson, variant);
+    const renderFingerprint = this.renderFingerprint(context, variant);
     const buffer = await compositeMockupImage(this.store, {
       templateKey,
       designKey,
@@ -80,11 +88,27 @@ export class SharpRenderer {
       variant: variant === "preview" ? "main" : variant,
       outputWidth,
       outputHeight,
+      expectedTemplateCanvas,
     });
 
-    const relKey = `pipeline-mockups/${context.id}/${variant}.png`;
+    const relKey = `pipeline-mockups/${context.id}/${this.renderVersion}/${renderFingerprint}/${variant}.png`;
     const fileKey = await this.store.putBuffer(relKey, buffer, "image/png");
-    return { fileKey, objectKey: fileKey, contentType: "image/png", format: "png", widthPx: outputWidth, heightPx: outputHeight };
+    return { fileKey, objectKey: fileKey, contentType: "image/png", format: "png", widthPx: outputWidth, heightPx: outputHeight, renderVersion: this.renderVersion, renderFingerprint };
+  }
+
+  renderFingerprint(context: PipelineRenderContext, variant: "main" | "lifestyle" | "closeup" | "preview") {
+    const normalizedVariant = variant === "preview" ? "main" : variant;
+    const templateKey = resolveTemplateImageKey(context.placementConfigJson as any, normalizedVariant);
+    const placement = resolvePipelinePlacement(context.placementConfigJson, context, normalizedVariant);
+    const expectedTemplateCanvas = this.expectedTemplateCanvas(context.placementConfigJson, variant);
+    return createHash("sha256").update(JSON.stringify({
+      renderVersion: this.renderVersion,
+      variant,
+      templateKey,
+      designKey: context.latestDesignVersion?.fileKey ?? null,
+      placement,
+      expectedTemplateCanvas: expectedTemplateCanvas ?? null,
+    })).digest("hex").slice(0, 20);
   }
 
   async renderFilmPreview(placementId: string): Promise<RenderedFile> {
@@ -174,6 +198,25 @@ export class SharpRenderer {
       .toBuffer();
     const fileKey = await this.store.putBuffer(relKey, buffer, "image/png");
     return { fileKey, objectKey: fileKey, contentType: "image/png", format: "png", widthPx, heightPx };
+  }
+
+  private expectedTemplateCanvas(placementConfigJson: unknown, variant: "main" | "lifestyle" | "closeup" | "preview") {
+    const config = parsePlacementConfig(placementConfigJson);
+    if (variant === "main" || variant === "preview") {
+      return this.canvasDimensions(config?.mockupView?.metadataJson);
+    }
+    const role = variant === "lifestyle" ? "LIFESTYLE" : "DETAIL";
+    const asset = config?.galleryAssets?.find((item) => item.role === role);
+    const region = parseVariantRenderRegion(asset?.metadataJson);
+    return region ? { width: region.canvasWidth, height: region.canvasHeight } : undefined;
+  }
+
+  private canvasDimensions(value: unknown) {
+    if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+    const record = value as Record<string, unknown>;
+    const width = Number(record.canvasWidth);
+    const height = Number(record.canvasHeight);
+    return Number.isInteger(width) && width > 0 && Number.isInteger(height) && height > 0 ? { width, height } : undefined;
   }
 }
 

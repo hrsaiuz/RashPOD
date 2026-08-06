@@ -5,6 +5,7 @@ export const permissions = {
   "design:moderate": ["MODERATOR", "ADMIN", "SUPER_ADMIN"],
   "pipeline-config:read": ["MODERATOR", "ADMIN", "SUPER_ADMIN", "OPERATIONS_MANAGER"],
   "design-workflow:retry": ["ADMIN", "SUPER_ADMIN", "OPERATIONS_MANAGER", "MODERATOR"],
+  "rights:read-own": ["DESIGNER", "ADMIN", "SUPER_ADMIN"],
   "rights:update-own": ["DESIGNER", "ADMIN", "SUPER_ADMIN"],
   "rights:enable-film-own": ["DESIGNER", "ADMIN", "SUPER_ADMIN"],
   "rights:disable-film-own": ["DESIGNER", "ADMIN", "SUPER_ADMIN"],

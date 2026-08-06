@@ -2,6 +2,34 @@ import { MediaCategory } from "@prisma/client";
 import { MediaService } from "../src/modules/media/media.service";
 
 describe("MediaService storefront media", () => {
+  it("rejects unsupported mockup template media before issuing an upload URL", async () => {
+    const storage = { createPublicPresignedUploadUrl: jest.fn() };
+    const service = new MediaService({} as any, { log: jest.fn() } as any, storage as any);
+
+    await expect(service.createUploadUrl("admin-1", {
+      category: MediaCategory.MOCKUP_TEMPLATE,
+      filename: "template.svg",
+      mimeType: "image/svg+xml",
+      sizeBytes: 1024,
+    })).rejects.toThrow("must be PNG, JPEG, or WebP");
+    expect(storage.createPublicPresignedUploadUrl).not.toHaveBeenCalled();
+  });
+
+  it("does not delete an object that a mockup view still references", async () => {
+    const storage = { deletePublicObject: jest.fn() };
+    const prisma: any = {
+      mediaAsset: { findUnique: jest.fn().mockResolvedValue({ id: "asset-1", objectKey: "media/mockup/front.png" }), delete: jest.fn() },
+      mockupTemplate: { count: jest.fn().mockResolvedValue(0) },
+      mockupView: { count: jest.fn().mockResolvedValue(1) },
+      mockupGalleryAsset: { count: jest.fn().mockResolvedValue(0) },
+    };
+    const service = new MediaService(prisma, { log: jest.fn() } as any, storage as any);
+
+    await expect(service.remove("admin-1", "asset-1")).rejects.toThrow("still referenced by a mockup configuration");
+    expect(storage.deletePublicObject).not.toHaveBeenCalled();
+    expect(prisma.mediaAsset.delete).not.toHaveBeenCalled();
+  });
+
   it("returns a media-library SVG footer logo without rewriting or rasterizing its URL", async () => {
     const svgUrl = "https://storage.googleapis.com/rashpod-assets/media/branding_logo_footer/rashpod-footer.svg";
     const prisma: any = {

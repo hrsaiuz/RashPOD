@@ -58,6 +58,7 @@ export interface PlacementConfigV1 {
     placementCode: string;
     name: string;
     blankImageKey: string;
+    metadataJson?: Record<string, unknown> | null;
   } | null;
   galleryAssets?: Array<{
     id: string;

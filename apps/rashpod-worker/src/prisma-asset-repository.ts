@@ -504,8 +504,34 @@ export class PrismaAssetRepository implements WorkerRepository {
     });
     if (!selection || selection.status !== DesignProductSelectionStatus.MOCKUP_READY) return null;
     if (selection.productCompositionId) return this.createListingDraftForComposition(selection.productCompositionId);
+    const generatedAssets = selection.mockupAssets.filter((asset) => asset.status === "GENERATED" || asset.status === "READY");
+    const renderAssets = generatedAssets.map((asset) => ({
+      id: asset.id,
+      objectKey: asset.objectKey,
+      contentType: asset.contentType,
+      widthPx: asset.widthPx,
+      heightPx: asset.heightPx,
+      mockupType: asset.mockupType,
+    }));
     const existing = await this.prisma.commerceListing.findUnique({ where: { designProductSelectionId: selection.id } });
-    if (existing) return { id: existing.id, status: existing.status };
+    if (existing) {
+      const refreshed = await this.prisma.commerceListing.update({
+        where: { id: existing.id },
+        data: {
+          mockupAssetIds: generatedAssets.map((asset) => asset.id),
+          imagesJson: generatedAssets.map((asset) => asset.imageUrl).filter(Boolean),
+          metadataJson: {
+            ...jsonRecord(existing.metadataJson),
+            renderAssets,
+          },
+        },
+      });
+      await this.prisma.designProductSelection.update({
+        where: { id: selection.id },
+        data: { status: selectionStatusForListing(refreshed.status) },
+      });
+      return { id: refreshed.id, status: refreshed.status };
+    }
 
     const isLocal = selection.pipeline === PipelineType.LOCAL;
     const title = isLocal
@@ -535,16 +561,11 @@ export class PrismaAssetRepository implements WorkerRepository {
         localBaseProductId: selection.localBaseProductId,
         printfulProductTemplateId: selection.printfulProductTemplateId,
         designProductSelectionId: selection.id,
-        mockupAssetIds: selection.mockupAssets.filter((asset) => asset.status === "GENERATED" || asset.status === "READY").map((asset) => asset.id),
-        imagesJson: selection.mockupAssets
-          .filter((asset) => asset.status === "GENERATED" || asset.status === "READY")
-          .map((asset) => asset.imageUrl)
-          .filter(Boolean),
+        mockupAssetIds: generatedAssets.map((asset) => asset.id),
+        imagesJson: generatedAssets.map((asset) => asset.imageUrl).filter(Boolean),
         metadataJson: {
           ...(royalty.rule ? { royaltyRuleId: royalty.rule.id, royaltyBasis: royalty.rule.basis, royaltyValue: royalty.rule.value.toString() } : {}),
-          renderAssets: selection.mockupAssets
-            .filter((asset) => asset.status === "GENERATED" || asset.status === "READY")
-            .map((asset) => ({ id: asset.id, objectKey: asset.objectKey, contentType: asset.contentType, widthPx: asset.widthPx, heightPx: asset.heightPx, mockupType: asset.mockupType })),
+          renderAssets,
         },
       },
     });
@@ -601,6 +622,20 @@ export class PrismaAssetRepository implements WorkerRepository {
     const price = isLocal ? (composition.localBaseProduct?.defaultPrice ?? new Prisma.Decimal(0)) : (composition.printfulProductTemplate?.defaultRetailPrice ?? new Prisma.Decimal(0));
     const cost = isLocal ? composition.localBaseProduct?.baseCost : composition.printfulProductTemplate?.estimatedBaseCost;
     const royalty = await this.calculateRoyalty(price, cost ?? null);
+    const existingListing = await this.prisma.commerceListing.findUnique({ where: { productCompositionId: composition.id } });
+    const listingMetadata = {
+      ...jsonRecord(existingListing?.metadataJson),
+      ...(royalty.rule ? { royaltyRuleId: royalty.rule.id, royaltyBasis: royalty.rule.basis, royaltyValue: royalty.rule.value.toString() } : {}),
+      productCompositionId: composition.id,
+      placements: composition.selections.map((item) => ({
+        selectionId: item.id,
+        placement: item.placement,
+        providerPlacement: item.providerPlacement,
+        sourceDesignVersionId: item.sourceDesignVersionId,
+        placementConfigJson: item.placementConfigJson,
+      })),
+      renderAssets: generatedAssets.map((asset) => ({ id: asset.id, selectionId: asset.selection.id, placement: asset.selection.placement, objectKey: asset.objectKey, contentType: asset.contentType, widthPx: asset.widthPx, heightPx: asset.heightPx, mockupType: asset.mockupType })),
+    };
 
     const listing = await this.prisma.commerceListing.upsert({
       where: { productCompositionId: composition.id },
@@ -622,20 +657,14 @@ export class PrismaAssetRepository implements WorkerRepository {
         productCompositionId: composition.id,
         mockupAssetIds: generatedAssets.map((asset) => asset.id),
         imagesJson: publicAssets.map((asset) => asset.imageUrl).filter(Boolean),
-        metadataJson: {
-          ...(royalty.rule ? { royaltyRuleId: royalty.rule.id, royaltyBasis: royalty.rule.basis, royaltyValue: royalty.rule.value.toString() } : {}),
-          productCompositionId: composition.id,
-          placements: composition.selections.map((item) => ({
-            selectionId: item.id,
-            placement: item.placement,
-            providerPlacement: item.providerPlacement,
-            sourceDesignVersionId: item.sourceDesignVersionId,
-            placementConfigJson: item.placementConfigJson,
-          })),
-          renderAssets: generatedAssets.map((asset) => ({ id: asset.id, selectionId: asset.selection.id, placement: asset.selection.placement, objectKey: asset.objectKey, contentType: asset.contentType, widthPx: asset.widthPx, heightPx: asset.heightPx, mockupType: asset.mockupType })),
-        },
+        metadataJson: listingMetadata,
       },
-      update: {},
+      update: {
+        designProductSelectionId: primary.id,
+        mockupAssetIds: generatedAssets.map((asset) => asset.id),
+        imagesJson: publicAssets.map((asset) => asset.imageUrl).filter(Boolean),
+        metadataJson: listingMetadata,
+      },
     });
 
     const targets = [...new Set(composition.selections.flatMap((item) => this.marketplacesForSelection(item.pipeline, item.targetMarketplaces)))];
@@ -660,7 +689,7 @@ export class PrismaAssetRepository implements WorkerRepository {
     }
     await this.prisma.designProductSelection.updateMany({
       where: { productCompositionId: composition.id },
-      data: { status: DesignProductSelectionStatus.LISTING_DRAFT },
+      data: { status: selectionStatusForListing(listing.status) },
     });
     return { id: listing.id, status: listing.status };
   }
@@ -987,6 +1016,16 @@ export class PrismaAssetRepository implements WorkerRepository {
 
 export function compositionReadyForListing(selections: Array<{ status: string }>) {
   return selections.length > 0 && selections.every((item) => item.status === DesignProductSelectionStatus.MOCKUP_READY);
+}
+
+function jsonRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
+}
+
+function selectionStatusForListing(status: ListingStatus): DesignProductSelectionStatus {
+  if (status === ListingStatus.PUBLISHED) return DesignProductSelectionStatus.PUBLISHED;
+  if (status === ListingStatus.READY_TO_PUBLISH) return DesignProductSelectionStatus.READY_TO_PUBLISH;
+  return DesignProductSelectionStatus.LISTING_DRAFT;
 }
 
 export function selectCompositionGallery<T extends { selection: { id: string }; mockupType: string }>(assets: T[], primarySelectionId: string): T[] {

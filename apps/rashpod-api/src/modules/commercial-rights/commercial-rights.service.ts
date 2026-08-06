@@ -1,4 +1,4 @@
-import { ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
 import { FilmConsentAction, Prisma, UserRole } from "@prisma/client";
 import { PrismaService } from "../../prisma/prisma.service";
 import { AuditService } from "../audit/audit.service";
@@ -20,7 +20,8 @@ export class CommercialRightsService {
     return { design, isAdmin };
   }
 
-  getByDesign(designId: string) {
+  async getByDesign(designId: string, user: RequestUser) {
+    await this.getOwnedDesignOrThrow(designId, user);
     return this.prisma.commercialRights.findUnique({ where: { designAssetId: designId } });
   }
 
@@ -29,7 +30,12 @@ export class CommercialRightsService {
     const before = await this.prisma.commercialRights.findUnique({ where: { designAssetId: designId } });
     const updated = await this.prisma.commercialRights.update({
       where: { designAssetId: designId },
-      data: dto,
+      data: {
+        allowProductSales: dto.allowProductSales,
+        allowMarketplacePublishing: dto.allowMarketplacePublishing,
+        allowCorporateBidding: dto.allowCorporateBidding,
+        filmRoyaltyRate: dto.filmRoyaltyRate,
+      },
     });
     await this.audit.log({
       actorId: user.sub,
@@ -43,73 +49,92 @@ export class CommercialRightsService {
 
   async enableFilmSales(designId: string, user: RequestUser, reason?: string) {
     const { design, isAdmin } = await this.getOwnedDesignOrThrow(designId, user);
-    const latestVersion = await this.prisma.designVersion.findFirst({ where: { designAssetId: designId }, orderBy: { createdAt: "desc" } });
-    const settings = await this.prisma.filmSaleSettings.findFirst({ orderBy: { updatedAt: "desc" } });
-    const updated = await this.prisma.commercialRights.update({
-      where: { designAssetId: designId },
-      data: { allowFilmSales: true, filmConsentGrantedAt: new Date(), filmConsentRevokedAt: null, filmConsentVersionId: latestVersion?.id },
-    });
-    await this.prisma.filmConsentEvent.create({
-      data: {
-        designAssetId: designId,
-        designerId: design.designerId,
-        actorId: user.sub,
-        designVersionId: latestVersion?.id,
-        action: isAdmin ? FilmConsentAction.ADMIN_ENABLED : FilmConsentAction.ENABLED,
-        reason: reason?.trim() || null,
-        policySnapshotJson: this.cleanJson({
-          settingsId: settings?.id ?? null,
-          settingsVersion: settings?.settingsVersion ?? null,
-          revocationPolicy: settings?.revocationPolicy ?? null,
-          consentPolicyJson: settings?.consentPolicyJson ?? null,
-        }),
-        royaltySnapshotJson: this.cleanJson({
-          defaultRoyaltyBasis: settings?.defaultRoyaltyBasis ?? null,
-          defaultRoyaltyValue: settings?.defaultRoyaltyValue ? Number(settings.defaultRoyaltyValue) : null,
-          filmRoyaltyRate: updated.filmRoyaltyRate,
-        }),
-      },
-    });
-    await this.audit.log({
-      actorId: user.sub,
-      action: "rights.enable-film",
-      entityType: "CommercialRights",
-      entityId: updated.id,
-      metadata: { reason, designVersionId: latestVersion?.id, isAdmin },
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const latestVersion = await tx.designVersion.findFirst({ where: { designAssetId: designId }, orderBy: { createdAt: "desc" } });
+      if (!latestVersion) {
+        throw new BadRequestException("Upload a verified design version before enabling film sales");
+      }
+      const settings = await tx.filmSaleSettings.findFirst({ orderBy: { updatedAt: "desc" } });
+      const rights = await tx.commercialRights.update({
+        where: { designAssetId: designId },
+        data: { allowFilmSales: true, filmConsentGrantedAt: new Date(), filmConsentRevokedAt: null, filmConsentVersionId: latestVersion.id },
+      });
+      await tx.filmConsentEvent.create({
+        data: {
+          designAssetId: designId,
+          designerId: design.designerId,
+          actorId: user.sub,
+          designVersionId: latestVersion.id,
+          action: isAdmin ? FilmConsentAction.ADMIN_ENABLED : FilmConsentAction.ENABLED,
+          reason: reason?.trim() || null,
+          policySnapshotJson: this.cleanJson({
+            settingsId: settings?.id ?? null,
+            settingsVersion: settings?.settingsVersion ?? null,
+            revocationPolicy: settings?.revocationPolicy ?? null,
+            consentPolicyJson: settings?.consentPolicyJson ?? null,
+          }),
+          royaltySnapshotJson: this.cleanJson({
+            defaultRoyaltyBasis: settings?.defaultRoyaltyBasis ?? null,
+            defaultRoyaltyValue: settings?.defaultRoyaltyValue ? Number(settings.defaultRoyaltyValue) : null,
+            filmRoyaltyRate: rights.filmRoyaltyRate,
+          }),
+        },
+      });
+      await tx.auditLog.create({
+        data: {
+          actorId: user.sub,
+          actorEmail: user.email,
+          actorRole: user.role,
+          tenantId: design.tenantId,
+          action: "rights.enable-film",
+          entityType: "CommercialRights",
+          entityId: rights.id,
+          metadata: this.cleanJson({ reason, designVersionId: latestVersion.id, isAdmin }),
+        },
+      });
+      return rights;
     });
     return updated;
   }
 
   async disableFilmSales(designId: string, user: RequestUser, reason?: string) {
     const { design, isAdmin } = await this.getOwnedDesignOrThrow(designId, user);
-    const settings = await this.prisma.filmSaleSettings.findFirst({ orderBy: { updatedAt: "desc" } });
-    const updated = await this.prisma.commercialRights.update({
-      where: { designAssetId: designId },
-      data: { allowFilmSales: false, filmConsentRevokedAt: new Date() },
-    });
-    await this.prisma.filmConsentEvent.create({
-      data: {
-        designAssetId: designId,
-        designerId: design.designerId,
-        actorId: user.sub,
-        designVersionId: updated.filmConsentVersionId,
-        action: isAdmin ? FilmConsentAction.ADMIN_REVOKED : FilmConsentAction.REVOKED,
-        reason: reason?.trim() || null,
-        policySnapshotJson: this.cleanJson({
-          settingsId: settings?.id ?? null,
-          settingsVersion: settings?.settingsVersion ?? null,
-          revocationPolicy: settings?.revocationPolicy ?? null,
-          consentPolicyJson: settings?.consentPolicyJson ?? null,
-        }),
-        royaltySnapshotJson: this.cleanJson({ filmRoyaltyRate: updated.filmRoyaltyRate }),
-      },
-    });
-    await this.audit.log({
-      actorId: user.sub,
-      action: "rights.disable-film",
-      entityType: "CommercialRights",
-      entityId: updated.id,
-      metadata: { reason, isAdmin },
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const settings = await tx.filmSaleSettings.findFirst({ orderBy: { updatedAt: "desc" } });
+      const rights = await tx.commercialRights.update({
+        where: { designAssetId: designId },
+        data: { allowFilmSales: false, filmConsentRevokedAt: new Date() },
+      });
+      await tx.filmConsentEvent.create({
+        data: {
+          designAssetId: designId,
+          designerId: design.designerId,
+          actorId: user.sub,
+          designVersionId: rights.filmConsentVersionId,
+          action: isAdmin ? FilmConsentAction.ADMIN_REVOKED : FilmConsentAction.REVOKED,
+          reason: reason?.trim() || null,
+          policySnapshotJson: this.cleanJson({
+            settingsId: settings?.id ?? null,
+            settingsVersion: settings?.settingsVersion ?? null,
+            revocationPolicy: settings?.revocationPolicy ?? null,
+            consentPolicyJson: settings?.consentPolicyJson ?? null,
+          }),
+          royaltySnapshotJson: this.cleanJson({ filmRoyaltyRate: rights.filmRoyaltyRate }),
+        },
+      });
+      await tx.auditLog.create({
+        data: {
+          actorId: user.sub,
+          actorEmail: user.email,
+          actorRole: user.role,
+          tenantId: design.tenantId,
+          action: "rights.disable-film",
+          entityType: "CommercialRights",
+          entityId: rights.id,
+          metadata: this.cleanJson({ reason, isAdmin }),
+        },
+      });
+      return rights;
     });
     return updated;
   }

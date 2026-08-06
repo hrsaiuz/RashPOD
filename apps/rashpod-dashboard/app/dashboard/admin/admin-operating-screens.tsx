@@ -37,6 +37,7 @@ type MockupView = IdRow & {
   sortOrder: number;
   isPrimary: boolean;
   isActive: boolean;
+  metadataJson?: Record<string, unknown> | null;
   _count?: { printAreas: number; galleryAssets: number };
 };
 type MockupGalleryAsset = IdRow & {
@@ -365,7 +366,7 @@ export function ProductTypesScreen() {
   );
 }
 
-const MOCKUP_EMPTY = { baseProductId: "", name: "", baseImageKey: "", isActive: true, sortOrder: "0" };
+const MOCKUP_EMPTY = { baseProductId: "", name: "", baseImageKey: "", isActive: false, sortOrder: "0" };
 
 type MockupImageField = "baseImageKey";
 
@@ -396,6 +397,7 @@ type MockupViewEditingState = {
   isPrimary: boolean;
   isActive: boolean;
   previewUrl?: string;
+  metadataJson: Record<string, unknown>;
 };
 
 type MockupGalleryEditingState = {
@@ -439,6 +441,8 @@ function defaultRenderRegion(canvasWidth: number, canvasHeight: number): Variant
 }
 
 async function uploadMockupTemplateImage(file: File, title: string) {
+  const dimensions = await readMockupImageDimensions(file);
+  if (!dimensions) throw new Error("Could not read the mockup image dimensions.");
   const signRes = await fetch("/api/proxy/admin/media/upload-url", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -461,11 +465,39 @@ async function uploadMockupTemplateImage(file: File, title: string) {
       title,
       mimeType: file.type || "application/octet-stream",
       sizeBytes: file.size,
+      width: dimensions.width,
+      height: dimensions.height,
     }),
   });
   if (!completeRes.ok) throw new Error(`Finalize failed (${completeRes.status})`);
   const asset = (await completeRes.json()) as { objectKey: string; publicUrl?: string | null };
-  return { objectKey: signed.objectKey, publicUrl: asset.publicUrl ?? undefined };
+  return { objectKey: signed.objectKey, publicUrl: asset.publicUrl ?? undefined, ...dimensions };
+}
+
+async function readMockupImageDimensions(file: File): Promise<{ width: number; height: number } | null> {
+  try {
+    if (typeof createImageBitmap === "function") {
+      const bitmap = await createImageBitmap(file);
+      const dimensions = { width: bitmap.width, height: bitmap.height };
+      bitmap.close();
+      if (dimensions.width > 0 && dimensions.height > 0) return dimensions;
+    }
+  } catch {
+    // Fall through to the HTML image decoder for browsers without createImageBitmap support.
+  }
+  return new Promise((resolve) => {
+    const image = new Image();
+    const url = URL.createObjectURL(file);
+    image.onload = () => {
+      URL.revokeObjectURL(url);
+      resolve(image.naturalWidth > 0 && image.naturalHeight > 0 ? { width: image.naturalWidth, height: image.naturalHeight } : null);
+    };
+    image.onerror = () => {
+      URL.revokeObjectURL(url);
+      resolve(null);
+    };
+    image.src = url;
+  });
 }
 
 function MockupImageUploadField({
@@ -646,6 +678,7 @@ export function MockupTemplatesScreen() {
             isPrimary: view.isPrimary,
             isActive: view.isActive,
             previewUrl: mediaByObjectKey.get(view.blankImageKey),
+            metadataJson: view.metadataJson ?? {},
           }
         : {
             viewKey: "",
@@ -656,6 +689,7 @@ export function MockupTemplatesScreen() {
             sortOrder: String(viewCount),
             isPrimary: viewCount === 0,
             isActive: true,
+            metadataJson: {},
           },
     );
   }
@@ -697,7 +731,12 @@ export function MockupTemplatesScreen() {
       const uploaded = await uploadMockupTemplateImage(file, `${managing.name} — ${label}`);
       setMediaByObjectKey((current) => new Map(current).set(uploaded.objectKey, uploaded.publicUrl ?? ""));
       if (target === "view") {
-        setViewEditing((current) => current ? { ...current, blankImageKey: uploaded.objectKey, previewUrl: uploaded.publicUrl } : current);
+        setViewEditing((current) => current ? {
+          ...current,
+          blankImageKey: uploaded.objectKey,
+          previewUrl: uploaded.publicUrl,
+          metadataJson: { ...current.metadataJson, canvasWidth: uploaded.width, canvasHeight: uploaded.height },
+        } : current);
       } else {
         setGalleryEditing((current) => current ? { ...current, imageKey: uploaded.objectKey, previewUrl: uploaded.publicUrl, renderRegion: undefined } : current);
       }
@@ -723,6 +762,7 @@ export function MockupTemplatesScreen() {
         sortOrder: Number(viewEditing.sortOrder),
         isPrimary: viewEditing.isPrimary,
         isActive: viewEditing.isActive,
+        metadataJson: viewEditing.metadataJson,
       };
       if (viewEditing.id) await api.patch(`/admin/mockup-views/${viewEditing.id}`, payload);
       else await api.post(`/admin/mockup-templates/${managing.id}/views`, payload);
@@ -989,16 +1029,19 @@ export function MockupTemplatesScreen() {
               label="Active"
               checked={editing.isActive}
               disabled={Boolean(
-                editing.id
-                && !editing.isActive
-                && !(items.find((template) => template.id === editing.id)?.views ?? []).some((view) => view.isPrimary && view.isActive),
+                !editing.id
+                || (
+                  !editing.isActive
+                  && !(items.find((template) => template.id === editing.id)?.views ?? []).some((view) => view.isPrimary && view.isActive)
+                ),
               )}
               helper={
-                editing.id
-                && !editing.isActive
-                && !(items.find((template) => template.id === editing.id)?.views ?? []).some((view) => view.isPrimary && view.isActive)
-                  ? "Add or promote an active primary product view before activating this template."
-                  : undefined
+                !editing.id
+                  ? "New templates are saved as drafts. Add print areas plus calibrated lifestyle and detail images before activation."
+                  : !editing.isActive
+                    && !(items.find((template) => template.id === editing.id)?.views ?? []).some((view) => view.isPrimary && view.isActive)
+                    ? "Add or promote an active primary product view before activating this template."
+                    : undefined
               }
               onChange={(v) => setEditing({ ...editing, isActive: v })}
             />

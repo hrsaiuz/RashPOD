@@ -99,10 +99,40 @@ describe("ListingsService lifecycle", () => {
     const audit: any = { log: jest.fn().mockResolvedValue(undefined) };
     const service = new ListingsService(prisma, audit);
 
-    await service.patch(admin as any, "lst-4", { title: "Updated" });
+    await service.patch(admin as any, "lst-4", {
+      title: "Updated",
+      variants: [{ id: "black-m", color: "Black", size: "M", price: 100000, enabled: true }],
+    });
 
-    expect(prisma.commerceListing.update).toHaveBeenCalled();
+    expect(prisma.commerceListing.update).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        metadataJson: {
+          variants: [{ id: "black-m", color: "Black", size: "M", price: 100000, enabled: true }],
+        },
+      }),
+    }));
     expect(audit.log).toHaveBeenCalledWith(expect.objectContaining({ action: "listing.update" }));
+  });
+
+  it("rejects variants smuggled through unvalidated listing metadata", async () => {
+    const update = jest.fn();
+    const service = new ListingsService({
+      commerceListing: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: "lst-metadata-variants",
+          type: ListingType.PRODUCT,
+          designerId: "designer-2",
+          designProductSelectionId: "selection-1",
+          status: ListingStatus.DRAFT,
+        }),
+        update,
+      },
+    } as never, { log: jest.fn() } as never);
+
+    await expect(service.patch(admin as any, "lst-metadata-variants", {
+      metadataJson: { variants: [{ id: "bad", price: "not-a-price" }] },
+    })).rejects.toThrow("validated variants field");
+    expect(update).not.toHaveBeenCalled();
   });
 
   it("applies active royalty rules when a moderator publishes a listing", async () => {
@@ -244,6 +274,114 @@ describe("ListingsService lifecycle", () => {
     expect(result.status).toBe(ListingStatus.PUBLISHED);
     expect(prisma.commerceListing.update).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ status: ListingStatus.PUBLISHED }) }));
     expect(audit.log).toHaveBeenCalledWith(expect.objectContaining({ action: "listing.publish" }));
+  });
+
+  it("blocks a product composition when complementary placement mockups are stale", async () => {
+    const frontAssets = [readyMockup("front-main", "MAIN"), readyMockup("front-life", "LIFESTYLE"), readyMockup("front-detail", "DETAIL")];
+    const listing = {
+      id: "lst-composition-stale",
+      type: ListingType.PRODUCT,
+      status: ListingStatus.DRAFT,
+      designerId: "designer-1",
+      title: "Front and sleeve tee",
+      price: new Prisma.Decimal(100000),
+      cost: null,
+      publishedAt: null,
+      metadataJson: { variants: [{ id: "black-m", color: "Black", size: "M", price: "100000", enabled: true }] },
+      imagesJson: ["mockups/front-main.png", "mockups/sleeve-main.png", "mockups/front-detail.png"],
+      designProductSelectionId: "front-selection",
+      productCompositionId: "composition-1",
+      designProductSelection: { mockupAssets: frontAssets },
+      productComposition: {
+        selections: [
+          { placement: "FRONT", sourceDesignVersionId: "front-version", mockupAssets: frontAssets },
+          {
+            placement: "LEFT_SLEEVE",
+            sourceDesignVersionId: "sleeve-version",
+            mockupAssets: [{ id: "sleeve-main", mockupType: "MAIN", status: "FAILED", imageUrl: null, objectKey: null, archivedAt: null }],
+          },
+        ],
+      },
+      designAsset: { commercialRights: { allowProductSales: true, allowMarketplacePublishing: false } },
+    };
+    const prisma: any = { commerceListing: { findUnique: jest.fn().mockResolvedValue(listing), update: jest.fn() } };
+    const audit: any = { log: jest.fn().mockResolvedValue(undefined) };
+    const service = new ListingsService(prisma, audit);
+
+    await expect(service.publish(admin as any, listing.id)).rejects.toThrow("LEFT_SLEEVE requires a ready mockup view");
+    expect(prisma.commerceListing.update).not.toHaveBeenCalled();
+  });
+
+  it("publishes a fully configured front-and-sleeve product composition", async () => {
+    const frontAssets = [readyMockup("front-main", "MAIN"), readyMockup("front-life", "LIFESTYLE"), readyMockup("front-detail", "DETAIL")];
+    const sleeveAssets = [readyMockup("sleeve-main", "MAIN"), readyMockup("sleeve-life", "LIFESTYLE"), readyMockup("sleeve-detail", "DETAIL")];
+    const listing = {
+      id: "lst-composition-ready",
+      type: ListingType.PRODUCT,
+      status: ListingStatus.DRAFT,
+      designerId: "designer-1",
+      title: "Front and sleeve tee",
+      price: new Prisma.Decimal(100000),
+      cost: null,
+      publishedAt: null,
+      metadataJson: { variants: [{ id: "black-m", color: "Black", size: "M", price: "100000", enabled: true }] },
+      imagesJson: ["mockups/front-main.png", "mockups/sleeve-main.png", "mockups/front-detail.png"],
+      designProductSelectionId: "front-selection",
+      productCompositionId: "composition-1",
+      designProductSelection: { mockupAssets: frontAssets },
+      productComposition: {
+        selections: [
+          { placement: "FRONT", sourceDesignVersionId: "front-version", mockupAssets: frontAssets },
+          { placement: "LEFT_SLEEVE", sourceDesignVersionId: "sleeve-version", mockupAssets: sleeveAssets },
+        ],
+      },
+      designAsset: { commercialRights: { allowProductSales: true, allowMarketplacePublishing: false } },
+    };
+    const prisma: any = {
+      commerceListing: {
+        findUnique: jest.fn().mockResolvedValue(listing),
+        update: jest.fn().mockResolvedValue({ ...listing, status: ListingStatus.PUBLISHED }),
+      },
+    };
+    const audit: any = { log: jest.fn().mockResolvedValue(undefined) };
+    const service = new ListingsService(prisma, audit);
+
+    await expect(service.publish(admin as any, listing.id)).resolves.toEqual(expect.objectContaining({ status: ListingStatus.PUBLISHED }));
+    expect(prisma.commerceListing.update).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ status: ListingStatus.PUBLISHED }),
+    }));
+  });
+
+  it("blocks a two-placement listing when the sleeve mockup is missing from the public gallery", async () => {
+    const frontAssets = [readyMockup("front-main", "MAIN"), readyMockup("front-life", "LIFESTYLE"), readyMockup("front-detail", "DETAIL")];
+    const sleeveAssets = [readyMockup("sleeve-main", "MAIN"), readyMockup("sleeve-life", "LIFESTYLE"), readyMockup("sleeve-detail", "DETAIL")];
+    const listing = {
+      id: "lst-composition-hidden-sleeve",
+      type: ListingType.PRODUCT,
+      status: ListingStatus.DRAFT,
+      designerId: "designer-1",
+      title: "Front and sleeve tee",
+      price: new Prisma.Decimal(100000),
+      cost: null,
+      publishedAt: null,
+      metadataJson: { variants: [{ id: "black-m", color: "Black", size: "M", price: 100000, enabled: true }] },
+      imagesJson: ["mockups/front-main.png", "mockups/front-life.png", "mockups/front-detail.png"],
+      designProductSelectionId: "front-selection",
+      productCompositionId: "composition-1",
+      designProductSelection: { mockupAssets: frontAssets },
+      productComposition: {
+        selections: [
+          { placement: "FRONT", sourceDesignVersionId: "front-version", mockupAssets: frontAssets },
+          { placement: "LEFT_SLEEVE", sourceDesignVersionId: "sleeve-version", mockupAssets: sleeveAssets },
+        ],
+      },
+      designAsset: { commercialRights: { allowProductSales: true, allowMarketplacePublishing: false } },
+    };
+    const prisma: any = { commerceListing: { findUnique: jest.fn().mockResolvedValue(listing), update: jest.fn() } };
+    const service = new ListingsService(prisma, { log: jest.fn().mockResolvedValue(undefined) } as any);
+
+    await expect(service.publish(admin as any, listing.id)).rejects.toThrow("expose both placement mockups");
+    expect(prisma.commerceListing.update).not.toHaveBeenCalled();
   });
 
   it("throws not found when listing is missing", async () => {

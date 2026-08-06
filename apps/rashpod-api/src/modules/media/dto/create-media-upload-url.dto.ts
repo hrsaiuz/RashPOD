@@ -1,5 +1,7 @@
-import { IsEnum, IsInt, IsString, MaxLength, Min } from "class-validator";
+import { IsEnum, IsInt, IsString, Max, MaxLength, Min } from "class-validator";
 import { MediaCategory } from "@prisma/client";
+
+export const MEDIA_UPLOAD_MAX_BYTES = 50 * 1024 * 1024;
 
 export class CreateMediaUploadUrlDto {
   @IsEnum(MediaCategory)
@@ -15,5 +17,6 @@ export class CreateMediaUploadUrlDto {
 
   @IsInt()
   @Min(1)
+  @Max(MEDIA_UPLOAD_MAX_BYTES)
   sizeBytes!: number;
 }

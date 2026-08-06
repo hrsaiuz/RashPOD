@@ -135,10 +135,6 @@ export class DesignStoriesService {
             translationMetaJson: translationMeta as Prisma.InputJsonValue,
             audioFileIdsJson: audioFileIds as Prisma.InputJsonValue,
             videoFileIdsJson: videoFileIds as Prisma.InputJsonValue,
-            qrCodeFileId:
-              existing.slug === slug ? existing.qrCodeFileId : null,
-            qrCodeImageUrl:
-              existing.slug === slug ? existing.qrCodeImageUrl : null,
             reviewNotes: existing.status === DesignStoryStatus.NEEDS_CHANGES ? existing.reviewNotes : null,
             status: this.storyStatusAfterEdit(existing.status),
           },
@@ -173,6 +169,21 @@ export class DesignStoriesService {
         entityType: "DesignStory",
         entityId: story.id,
         metadata: { before: existing.slug, after: slug },
+      });
+    }
+    const needsQr = !story.qrCodeFileId || !story.qrCodeImageUrl || existing?.slug !== slug;
+    if (needsQr) {
+      await this.generateQrAsset(
+        story,
+        design.designerId,
+        design.tenantId ?? undefined,
+      );
+      await this.audit.log({
+        actorId: userId,
+        action: existing?.qrCodeFileId ? "design-story.qr.regenerated" : "design-story.qr.generated",
+        entityType: "DesignStory",
+        entityId: story.id,
+        metadata: { designAssetId: designId, slug, automatic: true },
       });
     }
     return this.toDesignerStoryDto(await this.prisma.designStory.findUniqueOrThrow({ where: { id: story.id } }));
@@ -838,13 +849,36 @@ export class DesignStoriesService {
         verifiedAt: new Date(),
       },
     });
-    return this.prisma.designStory.update({
-      where: { id: story.id },
+    const claimed = await this.prisma.designStory.updateMany({
+      where: { id: story.id, qrCodeFileId: story.qrCodeFileId },
       data: {
         qrCodeFileId: fileId,
         qrCodeImageUrl: uploaded.publicUrl,
       },
     });
+    if (claimed.count !== 1) {
+      const current = await this.prisma.designStory.findUniqueOrThrow({ where: { id: story.id } });
+      await this.prisma.fileAsset.updateMany({
+        where: { id: fileId, ownerId },
+        data: {
+          status: AssetLifecycleStatus.REPLACED,
+          replacedByAssetId: current.qrCodeFileId,
+          archivedAt: new Date(),
+        },
+      });
+      return current;
+    }
+    if (story.qrCodeFileId && story.qrCodeFileId !== fileId) {
+      await this.prisma.fileAsset.updateMany({
+        where: { id: story.qrCodeFileId, ownerId },
+        data: {
+          status: AssetLifecycleStatus.REPLACED,
+          replacedByAssetId: fileId,
+          archivedAt: new Date(),
+        },
+      });
+    }
+    return this.prisma.designStory.findUniqueOrThrow({ where: { id: story.id } });
   }
 
   private firstListingImage(value: unknown) {

@@ -379,6 +379,13 @@ export class AdminConfigService {
   }
 
   async createMockupTemplate(actorId: string, dto: CreateMockupTemplateDto) {
+    if (dto.isActive === true) {
+      throw new BadRequestException("New mockup templates must be saved inactive until their print areas and calibrated gallery are configured");
+    }
+    if (dto.lifestyleImageKey || dto.closeupImageKey) {
+      throw new BadRequestException("Create the template first, then add lifestyle and detail images through the calibrated gallery endpoints");
+    }
+    const baseCanvas = await this.mediaCanvas(dto.baseImageKey);
     const item = await this.prisma.$transaction(async (tx) => {
       const template = await tx.mockupTemplate.create({
         data: {
@@ -388,7 +395,7 @@ export class AdminConfigService {
           lifestyleImageKey: dto.lifestyleImageKey?.trim(),
           closeupImageKey: dto.closeupImageKey?.trim(),
           configurationVersion: "MULTI_VIEW_V2",
-          isActive: dto.isActive ?? true,
+          isActive: false,
           sortOrder: dto.sortOrder ?? 0,
         },
       });
@@ -402,31 +409,9 @@ export class AdminConfigService {
           sortOrder: 0,
           isPrimary: true,
           isActive: true,
+          metadataJson: baseCanvas ? { canvasWidth: baseCanvas.width, canvasHeight: baseCanvas.height } : undefined,
         },
       });
-      const galleryAssets = [
-        dto.lifestyleImageKey
-          ? {
-              mockupTemplateId: template.id,
-              mockupViewId: primaryView.id,
-              role: "LIFESTYLE" as const,
-              imageKey: dto.lifestyleImageKey.trim(),
-              sortOrder: 0,
-              isActive: true,
-            }
-          : null,
-        dto.closeupImageKey
-          ? {
-              mockupTemplateId: template.id,
-              mockupViewId: primaryView.id,
-              role: "DETAIL" as const,
-              imageKey: dto.closeupImageKey.trim(),
-              sortOrder: 0,
-              isActive: true,
-            }
-          : null,
-      ].filter((asset): asset is NonNullable<typeof asset> => Boolean(asset));
-      if (galleryAssets.length) await tx.mockupGalleryAsset.createMany({ data: galleryAssets });
       return template;
     });
     await this.audit.log({ actorId, action: "mockup-template.create", entityType: "MockupTemplate", entityId: item.id });
@@ -460,6 +445,17 @@ export class AdminConfigService {
     ) {
       throw new BadRequestException("Use mockup gallery asset endpoints to update multi-view lifestyle and detail images");
     }
+    let replacementCanvas: { width: number; height: number } | null = null;
+    if (existing.configurationVersion === "MULTI_VIEW_V2" && dto.baseImageKey) {
+      const primary = await this.prisma.mockupView.findFirst({
+        where: { mockupTemplateId: id, isPrimary: true },
+        select: { id: true, blankImageKey: true },
+      });
+      if (primary && primary.blankImageKey !== dto.baseImageKey.trim()) {
+        await this.assertViewReplacementCanvasCompatible(primary.id, primary.blankImageKey, dto.baseImageKey.trim());
+      }
+      replacementCanvas = await this.mediaCanvas(dto.baseImageKey);
+    }
     const item = await this.prisma.$transaction(async (tx) => {
       if (dto.isActive === true && existing.configurationVersion === "MULTI_VIEW_V2") {
         const primary = await tx.mockupView.findFirst({
@@ -468,6 +464,22 @@ export class AdminConfigService {
         });
         if (!primary) {
           throw new BadRequestException("A multi-view template requires an active primary view before activation");
+        }
+        const [printAreaCount, galleryAssets] = await Promise.all([
+          tx.printArea.count({ where: { mockupTemplateId: id, mockupViewId: primary.id, isActive: true } }),
+          tx.mockupGalleryAsset.findMany({
+            where: { mockupTemplateId: id, isActive: true, role: { in: ["LIFESTYLE", "DETAIL"] } },
+            select: { role: true, metadataJson: true },
+          }),
+        ]);
+        if (printAreaCount === 0) {
+          throw new BadRequestException("A multi-view template requires an active print area on its primary view before activation");
+        }
+        const calibratedRoles = new Set(
+          galleryAssets.filter((asset) => parseVariantRenderRegion(asset.metadataJson)).map((asset) => asset.role),
+        );
+        if (!calibratedRoles.has("LIFESTYLE") || !calibratedRoles.has("DETAIL")) {
+          throw new BadRequestException("A multi-view template requires calibrated lifestyle and detail gallery images before activation");
         }
       }
       const updated = await tx.mockupTemplate.update({
@@ -490,7 +502,10 @@ export class AdminConfigService {
         if (primary) {
           await tx.mockupView.update({
             where: { id: primary.id },
-            data: { blankImageKey: dto.baseImageKey.trim() },
+            data: {
+              blankImageKey: dto.baseImageKey.trim(),
+              ...(replacementCanvas ? { metadataJson: { canvasWidth: replacementCanvas.width, canvasHeight: replacementCanvas.height } } : {}),
+            },
           });
         }
       }
@@ -542,6 +557,11 @@ export class AdminConfigService {
     const placementCode = this.normalizeMockupKey(dto.placementCode, "placement code");
     const duplicate = await this.prisma.mockupView.findFirst({ where: { mockupTemplateId, viewKey }, select: { id: true } });
     if (duplicate) throw new ConflictException("A mockup view with this key already exists for the template");
+    const canvas = await this.mediaCanvas(dto.blankImageKey);
+    const metadata = {
+      ...(dto.metadataJson ?? {}),
+      ...(canvas ? { canvasWidth: canvas.width, canvasHeight: canvas.height } : {}),
+    };
 
     const item = await this.prisma.$transaction(async (tx) => {
       const viewCount = await tx.mockupView.count({ where: { mockupTemplateId } });
@@ -564,7 +584,7 @@ export class AdminConfigService {
           sortOrder: dto.sortOrder ?? 0,
           isPrimary,
           isActive,
-          metadataJson: dto.metadataJson as Prisma.InputJsonValue | undefined,
+          metadataJson: Object.keys(metadata).length > 0 ? metadata as Prisma.InputJsonValue : undefined,
         },
       });
       await tx.mockupTemplate.update({
@@ -578,6 +598,7 @@ export class AdminConfigService {
         await this.syncLegacyGalleryRole(tx, mockupTemplateId, "LIFESTYLE");
         await this.syncLegacyGalleryRole(tx, mockupTemplateId, "DETAIL");
       }
+      await this.assertActiveTemplateIntegrity(tx, mockupTemplateId);
       return view;
     });
 
@@ -609,6 +630,19 @@ export class AdminConfigService {
     if ((existing.isPrimary || dto.isPrimary === true) && dto.isActive === false) {
       throw new BadRequestException("The primary mockup view must be active");
     }
+    const replacementImageKey = dto.blankImageKey?.trim();
+    let replacementCanvas: { width: number; height: number } | null = null;
+    if (replacementImageKey && replacementImageKey !== existing.blankImageKey) {
+      await this.assertViewReplacementCanvasCompatible(existing.id, existing.blankImageKey, replacementImageKey);
+      replacementCanvas = await this.mediaCanvas(replacementImageKey);
+    }
+    const metadata = dto.metadataJson || replacementCanvas
+      ? {
+          ...(existing.metadataJson && typeof existing.metadataJson === "object" && !Array.isArray(existing.metadataJson) ? existing.metadataJson as Record<string, unknown> : {}),
+          ...(dto.metadataJson ?? {}),
+          ...(replacementCanvas ? { canvasWidth: replacementCanvas.width, canvasHeight: replacementCanvas.height } : {}),
+        }
+      : undefined;
 
     const item = await this.prisma.$transaction(async (tx) => {
       if (dto.isPrimary === true) {
@@ -628,7 +662,7 @@ export class AdminConfigService {
           sortOrder: dto.sortOrder,
           isPrimary: dto.isPrimary,
           isActive: dto.isActive,
-          metadataJson: dto.metadataJson as Prisma.InputJsonValue | undefined,
+          metadataJson: metadata as Prisma.InputJsonValue | undefined,
         },
       });
       if (updated.isPrimary) {
@@ -642,6 +676,7 @@ export class AdminConfigService {
         await this.syncLegacyGalleryRole(tx, existing.mockupTemplateId, "LIFESTYLE");
         await this.syncLegacyGalleryRole(tx, existing.mockupTemplateId, "DETAIL");
       }
+      await this.assertActiveTemplateIntegrity(tx, existing.mockupTemplateId);
       return updated;
     });
 
@@ -692,6 +727,7 @@ export class AdminConfigService {
           }
         }
       }
+      await this.assertActiveTemplateIntegrity(tx, existing.mockupTemplateId);
       return deleted;
     });
 
@@ -713,10 +749,59 @@ export class AdminConfigService {
     }
   }
 
+  private async assertGalleryAssetCanvas(imageKey: string, metadata: Record<string, unknown> | undefined) {
+    const region = parseVariantRenderRegion(metadata);
+    if (!region) return;
+    const media = await this.prisma.mediaAsset.findFirst({
+      where: { objectKey: imageKey.trim(), isActive: true },
+      select: { width: true, height: true },
+    });
+    if (media?.width && media?.height && (media.width !== region.canvasWidth || media.height !== region.canvasHeight)) {
+      throw new BadRequestException(`Gallery render canvas must match the uploaded image (${media.width}x${media.height})`);
+    }
+  }
+
+  private async mediaCanvas(imageKey: string) {
+    const media = await this.prisma.mediaAsset.findFirst({
+      where: { objectKey: imageKey.trim(), isActive: true },
+      select: { width: true, height: true },
+    });
+    if (!media?.width || !media.height) {
+      throw new BadRequestException("Mockup images must be completed media uploads with known pixel dimensions");
+    }
+    if (media.width * media.height > 64_000_000) {
+      throw new BadRequestException("Mockup image dimensions exceed the 64 megapixel safety limit");
+    }
+    return { width: media.width, height: media.height };
+  }
+
+  private async assertViewReplacementCanvasCompatible(viewId: string, currentImageKey: string, replacementImageKey: string) {
+    const printAreaCount = await this.prisma.printArea.count({ where: { mockupViewId: viewId } });
+    if (printAreaCount === 0) return;
+    const [current, replacement] = await Promise.all([
+      this.prisma.mediaAsset.findFirst({ where: { objectKey: currentImageKey, isActive: true }, select: { width: true, height: true } }),
+      this.prisma.mediaAsset.findFirst({ where: { objectKey: replacementImageKey, isActive: true }, select: { width: true, height: true } }),
+    ]);
+    if (
+      !current?.width
+      || !current.height
+      || !replacement?.width
+      || !replacement.height
+      || current.width !== replacement.width
+      || current.height !== replacement.height
+    ) {
+      throw new ConflictException("Replacement mockup images must keep the same pixel dimensions while this view has print areas; remove or reconfigure the print areas first");
+    }
+  }
+
   async createMockupGalleryAsset(actorId: string, mockupTemplateId: string, dto: CreateMockupGalleryAssetDto) {
     await this.assertMockupTemplateExists(mockupTemplateId);
     if (dto.mockupViewId) await this.assertMockupViewForTemplate(dto.mockupViewId, mockupTemplateId);
     this.validateGalleryRenderRegion(dto.metadataJson);
+    if ((dto.isActive ?? true) && !parseVariantRenderRegion(dto.metadataJson)) {
+      throw new BadRequestException("Active gallery images require a calibrated artwork region");
+    }
+    await this.assertGalleryAssetCanvas(dto.imageKey, dto.metadataJson);
     const item = await this.prisma.$transaction(async (tx) => {
       const created = await tx.mockupGalleryAsset.create({
         data: {
@@ -747,7 +832,14 @@ export class AdminConfigService {
     const existing = await this.prisma.mockupGalleryAsset.findUnique({ where: { id } });
     if (!existing) throw new NotFoundException("Mockup gallery asset not found");
     if (dto.mockupViewId) await this.assertMockupViewForTemplate(dto.mockupViewId, existing.mockupTemplateId);
-    this.validateGalleryRenderRegion(dto.metadataJson);
+    const effectiveMetadata = dto.metadataJson ?? (existing.metadataJson && typeof existing.metadataJson === "object" && !Array.isArray(existing.metadataJson)
+      ? existing.metadataJson as Record<string, unknown>
+      : undefined);
+    this.validateGalleryRenderRegion(effectiveMetadata);
+    if ((dto.isActive ?? existing.isActive) && !parseVariantRenderRegion(effectiveMetadata)) {
+      throw new BadRequestException("Active gallery images require a calibrated artwork region");
+    }
+    await this.assertGalleryAssetCanvas(dto.imageKey ?? existing.imageKey, effectiveMetadata);
     const item = await this.prisma.$transaction(async (tx) => {
       const updated = await tx.mockupGalleryAsset.update({
         where: { id },
@@ -765,6 +857,7 @@ export class AdminConfigService {
       if (updated.role !== existing.role) {
         await this.syncLegacyGalleryRole(tx, existing.mockupTemplateId, updated.role);
       }
+      await this.assertActiveTemplateIntegrity(tx, existing.mockupTemplateId);
       return updated;
     });
     await this.audit.log({
@@ -783,6 +876,7 @@ export class AdminConfigService {
     const item = await this.prisma.$transaction(async (tx) => {
       const deleted = await tx.mockupGalleryAsset.delete({ where: { id } });
       await this.syncLegacyGalleryRole(tx, existing.mockupTemplateId, existing.role);
+      await this.assertActiveTemplateIntegrity(tx, existing.mockupTemplateId);
       return deleted;
     });
     await this.audit.log({ actorId, action: "mockup-gallery-asset.delete", entityType: "MockupGalleryAsset", entityId: item.id });
@@ -919,7 +1013,7 @@ export class AdminConfigService {
         const created = await tx.placementPreset.create({ data: presetData });
         defaultPresetId = created.id;
       }
-      return tx.printArea.update({
+      const updated = await tx.printArea.update({
         where: { id },
         data: {
           mockupTemplateId: dto.mockupTemplateId,
@@ -946,6 +1040,11 @@ export class AdminConfigService {
           isActive: dto.isActive,
         },
       });
+      await this.assertActiveTemplateIntegrity(tx, existing.mockupTemplateId);
+      if (targetTemplateId !== existing.mockupTemplateId) {
+        await this.assertActiveTemplateIntegrity(tx, targetTemplateId);
+      }
+      return updated;
     });
     await this.audit.log({ actorId, action: "print-area.update", entityType: "PrintArea", entityId: item.id });
     return item;
@@ -959,13 +1058,14 @@ export class AdminConfigService {
     if (placements + providerMappings > 0) {
       throw new ConflictException("Print area is used by workflow history and cannot be deleted. Deactivate its template instead.");
     }
-    const existing = await this.prisma.printArea.findUnique({ where: { id }, select: { defaultPresetId: true } });
+    const existing = await this.prisma.printArea.findUnique({ where: { id }, select: { defaultPresetId: true, mockupTemplateId: true } });
     if (!existing) throw new NotFoundException("Print area not found");
     const item = await this.prisma.$transaction(async (tx) => {
       const deleted = await tx.printArea.delete({ where: { id } });
       if (existing.defaultPresetId) {
         await tx.placementPreset.updateMany({ where: { id: existing.defaultPresetId }, data: { active: false } });
       }
+      await this.assertActiveTemplateIntegrity(tx, existing.mockupTemplateId);
       return deleted;
     });
     await this.audit.log({ actorId, action: "print-area.delete", entityType: "PrintArea", entityId: item.id });
@@ -975,6 +1075,33 @@ export class AdminConfigService {
   private async assertMockupTemplateExists(id: string) {
     const template = await this.prisma.mockupTemplate.findUnique({ where: { id }, select: { id: true } });
     if (!template) throw new NotFoundException("Mockup template not found");
+  }
+
+  private async assertActiveTemplateIntegrity(client: Prisma.TransactionClient, mockupTemplateId: string) {
+    const template = await client.mockupTemplate.findUnique({
+      where: { id: mockupTemplateId },
+      select: { isActive: true, configurationVersion: true },
+    });
+    if (!template?.isActive || template.configurationVersion !== "MULTI_VIEW_V2") return;
+    const primary = await client.mockupView.findFirst({
+      where: { mockupTemplateId, isPrimary: true, isActive: true },
+      select: { id: true },
+    });
+    if (!primary) throw new ConflictException("An active mockup template must keep an active primary view");
+    const [printAreaCount, galleryAssets] = await Promise.all([
+      client.printArea.count({ where: { mockupTemplateId, mockupViewId: primary.id, isActive: true } }),
+      client.mockupGalleryAsset.findMany({
+        where: { mockupTemplateId, isActive: true, role: { in: ["LIFESTYLE", "DETAIL"] } },
+        select: { role: true, metadataJson: true },
+      }),
+    ]);
+    if (printAreaCount === 0) {
+      throw new ConflictException("An active mockup template must keep an active print area on its primary view");
+    }
+    const calibratedRoles = new Set(galleryAssets.filter((asset) => parseVariantRenderRegion(asset.metadataJson)).map((asset) => asset.role));
+    if (!calibratedRoles.has("LIFESTYLE") || !calibratedRoles.has("DETAIL")) {
+      throw new ConflictException("An active mockup template must keep calibrated lifestyle and detail gallery images");
+    }
   }
 
   private async assertMockupViewForTemplate(id: string, mockupTemplateId: string) {

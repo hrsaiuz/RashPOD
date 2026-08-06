@@ -1260,6 +1260,7 @@ export class DesignWorkflowService {
         placementCode: string;
         name: string;
         blankImageKey: string;
+        metadataJson: Prisma.JsonValue | null;
       } | null;
     };
     preset?: { id: string; name: string; alignment: unknown } | null;
@@ -1294,6 +1295,7 @@ export class DesignWorkflowService {
             placementCode: input.area.mockupView.placementCode,
             name: input.area.mockupView.name,
             blankImageKey: input.area.mockupView.blankImageKey,
+            metadataJson: input.area.mockupView.metadataJson,
           }
         : null,
       galleryAssets: [lifestyleAsset, detailAsset]

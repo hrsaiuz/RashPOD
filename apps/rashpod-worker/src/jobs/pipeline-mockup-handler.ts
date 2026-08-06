@@ -4,6 +4,8 @@ import { PrintfulMockupStartHelper } from "./printful-mockup-poll-handler";
 import { summarizePrintfulFailure, type PrintfulFailureSummary } from "@rashpod/printful";
 
 export interface PipelineMockupRendererPort {
+  readonly renderVersion?: string;
+  renderFingerprint?(context: PipelineRenderContext, variant: "main" | "lifestyle" | "closeup" | "preview"): string;
   renderListingVariant(selectionId: string, variant: "main" | "lifestyle" | "closeup"): Promise<RenderedFile>;
   renderPreview(selectionId: string): Promise<RenderedFile>;
   renderPipelineMockup?(context: PipelineRenderContext, variant: "main" | "lifestyle" | "closeup" | "preview"): Promise<RenderedFile>;
@@ -60,15 +62,25 @@ export class PipelineMockupJobHandler {
     await repo.updatePipelineSelection(selectionId, { status: "MOCKUP_GENERATING", errorMessage: null });
 
     const assets = await repo.listMockupAssets(selectionId);
+    const requiredTypes = ["MAIN", "LIFESTYLE", "DETAIL"] as const;
+    if (requiredTypes.some((mockupType) => !assets.some((asset) => asset.mockupType === mockupType))) {
+      await this.failSelection(selectionId, "MOCKUP_ASSET_SET_INCOMPLETE");
+      return { failed: true, errorCode: "MOCKUP_ASSET_SET_INCOMPLETE", assets: await repo.listMockupAssets(selectionId) };
+    }
     const results: MockupAssetRecord[] = [];
     let failed = false;
 
     for (const asset of assets) {
-      if ((asset.status === "GENERATED" || asset.status === "READY") && (asset.objectKey || asset.imageUrl)) {
-        results.push(asset);
-        continue;
-      }
+      const assetMetadata = this.record(asset.metadataJson);
+      const variant = this.variantForAsset(asset);
       try {
+        const expectedFingerprint = this.renderer.renderFingerprint?.(selection, variant);
+        const rendererIsCurrent = (!this.renderer.renderVersion || assetMetadata.renderVersion === this.renderer.renderVersion)
+          && (!expectedFingerprint || assetMetadata.renderFingerprint === expectedFingerprint);
+        if ((asset.status === "GENERATED" || asset.status === "READY") && (asset.objectKey || asset.imageUrl) && rendererIsCurrent) {
+          results.push(asset);
+          continue;
+        }
         await repo.updateMockupAsset(asset.id, { status: "PROCESSING", renderJobId, failureReason: null });
         const rendered = await this.renderAsset(selection, asset);
         const placementSnapshot = {
@@ -103,7 +115,16 @@ export class PipelineMockupJobHandler {
           renderJobId,
           failureReason: null,
           providerTaskId,
-          metadataJson: { widthPx: rendered.widthPx, heightPx: rendered.heightPx, contentType: rendered.contentType, format: rendered.format, objectKey: rendered.objectKey, placementSnapshot },
+          metadataJson: {
+            widthPx: rendered.widthPx,
+            heightPx: rendered.heightPx,
+            contentType: rendered.contentType,
+            format: rendered.format,
+            objectKey: rendered.objectKey,
+            renderVersion: rendered.renderVersion ?? this.renderer.renderVersion ?? null,
+            renderFingerprint: rendered.renderFingerprint ?? expectedFingerprint ?? null,
+            placementSnapshot,
+          },
         });
         results.push(updated);
       } catch (error) {
@@ -130,11 +151,15 @@ export class PipelineMockupJobHandler {
   }
 
   private async renderAsset(selection: PipelineSelectionRecord, asset: MockupAssetRecord) {
-    const variant = asset.mockupType === "MAIN" ? "main" : asset.mockupType === "DETAIL" ? "closeup" : asset.mockupType === "SECONDARY" || asset.mockupType === "LIFESTYLE" ? "lifestyle" : "preview";
+    const variant = this.variantForAsset(asset);
     if (this.renderer.renderPipelineMockup) return this.renderer.renderPipelineMockup(selection, variant);
     if (variant === "main") return this.renderer.renderListingVariant(selection.id, "main");
     if (variant === "lifestyle") return this.renderer.renderListingVariant(selection.id, "lifestyle");
     return this.renderer.renderPreview(selection.id);
+  }
+
+  private variantForAsset(asset: MockupAssetRecord): "main" | "lifestyle" | "closeup" | "preview" {
+    return asset.mockupType === "MAIN" ? "main" : asset.mockupType === "DETAIL" ? "closeup" : asset.mockupType === "SECONDARY" || asset.mockupType === "LIFESTYLE" ? "lifestyle" : "preview";
   }
 
   private async failSelection(selectionId: string, errorMessage: string, failure?: PrintfulFailureSummary) {
@@ -169,5 +194,9 @@ export class PipelineMockupJobHandler {
       throw new Error("Pipeline repository methods are not configured");
     }
     return this.repo as Required<Pick<WorkerRepository, "getPipelineSelection" | "updatePipelineSelection" | "listMockupAssets" | "updateMockupAsset" | "createListingDraftForSelection">>;
+  }
+
+  private record(value: unknown): Record<string, unknown> {
+    return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
   }
 }

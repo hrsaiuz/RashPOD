@@ -1,4 +1,4 @@
-import { ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
 import { ListingStatus, ListingType, PipelineType, Prisma, UserRole } from "@prisma/client";
 import { PrismaService } from "../../prisma/prisma.service";
 import { AuditService } from "../audit/audit.service";
@@ -178,8 +178,15 @@ export class ListingsService {
       await this.assertFilmPriceFloor(dto.price);
     }
 
-    const metadataJson = dto.metadataJson
-      ? this.mergePatchMetadata(listing.metadataJson, dto.metadataJson)
+    if (dto.metadataJson && Object.prototype.hasOwnProperty.call(dto.metadataJson, "variants")) {
+      throw new BadRequestException("Use the validated variants field instead of metadataJson.variants");
+    }
+    const metadataPatch = {
+      ...(dto.metadataJson ?? {}),
+      ...(dto.variants ? { variants: dto.variants } : {}),
+    };
+    const metadataJson = Object.keys(metadataPatch).length > 0
+      ? this.mergePatchMetadata(listing.metadataJson, metadataPatch)
       : undefined;
 
     const updated = await this.prisma.commerceListing.update({
@@ -610,6 +617,11 @@ export class ListingsService {
       include: {
         designAsset: { include: { commercialRights: true } },
         designProductSelection: { include: { mockupAssets: true } },
+        productComposition: {
+          include: {
+            selections: { include: { mockupAssets: true }, orderBy: { createdAt: "asc" } },
+          },
+        },
       },
     });
     if (!listing) throw new NotFoundException("Listing not found");
@@ -624,6 +636,12 @@ export class ListingsService {
         Boolean(asset.imageUrl || asset.objectKey),
     ) ?? [];
     const readyTypes = new Set(readyMockups.map((asset) => asset.mockupType));
+    const listingMetadata = listing.metadataJson && typeof listing.metadataJson === "object" && !Array.isArray(listing.metadataJson)
+      ? listing.metadataJson as Record<string, unknown>
+      : {};
+    const configuredVariants = Array.isArray(listingMetadata.variants)
+      ? listingMetadata.variants.filter((variant): variant is Record<string, unknown> => Boolean(variant) && typeof variant === "object" && !Array.isArray(variant))
+      : [];
 
     const reasons: string[] = [];
     if (!listing.designAsset?.commercialRights?.allowProductSales) {
@@ -652,6 +670,53 @@ export class ListingsService {
         reasons.push("Product listing images require placement snapshot and render metadata");
       }
     }
+    if (listing.type === ListingType.PRODUCT && listing.productComposition) {
+      if (!listing.title.trim()) reasons.push("Product listing title is required");
+      if (Number(listing.price) <= 0) reasons.push("Product listing price must be greater than zero");
+      if (imageUrls.length < 3) reasons.push("Product listing requires three public gallery images");
+      const usableVariants = configuredVariants.filter((variant) => {
+        const price = Number(variant.price);
+        return variant.enabled !== false && typeof variant.id === "string" && variant.id.trim().length > 0 && Number.isFinite(price) && price > 0;
+      });
+      if (usableVariants.length === 0) reasons.push("Product listing requires at least one enabled variation with a valid price");
+
+      if (listing.productComposition.selections.length === 0) {
+        reasons.push("Product composition requires at least one placement");
+      }
+      const publicImageUrls = new Set(imageUrls.map((value) => toPublicListingImageUrl(value)));
+      const placementMainImages: string[] = [];
+      for (const selection of listing.productComposition.selections) {
+        const placementReadyAssets = selection.mockupAssets.filter(
+          (asset) =>
+            (asset.status === "GENERATED" || asset.status === "READY") &&
+            !asset.archivedAt &&
+            Boolean(asset.imageUrl || asset.objectKey),
+        );
+        if (!selection.sourceDesignVersionId) {
+          reasons.push(`Placement ${selection.placement} is not linked to an approved artwork version`);
+        }
+        if (!placementReadyAssets.some((asset) => asset.mockupType === "MAIN")) {
+          reasons.push(`Placement ${selection.placement} requires a ready mockup view`);
+        }
+        const mainAsset = placementReadyAssets.find((asset) => asset.mockupType === "MAIN");
+        const mainImage = mainAsset?.imageUrl || mainAsset?.objectKey;
+        if (mainImage) placementMainImages.push(toPublicListingImageUrl(mainImage));
+        if (placementReadyAssets.some((asset) => !asset.placementSnapshotJson || !asset.contentType || !asset.format || !asset.widthPx || !asset.heightPx)) {
+          reasons.push(`Placement ${selection.placement} mockups require render metadata`);
+        }
+      }
+      if (listing.productComposition.selections.length === 2) {
+        if (placementMainImages.length !== 2 || new Set(placementMainImages).size !== 2) {
+          reasons.push("Two-placement listings require two distinct ready placement mockups");
+        }
+        for (const mainImage of placementMainImages) {
+          if (!publicImageUrls.has(mainImage)) {
+            reasons.push("Two-placement listings must expose both placement mockups in the public gallery");
+            break;
+          }
+        }
+      }
+    }
 
     if (reasons.length > 0) {
       await this.audit.log({
@@ -665,6 +730,7 @@ export class ListingsService {
           imageCount: imageUrls.length,
           readyMockupCount: readyMockups.length,
           designProductSelectionId: listing.designProductSelectionId,
+          productCompositionId: listing.productCompositionId,
         },
       });
       throw new ForbiddenException(reasons.join("; "));

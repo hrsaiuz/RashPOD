@@ -12,6 +12,17 @@ function firstPresent(...values: Array<string | undefined>) {
   return values.find((value) => value && value.trim().length > 0)?.trim();
 }
 
+export function resolveLocalArtifactPath(root: string, objectKey: string) {
+  const normalized = objectKey.replace(/\\/g, "/");
+  if (!normalized || path.isAbsolute(normalized)) throw new Error("Invalid local artifact key");
+  const resolvedRoot = path.resolve(root);
+  const resolved = path.resolve(resolvedRoot, normalized);
+  if (resolved !== resolvedRoot && !resolved.startsWith(`${resolvedRoot}${path.sep}`)) {
+    throw new Error("Invalid local artifact key");
+  }
+  return resolved;
+}
+
 export function resolveBucketNames() {
   const shared = firstPresent(process.env.GCS_BUCKET_ASSETS, process.env.GCS_BUCKET_NAME);
   return {
@@ -28,8 +39,7 @@ class LocalArtifactStore implements ArtifactStore {
   ) {}
 
   private resolvePath(objectKey: string) {
-    const normalized = objectKey.replace(/\\/g, "/");
-    return path.join(this.baseDir, normalized);
+    return resolveLocalArtifactPath(this.baseDir, objectKey);
   }
 
   async getBuffer(objectKey: string, bucket: "private" | "public"): Promise<Buffer> {
@@ -38,8 +48,8 @@ class LocalArtifactStore implements ArtifactStore {
       this.resolvePath(path.join(bucket, objectKey)),
       this.resolvePath(path.join("fixtures", objectKey)),
       ...this.sourceDirs.flatMap((dir) => [
-        path.join(dir, objectKey),
-        path.join(dir, bucket, objectKey),
+        resolveLocalArtifactPath(dir, objectKey),
+        resolveLocalArtifactPath(dir, path.join(bucket, objectKey)),
       ]),
     ];
     for (const candidate of candidates) {
@@ -54,7 +64,7 @@ class LocalArtifactStore implements ArtifactStore {
 
   async putBuffer(relKey: string, buffer: Buffer): Promise<string> {
     const normalized = relKey.replace(/\\/g, "/");
-    const absPath = path.join(this.baseDir, normalized);
+    const absPath = resolveLocalArtifactPath(this.baseDir, normalized);
     await fs.mkdir(path.dirname(absPath), { recursive: true });
     await fs.writeFile(absPath, buffer);
     return normalized;

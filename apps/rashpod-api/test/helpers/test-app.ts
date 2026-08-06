@@ -1,4 +1,4 @@
-import { INestApplication } from "@nestjs/common";
+import { INestApplication, ValidationPipe } from "@nestjs/common";
 import { Test } from "@nestjs/testing";
 import { AppModule } from "../../src/app.module";
 import { PrismaService } from "../../src/prisma/prisma.service";
@@ -14,6 +14,7 @@ export async function createTestApp() {
     .compile();
 
   const app = moduleRef.createNestApplication();
+  app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true, forbidNonWhitelisted: true }));
   await app.init();
   return { app: app as INestApplication, fakePrisma };
 }

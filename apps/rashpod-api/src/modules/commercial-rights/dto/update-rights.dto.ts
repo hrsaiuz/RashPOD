@@ -11,10 +11,6 @@ export class UpdateRightsDto {
 
   @IsBoolean()
   @IsOptional()
-  allowFilmSales?: boolean;
-
-  @IsBoolean()
-  @IsOptional()
   allowCorporateBidding?: boolean;
 
   @IsNumber()

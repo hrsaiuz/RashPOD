@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from "@nestjs/common";
 import { MediaCategory, Prisma } from "@prisma/client";
 import { PrismaService } from "../../prisma/prisma.service";
 import { AuditService } from "../audit/audit.service";
@@ -22,6 +22,7 @@ const CUSTOM_ORDER_PRODUCTS = [
   { key: "hoodie", label: "clothes", title: "hoodie" },
 ] as const;
 const CUSTOM_ORDER_SETTING_KEY = "storefront.customOrderProducts";
+const MOCKUP_IMAGE_MIME_TYPES = new Set(["image/png", "image/jpeg", "image/webp"]);
 
 function sanitizeFilename(name: string) {
   return name.replace(/[^a-zA-Z0-9._-]+/g, "-").slice(0, 200);
@@ -44,6 +45,7 @@ export class MediaService {
   ) {}
 
   async createUploadUrl(_actorId: string, dto: CreateMediaUploadUrlDto) {
+    this.assertSupportedMockupMedia(dto.category, dto.mimeType);
     const safeName = sanitizeFilename(dto.filename);
     const folder = dto.category.toLowerCase();
     const objectKey = `media/${folder}/${Date.now()}-${safeName}`;
@@ -56,6 +58,7 @@ export class MediaService {
   }
 
   async completeUpload(actorId: string, dto: CompleteMediaUploadDto) {
+    this.assertSupportedMockupMedia(dto.category, dto.mimeType);
     const objectMetadata = await this.storage.getPublicObjectMetadata(dto.objectKey);
     if (!objectMetadata) throw new BadRequestException("Uploaded media object was not found in Google Cloud Storage");
     if (objectMetadata.sizeBytes !== dto.sizeBytes) throw new BadRequestException("Uploaded media size does not match");
@@ -120,6 +123,12 @@ export class MediaService {
     }
   }
 
+  private assertSupportedMockupMedia(category: MediaCategory, mimeType: string) {
+    if (category === MediaCategory.MOCKUP_TEMPLATE && !MOCKUP_IMAGE_MIME_TYPES.has(mimeType.toLowerCase())) {
+      throw new BadRequestException("Mockup templates must be PNG, JPEG, or WebP images");
+    }
+  }
+
   list(filter: { category?: MediaCategory; activeOnly?: boolean }) {
     const where: Prisma.MediaAssetWhereInput = {};
     if (filter.category) where.category = filter.category;
@@ -154,6 +163,22 @@ export class MediaService {
   async remove(actorId: string, id: string) {
     const asset = await this.prisma.mediaAsset.findUnique({ where: { id } });
     if (!asset) throw new NotFoundException("Media asset not found");
+    const [templateReferences, viewReferences, galleryReferences] = await Promise.all([
+      this.prisma.mockupTemplate.count({
+        where: {
+          OR: [
+            { baseImageKey: asset.objectKey },
+            { lifestyleImageKey: asset.objectKey },
+            { closeupImageKey: asset.objectKey },
+          ],
+        },
+      }),
+      this.prisma.mockupView.count({ where: { blankImageKey: asset.objectKey } }),
+      this.prisma.mockupGalleryAsset.count({ where: { imageKey: asset.objectKey } }),
+    ]);
+    if (templateReferences + viewReferences + galleryReferences > 0) {
+      throw new ConflictException("Media is still referenced by a mockup configuration; replace or remove those references first");
+    }
     await this.storage.deletePublicObject(asset.objectKey);
     await this.prisma.mediaAsset.delete({ where: { id } });
     await this.audit.log({

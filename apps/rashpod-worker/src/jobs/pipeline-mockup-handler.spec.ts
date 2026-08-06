@@ -152,6 +152,19 @@ describe("PipelineMockupJobHandler", () => {
     expect(repo.assets.every((asset) => asset.status === "FAILED" && asset.failureReason === "template missing" && asset.renderJobId === "job_1")).toBe(true);
   });
 
+  it("fails safely instead of creating a listing when the required three-image asset set is incomplete", async () => {
+    const repo = createRepo();
+    repo.assets = repo.assets.filter((asset) => asset.mockupType !== "DETAIL");
+    const handler = new PipelineMockupJobHandler(repo, renderer);
+
+    const result = await handler.handleLocalMockups({ designProductSelectionId: "sel_1" });
+
+    expect(result).toEqual(expect.objectContaining({ failed: true, errorCode: "MOCKUP_ASSET_SET_INCOMPLETE" }));
+    expect(repo.selection).toEqual(expect.objectContaining({ status: "MOCKUP_FAILED", errorMessage: "MOCKUP_ASSET_SET_INCOMPLETE" }));
+    expect(repo.assets.every((asset) => asset.status === "FAILED")).toBe(true);
+    expect(repo.listingCalls).toBe(0);
+  });
+
   it("does not re-render or duplicate assets that are already generated on retry", async () => {
     const repo = createRepo();
     repo.assets = repo.assets.map((asset) => ({ ...asset, status: "GENERATED", imageUrl: `mockups/${asset.id}.png`, objectKey: `mockups/${asset.id}.png` }));
@@ -164,5 +177,68 @@ describe("PipelineMockupJobHandler", () => {
     expect(retryRenderer.renderPipelineMockup).not.toHaveBeenCalled();
     expect(repo.assets).toHaveLength(4);
     expect(repo.listingCalls).toBe(1);
+  });
+
+  it("re-renders stale local assets when the Sharp renderer version changes", async () => {
+    const repo = createRepo();
+    repo.assets = repo.assets.map((asset) => ({
+      ...asset,
+      status: "GENERATED",
+      imageUrl: `mockups/${asset.id}.png`,
+      objectKey: `mockups/${asset.id}.png`,
+      metadataJson: { renderVersion: "sharp-compositor-v1" },
+    }));
+    const versionedRenderer = {
+      ...renderer,
+      renderVersion: "sharp-compositor-v2",
+      renderPipelineMockup: jest.fn(async (_context: any, variant: string) => {
+        const fileKey = `mockups/v2/${variant}.png`;
+        return { fileKey, objectKey: fileKey, contentType: "image/png", format: "png", widthPx: 2000, heightPx: 2000, renderVersion: "sharp-compositor-v2" };
+      }),
+    };
+    const handler = new PipelineMockupJobHandler(repo, versionedRenderer);
+
+    const result = await handler.handleLocalMockups({ designProductSelectionId: "sel_1", workerJobId: "job_quality_upgrade" });
+
+    expect(result.failed).toBe(false);
+    expect(versionedRenderer.renderPipelineMockup).toHaveBeenCalledTimes(4);
+    expect(repo.assets.every((asset) => (asset.metadataJson as any).renderVersion === "sharp-compositor-v2")).toBe(true);
+    expect(repo.assets.every((asset) => asset.objectKey?.startsWith("mockups/v2/"))).toBe(true);
+  });
+
+  it("re-renders current-version assets when their artwork or placement fingerprint changes", async () => {
+    const repo = createRepo();
+    repo.assets = repo.assets.map((asset) => ({
+      ...asset,
+      status: "GENERATED",
+      imageUrl: `mockups/${asset.id}.png`,
+      objectKey: `mockups/${asset.id}.png`,
+      metadataJson: { renderVersion: "sharp-compositor-v2", renderFingerprint: "stale-input" },
+    }));
+    const fingerprintRenderer = {
+      ...renderer,
+      renderVersion: "sharp-compositor-v2",
+      renderFingerprint: jest.fn((_context: any, variant: string) => `current-${variant}`),
+      renderPipelineMockup: jest.fn(async (_context: any, variant: string) => {
+        const fileKey = `mockups/current/${variant}.png`;
+        return {
+          fileKey,
+          objectKey: fileKey,
+          contentType: "image/png",
+          format: "png",
+          widthPx: 2000,
+          heightPx: 2000,
+          renderVersion: "sharp-compositor-v2",
+          renderFingerprint: `current-${variant}`,
+        };
+      }),
+    };
+    const handler = new PipelineMockupJobHandler(repo, fingerprintRenderer);
+
+    const result = await handler.handleLocalMockups({ designProductSelectionId: "sel_1" });
+
+    expect(result.failed).toBe(false);
+    expect(fingerprintRenderer.renderPipelineMockup).toHaveBeenCalledTimes(4);
+    expect(repo.assets.every((asset) => String((asset.metadataJson as any).renderFingerprint).startsWith("current-"))).toBe(true);
   });
 });

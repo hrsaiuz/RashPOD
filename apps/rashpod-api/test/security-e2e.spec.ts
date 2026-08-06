@@ -101,12 +101,31 @@ describe("Security e2e", () => {
     const res = await request(app.getHttpServer())
       .patch(`/designs/${designA.body.id}/commercial-rights`)
       .set("Authorization", `Bearer ${adminToken}`)
-      .send({ allowFilmSales: true, filmRoyaltyRate: 12.5 });
+      .send({ allowProductSales: true, filmRoyaltyRate: 12.5 });
     expect(res.status).toBe(200);
 
     const overrideAudit = fakePrisma.__state.audits.find(
       (a: any) => a.action === "rights.admin-override" && a.entityType === "CommercialRights",
     );
     expect(overrideAudit).toBeTruthy();
+  });
+
+  it("blocks cross-designer rights reads and generic film-consent toggles", async () => {
+    const designA = await request(app.getHttpServer())
+      .post("/designs")
+      .set("Authorization", `Bearer ${tokenA}`)
+      .send({ title: "Private Rights", description: "x" });
+    expect(designA.status).toBe(201);
+
+    const crossDesignerRead = await request(app.getHttpServer())
+      .get(`/designs/${designA.body.id}/commercial-rights`)
+      .set("Authorization", `Bearer ${tokenB}`);
+    expect(crossDesignerRead.status).toBe(403);
+
+    const bypassConsent = await request(app.getHttpServer())
+      .patch(`/designs/${designA.body.id}/commercial-rights`)
+      .set("Authorization", `Bearer ${tokenA}`)
+      .send({ allowFilmSales: true });
+    expect(bypassConsent.status).toBe(400);
   });
 });
