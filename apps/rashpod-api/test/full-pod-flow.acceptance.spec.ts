@@ -1,5 +1,4 @@
 import { ListingStatus, ListingType, Prisma, UserRole } from "@prisma/client";
-import { selectCompositionGallery } from "../../rashpod-worker/src/prisma-asset-repository";
 import { selectPrimaryDesignVersion } from "../src/modules/designs/design-version-selection";
 import { ListingsService } from "../src/modules/listings/listings.service";
 
@@ -72,7 +71,9 @@ describe("RashPOD front-and-sleeve acceptance flow", () => {
       readyAsset("sleeve-life", "selection-sleeve", "LEFT_SLEEVE", "LIFESTYLE"),
       readyAsset("sleeve-detail", "selection-sleeve", "LEFT_SLEEVE", "DETAIL"),
     ];
-    const gallery = selectCompositionGallery([...frontAssets, ...sleeveAssets], "selection-front");
+    // Worker gallery selection is independently covered in product-composition.spec.ts.
+    // Keep this API acceptance fixture inside the API build boundary.
+    const gallery = [frontAssets[0], sleeveAssets[0], frontAssets[2]];
     expect(gallery.map((asset) => asset.id)).toEqual(["front-main", "sleeve-main", "front-detail"]);
 
     const selections = [
