@@ -2,6 +2,7 @@ import { Injectable } from "@nestjs/common";
 import { PrismaService } from "../../prisma/prisma.service";
 import { StorageService } from "../files/storage.service";
 import { PrintfulClient } from "./printful.client";
+import { canonicalPlacementKind } from "./printful-placement";
 
 @Injectable()
 export class PrintfulFilesService {
@@ -16,8 +17,10 @@ export class PrintfulFilesService {
       where: { id: designId },
       include: { versions: { orderBy: { createdAt: "desc" }, take: 20 } },
     });
-    const normalizedPlacement = placement?.trim().toUpperCase().replace(/[\s-]+/g, "_");
-    const exactVersion = design?.versions.find((version) => normalizedPlacement && version.placement === normalizedPlacement);
+    const normalizedPlacement = canonicalPlacementKind(placement);
+    const exactVersion = design?.versions.find((version) => (
+      normalizedPlacement && canonicalPlacementKind(version.placement) === normalizedPlacement
+    ));
     const defaultVersion = design?.versions.find((version) => !version.placement);
     const sourceVersion = exactVersion ?? defaultVersion ?? (normalizedPlacement ? undefined : design?.versions[0]);
     if (!sourceVersion?.fileKey) throw new Error("DESIGN_FILE_MISSING");

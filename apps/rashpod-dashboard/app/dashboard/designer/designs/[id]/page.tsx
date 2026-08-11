@@ -23,6 +23,8 @@ import {
   uploadToSignedUrl,
   type CommercialRights,
   type Design,
+  type DesignUploadPlacementOption,
+  type DesignUploadProductTypeOption,
   type DesignWorkflowDetail,
   type UploadUrlResponse,
 } from "../../../../../lib/api";
@@ -53,6 +55,7 @@ export default function DesignDetailPage() {
   const [error, setError] = useState("");
   const [action, setAction] = useState<"" | "submitting" | "version">("");
   const [uploadPlacement, setUploadPlacement] = useState("FRONT");
+  const [configuredPlacements, setConfiguredPlacements] = useState<DesignUploadPlacementOption[]>([]);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
@@ -69,12 +72,20 @@ export default function DesignDetailPage() {
     setLoading(true);
     setError("");
     try {
-      const [d, r] = await Promise.all([
+      const [d, r, options] = await Promise.all([
         api.get<DesignerDesignDetail>(`/designer/designs/${id}`),
         api.get<CommercialRights | null>(`/designs/${id}/commercial-rights`).catch(() => null),
+        api.get<DesignUploadProductTypeOption[]>("/designer/designs/upload-options").catch(() => []),
       ]);
       setDesign(d);
       setRights(r);
+      const requestedProduct = options.flatMap((item) => item.baseProducts).find((item) => item.id === d.requestedBaseProductId);
+      const placements = requestedProduct?.placements
+        ?? (d.requestedBaseProductId ? [] : LEGACY_PLACEMENT_OPTIONS.map((code) => ({ code, name: placementLabel(code), mockupTemplateId: "", printAreaId: "" })));
+      setConfiguredPlacements(placements);
+      if (placements.length) {
+        setUploadPlacement((current) => placements.some((item) => item.code === current) ? current : placements[0].code);
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load design");
     } finally {
@@ -142,7 +153,11 @@ export default function DesignDetailPage() {
     }
   }
 
-  const canSubmit = design && (design.status === "DRAFT" || design.status === "NEEDS_FIX" || design.status === "REJECTED");
+  const editable = Boolean(design && (design.status === "DRAFT" || design.status === "NEEDS_FIX" || design.status === "REJECTED"));
+  const hasRequiredArtwork = Boolean(design && (design.requestedBaseProductId
+    ? design.versions?.some((version) => version.placement && configuredPlacements.some((placement) => placement.code === version.placement))
+    : design.versions?.length));
+  const canSubmit = editable && hasRequiredArtwork;
   const latestVersion = design?.versions?.find((version) => version.placement === "FRONT")
     ?? design?.versions?.find((version) => !version.placement)
     ?? design?.versions?.[0];
@@ -204,18 +219,28 @@ export default function DesignDetailPage() {
 
             <Card>
               <h2 className="text-lg font-semibold text-brand-ink mb-2">Placement artwork</h2>
-              <p className="mb-4 text-sm text-brand-muted">One placement is enough to submit. Add other placement files only when this design package also includes artwork for the back, chest, or sleeves.</p>
-              <label className="mb-4 block max-w-sm text-sm font-semibold text-brand-ink">
-                Upload for placement
-                <select
-                  className="mt-2 min-h-11 w-full rounded-xl border border-surface-borderSoft bg-white px-3 font-normal outline-none focus-visible:ring-4 focus-visible:ring-brand-blue/20 disabled:cursor-not-allowed disabled:opacity-50"
-                  value={uploadPlacement}
-                  onChange={(event) => setUploadPlacement(event.target.value)}
-                  disabled={Boolean(action)}
-                >
-                  {PLACEMENT_OPTIONS.map((placement) => <option key={placement} value={placement}>{placementLabel(placement)}</option>)}
-                </select>
-              </label>
+              <p className="mb-4 text-sm text-brand-muted">
+                {design.requestedBaseProduct
+                  ? `Only placements configured for ${design.requestedBaseProduct.name} are available.`
+                  : "This legacy design is not tied to a base product. Choose from the original placement list."}
+              </p>
+              {configuredPlacements.length ? (
+                <label className="mb-4 block max-w-sm text-sm font-semibold text-brand-ink">
+                  Upload for placement
+                  <select
+                    className="mt-2 min-h-11 w-full rounded-xl border border-surface-borderSoft bg-white px-3 font-normal outline-none focus-visible:ring-4 focus-visible:ring-brand-blue/20 disabled:cursor-not-allowed disabled:opacity-50"
+                    value={uploadPlacement}
+                    onChange={(event) => setUploadPlacement(event.target.value)}
+                    disabled={Boolean(action)}
+                  >
+                    {configuredPlacements.map((placement) => <option key={placement.code} value={placement.code}>{placement.name || placementLabel(placement.code)}</option>)}
+                  </select>
+                </label>
+              ) : (
+                <div role="alert" className="mb-4 rounded-2xl border border-status-warning/30 bg-status-warning/5 p-4 text-sm text-brand-muted">
+                  This product has no active placement configuration. Ask an administrator to configure its mockup template before uploading more artwork.
+                </div>
+              )}
               <div className="flex flex-wrap gap-3">
                 <Button
                   variant="primaryBlue"
@@ -224,12 +249,12 @@ export default function DesignDetailPage() {
                   onClick={submitForReview}
                 >
                   <Send size={16} />
-                  {canSubmit ? "Submit for review" : `Cannot submit (${design.status})`}
+                  {canSubmit ? "Submit for review" : editable ? "Upload artwork before submitting" : `Cannot submit (${design.status})`}
                 </Button>
                 <Button
                   variant="secondary"
                   loading={action === "version"}
-                  disabled={Boolean(action)}
+                  disabled={!editable || Boolean(action) || configuredPlacements.length === 0}
                   onClick={() => fileInputRef.current?.click()}
                 >
                   <UploadIcon size={16} />
@@ -251,13 +276,13 @@ export default function DesignDetailPage() {
               </div>
               {design.versions?.length ? (
                 <ul className="mt-5 grid gap-2 sm:grid-cols-2" aria-label="Uploaded placement artwork">
-                  {PLACEMENT_OPTIONS.map((placement) => {
-                    const version = design.versions?.find((item) => item.placement === placement);
+                  {configuredPlacements.map((placement) => {
+                    const version = design.versions?.find((item) => item.placement === placement.code);
                     const defaultVersion = design.versions?.find((item) => !item.placement);
                     const status = version ? "Uploaded" : defaultVersion ? "Uses default" : "Optional";
                     return (
-                      <li key={placement} className="flex min-h-11 items-center justify-between rounded-xl border border-surface-borderSoft px-3 text-sm">
-                        <span className="font-medium text-brand-ink">{placementLabel(placement)}</span>
+                      <li key={placement.code} className="flex min-h-11 items-center justify-between rounded-xl border border-surface-borderSoft px-3 text-sm">
+                        <span className="font-medium text-brand-ink">{placement.name || placementLabel(placement.code)}</span>
                         <span className={version ? "text-semantic-success" : "text-brand-muted"}>{status}</span>
                       </li>
                     );
@@ -290,7 +315,7 @@ export default function DesignDetailPage() {
   );
 }
 
-const PLACEMENT_OPTIONS = ["FRONT", "BACK", "LEFT_CHEST", "RIGHT_CHEST", "LEFT_SLEEVE", "RIGHT_SLEEVE", "FULL_WRAP"] as const;
+const LEGACY_PLACEMENT_OPTIONS = ["FRONT", "BACK", "LEFT_CHEST", "RIGHT_CHEST", "LEFT_SLEEVE", "RIGHT_SLEEVE", "FULL_WRAP"] as const;
 
 function placementLabel(value: string) {
   return value.toLowerCase().replace(/_/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase());

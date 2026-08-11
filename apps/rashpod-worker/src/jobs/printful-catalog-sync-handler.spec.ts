@@ -39,8 +39,15 @@ describe("PrintfulCatalogSyncJobHandler", () => {
   });
 
   it("fails when Printful is disabled", async () => {
-    const repo = createRepo();
-    const handler = new PrintfulCatalogSyncJobHandler(repo);
+    process.env.PRINTFUL_ENABLED = "true";
+    process.env.PRINTFUL_API_TOKEN = "token";
+    const repo = createRepo({
+      async getPrintfulSettings() {
+        return { enabled: false, catalogAllowlist: [] };
+      },
+    });
+    const client = { hasToken: () => true } as any;
+    const handler = new PrintfulCatalogSyncJobHandler(repo, client);
 
     const result = await handler.handleSync({ requestedBy: "admin_1" });
 
@@ -49,7 +56,6 @@ describe("PrintfulCatalogSyncJobHandler", () => {
   });
 
   it("persists templates from the configured allowlist", async () => {
-    process.env.PRINTFUL_ENABLED = "true";
     process.env.PRINTFUL_API_TOKEN = "token";
     const repo = createRepo();
     const client = {
@@ -68,7 +74,6 @@ describe("PrintfulCatalogSyncJobHandler", () => {
   });
 
   it("fails when allowlist is empty", async () => {
-    process.env.PRINTFUL_ENABLED = "true";
     process.env.PRINTFUL_API_TOKEN = "token";
     const repo = createRepo({
       async getPrintfulSettings() {

@@ -36,7 +36,7 @@ export class PrintfulController {
   }
 
   @Post("catalog-products/:id/prepare")
-  @RequirePermission("printful-catalog:read")
+  @RequirePermission("printful-template:manage")
   prepareProduct(
     @CurrentUser() user: RequestUser,
     @Param("id", ParseIntPipe) id: number,

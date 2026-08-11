@@ -13,12 +13,12 @@ import { ModeratorListingWizard } from "../../moderator-listing-wizard";
 import { GlobalSelectionMockupEditor, LocalSelectionMockupEditor } from "../../../../../components/mockup";
 import { DesignPreviewCard } from "../../../../../components/design/DesignPreviewCard";
 import { ModeratorDesignStoryReview } from "../../../../../components/design-story/ModeratorDesignStoryReview";
-import { PrintfulModerationCatalog, type PreparedPrintfulProduct, type PrintfulCatalogVariant } from "../../../../../components/moderator/PrintfulModerationCatalog";
+import type { PrintfulCatalogVariant } from "../../../../../components/moderator/PrintfulModerationCatalog";
 import { isMockupConfigurationFailure, isMockupRetryable, MockupErrorHint, PlacementChips, ReadinessChecklist } from "../../moderator-pipeline-helpers";
 import { buildModerationDecisionPayload } from "./moderation-decision-payload";
 import { moderatorPrintAreasForTemplate, preferredAreaForPreset } from "./local-print-area-selection";
 import { useToast } from "../../../../../components/feedback/toast-provider";
-import { inferWorkflowStep, placementArtworkAvailable, type WorkflowStep } from "./moderation-workflow";
+import { inferWorkflowStep, normalizePlacement, placementArtworkAvailable, type WorkflowStep } from "./moderation-workflow";
 import { downloadFileInBackground } from "../../../../../lib/background-transfer";
 
 const REJECTION_REASONS = [
@@ -33,14 +33,6 @@ const REJECTION_REASONS = [
   ["DUPLICATE_OR_SPAM", "Duplicate or spam design"],
   ["MARKETPLACE_COMPLIANCE_RISK", "Marketplace compliance risk"],
   ["OTHER", "Other"],
-] as const;
-
-const MARKETPLACES = [
-  ["ETSY", "Etsy"],
-  ["EBAY", "eBay"],
-  ["SHOPIFY", "Shopify"],
-  ["WOOCOMMERCE", "WooCommerce"],
-  ["AMAZON", "Amazon"],
 ] as const;
 
 type BaseProductOption = {
@@ -132,6 +124,12 @@ type PrintfulTemplateOption = {
 };
 
 type PipelineMode = "uzbek" | "global";
+type PrintfulSettingsOption = {
+  enabled: boolean;
+  tokenConfigured: boolean;
+  allowGlobalWithoutLocal: boolean;
+  connectedMarketplaces: string[];
+};
 type LocalSelectionForm = {
   id: string;
   compositionKey: string;
@@ -186,6 +184,7 @@ export default function Page() {
   const [mockupTemplates, setMockupTemplates] = useState<MockupTemplateOption[]>([]);
   const [printAreas, setPrintAreas] = useState<PrintAreaOption[]>([]);
   const [printfulTemplates, setPrintfulTemplates] = useState<PrintfulTemplateOption[]>([]);
+  const [printfulSettings, setPrintfulSettings] = useState<PrintfulSettingsOption>({ enabled: false, tokenConfigured: false, allowGlobalWithoutLocal: false, connectedMarketplaces: [] });
   const [localSelections, setLocalSelections] = useState<LocalSelectionForm[]>([]);
   const [globalSelections, setGlobalSelections] = useState<GlobalSelectionForm[]>([]);
   const [loading, setLoading] = useState(true);
@@ -307,20 +306,22 @@ export default function Page() {
     setConfigLoading(true);
     setConfigError("");
     try {
-      const [products, presets, templates, areas, printful] = await Promise.all([
+      const [products, presets, templates, areas, printful, settings] = await Promise.all([
         api.get<BaseProductOption[]>("/admin/base-products"),
         api.get<PlacementPresetOption[]>("/admin/placement-presets"),
         api.get<MockupTemplateOption[]>("/admin/mockup-templates"),
         api.get<PrintAreaOption[]>("/admin/print-areas"),
         api.get<PrintfulTemplateOption[]>("/admin/printful/product-templates"),
+        api.get<PrintfulSettingsOption>("/admin/integrations/printful/settings"),
       ]);
       setBaseProducts(products);
       setPlacementPresets(presets);
       setMockupTemplates(templates);
       setPrintAreas(areas);
       setPrintfulTemplates(printful);
-      setLocalSelections((current) => current.length ? current : [createLocalSelection(products, presets, templates, areas, detail?.versions)]);
-      setGlobalSelections((current) => current.length ? current : [createGlobalSelection(printful, presets, detail?.versions)]);
+      setPrintfulSettings(settings);
+      setLocalSelections((current) => current.length ? current : [createLocalSelection(products, presets, templates, areas, detail?.versions, detail?.requestedBaseProductId)]);
+      setGlobalSelections((current) => current.length ? current : [createGlobalSelection(printful, presets, detail?.versions, settings.connectedMarketplaces)]);
     } catch (e) {
       setConfigError(e instanceof Error ? e.message : "Failed to load pipeline configuration");
     } finally {
@@ -597,42 +598,6 @@ export default function Page() {
     }
   }
 
-  function applyPreparedPrintfulProduct(index: number, prepared: PreparedPrintfulProduct) {
-    const template = { ...prepared.template, variantOptions: prepared.product.variants } as PrintfulTemplateOption;
-    const presets = prepared.presets as PlacementPresetOption[];
-    const preset = presets.find((item) => item.providerPlacement === template.defaultPlacement)
-      ?? presets.find((item) => item.providerPlacement === "front")
-      ?? presets[0];
-    const variantIds = prepared.product.variants.filter((item) => item.inStock).map((item) => String(item.id));
-    const compositionKey = globalSelections[index]?.compositionKey;
-    const orderedPresets = preset ? [preset, ...presets.filter((item) => item.id !== preset.id)] : presets;
-
-    setPrintfulTemplates((current) => [...current.filter((item) => item.id !== template.id), template]);
-    setPlacementPresets((current) => [...current.filter((item) => !presets.some((presetItem) => presetItem.id === item.id)), ...presets]);
-    setGlobalSelections((current) => {
-      let placementIndex = 0;
-      return current.map((selection) => {
-        if (selection.compositionKey !== compositionKey) return selection;
-        const placementPreset = orderedPresets[placementIndex] ?? orderedPresets[0];
-        placementIndex += 1;
-        return {
-          ...selection,
-          ...globalDefaultsFromPreset(placementPreset),
-          printfulProductTemplateId: template.id,
-          placementPresetId: placementPreset?.id ?? "",
-          technique: defaultTechnique(template),
-          selectedVariantIds: variantIds,
-          previewTaskKey: undefined,
-          previewUrls: undefined,
-          previewLoading: false,
-          editorReady: false,
-          preferContextInitialPlacement: true,
-        };
-      });
-    });
-    toast({ tone: "success", title: "Printful product selected", description: "Printable areas and current in-stock variants are ready for placement." });
-  }
-
   function addGlobalPlacement(index: number) {
     const source = globalSelections[index];
     if (!source) return;
@@ -746,8 +711,12 @@ export default function Page() {
 
   function submitApproval(decisionOverride?: "APPROVE_LOCAL" | "APPROVE_GLOBAL") {
     const decision = decisionOverride ?? (pipelineMode === "global" ? "APPROVE_GLOBAL" : "APPROVE_LOCAL");
-    if (decision === "APPROVE_GLOBAL" && (!localSelections.length || !globalSelections.length)) {
-      setActionError("Global pipeline requires at least one local product and one Printful template.");
+    if (decision === "APPROVE_GLOBAL" && !globalSelections.length) {
+      setActionError("Choose at least one Printful product before approving the global pipeline.");
+      return;
+    }
+    if (decision === "APPROVE_GLOBAL" && !printfulSettings.allowGlobalWithoutLocal && !localSelections.length) {
+      setActionError("This workspace requires a local product alongside the Printful setup.");
       return;
     }
     setPendingDecision(decision);
@@ -759,7 +728,7 @@ export default function Page() {
     try {
       const payload = buildModerationDecisionPayload({
         decision,
-        localSelections: toLocalPayload(),
+        localSelections: decision === "APPROVE_GLOBAL" && printfulSettings.allowGlobalWithoutLocal ? [] : toLocalPayload(),
         globalPrintfulSelections: toGlobalPayload(),
         rejectionReasons: selectedReasons,
         customRejectionReason: customReason,
@@ -833,12 +802,27 @@ export default function Page() {
       && selection.placementPresetId
       && selection.selectedVariantIds.length
       && selection.editorReady
-      && placementArtworkAvailable(detail?.versions, placementPresets.find((item) => item.id === selection.placementPresetId)?.placement ?? "FRONT")),
+      && placementArtworkAvailable(detail?.versions, presetPlacement(selection.placementPresetId))),
     [detail?.versions, globalSelections, placementPresets],
   );
 
   const productRightsOk = Boolean(detail?.commercialRights?.allowProductSales);
   const marketplaceRightsOk = Boolean(detail?.commercialRights?.allowMarketplacePublishing);
+  const printfulAvailable = printfulSettings.enabled && printfulSettings.tokenConfigured;
+  const globalRequiresLocal = !printfulSettings.allowGlobalWithoutLocal;
+  const localSetupRequired = pipelineMode === "uzbek" || globalRequiresLocal;
+  const approvalReady = pipelineMode === "uzbek"
+    ? localSelections.length > 0 && localReady && productRightsOk
+    : globalSelections.length > 0
+      && globalReady
+      && printfulAvailable
+      && (!globalRequiresLocal || (localSelections.length > 0 && localReady))
+      && productRightsOk
+      && marketplaceRightsOk;
+  const marketplaceOptions = printfulSettings.connectedMarketplaces.map((value) => ({
+    value,
+    label: formatPlacementLabel(value),
+  }));
 
   useEffect(() => {
     const target = pendingScrollTargetRef.current;
@@ -972,45 +956,61 @@ export default function Page() {
                   >
                     <div className="flex items-center gap-2 text-brand-blue">
                       <MapPin size={18} />
-                      <span className="font-semibold text-brand-ink">Uzbek pipeline</span>
+                      <span className="font-semibold text-brand-ink">Sell locally</span>
                     </div>
-                    <p className="mt-2 text-sm text-brand-muted">Local production with RashPOD base products and mockup templates.</p>
+                    <p className="mt-2 text-sm text-brand-muted">Choose a RashPOD base product, place the artwork, and generate local-production mockups.</p>
                   </button>
                   <button
                     type="button"
                     onClick={() => setPipelineMode("global")}
-                    className={`rounded-2xl border p-4 text-left transition ${pipelineMode === "global" ? "border-brand-peach bg-brand-peach/10 ring-2 ring-brand-peach/30" : "border-surface-borderSoft bg-white"}`}
+                    disabled={!printfulAvailable}
+                    className={`rounded-2xl border p-4 text-left transition disabled:cursor-not-allowed disabled:opacity-50 ${pipelineMode === "global" ? "border-brand-peach bg-brand-peach/10 ring-2 ring-brand-peach/30" : "border-surface-borderSoft bg-white"}`}
                   >
                     <div className="flex items-center gap-2 text-brand-peach">
                       <Globe2 size={18} />
-                      <span className="font-semibold text-brand-ink">Global pipeline</span>
+                      <span className="font-semibold text-brand-ink">Sell globally with Printful</span>
                     </div>
-                    <p className="mt-2 text-sm text-brand-muted">Uzbek local products plus Printful pathway for global marketplaces.</p>
+                    <p className="mt-2 text-sm text-brand-muted">
+                      {printfulAvailable ? "Choose the Printful product, sellable variants, print method, and placement." : "Printful is disabled or its API connection is not configured."}
+                      {globalRequiresLocal ? " This workspace also requires a local RashPOD product." : " A local product is not required by this workspace."}
+                    </p>
                   </button>
                 </div>
 
-                <div className="grid items-start gap-5 2xl:grid-cols-2">
-                  <DecisionSection icon={<MapPin size={20} />} title={pipelineMode === "global" ? "Uzbek Base Products" : "Select Base Products"}>
+                <div className={`grid items-start gap-5 ${pipelineMode === "global" && localSetupRequired ? "2xl:grid-cols-2" : ""}`}>
+                  {localSetupRequired ? <DecisionSection icon={<MapPin size={20} />} title={pipelineMode === "global" ? "1. Required local product" : "1. Choose local product and placement"}>
                     <div className="space-y-4">
+                      {detail.requestedBaseProduct ? (
+                        <div className="rounded-2xl border border-brand-blue/25 bg-brand-lightBlue/20 p-4">
+                          <p className="text-xs font-semibold uppercase tracking-wide text-brand-blue">Designer request</p>
+                          <p className="mt-1 font-semibold text-brand-ink">{detail.requestedBaseProduct.name}</p>
+                          <p className="mt-1 text-sm text-brand-muted">This is preselected as the starting product. The moderator can change it if production requirements demand another option.</p>
+                        </div>
+                      ) : null}
                       {localSelections.map((selection, index) => (
                         <SelectionPanel key={selection.id} title={compositionPlacementTitle(localSelections, index, "Local product")} onRemove={localSelections.length > 1 ? () => setLocalSelections((current) => current.filter((_, itemIndex) => itemIndex !== index)) : undefined}>
                           <div>
                             <p className="mb-2 text-sm font-medium text-brand-ink">Base product</p>
                             <ProductPickerGrid
-                              items={activeBaseProducts.map((item) => ({
-                                id: item.id,
-                                name: item.name,
-                                imageUrl: item.imageUrl,
-                                subtitle: item.productType?.name ?? undefined,
-                                badge: item.productType?.name ?? "Local",
-                              }))}
+                              items={activeBaseProducts.map((item) => {
+                                const configured = localTemplatesFor(item.id).some((template) => artworkPrintAreasFor(template.id).length > 0);
+                                return {
+                                  id: item.id,
+                                  name: item.name,
+                                  imageUrl: item.imageUrl,
+                                  subtitle: configured ? item.productType?.name ?? undefined : "No print area matches the uploaded artwork",
+                                  badge: item.productType?.name ?? "Local",
+                                  disabled: !configured,
+                                };
+                              })}
                               selectedId={selection.localBaseProductId}
                               onSelect={(value) => selectLocalProduct(index, value)}
                               emptyLabel="No active base products configured."
                             />
                           </div>
                           <div className="mt-4">
-                            <p className="mb-2 text-sm font-medium text-brand-ink">Placement area</p>
+                            <p className="mb-1 text-sm font-medium text-brand-ink">Artwork placement</p>
+                            <p className="mb-2 text-xs text-brand-muted">Choose which uploaded artwork side will be printed on this product.</p>
                             <PlacementChips
                               presets={localPresetsFor(selection.localBaseProductId)}
                               selectedId={selection.placementPresetId}
@@ -1021,19 +1021,22 @@ export default function Page() {
                             placement={localPlacement(selection, printAreas, placementPresets)}
                             versions={detail.versions}
                           />
-                          <div className="mt-4 grid gap-3 md:grid-cols-2">
-                            <SelectField label="Placement preset (optional)" value={selection.placementPresetId} onChange={(value) => selectLocalPreset(index, value)} options={localPresetsFor(selection.localBaseProductId).map((item) => ({ value: item.id, label: `${item.name} - ${item.placement}` }))} />
-                            <SelectField label="Mockup template" value={selection.mockupTemplateId} onChange={(value) => selectLocalTemplate(index, value)} options={localTemplatesFor(selection.localBaseProductId).map((item) => ({ value: item.id, label: item.name }))} />
-                            <SelectField
-                              label="Product view / print area"
-                              value={selection.printAreaId}
-                              onChange={(value) => selectPrintArea(index, value)}
-                              options={artworkPrintAreasFor(selection.mockupTemplateId).map((item) => ({
-                                value: item.id,
-                                label: `${item.mockupView?.name ?? "Legacy primary view"} · ${item.name} · safe ${item.safeWidth}x${item.safeHeight}px`,
-                              }))}
-                            />
-                          </div>
+                          <details className="mt-4 rounded-2xl border border-surface-borderSoft bg-surface-card p-4">
+                            <summary className="cursor-pointer text-sm font-semibold text-brand-blue">Advanced production setup</summary>
+                            <p className="mt-2 text-xs text-brand-muted">The recommended template and print area are selected automatically. Change them only when production needs another calibrated view.</p>
+                            <div className="mt-4 grid gap-3">
+                              <SelectField label="Mockup template" value={selection.mockupTemplateId} onChange={(value) => selectLocalTemplate(index, value)} options={localTemplatesFor(selection.localBaseProductId).map((item) => ({ value: item.id, label: item.name }))} />
+                              <SelectField
+                                label="Production print area"
+                                value={selection.printAreaId}
+                                onChange={(value) => selectPrintArea(index, value)}
+                                options={artworkPrintAreasFor(selection.mockupTemplateId).map((item) => ({
+                                  value: item.id,
+                                  label: `${item.mockupView?.name ?? "Legacy primary view"} · ${item.name} · safe ${item.safeWidth}x${item.safeHeight}px`,
+                                }))}
+                              />
+                            </div>
+                          </details>
                           <div className="mt-4">
                             <ReadinessChecklist
                               items={[
@@ -1093,7 +1096,7 @@ export default function Page() {
                             onClick={() => setExpandedLocal((current) => ({ ...current, [selection.id]: !current[selection.id] }))}
                           >
                             {expandedLocal[selection.id] ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                            Numeric placement debug
+                            Advanced numeric controls
                           </button>
                           {expandedLocal[selection.id] ? (
                             <>
@@ -1134,24 +1137,32 @@ export default function Page() {
                       <Button variant="secondary" size="sm" onClick={() => setLocalSelections((current) => [...current, createLocalSelection(baseProducts, placementPresets, mockupTemplates, printAreas, detail?.versions)])} disabled={configLoading}>
                         <Plus size={16} /> Add Local Product
                       </Button>
-                      <Button
-                        onClick={() => submitApproval("APPROVE_LOCAL")}
-                        disabled={submitting || configLoading || !productRightsOk || !localSelections.length || !localReady}
-                        loading={submitting && pendingDecision === "APPROVE_LOCAL"}
-                      >
-                        <MapPin size={18} /> Approve Local & Generate Mockups
-                      </Button>
                     </div>
-                  </DecisionSection>
+                  </DecisionSection> : null}
 
-                  <DecisionSection icon={<Globe2 size={20} />} title="Printful Products">
+                  {pipelineMode === "global" ? <DecisionSection icon={<Globe2 size={20} />} title={globalRequiresLocal ? "2. Choose Printful product and placement" : "1. Choose Printful product and placement"}>
                     <div className="space-y-4">
                       {globalSelections.map((selection, index) => (
                         <SelectionPanel key={selection.id} title={compositionPlacementTitle(globalSelections, index, "Printful product")} onRemove={globalSelections.length > 1 ? () => removeGlobalSelection(index) : undefined}>
                           <div>
-                            <PrintfulModerationCatalog
-                              selectedCatalogProductId={printfulTemplates.find((item) => item.id === selection.printfulProductTemplateId)?.printfulCatalogProductId}
-                              onPrepared={(prepared) => applyPreparedPrintfulProduct(index, prepared)}
+                            <p className="mb-2 text-sm font-medium text-brand-ink">Configured Printful product</p>
+                            <ProductPickerGrid
+                              items={activePrintfulTemplates.map((item) => {
+                                const compatiblePlacements = globalPresetsFor(item.id).length;
+                                return {
+                                  id: item.id,
+                                  name: item.displayName,
+                                  imageUrl: item.previewImageUrl,
+                                  subtitle: compatiblePlacements
+                                    ? `${compatiblePlacements} compatible placement${compatiblePlacements === 1 ? "" : "s"}`
+                                    : "No placement matches the uploaded artwork",
+                                  badge: "Global",
+                                  disabled: compatiblePlacements === 0,
+                                };
+                              })}
+                              selectedId={selection.printfulProductTemplateId}
+                              onSelect={(value) => selectPrintfulTemplate(index, value)}
+                              emptyLabel="No Printful products are configured. Ask an administrator to add a product template before global approval."
                             />
                             {selection.printfulProductTemplateId ? (
                               <div className="mt-4 rounded-2xl border border-brand-blue/30 bg-brand-lightBlue/20 p-4">
@@ -1164,7 +1175,8 @@ export default function Page() {
                           {selection.printfulProductTemplateId ? (
                             <>
                               <div className="mt-4">
-                                <p className="mb-2 text-sm font-medium text-brand-ink">Placement area</p>
+                                <p className="mb-1 text-sm font-medium text-brand-ink">Artwork placement</p>
+                                <p className="mb-2 text-xs text-brand-muted">Choose the Printful print area that matches the uploaded artwork.</p>
                                 <PlacementChips
                                   presets={globalPresetsFor(selection.printfulProductTemplateId)}
                                   selectedId={selection.placementPresetId}
@@ -1172,15 +1184,15 @@ export default function Page() {
                                 />
                               </div>
                               <PlacementArtworkNotice
-                                placement={placementPresets.find((item) => item.id === selection.placementPresetId)?.placement ?? "FRONT"}
+                                placement={presetPlacement(selection.placementPresetId)}
                                 versions={detail.versions}
                               />
-                              <div className="mt-4 grid gap-3 md:grid-cols-2 lg:grid-cols-3">
-                                <SelectField label="Printful placement" value={selection.placementPresetId} onChange={(value) => selectGlobalPreset(index, value)} options={globalPresetsFor(selection.printfulProductTemplateId).map((item) => ({ value: item.id, label: `${item.name} - ${item.providerPlacement ?? item.placement}` }))} />
+                              <div className="mt-4 grid gap-3">
                                 <SelectField label="Technique" value={selection.technique} onChange={(value) => invalidateGlobalPreview(index, { technique: value })} options={techniqueOptionsFor(selection.printfulProductTemplateId, printfulTemplates)} />
                               </div>
                               <div className="mt-4">
-                                <p className="mb-2 text-sm font-medium text-brand-ink">Variants for mockup</p>
+                                <p className="mb-1 text-sm font-medium text-brand-ink">Sellable variants</p>
+                                <p className="mb-2 text-xs text-brand-muted">Choose the exact variants that may be offered. One in-stock variant is selected initially.</p>
                                 <div className="flex flex-wrap gap-2">
                                   {variantIdsFromTemplate(printfulTemplates.find((item) => item.id === selection.printfulProductTemplateId)).map((variantId) => (
                                     <label key={variantId} className="flex min-h-10 items-center gap-2 rounded-pill border border-surface-borderSoft px-3 text-xs text-brand-ink">
@@ -1202,7 +1214,7 @@ export default function Page() {
                               {selection.printfulProductTemplateId && selection.placementPresetId && params.id ? (
                                 <div className="mt-4">
                                   <p className="mb-2 text-sm font-medium text-brand-ink">Visual placement</p>
-                                  {placementArtworkAvailable(detail.versions, placementPresets.find((item) => item.id === selection.placementPresetId)?.placement ?? "FRONT") ? <GlobalSelectionMockupEditor
+                                  {placementArtworkAvailable(detail.versions, presetPlacement(selection.placementPresetId)) ? <GlobalSelectionMockupEditor
                                     designId={String(params.id)}
                                     selection={{
                                       printfulProductTemplateId: selection.printfulProductTemplateId,
@@ -1250,7 +1262,7 @@ export default function Page() {
                                 onClick={() => setExpandedGlobalNumeric((current) => ({ ...current, [selection.id]: !current[selection.id] }))}
                               >
                                 {expandedGlobalNumeric[selection.id] ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                                Numeric placement debug
+                                Advanced numeric controls
                               </button>
                               {expandedGlobalNumeric[selection.id] ? (
                                 <div className="mt-3 grid gap-3 sm:grid-cols-3 lg:grid-cols-6">
@@ -1269,39 +1281,65 @@ export default function Page() {
                               {!selection.editorReady ? <p className="mt-2 text-xs text-status-warning">Use the visual placement controls once to validate numeric changes.</p> : null}
                             </>
                           ) : null}
-                          <div className="mt-4 flex flex-wrap gap-2">
-                            {MARKETPLACES.map(([value, label]) => (
-                              <label key={value} className="flex min-h-11 items-center gap-2 rounded-pill border border-surface-borderSoft px-3 text-sm text-brand-ink">
-                                <input type="checkbox" checked={selection.targetMarketplaces.includes(value)} onChange={() => toggleMarketplace(index, value)} />
-                                <span>{label}</span>
-                              </label>
-                            ))}
+                          <div className="mt-4">
+                            <p className="mb-1 text-sm font-medium text-brand-ink">Publishing destinations (optional)</p>
+                            <p className="mb-2 text-xs text-brand-muted">Only marketplaces connected in Printful settings are available here.</p>
+                            {marketplaceOptions.length ? (
+                              <div className="flex flex-wrap gap-2">
+                                {marketplaceOptions.map(({ value, label }) => (
+                                  <label key={value} className="flex min-h-11 items-center gap-2 rounded-pill border border-surface-borderSoft px-3 text-sm text-brand-ink">
+                                    <input type="checkbox" checked={selection.targetMarketplaces.includes(value)} onChange={() => toggleMarketplace(index, value)} />
+                                    <span>{label}</span>
+                                  </label>
+                                ))}
+                              </div>
+                            ) : (
+                              <p className="rounded-xl border border-status-warning/30 bg-status-warning/5 px-3 py-2 text-sm text-brand-muted">No publishing destinations are connected. The product can be approved for Printful, but publishing must be configured separately.</p>
+                            )}
                           </div>
                         </SelectionPanel>
                       ))}
-                      <Button variant="secondary" size="sm" onClick={() => setGlobalSelections((current) => [...current, createGlobalSelection(printfulTemplates, placementPresets, detail?.versions)])} disabled={configLoading}>
-                        <Plus size={16} /> Add Printful Product
-                      </Button>
-                      <Button
-                        onClick={() => submitApproval("APPROVE_GLOBAL")}
-                        disabled={submitting || configLoading || !productRightsOk || !marketplaceRightsOk || !localSelections.length || !localReady || !globalSelections.length || !globalReady}
-                        loading={submitting && pendingDecision === "APPROVE_GLOBAL"}
-                      >
-                        <Globe2 size={18} /> Approve Global & Generate Mockups
+                      <Button variant="secondary" size="sm" onClick={() => setGlobalSelections((current) => [...current, createGlobalSelection(printfulTemplates, placementPresets, detail?.versions, printfulSettings.connectedMarketplaces)])} disabled={configLoading}>
+                        <Plus size={16} /> Add another Printful product
                       </Button>
                     </div>
-                  </DecisionSection>
+                  </DecisionSection> : null}
                 </div>
 
-                <div className="mt-5 space-y-3">
+                <div className="mt-5 space-y-4 rounded-2xl border border-surface-borderSoft bg-surface-card p-4">
+                  <div>
+                    <h3 className="font-semibold text-brand-ink">Approval summary</h3>
+                    <p className="mt-1 text-sm text-brand-muted">
+                      {pipelineMode === "uzbek"
+                        ? "This approves local RashPOD product sales and starts local mockup generation."
+                        : globalRequiresLocal
+                          ? "This approves both the required local product and Printful product setup, then starts mockup generation."
+                          : "This approves only the Printful/global setup and starts Printful mockup generation."}
+                    </p>
+                  </div>
                   <ReadinessChecklist
                     items={[
-                      { label: "Local product selections ready", ok: localReady },
-                      { label: pipelineMode === "global" ? "Printful selections ready" : "Printful not required (Uzbek only)", ok: pipelineMode === "uzbek" || globalReady },
+                      ...(localSetupRequired ? [{ label: "Local products and placements are ready", ok: localSelections.length > 0 && localReady }] : []),
+                      ...(pipelineMode === "global" ? [{ label: "Printful products, variants, and placements are ready", ok: globalSelections.length > 0 && globalReady }] : []),
+                      ...(pipelineMode === "global" ? [{ label: "Printful integration is connected", ok: printfulAvailable }] : []),
                       { label: "Product sales rights granted", ok: productRightsOk },
-                      { label: pipelineMode === "global" ? "Marketplace publishing rights granted" : "Marketplace rights not required", ok: pipelineMode === "uzbek" || marketplaceRightsOk },
+                      ...(pipelineMode === "global" ? [{ label: "Marketplace publishing rights granted", ok: marketplaceRightsOk }] : []),
                     ]}
                   />
+                  <div>
+                    <label className="block text-sm font-medium text-brand-ink" htmlFor="approvalNotes">Internal moderator note (optional)</label>
+                    <Input id="approvalNotes" value={notes} onChange={(event) => setNotes(event.target.value)} placeholder="Record context for the audit trail" className="mt-2" />
+                  </div>
+                  <div className="flex justify-end">
+                    <Button
+                      onClick={() => submitApproval()}
+                      disabled={submitting || configLoading || !approvalReady}
+                      loading={submitting && pendingDecision === (pipelineMode === "global" ? "APPROVE_GLOBAL" : "APPROVE_LOCAL")}
+                    >
+                      {pipelineMode === "global" ? <Globe2 size={18} /> : <MapPin size={18} />}
+                      {pipelineMode === "global" ? "Approve global sale & generate mockups" : "Approve local sale & generate mockups"}
+                    </Button>
+                  </div>
                 </div>
               </Card>
               ) : null}
@@ -1510,7 +1548,13 @@ export default function Page() {
       <ConfirmationDialog
         open={pendingDecision !== null}
         title={pendingDecision === "REJECT" ? "Reject this design?" : "Approve and generate mockups?"}
-        description={pendingDecision === "REJECT" ? "The designer will receive the selected rejection reasons. This action is recorded in the moderation audit." : `This will approve the ${pendingDecision === "APPROVE_GLOBAL" ? "local and global" : "local"} pipeline and start mockup generation.`}
+        description={pendingDecision === "REJECT"
+          ? "The designer will receive the selected rejection reasons. This action is recorded in the moderation audit."
+          : pendingDecision === "APPROVE_GLOBAL"
+            ? printfulSettings.allowGlobalWithoutLocal
+              ? "This approves the Printful/global setup only and starts global mockup generation."
+              : "This approves the required local setup and the Printful/global setup, then starts mockup generation."
+            : "This approves the local RashPOD setup and starts local mockup generation."}
         confirmLabel={pendingDecision === "REJECT" ? "Reject design" : "Approve & generate"}
         destructive={pendingDecision === "REJECT"}
         busy={submitting}
@@ -1587,16 +1631,20 @@ function ModerationWorkflowStepper({
   );
 }
 
-function createLocalSelection(products: BaseProductOption[], presets: PlacementPresetOption[], templates: MockupTemplateOption[], areas: PrintAreaOption[], versions?: Array<{ placement?: string | null }>): LocalSelectionForm {
+function createLocalSelection(products: BaseProductOption[], presets: PlacementPresetOption[], templates: MockupTemplateOption[], areas: PrintAreaOption[], versions?: Array<{ placement?: string | null }>, requestedBaseProductId?: string | null): LocalSelectionForm {
   const activeProducts = products.filter((item) => item.isActive !== false);
   const activeTemplates = templates.filter((item) => item.isActive !== false);
+  const requestedProduct = activeProducts.find((item) => item.id === requestedBaseProductId);
+  const candidateTemplates = requestedProduct
+    ? activeTemplates.filter((item) => item.baseProductId === requestedProduct.id)
+    : activeTemplates.filter((item) => activeProducts.some((product) => product.id === item.baseProductId));
   const matchingArea = areas.find((item) => item.isActive !== false
     && item.mockupView?.isActive !== false
     && placementArtworkAvailable(versions, item.placement ?? item.mockupView?.placementCode ?? "FRONT")
-    && activeTemplates.some((template) => template.id === item.mockupTemplateId && activeProducts.some((product) => product.id === template.baseProductId)));
-  const template = activeTemplates.find((item) => item.id === matchingArea?.mockupTemplateId)
-    ?? activeTemplates.find((item) => activeProducts.some((product) => product.id === item.baseProductId));
-  const product = activeProducts.find((item) => item.id === template?.baseProductId) ?? activeProducts[0];
+    && candidateTemplates.some((template) => template.id === item.mockupTemplateId));
+  const template = candidateTemplates.find((item) => item.id === matchingArea?.mockupTemplateId)
+    ?? candidateTemplates[0];
+  const product = requestedProduct ?? activeProducts.find((item) => item.id === template?.baseProductId) ?? activeProducts[0];
   const configuredAreas = areas.filter((item) => item.isActive !== false && item.mockupView?.isActive !== false && item.mockupTemplateId === template?.id);
   const area = configuredAreas.find((item) => item.id === matchingArea?.id)
     ?? configuredAreas.find((item) => placementArtworkAvailable(versions, item.placement ?? item.mockupView?.placementCode ?? "FRONT"))
@@ -1606,17 +1654,16 @@ function createLocalSelection(products: BaseProductOption[], presets: PlacementP
   return { id: crypto.randomUUID(), compositionKey: crypto.randomUUID(), localBaseProductId: product?.id ?? "", mockupTemplateId: template?.id ?? "", printAreaId: area?.id ?? "", placementPresetId: preset?.id ?? "", ...localDefaultsFromPreset(preset, area) };
 }
 
-function createGlobalSelection(templates: PrintfulTemplateOption[], presets: PlacementPresetOption[], versions?: Array<{ placement?: string | null }>): GlobalSelectionForm {
+function createGlobalSelection(templates: PrintfulTemplateOption[], presets: PlacementPresetOption[], versions?: Array<{ placement?: string | null }>, connectedMarketplaces: string[] = []): GlobalSelectionForm {
   const activeTemplates = templates.filter((item) => item.active !== false);
   const matchingPreset = presets.find((item) => item.active !== false
     && item.pipeline === "GLOBAL_PRINTFUL"
     && placementArtworkAvailable(versions, item.providerPlacement ?? item.placement)
     && (!item.productTemplateId || activeTemplates.some((template) => template.id === item.productTemplateId)));
-  const template = activeTemplates.find((item) => item.id === matchingPreset?.productTemplateId) ?? activeTemplates[0];
+  const template = activeTemplates.find((item) => item.id === matchingPreset?.productTemplateId);
   const availablePresets = presets.filter((item) => item.active !== false && item.pipeline === "GLOBAL_PRINTFUL" && (!item.productTemplateId || item.productTemplateId === template?.id));
   const preset = availablePresets.find((item) => item.id === matchingPreset?.id)
-    ?? availablePresets.find((item) => placementArtworkAvailable(versions, item.providerPlacement ?? item.placement))
-    ?? availablePresets[0];
+    ?? availablePresets.find((item) => placementArtworkAvailable(versions, item.providerPlacement ?? item.placement));
   const variantIds = variantIdsFromTemplate(template);
   return {
     id: crypto.randomUUID(),
@@ -1624,7 +1671,7 @@ function createGlobalSelection(templates: PrintfulTemplateOption[], presets: Pla
     printfulProductTemplateId: template?.id ?? "",
     placementPresetId: preset?.id ?? "",
     technique: defaultTechnique(template),
-    targetMarketplaces: ["ETSY"],
+    targetMarketplaces: connectedMarketplaces.slice(0, 1),
     ...globalDefaultsFromPreset(preset),
     selectedVariantIds: variantIds.slice(0, 1),
   };
@@ -1730,8 +1777,10 @@ function PlacementArtworkNotice(props: {
   placement: string;
   versions?: Array<{ id: string; placement?: string | null }>;
 }) {
-  const normalized = props.placement.trim().toUpperCase().replace(/[\s-]+/g, "_");
-  const dedicated = props.versions?.find((version) => version.placement === normalized);
+  const normalized = normalizePlacement(props.placement);
+  const dedicated = props.versions?.find((version) => (
+    typeof version.placement === "string" && normalizePlacement(version.placement) === normalized
+  ));
   const fallback = props.versions?.find((version) => !version.placement);
   const available = dedicated ?? fallback;
   return (

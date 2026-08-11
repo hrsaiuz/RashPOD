@@ -48,4 +48,19 @@ describe("PrintfulFilesService placement artwork selection", () => {
     });
     expect(client.uploadFileFromUrl).toHaveBeenCalledWith("https://signed.example/design.png");
   });
+
+  it("uses canonical sleeve artwork for Printful's direction-last placement code", async () => {
+    const { service, storage } = setup([
+      { id: "front_version", fileKey: "designs/front.png", placement: "FRONT" },
+      { id: "sleeve_version", fileKey: "designs/left-sleeve.png", placement: "LEFT_SLEEVE" },
+    ]);
+
+    await expect(service.ensurePrintfulFileForDesign("design_1", "sleeve_left")).resolves.toEqual(
+      expect.objectContaining({ status: "READY", printfulFileId: "123" }),
+    );
+    expect(storage.createSignedReadUrl).toHaveBeenCalledWith({
+      objectKey: "designs/left-sleeve.png",
+      expiresSeconds: 60 * 60,
+    });
+  });
 });

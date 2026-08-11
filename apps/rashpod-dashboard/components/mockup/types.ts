@@ -3,6 +3,7 @@ import type { EditorPlacementState, PlacementConstraints, PrintAreaRect, PrintAr
 export interface MockupEditorContextResponse {
   templateWidthPx: number;
   templateHeightPx: number;
+  templateImageKey?: string;
   templateImageUrl: string | null;
   designImageUrl: string | null;
   printArea: PrintAreaRect;

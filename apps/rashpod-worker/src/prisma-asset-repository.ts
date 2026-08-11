@@ -767,7 +767,7 @@ export class PrismaAssetRepository implements WorkerRepository {
     const setting = await this.prisma.platformSetting.findUnique({ where: { key: "integrations.printful" } });
     const parsed = parsePrintfulSettings(setting?.value);
     return {
-      enabled: parsed.enabled || process.env.PRINTFUL_ENABLED === "true",
+      enabled: parsed.enabled,
       defaultStoreId: parsed.defaultStoreId ?? process.env.PRINTFUL_STORE_ID ?? null,
       catalogAllowlist: parsed.catalogAllowlist,
     };

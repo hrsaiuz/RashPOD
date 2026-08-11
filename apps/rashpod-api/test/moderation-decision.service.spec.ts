@@ -16,11 +16,12 @@ function createService(prismaOverrides: any = {}) {
   const jobs = { enqueue: jest.fn() } as any;
   const storage = {
     isCloudStorageConfigured: jest.fn().mockReturnValue(false),
-    buildPublicUrl: jest.fn(),
-    createPublicSignedReadUrl: jest.fn(),
-    createSignedReadUrl: jest.fn(),
+    buildPublicUrl: jest.fn((objectKey: string) => `https://storage.test/${objectKey}`),
+    createPublicSignedReadUrl: jest.fn(({ objectKey }: { objectKey: string }) => `http://localhost/public/${objectKey}`),
+    createSignedReadUrl: jest.fn(({ objectKey }: { objectKey: string }) => `http://localhost/private/${objectKey}`),
+    getPublicObjectMetadata: jest.fn().mockResolvedValue({ sizeBytes: 1000, mimeType: "image/png" }),
   } as any;
-  return { service: new DesignWorkflowService(prisma, audit, designStories, jobs, new PlacementCalculationService(), new MarketplaceComplianceService(), storage, {} as any, {} as any, {} as any, {} as any), prisma, audit, designStories, jobs };
+  return { service: new DesignWorkflowService(prisma, audit, designStories, jobs, new PlacementCalculationService(), new MarketplaceComplianceService(), storage, {} as any, {} as any, {} as any, {} as any), prisma, audit, designStories, jobs, storage };
 }
 
 describe("DesignWorkflowService moderation validation", () => {
@@ -145,7 +146,21 @@ describe("DesignWorkflowService moderation validation", () => {
         upsert: jest.fn().mockResolvedValue({ id: "selection_1" }),
       },
     };
-    const { service } = createService();
+    const { service } = createService({
+      mediaAsset: {
+        findFirst: jest.fn().mockImplementation(({ where }: any) => {
+          const reference = where?.OR?.[0]?.key;
+          return reference === "mockups/front-view.png"
+            ? {
+                objectKey: "media/mockup_template/front-view.png",
+                publicUrl: "https://storage.test/media/mockup_template/front-view.png",
+                width: 1600,
+                height: 1800,
+              }
+            : null;
+        }),
+      },
+    });
     jest.spyOn(service as any, "ensurePendingMockupAssets").mockResolvedValue(undefined);
 
     await expect((service as any).createLocalSelection(tx, "mod_1", "design_1", {
@@ -172,11 +187,11 @@ describe("DesignWorkflowService moderation validation", () => {
           placement: "FRONT",
           placementConfigJson: expect.objectContaining({
             mockupTemplate: expect.objectContaining({
-              baseImageKey: "mockups/front-view.png",
+              baseImageKey: "media/mockup_template/front-view.png",
               lifestyleImageKey: "mockups/lifestyle-front.png",
               closeupImageKey: "mockups/detail-global.png",
             }),
-            mockupView: expect.objectContaining({ id: "view_front", blankImageKey: "mockups/front-view.png" }),
+            mockupView: expect.objectContaining({ id: "view_front", blankImageKey: "media/mockup_template/front-view.png" }),
             galleryAssets: expect.arrayContaining([
               expect.objectContaining({ id: "lifestyle_front", role: "LIFESTYLE" }),
               expect.objectContaining({ id: "detail_global", role: "DETAIL" }),
@@ -543,6 +558,14 @@ describe("DesignWorkflowService moderation validation", () => {
         }),
       },
       placementPreset,
+      mediaAsset: {
+        findFirst: jest.fn().mockResolvedValue({
+          objectKey: "media/mockup_template/front-view.png",
+          publicUrl: "https://storage.test/media/mockup_template/front-view.png",
+          width: 1600,
+          height: 1800,
+        }),
+      },
     });
 
     await expect(service.mockupEditorContext("design_1", {
@@ -550,11 +573,28 @@ describe("DesignWorkflowService moderation validation", () => {
       mockupTemplateId: "template_1",
       printAreaId: "area_1",
     })).resolves.toEqual(expect.objectContaining({
+      templateWidthPx: 1600,
+      templateHeightPx: 1800,
+      templateImageKey: "media/mockup_template/front-view.png",
+      templateImageUrl: "https://storage.test/media/mockup_template/front-view.png",
       printArea: expect.objectContaining({ x: 300, y: 200, safeX: 330, safeY: 240 }),
       initialPlacement: expect.objectContaining({ x: expect.any(Number), y: expect.any(Number) }),
       preset: null,
     }));
     expect(placementPreset.findUnique).not.toHaveBeenCalled();
+  });
+
+  it("rejects a missing exact mockup object instead of substituting another product image", async () => {
+    const { service, storage } = createService();
+    storage.getPublicObjectMetadata.mockResolvedValue(null);
+
+    await expect(
+      (service as any).resolveMockupImageReference("mockup-templates/local/tee/front-base.png", "product view"),
+    ).rejects.toThrow(
+      'MOCKUP_TEMPLATE_IMAGE_MISSING: product view references "mockup-templates/local/tee/front-base.png", but its exact uploaded media object was not found',
+    );
+    expect(storage.buildPublicUrl).not.toHaveBeenCalled();
+    expect(storage.createPublicSignedReadUrl).not.toHaveBeenCalled();
   });
 
   it("rejects a stale placement preset id before opening the mockup editor", async () => {
@@ -625,6 +665,68 @@ describe("DesignWorkflowService moderation validation", () => {
       placementPresetId: "global_preset_1",
       placement: "BACK",
     })).rejects.toThrow("Printful preset placement does not match selection");
+  });
+
+  it("opens Printful sleeve_left context with the canonical left-sleeve artwork", async () => {
+    const { service, storage } = createService({
+      designAsset: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: "design_1",
+          versions: [
+            { id: "front_version", fileKey: "designs/front.png", placement: "FRONT" },
+            { id: "sleeve_version", fileKey: "designs/left-sleeve.png", placement: "LEFT_SLEEVE" },
+          ],
+        }),
+      },
+      printfulProductTemplate: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: "printful_template_1",
+          active: true,
+          defaultTechnique: "dtg",
+          printAreasJson: {
+            sleeve_left: {
+              placement: "sleeve_left",
+              technique: "dtg",
+              printAreaWidthIn: 4,
+              printAreaHeightIn: 5,
+              areaLeftIn: 0,
+              areaTopIn: 0,
+            },
+          },
+          metadataJson: null,
+        }),
+      },
+      placementPreset: {
+        findUnique: jest.fn().mockResolvedValue({
+          id: "global_preset_1",
+          name: "Left sleeve",
+          active: true,
+          pipeline: "GLOBAL_PRINTFUL",
+          placement: "LEFT_SLEEVE",
+          providerPlacement: "sleeve_left",
+          productTemplateId: "printful_template_1",
+          defaultWidthIn: 3,
+          defaultHeightIn: 4,
+          defaultX: 0.5,
+          defaultY: 0.5,
+          defaultScale: 1,
+          alignment: "CENTER",
+        }),
+      },
+    });
+
+    await expect(service.printfulMockupEditorContext("design_1", {
+      printfulProductTemplateId: "printful_template_1",
+      placementPresetId: "global_preset_1",
+      placement: "sleeve_left",
+    })).resolves.toEqual(expect.objectContaining({
+      designImageUrl: "http://localhost/private/designs/left-sleeve.png",
+      printArea: expect.objectContaining({ width: expect.any(Number), height: expect.any(Number) }),
+    }));
+    expect(storage.createSignedReadUrl).toHaveBeenCalledWith({
+      objectKey: "designs/left-sleeve.png",
+      expiresSeconds: 60 * 60,
+    });
   });
 
   it("rejects a mismatched Printful preset when creating a global selection", async () => {

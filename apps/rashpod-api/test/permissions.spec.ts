@@ -1,4 +1,6 @@
 import { permissions } from "../src/common/auth/permissions";
+import { PERMISSION_KEY } from "../src/common/auth/permission.decorator";
+import { PrintfulController } from "../src/modules/printful/printful.controller";
 
 describe("permissions matrix", () => {
   it("keeps film-rights permissions owned by designer/admin only", () => {
@@ -19,5 +21,10 @@ describe("permissions matrix", () => {
 
   it("limits designer invitation management to admin roles", () => {
     expect(permissions["designer-invitations:manage"]).toEqual(["ADMIN", "SUPER_ADMIN"]);
+  });
+
+  it("requires template-management permission when preparing a shared Printful product", () => {
+    expect(Reflect.getMetadata(PERMISSION_KEY, PrintfulController.prototype.prepareProduct)).toBe("printful-template:manage");
+    expect(permissions["printful-template:manage"]).not.toContain("MODERATOR");
   });
 });

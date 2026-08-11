@@ -8,7 +8,7 @@ const MAX_POLL_ATTEMPTS = 12;
 export class PrintfulMockupPollJobHandler {
   constructor(
     private readonly repo: WorkerRepository,
-    private readonly client = new PrintfulApiClient(),
+    private readonly client = new PrintfulApiClient({ enabled: true }),
     private readonly artifactStore = createArtifactStore(),
   ) {}
 
@@ -98,7 +98,7 @@ export class PrintfulMockupPollJobHandler {
 export class PrintfulMockupStartHelper {
   constructor(
     private readonly repo: WorkerRepository,
-    private readonly client = new PrintfulApiClient(),
+    private readonly client = new PrintfulApiClient({ enabled: true }),
   ) {}
 
   async ensureFileAndCreateTask(selectionId: string, renderJobId?: string) {

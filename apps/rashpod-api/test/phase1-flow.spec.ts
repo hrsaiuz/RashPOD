@@ -1,4 +1,5 @@
 import { JwtService } from "@nestjs/jwt";
+import { PlacementKind } from "@prisma/client";
 import { AuthService } from "../src/modules/auth/auth.service";
 import { AuditService } from "../src/modules/audit/audit.service";
 import { DesignsService } from "../src/modules/designs/designs.service";
@@ -38,11 +39,62 @@ describe("Phase1 flow integration-style", () => {
     const user = await prisma.user.findUnique({ where: { email: "designer-flow@test.local" } });
     expect(user).toBeTruthy();
 
-    const design = await designs.create(user!.id, { title: "Bird", description: "Blue bird logo" });
+    const productType = await prisma.productType.create({
+      data: {
+        tenantId: null,
+        name: "T-shirt",
+        slug: "phase1-t-shirt",
+        category: "APPAREL",
+        productionMethod: "DTF",
+        isActive: true,
+        availableForDesigners: true,
+      },
+    });
+    const baseProduct = await prisma.baseProduct.create({
+      data: {
+        tenantId: null,
+        productTypeId: productType.id,
+        name: "Classic tee",
+        skuPrefix: "PHASE1-TEE",
+        isActive: true,
+      },
+    });
+    const template = await prisma.mockupTemplate.create({
+      data: {
+        tenantId: null,
+        baseProductId: baseProduct.id,
+        name: "Classic tee front",
+        baseImageKey: "mockups/phase1-tee-front.png",
+        isActive: true,
+      },
+    });
+    await prisma.printArea.create({
+      data: {
+        mockupTemplateId: template.id,
+        name: "Front",
+        placement: PlacementKind.FRONT,
+        x: 100,
+        y: 100,
+        width: 800,
+        height: 1000,
+        safeX: 120,
+        safeY: 120,
+        safeWidth: 760,
+        safeHeight: 960,
+        isActive: true,
+      },
+    });
+
+    const design = await designs.create(user!.id, {
+      title: "Bird",
+      description: "Blue bird logo",
+      requestedBaseProductId: baseProduct.id,
+    });
     const upload = await files.createUploadUrl(user!.id, {
       filename: "bird.png",
       mimeType: "image/png",
       sizeBytes: 120000,
+      designId: design.id,
     });
     await files.completeUpload(user!.id, {
       fileId: upload.fileId,
@@ -55,6 +107,7 @@ describe("Phase1 flow integration-style", () => {
       widthPx: 2000,
       heightPx: 2000,
       dpi: 300,
+      placement: PlacementKind.FRONT,
     });
     expect(version.designAssetId).toBe(design.id);
 

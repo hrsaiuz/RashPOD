@@ -1,4 +1,4 @@
-import { IsOptional, IsString, MinLength } from "class-validator";
+import { IsOptional, IsString, IsUUID, MinLength } from "class-validator";
 
 export class CreateDesignDto {
   @IsString()
@@ -8,4 +8,7 @@ export class CreateDesignDto {
   @IsString()
   @IsOptional()
   description?: string;
+
+  @IsUUID("4")
+  requestedBaseProductId!: string;
 }

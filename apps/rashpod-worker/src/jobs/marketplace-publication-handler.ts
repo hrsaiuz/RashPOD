@@ -8,7 +8,7 @@ const ACTION = "marketplace-publication.publish";
 export class MarketplacePublicationJobHandler {
   constructor(
     private readonly repo: WorkerRepository,
-    private readonly client = new PrintfulApiClient(),
+    private readonly client = new PrintfulApiClient({ enabled: true }),
   ) {}
 
   async handlePublish(input: { marketplacePublicationId: string; publicationVersion?: string }) {
@@ -47,7 +47,7 @@ export class MarketplacePublicationJobHandler {
     const mockupIds = Array.isArray(publication.productListing.mockupAssetIds) ? publication.productListing.mockupAssetIds : [];
     if (mockupIds.length === 0) return this.failPublication(publication, "MISSING_MOCKUPS", "Generated mockups are required before publishing.");
 
-    const providerError = this.providerReadinessError(publication);
+    const providerError = await this.providerReadinessError(publication);
     if (providerError) return this.failPublication(publication, providerError, providerError);
 
     await repo.updateMarketplacePublication(publication.id, { status: "PUBLISHING", errorMessage: null });
@@ -231,9 +231,11 @@ export class MarketplacePublicationJobHandler {
     return { failed: true, errorCode };
   }
 
-  private providerReadinessError(publication: MarketplacePublicationPublishContext) {
+  private async providerReadinessError(publication: MarketplacePublicationPublishContext) {
     if (publication.provider !== "PRINTFUL") return null;
-    if (process.env.PRINTFUL_ENABLED !== "true") return "PRINTFUL_NOT_CONFIGURED";
+    if (!this.repo.getPrintfulSettings) throw new Error("Printful settings repository method is not configured");
+    const settings = await this.repo.getPrintfulSettings();
+    if (!settings.enabled) return "PRINTFUL_NOT_CONFIGURED";
     if (!process.env.PRINTFUL_API_TOKEN) return "PRINTFUL_API_TOKEN_MISSING";
     return null;
   }

@@ -55,4 +55,11 @@ describe("placement artwork readiness", () => {
     expect(placementArtworkAvailable([{ placement: "LEFT_SLEEVE" }], "left sleeve")).toBe(true);
     expect(placementArtworkAvailable([{ placement: null }], "LEFT_SLEEVE")).toBe(true);
   });
+
+  it("maps Printful direction-last and decorated chest aliases to canonical artwork", () => {
+    expect(placementArtworkAvailable([{ placement: "LEFT_SLEEVE" }], "sleeve_left")).toBe(true);
+    expect(placementArtworkAvailable([{ placement: "RIGHT_SLEEVE" }], "embroidery-sleeve-right")).toBe(true);
+    expect(placementArtworkAvailable([{ placement: "LEFT_CHEST" }], "embroidery_chest_left")).toBe(true);
+    expect(placementArtworkAvailable([{ placement: "FRONT" }], "embroidery_chest_center")).toBe(true);
+  });
 });

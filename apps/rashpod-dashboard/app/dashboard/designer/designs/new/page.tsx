@@ -8,21 +8,34 @@ import {
   ErrorState,
   FormField,
   Input,
+  ProductPickerGrid,
+  Select,
+  Skeleton,
   Textarea,
 } from "@rashpod/ui";
-import { ArrowLeft, Upload as UploadIcon, FileImage, CheckCircle2, AlertCircle, Send } from "lucide-react";
+import { ArrowLeft, Upload as UploadIcon, FileImage, CheckCircle2, AlertCircle, Send, Shirt } from "lucide-react";
 import { useAuth } from "../../../../auth/auth-provider";
 import DashboardLayout from "../../../dashboard-layout";
 import { DesignPreviewCard } from "../../../../../components/design/DesignPreviewCard";
 import { DesignerDesignStoryPanel } from "../../../../../components/design-story/DesignerDesignStoryPanel";
 import { useToast } from "../../../../../components/feedback/toast-provider";
-import { api, resolveUploadMimeType, uploadToSignedUrlWithProgress, type Design, type DesignWorkflowDetail, type UploadUrlResponse } from "../../../../../lib/api";
+import {
+  api,
+  resolveUploadMimeType,
+  uploadToSignedUrlWithProgress,
+  type Design,
+  type DesignUploadBaseProductOption,
+  type DesignUploadPlacementOption,
+  type DesignUploadProductTypeOption,
+  type DesignWorkflowDetail,
+  type UploadUrlResponse,
+} from "../../../../../lib/api";
 
 const ACCEPTED = ["image/png", "image/jpeg", "image/svg+xml"];
 const MAX_BYTES = 50 * 1024 * 1024;
-const PLACEMENTS = ["FRONT", "BACK", "LEFT_CHEST", "RIGHT_CHEST", "LEFT_SLEEVE", "RIGHT_SLEEVE"] as const;
-
 type Step = "form" | "pending_upload" | "uploading" | "verifying" | "ready" | "failed" | "success";
+type FormStep = 1 | 2 | 3;
+type PlacementCode = DesignUploadPlacementOption["code"];
 
 function uploadStepMessage(step: string, err: unknown): string {
   const detail = err instanceof Error ? err.message : "Upload failed";
@@ -47,8 +60,15 @@ export default function NewDesignPage() {
   const { toast } = useToast();
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [primaryPlacement, setPrimaryPlacement] = useState<(typeof PLACEMENTS)[number]>("FRONT");
-  const [file, setFile] = useState<File | null>(null);
+  const [formStep, setFormStep] = useState<FormStep>(1);
+  const [uploadOptions, setUploadOptions] = useState<DesignUploadProductTypeOption[]>([]);
+  const [optionsLoading, setOptionsLoading] = useState(true);
+  const [optionsError, setOptionsError] = useState("");
+  const [productTypeId, setProductTypeId] = useState("");
+  const [requestedBaseProductId, setRequestedBaseProductId] = useState("");
+  const [selectedPlacements, setSelectedPlacements] = useState<PlacementCode[]>([]);
+  const [placementFiles, setPlacementFiles] = useState<Partial<Record<PlacementCode, File>>>({});
+  const [uploadedPlacements, setUploadedPlacements] = useState<PlacementCode[]>([]);
   const [step, setStep] = useState<Step>("form");
   const [progress, setProgress] = useState("");
   const [uploadPercent, setUploadPercent] = useState(0);
@@ -64,10 +84,42 @@ export default function NewDesignPage() {
   const placementInputRef = useRef<HTMLInputElement | null>(null);
   const placementTargetRef = useRef<string | null>(null);
 
-  const localPreviewUrl = useMemo(() => (file ? URL.createObjectURL(file) : null), [file]);
+  const selectedProductType = useMemo(() => uploadOptions.find((item) => item.id === productTypeId) ?? null, [productTypeId, uploadOptions]);
+  const selectedBaseProduct = useMemo(
+    () => selectedProductType?.baseProducts.find((item) => item.id === requestedBaseProductId) ?? null,
+    [requestedBaseProductId, selectedProductType],
+  );
+  const selectedArtwork = useMemo(
+    () => selectedPlacements.flatMap((placement) => {
+      const artwork = placementFiles[placement];
+      return artwork ? [{ placement, file: artwork }] : [];
+    }),
+    [placementFiles, selectedPlacements],
+  );
+  const primaryFile = selectedArtwork[0]?.file ?? null;
+  const localPreviewUrl = useMemo(() => (primaryFile ? URL.createObjectURL(primaryFile) : null), [primaryFile]);
+  const placementsReady = selectedPlacements.length > 0 && selectedPlacements.every((placement) => Boolean(placementFiles[placement]));
   const handleStoryStatusChange = useCallback((status: string | null) => {
     setStorySubmittedForReview(status === "PENDING_REVIEW" || status === "PUBLISHED");
   }, []);
+
+  const loadUploadOptions = useCallback(async () => {
+    setOptionsLoading(true);
+    setOptionsError("");
+    try {
+      const options = await api.get<DesignUploadProductTypeOption[]>("/designer/designs/upload-options");
+      setUploadOptions(options.filter((item) => item.baseProducts.length > 0));
+    } catch (cause) {
+      setOptionsError(cause instanceof Error ? cause.message : "Product options could not be loaded.");
+    } finally {
+      setOptionsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!user) return;
+    void loadUploadOptions();
+  }, [loadUploadOptions, user]);
 
   useEffect(() => {
     return () => {
@@ -85,21 +137,53 @@ export default function NewDesignPage() {
       .catch(() => undefined);
   }, [createdId, step]);
 
-  function onPickFile(e: ChangeEvent<HTMLInputElement>) {
-    const f = e.target.files?.[0];
-    if (!f) return;
-    if (!ACCEPTED.includes(f.type) && !f.name.match(/\.(png|jpe?g|svg)$/i)) {
+  function selectProductType(nextProductTypeId: string) {
+    setProductTypeId(nextProductTypeId);
+    setRequestedBaseProductId("");
+    setSelectedPlacements([]);
+    setPlacementFiles({});
+    setError("");
+  }
+
+  function selectBaseProduct(baseProductId: string) {
+    setRequestedBaseProductId(baseProductId);
+    setSelectedPlacements([]);
+    setPlacementFiles({});
+    setError("");
+  }
+
+  function togglePlacement(placement: PlacementCode) {
+    setSelectedPlacements((current) => current.includes(placement)
+      ? current.filter((item) => item !== placement)
+      : [...current, placement]);
+    if (selectedPlacements.includes(placement)) {
+      setPlacementFiles((current) => {
+        const next = { ...current };
+        delete next[placement];
+        return next;
+      });
+    }
+    setError("");
+  }
+
+  function onPickFile(placement: PlacementCode, event: ChangeEvent<HTMLInputElement>) {
+    const nextFile = event.target.files?.[0];
+    if (!nextFile) return;
+    if (!ACCEPTED.includes(nextFile.type) && !nextFile.name.match(/\.(png|jpe?g|svg)$/i)) {
       setError("Unsupported file type. Use PNG, JPEG, or SVG.");
+      event.target.value = "";
       return;
     }
-    if (f.size > MAX_BYTES) {
+    if (nextFile.size > MAX_BYTES) {
       setError("File too large (max 50 MB).");
+      event.target.value = "";
       return;
     }
     setError("");
-    setFile(f);
+    setSelectedPlacements((current) => current.includes(placement) ? current : [...current, placement]);
+    setPlacementFiles((current) => ({ ...current, [placement]: nextFile }));
     setStep("pending_upload");
-    setProgress("Ready to upload. Submit when the title and file are correct.");
+    setProgress("Artwork is ready. Continue when every selected placement has a file.");
   }
 
   async function readImageDimensions(f: File): Promise<{ width: number; height: number } | null> {
@@ -158,8 +242,7 @@ export default function NewDesignPage() {
       const dimensions = await readImageDimensions(nextFile);
       await api.post(`/designs/${createdId}/versions`, {
         fileId: upload.fileId,
-        widthPx: dimensions?.width ?? 0,
-        heightPx: dimensions?.height ?? 0,
+        ...(dimensions ? { widthPx: dimensions.width, heightPx: dimensions.height } : {}),
         dpi: 300,
         placement,
       });
@@ -186,7 +269,9 @@ export default function NewDesignPage() {
       toast({
         tone: "success",
         title: "Design sent for moderation",
-        description: "The moderator can now review the artwork and its submitted story.",
+        description: storySubmittedForReview
+          ? "The moderator can now review the artwork and its submitted story."
+          : "The moderator can now review the artwork. You can add a story separately at any time.",
       });
     } catch (err) {
       const nextError = err instanceof Error ? err.message : "Submit for moderation failed";
@@ -199,101 +284,113 @@ export default function NewDesignPage() {
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
-    if (!user || !file || !title.trim()) return;
+    if (!user || !requestedBaseProductId || !placementsReady || !title.trim()) return;
     setError("");
     setStep("uploading");
     setUploadPercent(0);
-    const mimeType = resolveUploadMimeType(file);
 
-    let design: Design | null = null;
-    try {
-      setProgress("Creating design record…");
-      design = await api.post<Design>("/designs", {
-        title: title.trim(),
-        description: description.trim() || undefined,
-      });
-    } catch (err) {
-      setError(uploadStepMessage("create-design", err));
-      setStep("failed");
-      return;
+    let designId = createdId;
+    if (!designId) {
+      try {
+        setProgress("Creating design record…");
+        const design = await api.post<Design>("/designs", {
+          title: title.trim(),
+          description: description.trim() || undefined,
+          requestedBaseProductId,
+        });
+        designId = design.id;
+        setCreatedId(design.id);
+      } catch (err) {
+        setError(uploadStepMessage("create-design", err));
+        setStep("failed");
+        return;
+      }
     }
 
-    let upload: UploadUrlResponse;
-    try {
-      setProgress("Preparing upload…");
-      upload = await api.post<UploadUrlResponse>("/files/upload-url", {
-        purpose: "DESIGN_ORIGINAL",
-        filename: file.name,
-        mimeType,
-        sizeBytes: file.size,
-        designId: design.id,
-      });
-    } catch (err) {
-      setError(uploadStepMessage("upload-url", err));
-      setStep("failed");
-      return;
-    }
+    const pendingArtwork = selectedArtwork.filter((item) => !uploadedPlacements.includes(item.placement));
+    for (const [pendingIndex, artwork] of pendingArtwork.entries()) {
+      const mimeType = resolveUploadMimeType(artwork.file);
+      const itemNumber = uploadedPlacements.length + pendingIndex + 1;
+      const total = selectedArtwork.length;
+      let upload: UploadUrlResponse;
 
-    try {
-      setProgress("Uploading file to storage…");
-      await uploadToSignedUrlWithProgress(upload.url, file, mimeType, upload.headers, setUploadPercent);
-    } catch (err) {
-      setError(uploadStepMessage("storage-upload", err));
-      setStep("failed");
-      return;
-    }
+      try {
+        setProgress(`Preparing ${placementLabel(artwork.placement)} artwork (${itemNumber} of ${total})…`);
+        upload = await api.post<UploadUrlResponse>("/files/upload-url", {
+          purpose: "DESIGN_ORIGINAL",
+          filename: artwork.file.name,
+          mimeType,
+          sizeBytes: artwork.file.size,
+          designId,
+        });
+      } catch (err) {
+        setError(`${placementLabel(artwork.placement)}: ${uploadStepMessage("upload-url", err)}`);
+        setStep("failed");
+        return;
+      }
 
-    try {
-      setStep("verifying");
-      setProgress("Finalising upload…");
-      await api.post("/files/complete-upload", {
-        fileId: upload.fileId,
-        uploadedSizeBytes: file.size,
-        uploadedMimeType: mimeType,
-      });
-    } catch (err) {
-      setError(uploadStepMessage("complete-upload", err));
-      setStep("failed");
-      return;
-    }
+      try {
+        setStep("uploading");
+        setProgress(`Uploading ${placementLabel(artwork.placement)} artwork (${itemNumber} of ${total})…`);
+        await uploadToSignedUrlWithProgress(upload.url, artwork.file, mimeType, upload.headers, (percent) => {
+          setUploadPercent(Math.round(((itemNumber - 1 + percent / 100) / total) * 100));
+        });
+      } catch (err) {
+        setError(`${placementLabel(artwork.placement)}: ${uploadStepMessage("storage-upload", err)}`);
+        setStep("failed");
+        return;
+      }
 
-    try {
-      setProgress("Creating version…");
-      const dims = await readImageDimensions(file);
-      await api.post(`/designs/${design.id}/versions`, {
-        fileId: upload.fileId,
-        widthPx: dims?.width ?? 0,
-        heightPx: dims?.height ?? 0,
-        dpi: 300,
-        placement: primaryPlacement,
-      });
-    } catch (err) {
-      setError(uploadStepMessage("create-version", err));
-      setStep("failed");
-      return;
+      try {
+        setStep("verifying");
+        setProgress(`Verifying ${placementLabel(artwork.placement)} artwork (${itemNumber} of ${total})…`);
+        await api.post("/files/complete-upload", {
+          fileId: upload.fileId,
+          uploadedSizeBytes: artwork.file.size,
+          uploadedMimeType: mimeType,
+        });
+      } catch (err) {
+        setError(`${placementLabel(artwork.placement)}: ${uploadStepMessage("complete-upload", err)}`);
+        setStep("failed");
+        return;
+      }
+
+      try {
+        const dimensions = await readImageDimensions(artwork.file);
+        await api.post(`/designs/${designId}/versions`, {
+          fileId: upload.fileId,
+          ...(dimensions ? { widthPx: dimensions.width, heightPx: dimensions.height } : {}),
+          dpi: 300,
+          placement: artwork.placement,
+        });
+        setUploadedPlacements((current) => current.includes(artwork.placement) ? current : [...current, artwork.placement]);
+      } catch (err) {
+        setError(`${placementLabel(artwork.placement)}: ${uploadStepMessage("create-version", err)}`);
+        setStep("failed");
+        return;
+      }
     }
 
     setStep("ready");
     setProgress("Verified and ready for moderation.");
-    setCreatedId(design.id);
     setStep("success");
     toast({
       tone: "success",
       title: "Design saved",
-      description: "Add its story below, then send both items for moderation.",
+      description: "Submit the artwork now, or optionally add its story first.",
     });
   }
 
   return (
     <DashboardLayout role="designer">
-      <div className="max-w-2xl mx-auto space-y-6">
+      <div className="mx-auto max-w-5xl space-y-6">
         <Link href="/dashboard/designer/designs" className="inline-flex items-center gap-2 text-sm text-brand-muted hover:text-brand-ink">
           <ArrowLeft size={16} /> Back to designs
         </Link>
 
         <div>
           <h1 className="text-3xl font-bold text-brand-ink mb-1">Upload Design</h1>
-          <p className="text-brand-muted">PNG, JPEG, or SVG. Max 50 MB. Prefer transparent background and 300 DPI.</p>
+          <p className="text-brand-muted">Choose the product first, then upload artwork for every placement you want to offer.</p>
         </div>
 
         {step === "success" && createdId ? (
@@ -301,8 +398,8 @@ export default function NewDesignPage() {
             <Card>
               <ol className="grid gap-3 sm:grid-cols-3" aria-label="Design submission progress">
                 <UploadProgressStep number={1} label="Design uploaded" complete />
-                <UploadProgressStep number={2} label="Add story" complete={storySubmittedForReview} current={!storySubmittedForReview} />
-                <UploadProgressStep number={3} label="Send for moderation" complete={submittedForReview} current={storySubmittedForReview && !submittedForReview} />
+                <UploadProgressStep number={2} label="Story (optional)" complete={storySubmittedForReview} />
+                <UploadProgressStep number={3} label="Send for moderation" complete={submittedForReview} current={!submittedForReview} />
               </ol>
             </Card>
             <DesignPreviewCard
@@ -320,16 +417,16 @@ export default function NewDesignPage() {
                 <span className="rounded-pill bg-brand-blueLight px-3 py-1 text-xs font-semibold text-brand-ink">Before moderation</span>
               </div>
               <div className="mt-5 grid gap-3 sm:grid-cols-2">
-                {PLACEMENTS.filter((placement) => placement !== primaryPlacement).map((placement) => {
-                  const uploaded = designDetail?.versions?.some((version) => version.placement === placement);
-                  const loading = placementUploading === placement;
+                {(selectedBaseProduct?.placements ?? []).map((placement) => {
+                  const uploaded = designDetail?.versions?.some((version) => version.placement === placement.code);
+                  const loading = placementUploading === placement.code;
                   return (
-                    <div key={placement} className="flex min-h-16 items-center justify-between gap-3 rounded-2xl border border-brand-line bg-surface-card px-4 py-3">
+                    <div key={placement.code} className="flex min-h-16 items-center justify-between gap-3 rounded-2xl border border-brand-line bg-surface-card px-4 py-3">
                       <div>
-                        <p className="font-semibold text-brand-ink">{placementLabel(placement)}</p>
+                        <p className="font-semibold text-brand-ink">{placement.name || placementLabel(placement.code)}</p>
                         <p className={`text-xs ${uploaded ? "text-semantic-successText" : "text-brand-muted"}`}>{uploaded ? "Artwork uploaded" : "Uses no artwork until added"}</p>
                       </div>
-                      <Button variant="secondary" size="sm" loading={loading} disabled={Boolean(placementUploading) || submittedForReview} onClick={() => choosePlacementArtwork(placement)}>
+                      <Button variant="secondary" size="sm" loading={loading} disabled={Boolean(placementUploading) || submittedForReview} onClick={() => choosePlacementArtwork(placement.code)}>
                         <UploadIcon size={16} /> {uploaded ? "Replace" : "Upload"}
                       </Button>
                     </div>
@@ -340,6 +437,41 @@ export default function NewDesignPage() {
               {placementError ? <div className="mt-4"><ErrorState title="Placement upload failed" description={placementError} /></div> : null}
               {submittedForReview ? <p className="mt-4 text-sm text-brand-muted">This package has already been sent for moderation.</p> : null}
             </Card>
+            <Card>
+              <div className="flex flex-col items-center py-6 text-center">
+                <CheckCircle2 size={48} className="mb-3 text-semantic-success" />
+                <h2 className="mb-2 text-xl font-semibold text-brand-ink">Submit your design</h2>
+                <p className="mb-6 max-w-xl text-brand-muted">
+                  {submittedForReview ? (
+                    <>Your design is now <strong>pending moderation</strong>. A submitted story will be reviewed alongside it.</>
+                  ) : (
+                    <>Your artwork is ready. The story is <strong>optional</strong>—submit the design now or add a story below first.</>
+                  )}
+                </p>
+                {error ? <div className="mb-4 w-full"><ErrorState title="Submit failed" description={error} /></div> : null}
+                <div className="flex flex-wrap justify-center gap-3">
+                  {!submittedForReview ? (
+                    <Button
+                      variant="primaryBlue"
+                      loading={submittingForReview}
+                      disabled={Boolean(placementUploading)}
+                      onClick={() => void submitForModeration()}
+                    >
+                      <Send size={16} /> Submit design for moderation
+                    </Button>
+                  ) : null}
+                  <Link href={`/dashboard/designer/designs/${createdId}`}>
+                    <Button variant={submittedForReview ? "primaryBlue" : "secondary"}>Open design</Button>
+                  </Link>
+                  <Link href="/dashboard/designer/designs">
+                    <Button variant="secondary">Back to list</Button>
+                  </Link>
+                </div>
+                {!submittedForReview && placementUploading ? (
+                  <p className="mt-3 text-sm text-brand-muted">Wait for the complementary artwork upload to finish before submitting.</p>
+                ) : null}
+              </div>
+            </Card>
             <DesignerDesignStoryPanel
               designId={createdId}
               designTitle={title}
@@ -348,118 +480,186 @@ export default function NewDesignPage() {
                 setStorySubmittedForReview(true);
                 setSubmittedForReview(true);
               }}
-              reviewScope="design-and-story"
+              reviewScope="story"
               submissionBlocked={Boolean(placementUploading)}
               submissionBlockReason="Wait for the complementary artwork upload to finish before sending this package for moderation."
             />
-            <Card>
-            <div className="flex flex-col items-center text-center py-6">
-              <CheckCircle2 size={48} className="text-semantic-success mb-3" />
-              <h2 className="text-xl font-semibold text-brand-ink mb-2">Complete your submission</h2>
-              <p className="text-brand-muted mb-6">
-                {submittedForReview ? (
-                  <>Your design is now <strong>pending moderation</strong>. A submitted story will be reviewed alongside it.</>
-                ) : (
-                  <>The artwork is saved as a <strong>Draft</strong>. Finish the story above, then submit both items in one moderation request.</>
-                )}
-              </p>
-              {error ? <div className="mb-4 w-full"><ErrorState title="Submit failed" description={error} /></div> : null}
-              <div className="flex flex-wrap justify-center gap-3">
-                {!submittedForReview ? (
-                  <Button
-                    variant="primaryBlue"
-                    loading={submittingForReview}
-                    disabled={!storySubmittedForReview}
-                    onClick={() => void submitForModeration()}
-                  >
-                    <Send size={16} /> Retry design submission
-                  </Button>
-                ) : null}
-                <Link href={`/dashboard/designer/designs/${createdId}`}>
-                  <Button variant={submittedForReview ? "primaryBlue" : "secondary"}>Open design</Button>
-                </Link>
-                <Link href="/dashboard/designer/designs">
-                  <Button variant="secondary">Back to list</Button>
-                </Link>
-              </div>
-              {!submittedForReview && !storySubmittedForReview ? (
-                <p className="mt-3 text-sm text-brand-muted">
-                  Complete the story above to submit the design and story together.
-                </p>
-              ) : null}
-            </div>
-          </Card>
           </div>
         ) : (
           <Card>
-            <form onSubmit={onSubmit} className="space-y-5">
-              <FormField label="Title" required>
-                <Input
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  placeholder="e.g. Tashkent Skyline"
-                  required
-                />
-              </FormField>
+            <ol className="mb-7 grid gap-3 sm:grid-cols-3" aria-label="Design upload steps">
+              <UploadProgressStep number={1} label="Choose product" complete={formStep > 1} current={formStep === 1} />
+              <UploadProgressStep number={2} label="Add placements" complete={formStep > 2} current={formStep === 2} />
+              <UploadProgressStep number={3} label="Review & upload" complete={false} current={formStep === 3} />
+            </ol>
 
-              <FormField label="Description" helperText="Optional. Short context for the moderation team.">
-                <Textarea
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  placeholder="Notes about the artwork, inspiration, intended product fit…"
-                />
-              </FormField>
+            <form onSubmit={onSubmit} className="space-y-6">
+              {formStep === 1 ? (
+                <section aria-labelledby="upload-product-step" className="space-y-5">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-brand-blue">Step 1</p>
+                    <h2 id="upload-product-step" className="mt-1 text-xl font-semibold text-brand-ink">What product is this design for?</h2>
+                    <p className="mt-1 text-sm text-brand-muted">Your base product controls the available print placements and gives the moderator the right starting point.</p>
+                  </div>
 
-              <FormField label="First artwork placement" helperText="Choose the location this file belongs to. One uploaded placement is enough to submit." required>
-                <select
-                  className="mb-4 min-h-11 w-full rounded-xl border border-surface-borderSoft bg-white px-3 text-sm outline-none focus-visible:ring-4 focus-visible:ring-brand-blue/20"
-                  value={primaryPlacement}
-                  onChange={(event) => setPrimaryPlacement(event.target.value as (typeof PLACEMENTS)[number])}
-                >
-                  {PLACEMENTS.map((placement) => <option key={placement} value={placement}>{placementLabel(placement)}</option>)}
-                </select>
-                {localPreviewUrl ? (
-                  <div className="mb-4">
-                    <DesignPreviewCard title="Selected file" src={localPreviewUrl} alt={file?.name ?? "Selected design"} compact />
-                  </div>
-                ) : null}
-                <label className="flex flex-col items-center justify-center gap-3 px-6 py-8 border-2 border-dashed border-surface-border rounded-2xl cursor-pointer hover:border-brand-blue transition-colors">
-                  <FileImage size={36} className="text-brand-muted" />
-                  <div className="text-sm text-brand-ink">
-                    {file ? <strong>{file.name}</strong> : "Click to pick a file"}
-                  </div>
-                  {file && (
-                    <div className="text-xs text-brand-muted">
-                      {(file.size / 1024 / 1024).toFixed(2)} MB · {file.type || resolveUploadMimeType(file)}
+                  {optionsLoading ? <Skeleton className="h-52" /> : null}
+                  {optionsError ? (
+                    <div className="space-y-3">
+                      <ErrorState title="Product options unavailable" description={optionsError} />
+                      <Button type="button" variant="secondary" onClick={() => void loadUploadOptions()}>Try again</Button>
                     </div>
-                  )}
-                  <input
-                    type="file"
-                    className="hidden"
-                    accept=".png,.jpg,.jpeg,.svg,image/png,image/jpeg,image/svg+xml"
-                    onChange={onPickFile}
-                  />
-                </label>
-              </FormField>
+                  ) : null}
+                  {!optionsLoading && !optionsError ? (
+                    <>
+                      <FormField label="Product type" helperText="Choose a category before selecting its base product." required>
+                        <Select value={productTypeId} onChange={(event) => selectProductType(event.target.value)}>
+                          <option value="">Select product type</option>
+                          {uploadOptions.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+                        </Select>
+                      </FormField>
 
-              {error && (
-                <ErrorState title="Upload failed" description={error} />
-              )}
+                      {selectedProductType ? (
+                        <div>
+                          <p className="mb-3 text-sm font-medium text-brand-ink">Base product</p>
+                          <ProductPickerGrid
+                            items={selectedProductType.baseProducts.map((item) => ({
+                              id: item.id,
+                              name: item.name,
+                              imageUrl: item.imageUrl,
+                              subtitle: item.placements.length ? `${item.placements.length} placement${item.placements.length === 1 ? "" : "s"}` : "Placement setup incomplete",
+                              badge: selectedProductType.name,
+                              disabled: item.placements.length === 0,
+                            }))}
+                            selectedId={requestedBaseProductId}
+                            onSelect={selectBaseProduct}
+                            emptyLabel="No active base products are configured for this product type."
+                          />
+                        </div>
+                      ) : null}
 
-              {step !== "form" && step !== "success" && (
-                <div className="rounded-2xl border border-brand-line bg-brand-bg p-4">
-                  <div className="flex items-center justify-between gap-3 text-sm">
-                    <span className="font-semibold text-brand-ink">{uploadLabel(step)}</span>
-                    {step === "failed" ? <AlertCircle size={16} className="text-semantic-dangerText" /> : <span className="text-brand-muted">{step === "uploading" ? `${uploadPercent}%` : ""}</span>}
+                      {selectedBaseProduct ? (
+                        <div className="flex items-start gap-3 rounded-2xl border border-brand-blue/25 bg-brand-blue/5 p-4">
+                          <Shirt className="mt-0.5 shrink-0 text-brand-blue" size={20} aria-hidden="true" />
+                          <div>
+                            <p className="font-semibold text-brand-ink">{selectedBaseProduct.name}</p>
+                            <p className="mt-1 text-sm text-brand-muted">Available placements: {selectedBaseProduct.placements.map((item) => item.name || placementLabel(item.code)).join(", ")}.</p>
+                          </div>
+                        </div>
+                      ) : null}
+
+                      <div className="flex justify-end">
+                        <Button type="button" disabled={!selectedBaseProduct || selectedBaseProduct.placements.length === 0} onClick={() => setFormStep(2)}>
+                          Continue to placements
+                        </Button>
+                      </div>
+                    </>
+                  ) : null}
+                </section>
+              ) : null}
+
+              {formStep === 2 ? (
+                <section aria-labelledby="upload-placement-step" className="space-y-5">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-brand-blue">Step 2</p>
+                    <h2 id="upload-placement-step" className="mt-1 text-xl font-semibold text-brand-ink">Choose one or more placements</h2>
+                    <p className="mt-1 text-sm text-brand-muted">Upload a separate artwork file for each placement you select. PNG, JPEG, or SVG; maximum 50 MB per file.</p>
                   </div>
-                  {step === "uploading" ? <div className="mt-3 h-2 overflow-hidden rounded-full bg-white"><div className="h-full rounded-full bg-brand-blue transition-all" style={{ width: `${uploadPercent}%` }} /></div> : null}
-                  {progress ? <p className="mt-2 text-sm text-brand-muted">{progress}</p> : null}
-                </div>
-              )}
 
-              <Button type="submit" loading={step === "uploading" || step === "verifying"} disabled={!title.trim() || !file}>
-                <UploadIcon size={18} /> Upload design
-              </Button>
+                  <div className="grid gap-4 md:grid-cols-2">
+                    {(selectedBaseProduct?.placements ?? []).map((placement) => {
+                      const selected = selectedPlacements.includes(placement.code);
+                      const artwork = placementFiles[placement.code];
+                      return (
+                        <div key={placement.code} className={`rounded-2xl border p-4 transition ${selected ? "border-brand-blue bg-brand-blue/5 ring-2 ring-brand-blue/15" : "border-surface-borderSoft bg-white"}`}>
+                          <label className="flex cursor-pointer items-start gap-3">
+                            <input
+                              type="checkbox"
+                              className="mt-1 h-4 w-4 accent-brand-blue"
+                              checked={selected}
+                              onChange={() => togglePlacement(placement.code)}
+                            />
+                            <span>
+                              <span className="block font-semibold text-brand-ink">{placement.name || placementLabel(placement.code)}</span>
+                              <span className="mt-1 block text-xs text-brand-muted">Configured print area for {selectedBaseProduct?.name}.</span>
+                            </span>
+                          </label>
+                          {selected ? (
+                            <label className="mt-4 flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-surface-border px-4 py-5 text-center transition hover:border-brand-blue">
+                              <FileImage size={28} className="text-brand-muted" aria-hidden="true" />
+                              <span className="text-sm font-semibold text-brand-ink">{artwork ? artwork.name : "Choose artwork file"}</span>
+                              {artwork ? <span className="text-xs text-brand-muted">{(artwork.size / 1024 / 1024).toFixed(2)} MB · Click to replace</span> : <span className="text-xs text-brand-muted">Required for this placement</span>}
+                              <input
+                                type="file"
+                                className="sr-only"
+                                accept=".png,.jpg,.jpeg,.svg,image/png,image/jpeg,image/svg+xml"
+                                onChange={(event) => onPickFile(placement.code, event)}
+                              />
+                            </label>
+                          ) : null}
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {error ? <ErrorState title="Artwork file not accepted" description={error} /> : null}
+                  <div className="flex flex-wrap justify-between gap-3">
+                    <Button type="button" variant="secondary" onClick={() => setFormStep(1)}>Back</Button>
+                    <Button type="button" disabled={!placementsReady} onClick={() => setFormStep(3)}>Review design</Button>
+                  </div>
+                </section>
+              ) : null}
+
+              {formStep === 3 ? (
+                <section aria-labelledby="upload-review-step" className="space-y-5">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-brand-blue">Step 3</p>
+                    <h2 id="upload-review-step" className="mt-1 text-xl font-semibold text-brand-ink">Review and upload</h2>
+                    <p className="mt-1 text-sm text-brand-muted">Confirm the design details and placement files before creating the draft.</p>
+                  </div>
+
+                  <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(260px,0.72fr)]">
+                    <div className="space-y-5">
+                      <FormField label="Title" required>
+                        <Input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="e.g. Tashkent Skyline" required />
+                      </FormField>
+                      <FormField label="Description" helperText="Optional. Short context for the moderation team.">
+                        <Textarea value={description} onChange={(event) => setDescription(event.target.value)} placeholder="Notes about the artwork, inspiration, intended product fit…" />
+                      </FormField>
+                      <div className="rounded-2xl border border-surface-borderSoft bg-brand-bg/50 p-4 text-sm">
+                        <p className="font-semibold text-brand-ink">{selectedProductType?.name} · {selectedBaseProduct?.name}</p>
+                        <ul className="mt-3 space-y-2 text-brand-muted">
+                          {selectedArtwork.map((artwork) => (
+                            <li key={artwork.placement} className="flex items-center justify-between gap-3">
+                              <span>{placementLabel(artwork.placement)}</span>
+                              <span className="max-w-[60%] truncate font-medium text-brand-ink">{artwork.file.name}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    </div>
+                    {localPreviewUrl ? <DesignPreviewCard title="First placement preview" src={localPreviewUrl} alt={primaryFile?.name ?? "Selected design"} compact /> : null}
+                  </div>
+
+                  {error ? <ErrorState title="Upload failed" description={error} /> : null}
+                  {step !== "form" && step !== "success" ? (
+                    <div className="rounded-2xl border border-brand-line bg-brand-bg p-4" role="status">
+                      <div className="flex items-center justify-between gap-3 text-sm">
+                        <span className="font-semibold text-brand-ink">{uploadLabel(step)}</span>
+                        {step === "failed" ? <AlertCircle size={16} className="text-semantic-dangerText" /> : <span className="text-brand-muted">{uploadPercent}%</span>}
+                      </div>
+                      <div className="mt-3 h-2 overflow-hidden rounded-full bg-white"><div className="h-full rounded-full bg-brand-blue transition-all" style={{ width: `${uploadPercent}%` }} /></div>
+                      {progress ? <p className="mt-2 text-sm text-brand-muted">{progress}</p> : null}
+                    </div>
+                  ) : null}
+
+                  <div className="flex flex-wrap justify-between gap-3">
+                    <Button type="button" variant="secondary" disabled={Boolean(createdId)} onClick={() => setFormStep(2)}>Back</Button>
+                    <Button type="submit" loading={step === "uploading" || step === "verifying"} disabled={!title.trim() || !requestedBaseProductId || !placementsReady}>
+                      <UploadIcon size={18} /> {step === "failed" && createdId ? "Retry remaining artwork" : `Upload ${selectedArtwork.length} placement${selectedArtwork.length === 1 ? "" : "s"}`}
+                    </Button>
+                  </div>
+                </section>
+              ) : null}
             </form>
           </Card>
         )}

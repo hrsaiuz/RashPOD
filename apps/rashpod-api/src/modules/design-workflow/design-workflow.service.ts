@@ -26,6 +26,7 @@ import { JobDispatcherService } from "../worker-jobs/job-dispatcher.service";
 import { PrintfulFilesService } from "../printful/printful-files.service";
 import { PrintfulMockupService } from "../printful/printful-mockup.service";
 import { PrintfulClient } from "../printful/printful.client";
+import { canonicalPlacementKind } from "../printful/printful-placement";
 import { PodPlacementTransformService } from "../pod/placement-transform.service";
 import { MarketplaceComplianceService } from "./marketplace-compliance.service";
 import { PlacementCalculationService } from "./placement-calculation.service";
@@ -118,6 +119,7 @@ export class DesignWorkflowService {
         where: { id },
         include: {
           designer: { select: { id: true, email: true, displayName: true, handle: true } },
+          requestedBaseProduct: { include: { productType: true } },
           // A design can have dedicated artwork for every configured placement.
           // Keep enough history to resolve all placement-specific source versions.
           versions: { orderBy: { createdAt: "desc" }, take: 20 },
@@ -172,8 +174,12 @@ export class DesignWorkflowService {
   }
 
   private versionForPlacement<T extends { placement?: unknown }>(versions: T[], placement?: string | null) {
-    const normalized = placement?.trim().toUpperCase().replace(/[\s-]+/g, "_");
-    const exact = versions.find((version) => normalized && version.placement === normalized);
+    const normalized = canonicalPlacementKind(placement);
+    const exact = versions.find((version) => (
+      normalized
+      && typeof version.placement === "string"
+      && canonicalPlacementKind(version.placement) === normalized
+    ));
     const defaultVersion = versions.find((version) => !version.placement);
     // Never borrow artwork from another explicit placement. Legacy/default
     // versions remain a valid fallback for existing designs.
@@ -262,15 +268,8 @@ export class DesignWorkflowService {
       heightCm: printArea.heightCm,
     };
 
-    const templateImageKey = printArea.mockupView?.blankImageKey ?? template.baseImageKey;
-    const templateMedia = await this.prisma.mediaAsset.findFirst({
-      where: { OR: [{ objectKey: templateImageKey }, { key: templateImageKey }] },
-      select: { width: true, height: true },
-      orderBy: { updatedAt: "desc" },
-    });
-    const templateImageUrl = this.storage.isCloudStorageConfigured()
-      ? this.storage.buildPublicUrl(templateImageKey)
-      : await this.storage.createPublicSignedReadUrl({ objectKey: templateImageKey, expiresSeconds: 60 * 60 });
+    const configuredTemplateImageKey = printArea.mockupView?.blankImageKey ?? template.baseImageKey;
+    const templateImage = await this.resolveMockupImageReference(configuredTemplateImageKey, "product view");
     const designImageUrl = await this.safeSignedUrl(latestVersion.fileKey);
 
     const initialScale = Math.max(
@@ -293,9 +292,10 @@ export class DesignWorkflowService {
     );
 
     return {
-      templateWidthPx: templateMedia?.width ?? 2000,
-      templateHeightPx: templateMedia?.height ?? 2000,
-      templateImageUrl,
+      templateWidthPx: templateImage.width ?? 2000,
+      templateHeightPx: templateImage.height ?? 2000,
+      templateImageKey: templateImage.objectKey,
+      templateImageUrl: templateImage.imageUrl,
       designImageUrl,
       printArea: printAreaRect,
       constraints: {
@@ -551,6 +551,44 @@ export class DesignWorkflowService {
     } catch {
       return null;
     }
+  }
+
+  private async resolveMockupImageReference(reference: string, role: string) {
+    const configuredReference = reference.trim();
+    if (!configuredReference) {
+      throw new BadRequestException(`MOCKUP_TEMPLATE_IMAGE_MISSING: ${role} has no configured media reference`);
+    }
+
+    // Administrators normally persist MediaAsset.objectKey, but older records can
+    // contain the stable MediaAsset.key alias. Resolve either exact reference to
+    // the canonical object key used by GCS and the worker snapshot.
+    const media = await this.prisma.mediaAsset.findFirst({
+      where: {
+        isActive: true,
+        OR: [{ key: configuredReference }, { objectKey: configuredReference }],
+      },
+      select: { objectKey: true, publicUrl: true, width: true, height: true },
+      orderBy: { updatedAt: "desc" },
+    });
+    const objectKey = media?.objectKey.trim() || configuredReference;
+    const objectMetadata = await this.storage.getPublicObjectMetadata(objectKey).catch(() => null);
+    if (!objectMetadata) {
+      throw new BadRequestException(
+        `MOCKUP_TEMPLATE_IMAGE_MISSING: ${role} references "${configuredReference}", but its exact uploaded media object was not found`,
+      );
+    }
+
+    const imageUrl = this.storage.isCloudStorageConfigured()
+      ? this.storage.buildPublicUrl(objectKey)
+      : media?.publicUrl
+        ?? await this.storage.createPublicSignedReadUrl({ objectKey, expiresSeconds: 60 * 60 });
+
+    return {
+      objectKey,
+      imageUrl,
+      width: media?.width ?? null,
+      height: media?.height ?? null,
+    };
   }
 
   async submitModerationDecision(moderator: { sub: string; role: string; email?: string }, designId: string, dto: SubmitModerationDecisionDto) {
@@ -949,6 +987,35 @@ export class DesignWorkflowService {
       throw new BadRequestException("INVALID_PRODUCT_COMPOSITION: all placements in a composition must use the same local product and mockup template");
     }
     const placementConfig = this.localPlacementConfig({ template: selectedTemplate, area, preset, unit, anchor, position });
+    const configuredImageReferences = [
+      placementConfig.mockupTemplate.baseImageKey,
+      placementConfig.mockupTemplate.lifestyleImageKey,
+      placementConfig.mockupTemplate.closeupImageKey,
+      placementConfig.mockupView?.blankImageKey,
+      ...placementConfig.galleryAssets.map((asset) => asset.imageKey),
+    ].filter((reference): reference is string => Boolean(reference));
+    const canonicalImageEntries = await Promise.all(
+      [...new Set(configuredImageReferences)].map(async (reference) => {
+        const resolved = await this.resolveMockupImageReference(reference, "local mockup image");
+        return [reference, resolved.objectKey] as const;
+      }),
+    );
+    const canonicalImageKeys = new Map(canonicalImageEntries);
+    const canonicalImageKey = (reference: string) => canonicalImageKeys.get(reference) ?? reference;
+    placementConfig.mockupTemplate.baseImageKey = canonicalImageKey(placementConfig.mockupTemplate.baseImageKey);
+    if (placementConfig.mockupTemplate.lifestyleImageKey) {
+      placementConfig.mockupTemplate.lifestyleImageKey = canonicalImageKey(placementConfig.mockupTemplate.lifestyleImageKey);
+    }
+    if (placementConfig.mockupTemplate.closeupImageKey) {
+      placementConfig.mockupTemplate.closeupImageKey = canonicalImageKey(placementConfig.mockupTemplate.closeupImageKey);
+    }
+    if (placementConfig.mockupView) {
+      placementConfig.mockupView.blankImageKey = canonicalImageKey(placementConfig.mockupView.blankImageKey);
+    }
+    placementConfig.galleryAssets = placementConfig.galleryAssets.map((asset) => ({
+      ...asset,
+      imageKey: canonicalImageKey(asset.imageKey),
+    }));
     const positionHash = this.selectionHash({ pipeline: PipelineType.LOCAL, compositionKey, localBaseProductId: baseProduct.id, presetId: preset?.id ?? null, placement, placementConfig });
 
     const row = await tx.designProductSelection.upsert({
@@ -1004,7 +1071,7 @@ export class DesignWorkflowService {
     if (preset.productTemplateId && preset.productTemplateId !== template.id) throw new BadRequestException("INVALID_PLACEMENT: preset does not belong to Printful template");
 
     const providerPlacement = this.normalizeProviderPlacement(selection.placement);
-    const placement = this.placementKindForProvider(providerPlacement);
+    const placement = canonicalPlacementKind(providerPlacement) ?? PlacementKind.OTHER;
     if (this.providerPlacementForPreset(preset) !== providerPlacement) {
       throw new BadRequestException("INVALID_PLACEMENT: Printful preset placement does not match selection");
     }
@@ -1193,18 +1260,6 @@ export class DesignWorkflowService {
     return preset.providerPlacement
       ? this.normalizeProviderPlacement(preset.providerPlacement)
       : preset.placement.toLowerCase();
-  }
-
-  private placementKindForProvider(providerPlacement: string): PlacementKind {
-    const normalized = providerPlacement.toUpperCase();
-    if (normalized === "FRONT") return PlacementKind.FRONT;
-    if (normalized === "BACK") return PlacementKind.BACK;
-    if (normalized.includes("LEFT_CHEST") || normalized.includes("CHEST_LEFT")) return PlacementKind.LEFT_CHEST;
-    if (normalized.includes("RIGHT_CHEST") || normalized.includes("CHEST_RIGHT")) return PlacementKind.RIGHT_CHEST;
-    if (normalized.includes("LEFT_SLEEVE") || normalized.includes("SLEEVE_LEFT")) return PlacementKind.LEFT_SLEEVE;
-    if (normalized.includes("RIGHT_SLEEVE") || normalized.includes("SLEEVE_RIGHT")) return PlacementKind.RIGHT_SLEEVE;
-    if (normalized.includes("WRAP") || normalized.includes("ALL_OVER")) return PlacementKind.FULL_WRAP;
-    return PlacementKind.OTHER;
   }
 
   private normalizeMarketplaces(values: string[]) {

@@ -332,15 +332,16 @@ export class AdminConfigService {
   }
 
   async deleteBaseProduct(actorId: string, id: string) {
-    const [selections, presetSelections, listings, marketplaceMappings, providerMappings, intakeItems] = await Promise.all([
+    const [selections, presetSelections, requestedDesigns, listings, marketplaceMappings, providerMappings, intakeItems] = await Promise.all([
       this.prisma.designProductSelection.count({ where: { localBaseProductId: id } }),
       this.prisma.designProductSelection.count({ where: { placementPreset: { localBaseProductId: id } } }),
+      this.prisma.designAsset.count({ where: { requestedBaseProductId: id } }),
       this.prisma.commerceListing.count({ where: { localBaseProductId: id } }),
       this.prisma.marketplaceCategoryMapping.count({ where: { baseProductId: id } }),
       this.prisma.podProductMapping.count({ where: { baseProductId: id } }),
       this.prisma.externalOrderIntakeItem.count({ where: { baseProductId: id } }),
     ]);
-    if (selections + presetSelections + listings + marketplaceMappings + providerMappings + intakeItems > 0) {
+    if (selections + presetSelections + requestedDesigns + listings + marketplaceMappings + providerMappings + intakeItems > 0) {
       throw new ConflictException("Base product is used by workflow history and cannot be deleted. Deactivate it instead.");
     }
 

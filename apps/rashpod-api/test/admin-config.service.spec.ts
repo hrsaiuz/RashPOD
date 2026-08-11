@@ -232,6 +232,7 @@ describe("AdminConfigService catalog CRUD parity", () => {
       baseProduct: {
         update: jest.fn().mockResolvedValue({ id: "bp_1" }),
       },
+      designAsset: { count: jest.fn().mockResolvedValue(0) },
       designProductSelection: { count: jest.fn().mockResolvedValue(0) },
       commerceListing: { count: jest.fn().mockResolvedValue(0) },
       marketplaceCategoryMapping: { count: jest.fn().mockResolvedValue(0) },

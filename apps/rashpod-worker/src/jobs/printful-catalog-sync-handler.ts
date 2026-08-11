@@ -4,18 +4,18 @@ import { WorkerRepository } from "../repository";
 export class PrintfulCatalogSyncJobHandler {
   constructor(
     private readonly repo: WorkerRepository,
-    private readonly client = new PrintfulApiClient(),
+    private readonly client = new PrintfulApiClient({ enabled: true }),
   ) {}
 
   async handleSync(input: { requestedBy?: string }) {
     const repo = this.integrationRepo();
-    if (!this.client.isEnabled()) return this.fail("PRINTFUL_NOT_CONFIGURED", "Printful integration is disabled.");
-    if (!this.client.hasToken()) return this.fail("PRINTFUL_API_TOKEN_MISSING", "Printful API token is missing.");
     if (!repo.getPrintfulSettings || !repo.upsertPrintfulProductTemplate || !repo.ensurePrintfulPlacementPreset) {
       throw new Error("Printful catalog repository methods are not configured");
     }
 
     const settings = await repo.getPrintfulSettings();
+    if (!settings.enabled) return this.fail("PRINTFUL_NOT_CONFIGURED", "Printful integration is disabled.");
+    if (!this.client.hasToken()) return this.fail("PRINTFUL_API_TOKEN_MISSING", "Printful API token is missing.");
     const allowlist = settings.catalogAllowlist;
     await repo.createIntegrationLog({
       action: "printful.catalog.sync",

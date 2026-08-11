@@ -35,7 +35,8 @@ export class PipelineMockupJobHandler {
       return { failed: true, errorCode: "INVALID_PRINTFUL_VARIANT" };
     }
 
-    if (process.env.PRINTFUL_ENABLED !== "true") {
+    const settings = await this.printfulSettingsRepo().getPrintfulSettings();
+    if (!settings.enabled) {
       await this.failSelection(selection.id, "PRINTFUL_NOT_CONFIGURED");
       return { failed: true, errorCode: "PRINTFUL_NOT_CONFIGURED" };
     }
@@ -194,6 +195,13 @@ export class PipelineMockupJobHandler {
       throw new Error("Pipeline repository methods are not configured");
     }
     return this.repo as Required<Pick<WorkerRepository, "getPipelineSelection" | "updatePipelineSelection" | "listMockupAssets" | "updateMockupAsset" | "createListingDraftForSelection">>;
+  }
+
+  private printfulSettingsRepo() {
+    if (!this.repo.getPrintfulSettings) {
+      throw new Error("Printful settings repository method is not configured");
+    }
+    return this.repo as Required<Pick<WorkerRepository, "getPrintfulSettings">>;
   }
 
   private record(value: unknown): Record<string, unknown> {

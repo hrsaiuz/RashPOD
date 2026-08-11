@@ -1,4 +1,4 @@
-import { DesignStatus, ModerationDecision, UserRole } from "@prisma/client";
+import { DesignStatus, ModerationDecision, PlacementKind, UserRole } from "@prisma/client";
 
 type User = {
   id: string;
@@ -62,10 +62,10 @@ type ModerationCase = {
   reason?: string | null;
   createdAt: Date;
 };
-type ProductType = { id: string; name: string; slug: string; category: string; productionMethod: string; createdAt: Date; updatedAt: Date };
-type BaseProduct = { id: string; productTypeId: string; name: string; skuPrefix: string; isActive: boolean; createdAt: Date; updatedAt: Date };
-type MockupTemplate = { id: string; baseProductId: string; name: string; baseImageKey: string; isActive: boolean; createdAt: Date; updatedAt: Date };
-type PrintArea = { id: string; mockupTemplateId: string; mockupViewId?: string | null; name: string; x: number; y: number; width: number; height: number; safeX: number; safeY: number; safeWidth: number; safeHeight: number; isActive: boolean; createdAt: Date; updatedAt: Date };
+type ProductType = { id: string; tenantId?: string | null; name: string; slug: string; category: string; productionMethod: string; isActive?: boolean; availableForDesigners?: boolean; createdAt: Date; updatedAt: Date };
+type BaseProduct = { id: string; tenantId?: string | null; productTypeId: string; name: string; skuPrefix: string; isActive: boolean; createdAt: Date; updatedAt: Date };
+type MockupTemplate = { id: string; tenantId?: string | null; baseProductId: string; name: string; baseImageKey: string; isActive: boolean; createdAt: Date; updatedAt: Date };
+type PrintArea = { id: string; mockupTemplateId: string; mockupViewId?: string | null; name: string; placement?: PlacementKind | null; x: number; y: number; width: number; height: number; safeX: number; safeY: number; safeWidth: number; safeHeight: number; isActive: boolean; createdAt: Date; updatedAt: Date };
 type MockupPlacement = { id: string; designAssetId: string; designVersionId: string; mockupTemplateId: string; printAreaId: string; x: number; y: number; width: number; height: number; scale: number; rotation: number; approvedByDesigner: boolean; approvedAt?: Date | null; createdAt: Date; updatedAt: Date };
 type GeneratedAsset = { id: string; sourcePlacementId: string; type: string; status: string; createdAt: Date; updatedAt: Date };
 type WorkerJob = { id: string; type: string; status: string; payloadJson: Record<string, unknown>; attempts: number; maxAttempts: number; errorMessage?: string | null; nextRunAt: Date; lastErrorAt?: Date | null; claimedAt?: Date | null; completedAt?: Date | null; createdAt: Date; updatedAt: Date };
@@ -323,6 +323,23 @@ export function createFakePrisma(): any {
         baseProducts.push(row);
         return row;
       },
+      findFirst: async ({ where, select }: any) => {
+        const row = baseProducts.find((product) => {
+          if (where?.id && product.id !== where.id) return false;
+          if (where?.isActive != null && product.isActive !== where.isActive) return false;
+          if (where?.tenantId === null && (product.tenantId ?? null) !== null) return false;
+          if (Array.isArray(where?.OR) && !where.OR.some((scope: any) => (product.tenantId ?? null) === scope.tenantId)) return false;
+          const productType = productTypes.find((type) => type.id === product.productTypeId);
+          if (!productType) return false;
+          if (where?.productType?.isActive != null && productType.isActive !== where.productType.isActive) return false;
+          if (where?.productType?.availableForDesigners != null && productType.availableForDesigners !== where.productType.availableForDesigners) return false;
+          if (where?.productType?.tenantId === null && (productType.tenantId ?? null) !== null) return false;
+          if (Array.isArray(where?.productType?.OR) && !where.productType.OR.some((scope: any) => (productType.tenantId ?? null) === scope.tenantId)) return false;
+          return true;
+        }) ?? null;
+        if (!row || !select) return row;
+        return Object.fromEntries(Object.entries(select).filter(([, enabled]) => enabled).map(([key]) => [key, (row as any)[key]]));
+      },
     },
     mockupTemplate: {
       create: async ({ data }: any) => {
@@ -351,6 +368,29 @@ export function createFakePrisma(): any {
         const row = printAreas.find((area) => area.id === where.id) ?? null;
         if (!row || !include?.mockupView) return row;
         return { ...row, mockupView: null };
+      },
+      findMany: async ({ where, select }: any = {}) => {
+        const rows = printAreas.filter((area) => {
+          if (where?.isActive != null && area.isActive !== where.isActive) return false;
+          const template = mockupTemplates.find((item) => item.id === area.mockupTemplateId);
+          if (!template) return false;
+          if (where?.mockupTemplate?.isActive != null && template.isActive !== where.mockupTemplate.isActive) return false;
+          const product = baseProducts.find((item) => item.id === template.baseProductId);
+          if (!product) return false;
+          const productWhere = where?.mockupTemplate?.baseProduct;
+          if (productWhere?.id && product.id !== productWhere.id) return false;
+          if (productWhere?.isActive != null && product.isActive !== productWhere.isActive) return false;
+          const productType = productTypes.find((item) => item.id === product.productTypeId);
+          if (!productType) return false;
+          if (productWhere?.productType?.isActive != null && productType.isActive !== productWhere.productType.isActive) return false;
+          if (productWhere?.productType?.availableForDesigners != null && productType.availableForDesigners !== productWhere.productType.availableForDesigners) return false;
+          return true;
+        });
+        if (!select) return rows;
+        return rows.map((row) => ({
+          ...(select.placement ? { placement: row.placement ?? null } : {}),
+          ...(select.mockupView ? { mockupView: null } : {}),
+        }));
       },
     },
     mockupPlacement: {

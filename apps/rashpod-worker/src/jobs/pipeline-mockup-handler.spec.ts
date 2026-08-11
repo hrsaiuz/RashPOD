@@ -51,6 +51,9 @@ function createRepo(): WorkerRepository & { selection: any; assets: any[]; listi
       repo.listingCalls += 1;
       return { id: "listing_1", status: "DRAFT" };
     },
+    async getPrintfulSettings() {
+      return { enabled: false, catalogAllowlist: [] };
+    },
   };
   return repo;
 }
@@ -99,6 +102,8 @@ describe("PipelineMockupJobHandler", () => {
     const repo = createRepo();
     repo.selection.pipeline = "GLOBAL_PRINTFUL";
     repo.selection.printfulProductTemplate = { id: "pt_1", displayName: "Printful Tee" };
+    process.env.PRINTFUL_ENABLED = "true";
+    process.env.PRINTFUL_API_TOKEN = "test-token";
     const handler = new PipelineMockupJobHandler(repo, renderer);
 
     const result = await handler.handlePrintfulMockups({ designProductSelectionId: "sel_1" });
@@ -109,11 +114,27 @@ describe("PipelineMockupJobHandler", () => {
     expect(repo.assets.every((asset) => asset.status === "FAILED")).toBe(true);
   });
 
+  it("starts Printful mockups when the admin setting is enabled without the legacy runtime flag", async () => {
+    const repo = createRepo();
+    repo.selection.pipeline = "GLOBAL_PRINTFUL";
+    repo.selection.printfulProductTemplate = { id: "pt_1", displayName: "Printful Tee" };
+    repo.getPrintfulSettings = async () => ({ enabled: true, catalogAllowlist: [] });
+    process.env.PRINTFUL_API_TOKEN = "test-token";
+    const helper = { ensureFileAndCreateTask: jest.fn(async () => ({ taskKey: "task_1", printfulFileId: "file_1" })) };
+    const handler = new PipelineMockupJobHandler(repo, renderer, helper);
+
+    const result = await handler.handlePrintfulMockups({ designProductSelectionId: "sel_1" });
+
+    expect(result).toEqual({ processing: true, taskKey: "task_1", printfulFileId: "file_1" });
+    expect(helper.ensureFileAndCreateTask).toHaveBeenCalledWith("sel_1", undefined);
+    expect(repo.selection.status).toBe("MOCKUP_GENERATING");
+  });
+
   it("persists actionable details for a non-retryable Printful validation failure", async () => {
     const repo = createRepo();
     repo.selection.pipeline = "GLOBAL_PRINTFUL";
     repo.selection.printfulProductTemplate = { id: "pt_1", displayName: "Printful Tee" };
-    process.env.PRINTFUL_ENABLED = "true";
+    repo.getPrintfulSettings = async () => ({ enabled: true, catalogAllowlist: [] });
     process.env.PRINTFUL_API_TOKEN = "test-token";
     const printfulError = new Error("PRINTFUL_REQUEST_FAILED:400") as Error & { responseBody?: unknown; printfulOperation?: string };
     printfulError.responseBody = { error: { message: "Variant 401 does not support placement sleeve_left" }, request_id: "req_400" };

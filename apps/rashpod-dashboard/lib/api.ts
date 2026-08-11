@@ -180,12 +180,43 @@ export type ListingType = "PRODUCT" | "FILM";
 export interface Design {
   id: string;
   designerId: string;
+  requestedBaseProductId?: string | null;
+  requestedBaseProduct?: {
+    id: string;
+    name: string;
+    imageUrl?: string | null;
+    productType?: { id: string; name: string } | null;
+  } | null;
   title: string;
   description?: string | null;
   status: DesignStatus;
   commercialRights?: CommercialRights | null;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface DesignUploadPlacementOption {
+  code: "FRONT" | "BACK" | "LEFT_CHEST" | "RIGHT_CHEST" | "LEFT_SLEEVE" | "RIGHT_SLEEVE" | "FULL_WRAP" | "OTHER";
+  name: string;
+  mockupTemplateId: string;
+  mockupViewId?: string | null;
+  printAreaId: string;
+}
+
+export interface DesignUploadBaseProductOption {
+  id: string;
+  name: string;
+  description?: string | null;
+  imageUrl?: string | null;
+  placements: DesignUploadPlacementOption[];
+}
+
+export interface DesignUploadProductTypeOption {
+  id: string;
+  name: string;
+  slug: string;
+  category: string;
+  baseProducts: DesignUploadBaseProductOption[];
 }
 
 export interface ModerationQueueDesign extends Design {

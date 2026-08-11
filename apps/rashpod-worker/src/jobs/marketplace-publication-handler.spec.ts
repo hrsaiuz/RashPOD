@@ -41,6 +41,9 @@ function createRepo(publicationOverrides: any = {}) {
     async createIntegrationLog(data) {
       repo.logs.push(data);
     },
+    async getPrintfulSettings() {
+      return { enabled: false, catalogAllowlist: [] };
+    },
   };
   return repo;
 }
@@ -65,6 +68,8 @@ describe("MarketplacePublicationJobHandler", () => {
   });
 
   it("fails Printful publications when Printful is not configured", async () => {
+    process.env.PRINTFUL_ENABLED = "true";
+    process.env.PRINTFUL_API_TOKEN = "test-token";
     const repo = createRepo({ marketplace: "ETSY", provider: "PRINTFUL" });
     const handler = new MarketplacePublicationJobHandler(repo);
 
@@ -76,7 +81,6 @@ describe("MarketplacePublicationJobHandler", () => {
   });
 
   it("publishes selected variants to the selected Printful store", async () => {
-    process.env.PRINTFUL_ENABLED = "true";
     process.env.PRINTFUL_API_TOKEN = "test-token";
     const repo = createRepo({
       marketplace: "PRINTFUL",
@@ -98,6 +102,7 @@ describe("MarketplacePublicationJobHandler", () => {
         designProductSelectionId: "selection_1",
       },
     });
+    repo.getPrintfulSettings = async () => ({ enabled: true, catalogAllowlist: [] });
     repo.getMarketplacePublicationPublishContext = async () => ({
       ...repo.publication,
       printfulFileId: "file-1",
@@ -148,7 +153,6 @@ describe("MarketplacePublicationJobHandler", () => {
   });
 
   it("uploads the approved design file when its Printful mapping is missing", async () => {
-    process.env.PRINTFUL_ENABLED = "true";
     process.env.PRINTFUL_API_TOKEN = "test-token";
     const repo = createRepo({
       marketplace: "PRINTFUL",
@@ -156,6 +160,7 @@ describe("MarketplacePublicationJobHandler", () => {
       providerStoreId: "store-22",
       metadataJson: { variantIds: ["401"], retailPrice: "31.50", placement: "front" },
     });
+    repo.getPrintfulSettings = async () => ({ enabled: true, catalogAllowlist: [] });
     repo.getMarketplacePublicationPublishContext = async () => ({
       ...repo.publication,
       selection: { designId: "design-1" } as any,
@@ -204,9 +209,9 @@ describe("MarketplacePublicationJobHandler", () => {
   });
 
   it("publishes all artwork placements from one product composition", async () => {
-    process.env.PRINTFUL_ENABLED = "true";
     process.env.PRINTFUL_API_TOKEN = "test-token";
     const repo = createRepo({ marketplace: "PRINTFUL", provider: "PRINTFUL", providerStoreId: "store-22" });
+    repo.getPrintfulSettings = async () => ({ enabled: true, catalogAllowlist: [] });
     const template = {
       id: "template-1",
       displayName: "Premium tee",
@@ -256,7 +261,6 @@ describe("MarketplacePublicationJobHandler", () => {
   });
 
   it("updates an existing Printful sync product on retry instead of duplicating it", async () => {
-    process.env.PRINTFUL_ENABLED = "true";
     process.env.PRINTFUL_API_TOKEN = "test-token";
     const repo = createRepo({
       marketplace: "PRINTFUL",
@@ -273,6 +277,7 @@ describe("MarketplacePublicationJobHandler", () => {
         designProductSelectionId: "selection_1",
       },
     });
+    repo.getPrintfulSettings = async () => ({ enabled: true, catalogAllowlist: [] });
     repo.getMarketplacePublicationPublishContext = async () => ({
       ...repo.publication,
       printfulFileId: "file-1",

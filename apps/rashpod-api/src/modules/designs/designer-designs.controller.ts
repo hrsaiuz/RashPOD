@@ -21,24 +21,30 @@ export class DesignerDesignsController {
   @Get()
   @RequirePermission("design:read-own")
   list(@CurrentUser() user: RequestUser) {
-    return this.designsService.listOwn(user.sub);
+    return this.designsService.listOwn(user.sub, user.tenantId ?? user.tid);
+  }
+
+  @Get("upload-options")
+  @RequirePermission("design:create")
+  uploadOptions(@CurrentUser() user: RequestUser) {
+    return this.designsService.uploadOptions(user.tenantId ?? user.tid);
   }
 
   @Get(":id")
   @RequirePermission("design:read-own")
   get(@CurrentUser() user: RequestUser, @Param("id") id: string) {
-    return this.designsService.getOwn(user.sub, id);
+    return this.designsService.getOwn(user.sub, id, user.tenantId ?? user.tid);
   }
 
   @Post(":id/submit-for-moderation")
   @RequirePermission("design:submit-own")
   submitForModeration(@CurrentUser() user: RequestUser, @Param("id") id: string) {
-    return this.designsService.submit(user.sub, id);
+    return this.designsService.submit(user.sub, id, user.tenantId ?? user.tid);
   }
 
   @Post(":id/versions")
   @RequirePermission("design:create")
   createVersion(@CurrentUser() user: RequestUser, @Param("id") id: string, @Body() dto: CreateDesignVersionDto) {
-    return this.designsService.createVersion(user.sub, id, dto);
+    return this.designsService.createVersion(user.sub, id, dto, user.tenantId ?? user.tid);
   }
 }

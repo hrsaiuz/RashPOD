@@ -20,6 +20,19 @@ describe("buildModerationDecisionPayload", () => {
     });
   });
 
+  it("supports a global-only approval when workspace policy does not require a local product", () => {
+    expect(buildModerationDecisionPayload({
+      decision: "APPROVE_GLOBAL",
+      localSelections: [],
+      globalPrintfulSelections: [{ id: "global" }],
+      rejectionReasons: [],
+    })).toMatchObject({
+      decision: "APPROVE_GLOBAL",
+      localSelections: [],
+      globalPrintfulSelections: [{ id: "global" }],
+    });
+  });
+
   it("does not leak product selections into rejection payloads", () => {
     const payload = buildModerationDecisionPayload({ decision: "REJECT", localSelections: [{ id: "local" }], globalPrintfulSelections: [{ id: "global" }], rejectionReasons: ["LOW_IMAGE_RESOLUTION"] });
     expect(payload).toEqual({ decision: "REJECT", rejectionReasons: ["LOW_IMAGE_RESOLUTION"], customRejectionReason: undefined, moderatorNotes: undefined });
