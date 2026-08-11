@@ -183,6 +183,7 @@ export interface Design {
   title: string;
   description?: string | null;
   status: DesignStatus;
+  commercialRights?: CommercialRights | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -341,6 +342,13 @@ export interface CommercialRights {
   filmConsentGrantedAt?: string | null;
   filmConsentRevokedAt?: string | null;
   filmRoyaltyRate?: number | null;
+}
+
+export interface BulkCommercialRightsResult {
+  requestedCount: number;
+  updatedCount: number;
+  unchangedCount: number;
+  items: CommercialRights[];
 }
 
 export interface UploadUrlResponse {

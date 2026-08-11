@@ -33,6 +33,9 @@
 - [ ] Product approval does not enable film sales.
 - [ ] Designer can enable film sales for own design.
 - [ ] Designer can disable future film sales.
+- [ ] Designer can select uploaded designs and bulk-change only the rights explicitly chosen.
+- [ ] Bulk film enable records explicit, version-bound consent for every changed design.
+- [ ] A foreign, missing, or versionless design prevents the full bulk update without partial writes.
 - [ ] Consent timestamp is stored.
 - [ ] Revocation timestamp is stored.
 - [ ] Admin override is audit logged.

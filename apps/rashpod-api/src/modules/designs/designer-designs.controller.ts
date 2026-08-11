@@ -15,7 +15,7 @@ export class DesignerDesignsController {
   @Post()
   @RequirePermission("design:create")
   create(@CurrentUser() user: RequestUser, @Body() dto: CreateDesignDto) {
-    return this.designsService.create(user.sub, dto);
+    return this.designsService.create(user.sub, dto, user.tenantId ?? user.tid);
   }
 
   @Get()

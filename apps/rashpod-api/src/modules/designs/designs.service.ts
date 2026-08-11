@@ -15,10 +15,11 @@ export class DesignsService {
     private readonly storage: StorageService,
   ) {}
 
-  async create(designerId: string, dto: CreateDesignDto) {
+  async create(designerId: string, dto: CreateDesignDto, tenantId?: string) {
     const design = await this.prisma.designAsset.create({
       data: {
         designerId,
+        tenantId,
         title: dto.title,
         description: dto.description,
       },
@@ -31,6 +32,7 @@ export class DesignsService {
       action: "design.create",
       entityType: "DesignAsset",
       entityId: design.id,
+      tenantId,
     });
     return design;
   }
@@ -38,6 +40,7 @@ export class DesignsService {
   async listOwn(designerId: string) {
     return this.prisma.designAsset.findMany({
       where: { designerId },
+      include: { commercialRights: true },
       orderBy: { createdAt: "desc" },
     });
   }

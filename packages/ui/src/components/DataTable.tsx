@@ -120,9 +120,9 @@ function CardsView<T extends Record<string, any>>({
               className="flex justify-between gap-4 border-b border-surface-borderSoft py-2 last:border-b-0"
             >
               <span className="text-sm font-medium text-brand-muted">{column.header}</span>
-              <span className="text-right text-sm text-brand-ink">
+              <div className="text-right text-sm text-brand-ink">
                 {column.render ? column.render(row[column.key], row) : String(row[column.key] ?? "")}
-              </span>
+              </div>
             </div>
           ))}
         </div>

@@ -1,10 +1,37 @@
-import { Body, Controller, Get, Param, Patch, Post, UseGuards } from "@nestjs/common";
+import { Body, Controller, ForbiddenException, Get, Param, Patch, Post, UseGuards } from "@nestjs/common";
+import { UserRole } from "@prisma/client";
 import { CurrentUser, RequestUser } from "../../common/auth/current-user.decorator";
 import { JwtAuthGuard } from "../../common/auth/jwt-auth.guard";
 import { PermissionGuard } from "../../common/auth/permission.guard";
 import { RequirePermission } from "../../common/auth/permission.decorator";
+import { RbacService } from "../../common/auth/rbac.service";
+import { BulkFilmSalesAction, BulkUpdateRightsDto } from "./dto/bulk-update-rights.dto";
 import { UpdateRightsDto } from "./dto/update-rights.dto";
 import { CommercialRightsService } from "./commercial-rights.service";
+
+@Controller("designs")
+@UseGuards(JwtAuthGuard, PermissionGuard)
+export class BulkCommercialRightsController {
+  constructor(
+    private readonly service: CommercialRightsService,
+    private readonly rbac: RbacService,
+  ) {}
+
+  @Patch("commercial-rights/bulk")
+  @RequirePermission("rights:update-own")
+  update(@CurrentUser() user: RequestUser, @Body() dto: BulkUpdateRightsDto) {
+    const filmPermission =
+      dto.filmSalesAction === BulkFilmSalesAction.ENABLE
+        ? "rights:enable-film-own"
+        : dto.filmSalesAction === BulkFilmSalesAction.DISABLE
+          ? "rights:disable-film-own"
+          : null;
+    if (filmPermission && !this.rbac.getAllowedRoles(filmPermission).includes(user.role as UserRole)) {
+      throw new ForbiddenException(`Missing permission: ${filmPermission}`);
+    }
+    return this.service.updateBulk(user, dto);
+  }
+}
 
 @Controller("designs/:id")
 @UseGuards(JwtAuthGuard, PermissionGuard)

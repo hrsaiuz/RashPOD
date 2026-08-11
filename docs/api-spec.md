@@ -75,6 +75,7 @@ POST /moderation/designs/:id/suspend
 ```text
 GET   /designs/:id/commercial-rights
 PATCH /designs/:id/commercial-rights
+PATCH /designs/commercial-rights/bulk
 POST  /designs/:id/enable-film-sales
 POST  /designs/:id/disable-film-sales
 ```
@@ -83,6 +84,8 @@ Rules:
 - Only designer can enable film sales for own design.
 - Admin override requires audit log.
 - Product approval does not enable film sales automatically.
+- Bulk updates are atomic, accept at most 100 unique owned design IDs, and leave unspecified rights unchanged.
+- Bulk film enable/disable actions create the same version-bound consent history and audit records as single-design actions.
 
 ## Product Types and Templates
 ```text
